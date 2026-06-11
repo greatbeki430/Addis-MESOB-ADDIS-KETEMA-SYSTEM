@@ -3,13 +3,6 @@ import { useAuth } from "../../context/AuthContext";
 
 const registerStyles = {
   container: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "linear-gradient(135deg, #1a6b4a 0%, #2aaa78 100%)",
-  },
-  card: {
     background: "#fff",
     borderRadius: 16,
     padding: "40px",
@@ -30,9 +23,7 @@ const registerStyles = {
     textAlign: "center",
     marginBottom: 32,
   },
-  inputGroup: {
-    marginBottom: 16,
-  },
+  inputGroup: { marginBottom: 16 },
   row: {
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
@@ -82,23 +73,29 @@ const registerStyles = {
     fontSize: 12,
     marginBottom: 16,
   },
-  link: {
-    textAlign: "center",
-    marginTop: 20,
-    fontSize: 12,
-    color: "#666",
-  },
-  linkButton: {
-    background: "none",
-    border: "none",
+  success: {
+    background: "#e8f5ee",
     color: "#1a6b4a",
+    padding: "10px",
+    borderRadius: 8,
+    fontSize: 12,
+    marginBottom: 16,
+  },
+  buttonRow: { display: "flex", gap: 12, marginTop: 16 },
+  cancelButton: {
+    flex: 1,
+    padding: "12px",
+    background: "#f0f7f4",
+    color: "#666",
+    border: "1px solid #d0ddd6",
+    borderRadius: 8,
+    fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
-    fontSize: 12,
   },
 };
 
-export default function Register({ onSwitchToLogin }) {
+export default function Register({ onClose }) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -108,6 +105,7 @@ export default function Register({ onSwitchToLogin }) {
     phone: "",
   });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
 
@@ -118,6 +116,7 @@ export default function Register({ onSwitchToLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
 
     // Check if passwords match
     if (formData.password !== formData.confirmPassword) {
@@ -127,13 +126,27 @@ export default function Register({ onSwitchToLogin }) {
 
     setLoading(true);
 
-    // Remove confirmPassword before sending to API
+    // Create new object without confirmPassword
     // eslint-disable-next-line no-unused-vars
     const { confirmPassword, ...registerData } = formData;
-
     const result = await register(registerData);
 
-    if (!result.success) {
+    if (result.success) {
+      setSuccess(`User ${formData.name} created successfully!`);
+      // Reset form
+      setFormData({
+        name: "",
+        email: "",
+        password: "",
+        confirmPassword: "",
+        role: "member",
+        phone: "",
+      });
+      // Close modal after 1.5 seconds
+      setTimeout(() => {
+        if (onClose) onClose();
+      }, 1500);
+    } else {
       setError(result.error);
     }
     setLoading(false);
@@ -141,104 +154,105 @@ export default function Register({ onSwitchToLogin }) {
 
   return (
     <div style={registerStyles.container}>
-      <div style={registerStyles.card}>
-        <h1 style={registerStyles.title}>Create Account</h1>
-        <p style={registerStyles.subtitle}>Register for Addis MESOB</p>
+      <h1 style={registerStyles.title}>Create User Account</h1>
+      <p style={registerStyles.subtitle}>Add a new team member</p>
 
-        {error && <div style={registerStyles.error}>{error}</div>}
+      {error && <div style={registerStyles.error}>{error}</div>}
+      {success && <div style={registerStyles.success}>{success}</div>}
 
-        <form onSubmit={handleSubmit}>
-          <div style={registerStyles.inputGroup}>
-            <label style={registerStyles.label}>Full Name</label>
+      <form onSubmit={handleSubmit}>
+        <div style={registerStyles.inputGroup}>
+          <label style={registerStyles.label}>Full Name</label>
+          <input
+            type="text"
+            name="name"
+            style={registerStyles.input}
+            value={formData.name}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div style={registerStyles.inputGroup}>
+          <label style={registerStyles.label}>Email</label>
+          <input
+            type="email"
+            name="email"
+            style={registerStyles.input}
+            value={formData.email}
+            onChange={handleChange}
+            required
+          />
+        </div>
+
+        <div style={registerStyles.row}>
+          <div>
+            <label style={registerStyles.label}>Password</label>
             <input
-              type="text"
-              name="name"
+              type="password"
+              name="password"
               style={registerStyles.input}
-              value={formData.name}
+              value={formData.password}
               onChange={handleChange}
               required
             />
           </div>
-
-          <div style={registerStyles.inputGroup}>
-            <label style={registerStyles.label}>Email</label>
+          <div>
+            <label style={registerStyles.label}>Confirm Password</label>
             <input
-              type="email"
-              name="email"
+              type="password"
+              name="confirmPassword"
               style={registerStyles.input}
-              value={formData.email}
+              value={formData.confirmPassword}
               onChange={handleChange}
               required
             />
           </div>
+        </div>
 
-          <div style={registerStyles.row}>
-            <div>
-              <label style={registerStyles.label}>Password</label>
-              <input
-                type="password"
-                name="password"
-                style={registerStyles.input}
-                value={formData.password}
-                onChange={handleChange}
-                required
-              />
-            </div>
-            <div>
-              <label style={registerStyles.label}>Confirm Password</label>
-              <input
-                type="password"
-                name="confirmPassword"
-                style={registerStyles.input}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-              />
-            </div>
+        <div style={registerStyles.row}>
+          <div>
+            <label style={registerStyles.label}>Role</label>
+            <select
+              name="role"
+              style={registerStyles.select}
+              value={formData.role}
+              onChange={handleChange}
+            >
+              <option value="member">Member</option>
+              <option value="leader">Team Leader</option>
+              <option value="admin">Admin</option>
+            </select>
           </div>
-
-          <div style={registerStyles.row}>
-            <div>
-              <label style={registerStyles.label}>Role</label>
-              <select
-                name="role"
-                style={registerStyles.select}
-                value={formData.role}
-                onChange={handleChange}
-              >
-                <option value="member">Member</option>
-                <option value="leader">Team Leader</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            <div>
-              <label style={registerStyles.label}>Phone (Optional)</label>
-              <input
-                type="tel"
-                name="phone"
-                style={registerStyles.input}
-                value={formData.phone}
-                onChange={handleChange}
-              />
-            </div>
+          <div>
+            <label style={registerStyles.label}>Phone (Optional)</label>
+            <input
+              type="tel"
+              name="phone"
+              style={registerStyles.input}
+              value={formData.phone}
+              onChange={handleChange}
+            />
           </div>
+        </div>
 
+        <div style={registerStyles.buttonRow}>
+          <button
+            type="button"
+            style={registerStyles.cancelButton}
+            onClick={onClose}
+          >
+            Cancel
+          </button>
           <button
             type="submit"
             style={registerStyles.button}
             disabled={loading}
           >
-            {loading ? "Creating account..." : "Register"}
-          </button>
-        </form>
-
-        <div style={registerStyles.link}>
-          Already have an account?{" "}
-          <button onClick={onSwitchToLogin} style={registerStyles.linkButton}>
-            Login
+            {loading ? "Creating..." : "Create User"}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

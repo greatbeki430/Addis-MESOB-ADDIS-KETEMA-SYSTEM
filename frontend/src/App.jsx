@@ -8,12 +8,18 @@ import ForumReport from "./pages/ForumReport";
 import Evaluation from "./pages/Evaluation";
 import DailyReport from "./pages/DailyReport";
 import Services from "./pages/Services";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import Login from "./pages/auth/Login";
+import Register from "./pages/auth/Register";
 
-export default function App() {
+// This component handles the authenticated app
+function AuthenticatedApp() {
   const [tab, setTab] = useState("dashboard");
   const [lang, setLang] = useState("am");
   const [collapsed, setCollapsed] = useState(false);
   const t = translations[lang] || translations.am;
+  const { isAdmin } = useAuth();
+  const [showRegister, setShowRegister] = useState(false);
 
   return (
     <div
@@ -33,23 +39,66 @@ export default function App() {
         ::-webkit-scrollbar{width:5px;height:5px;}
         ::-webkit-scrollbar-track{background:#f0f7f4;}
         ::-webkit-scrollbar-thumb{background:#a0d4b8;border-radius:3px;}
+
+        /* Smooth scrolling for tables on mobile */
+        .daily-report-table-wrapper {
+          overflow-x: auto;
+          -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin;
+          margin: 0 -8px;
+          padding: 0 8px;
+        }
+        
+        /* Better touch targets on mobile */
+        @media (max-width: 768px) {
+          .services-search,
+          .services-filter {
+            min-height: 44px;
+          }
+          
+          .service-card {
+            cursor: pointer;
+            transition: transform 0.2s ease;
+          }
+          
+          .service-card:active {
+            transform: scale(0.98);
+            background-color: #f5f5f5;
+          }
+        }
+
+        /* Improve select dropdown on mobile */
+        @media (max-width: 480px) {
+          select {
+            font-size: 16px !important;
+          }
+        }
+
+        /* Better touch scrolling */
+        @media (max-width: 768px) {
+          .daily-report-table-wrapper {
+            margin: 0 -12px;
+            padding: 0 12px;
+          }
+          
+          input[type="number"] {
+            min-height: 32px;
+          }
+        }
         
         /* ===== Header Responsive CSS ===== */
-        /* Hide date on screens smaller than 600px */
         @media (max-width: 600px) {
           .header-date {
             display: none !important;
           }
         }
         
-        /* Hide app name on screens smaller than 480px */
         @media (max-width: 480px) {
           .header-appname {
             display: none !important;
           }
         }
         
-        /* Make language buttons smaller on very small screens */
         @media (max-width: 400px) {
           .header-lang-btn {
             padding: 2px 5px !important;
@@ -57,7 +106,6 @@ export default function App() {
           }
         }
         
-        /* Reduce header gap on mobile */
         @media (max-width: 550px) {
           header {
             gap: 6px !important;
@@ -66,26 +114,6 @@ export default function App() {
             gap: 6px !important;
           }
         }
-          /* Responsive Header CSS */
-@media (max-width: 600px) {
-  .header-date {
-    display: none !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .header-appname {
-    display: none !important;
-  }
-}
-
-@media (max-width: 400px) {
-  .header-lang-btn {
-    padding: 2px 4px !important;
-    font-size: 8px !important;
-    min-width: 22px !important;
-  }
-}
       `}</style>
 
       <Sidebar
@@ -98,7 +126,6 @@ export default function App() {
         setCollapsed={setCollapsed}
       />
 
-      {/* Right side container - fixed height for proper scrolling */}
       <div
         style={{
           flex: 1,
@@ -110,7 +137,6 @@ export default function App() {
       >
         <Header tab={tab} t={t} lang={lang} setLang={setLang} />
 
-        {/* Scrollable main content */}
         <main
           style={{
             flex: 1,
@@ -126,6 +152,95 @@ export default function App() {
           {tab === "services" && <Services t={t} />}
         </main>
       </div>
+
+      {/* Admin-only Register Modal */}
+      {isAdmin && showRegister && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => setShowRegister(false)}
+        >
+          <div onClick={(e) => e.stopPropagation()}>
+            <Register onClose={() => setShowRegister(false)} />
+          </div>
+        </div>
+      )}
+
+      {/* Admin-only Add User Button */}
+      {isAdmin && (
+        <button
+          onClick={() => setShowRegister(true)}
+          style={{
+            position: "fixed",
+            bottom: 20,
+            right: 20,
+            background: C.primary,
+            color: "#fff",
+            border: "none",
+            borderRadius: "50%",
+            width: 56,
+            height: 56,
+            fontSize: 24,
+            cursor: "pointer",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 100,
+          }}
+        >
+          +
+        </button>
+      )}
     </div>
+  );
+}
+
+// This component handles authentication state
+function AppRouter() {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: C.gray,
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 24, marginBottom: 10 }}>⏳</div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Login />;
+  }
+
+  return <AuthenticatedApp />;
+}
+
+// Main App component with AuthProvider
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRouter />
+    </AuthProvider>
   );
 }

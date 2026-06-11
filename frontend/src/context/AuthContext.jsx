@@ -1,4 +1,10 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
 import { authAPI } from "../services/api";
 
 const AuthContext = createContext();
@@ -11,39 +17,46 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem("token"));
 
-  // Load user on mount if token exists
+  // ✅ No separate loadUser function - logic directly in useEffect
   useEffect(() => {
-    if (token) {
-      // eslint-disable-next-line react-hooks/immutability
-      loadUser();
-    } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(false);
-    }
-  }, [token]);
+    let isMounted = true;
 
-  const loadUser = async () => {
-    try {
-      const response = await authAPI.getMe();
-      setUser(response.data);
-    } catch (error) {
-      console.error("Failed to load user:", error);
-      localStorage.removeItem("token");
-      setToken(null);
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  };
+    const initAuth = async () => {
+      if (!token) {
+        if (isMounted) setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await authAPI.getMe();
+        if (isMounted) {
+          setUser(response.data);
+        }
+      } catch (error) {
+        console.error("Failed to load user:", error);
+        if (isMounted) {
+          localStorage.removeItem("token");
+          setToken(null);
+          setUser(null);
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    initAuth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
 
   const register = async (userData) => {
     try {
       const response = await authAPI.register(userData);
-      const { token: newToken, ...userInfo } = response.data;
-      localStorage.setItem("token", newToken);
-      setToken(newToken);
-      setUser(userInfo);
-      return { success: true, data: userInfo };
+      return { success: true, data: response.data };
     } catch (error) {
       return {
         success: false,
@@ -68,16 +81,20 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem("token");
     setToken(null);
     setUser(null);
-  };
+    setLoading(false);
+  }, []);
+
+  const isAdmin = user?.role === "admin";
 
   const value = {
     user,
     loading,
     isAuthenticated: !!user,
+    isAdmin,
     register,
     login,
     logout,

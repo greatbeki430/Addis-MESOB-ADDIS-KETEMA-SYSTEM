@@ -2,9 +2,12 @@ import { C, F, card } from "../styles/theme";
 import StatCard from "../components/ui/StatCard";
 import { CRITERIA } from "../constants/criteria";
 import { SAMPLE_DATA } from "../constants/sampleData";
+import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard({ t }) {
   const td = t.dashboard;
+  const { user } = useAuth(); // Get user from auth context
+
   const total = SAMPLE_DATA.reduce((a, r) => a + r.total, 0);
   const males = SAMPLE_DATA.reduce((a, r) => a + r.male, 0);
   const females = SAMPLE_DATA.reduce((a, r) => a + r.female, 0);
@@ -14,43 +17,159 @@ export default function Dashboard({ t }) {
   }, {});
   const maxD = Math.max(...Object.values(depts));
 
+  // Get time-based greeting
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "🌅 Good morning";
+    if (hour < 18) return "☀️ Good afternoon";
+    return "🌙 Good evening";
+  };
+
+  // Get role badge styling
+  const getRoleBadge = (role) => {
+    switch (role) {
+      case "admin":
+        return { bg: "#dc2626", color: "#fff", label: "Admin", icon: "👑" };
+      case "leader":
+        return {
+          bg: "#1a6b4a",
+          color: "#fff",
+          label: "Team Leader",
+          icon: "⭐",
+        };
+      default:
+        return { bg: "#e8f5ee", color: "#1a6b4a", label: "Member", icon: "👤" };
+    }
+  };
+
+  const roleBadge = getRoleBadge(user?.role);
+  const greeting = getGreeting();
+  const userName = user?.name?.split(" ")[0] || "User"; // Get first name only
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (!user?.name) return "U";
+    return user.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
   return (
     <div style={{ width: "100%", padding: "20px" }}>
-      {/* Header */}
+      {/* Welcome Section - Personalized */}
       <div
         style={{
-          display: "flex",
-          flexWrap: "wrap",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 14,
+          background: `linear-gradient(135deg, ${C.primary}08, ${C.light}08)`,
+          borderRadius: 16,
+          padding: "clamp(16px, 4vw, 24px)",
           marginBottom: 24,
+          border: `1px solid ${C.border}`,
         }}
       >
-        <h1
+        <div
           style={{
-            fontSize: "clamp(20px, 5vw, 26px)",
-            fontWeight: 900,
-            color: C.dark,
-            fontFamily: F.serif,
-            margin: 0,
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 16,
           }}
         >
-          {td.title}
-        </h1>
-        <span
-          style={{
-            background: C.primary,
-            color: "#fff",
-            padding: "3px 12px",
-            borderRadius: 20,
-            fontSize: 11,
-            fontWeight: 700,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {t.year}
-        </span>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            {/* User Avatar */}
+            <div
+              style={{
+                width: "clamp(50px, 10vw, 64px)",
+                height: "clamp(50px, 10vw, 64px)",
+                background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "clamp(20px, 5vw, 28px)",
+                fontWeight: 900,
+                color: "#fff",
+                boxShadow: `0 4px 12px ${C.primary}44`,
+              }}
+            >
+              {getUserInitials()}
+            </div>
+
+            <div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: "clamp(18px, 5vw, 24px)",
+                    fontWeight: 800,
+                    color: C.dark,
+                    fontFamily: F.serif,
+                    margin: 0,
+                  }}
+                >
+                  {greeting}, {userName}!
+                </h2>
+                <span
+                  style={{
+                    background: roleBadge.bg,
+                    color: roleBadge.color,
+                    padding: "4px 12px",
+                    borderRadius: 20,
+                    fontSize: "clamp(10px, 3vw, 12px)",
+                    fontWeight: 700,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <span>{roleBadge.icon}</span>
+                  {roleBadge.label}
+                </span>
+              </div>
+              <p
+                style={{
+                  color: C.muted,
+                  fontSize: "clamp(11px, 3vw, 13px)",
+                  marginTop: 6,
+                  fontFamily: F.sans,
+                }}
+              >
+                {user?.email} • Last login: {new Date().toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+
+          {/* Year Badge */}
+          <span
+            style={{
+              background: C.primary,
+              color: "#fff",
+              padding: "3px 12px",
+              borderRadius: 20,
+              fontSize: 11,
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {t.year}
+          </span>
+        </div>
       </div>
 
       {/* Stat Cards - Fully Responsive to container width */}

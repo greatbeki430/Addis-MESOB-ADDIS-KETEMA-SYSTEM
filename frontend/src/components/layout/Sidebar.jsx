@@ -24,7 +24,7 @@ export default function Sidebar({
   return (
     <aside
       style={{
-        width: collapsed ? 56 : 180,
+        width: collapsed ? 56 : 160,
         minHeight: "100vh",
         background: C.dark,
         display: "flex",
