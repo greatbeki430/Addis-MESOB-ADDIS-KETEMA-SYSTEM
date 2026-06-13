@@ -17,9 +17,18 @@ function AuthenticatedApp() {
   const [tab, setTab] = useState("dashboard");
   const [lang, setLang] = useState("am");
   const [collapsed, setCollapsed] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState(null); // ✅ New state for selected team
   const t = translations[lang] || translations.am;
   const { isAdmin } = useAuth();
   const [showRegister, setShowRegister] = useState(false);
+
+  // Handle forum tab - reset selected team when not on forum
+  const handleSetTab = (newTab) => {
+    setTab(newTab);
+    if (newTab !== "forum") {
+      setSelectedTeam(null); // Clear selected team when leaving forum
+    }
+  };
 
   return (
     <div
@@ -118,12 +127,14 @@ function AuthenticatedApp() {
 
       <Sidebar
         tab={tab}
-        setTab={setTab}
+        setTab={handleSetTab}
         lang={lang}
         setLang={setLang}
         t={t}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
+        selectedTeam={selectedTeam}
+        setSelectedTeam={setSelectedTeam}
       />
 
       <div
@@ -146,7 +157,17 @@ function AuthenticatedApp() {
           }}
         >
           {tab === "dashboard" && <Dashboard t={t} />}
-          {tab === "forum" && <ForumReport t={t} />}
+          {tab === "forum" && (
+            <ForumReport
+              t={t}
+              lang={lang}
+              selectedTeam={selectedTeam}
+              onReportSaved={(teamId, reportData) => {
+                // Optional: Handle report save if needed
+                console.log("Report saved for team:", teamId, reportData);
+              }}
+            />
+          )}
           {tab === "evaluation" && <Evaluation t={t} />}
           {tab === "report" && <DailyReport t={t} />}
           {tab === "services" && <Services t={t} />}

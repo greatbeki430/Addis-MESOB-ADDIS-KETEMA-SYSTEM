@@ -57,6 +57,21 @@ export const translations = {
       newReport: "New Report ➤",
       saved: "Report Saved!",
       savedSub: "Peer Forum report completed successfully.",
+      // NEW KEYS FOR TEAM FUNCTIONALITY
+      teamsTitle: "Forum Reports by Team",
+      addTeam: "Add Team",
+      selectTeamToReport: "Select a team to create or view their forum report",
+      noTeamsYet:
+        "No teams created yet. Click the button below to add your first team.",
+      createFirstTeam: "Create First Team",
+      openReport: "Open Report",
+      backToTeams: "Back to Teams",
+      addNewTeam: "Add New Team",
+      teamName: "Team Name",
+      teamDescription: "Team Description",
+      teamLeader: "Team Leader",
+      createTeam: "Create Team",
+      selectTeamPrompt: "Select a team from the sidebar to start a report",
     },
     evaluation: {
       title: "Peer Forum Evaluation",
@@ -111,6 +126,9 @@ export const translations = {
       "Problems encountered",
       "How they were resolved",
     ],
+    common: {
+      cancel: "Cancel",
+    },
   },
   am: {
     appName: "አዲስ መሶብ",
@@ -167,6 +185,20 @@ export const translations = {
       newReport: "አዲስ ሪፖርት ➤",
       saved: "ሪፖርቱ ተሞልቷል!",
       savedSub: "የአቻ ፎረም ሪፖርት በተሳካ ሁኔታ ተጠናቋል።",
+      // NEW KEYS FOR TEAM FUNCTIONALITY (AMHARIC)
+      teamsTitle: "በቡድን የአቻ ፎረም ሪፖርቶች",
+      addTeam: "+ ቡድን ጨምር",
+      selectTeamToReport: "ሪፖርት ለመሙላት ቡድን ይምረጡ",
+      noTeamsYet: "እስካሁን ምንም ቡድን አልተፈጠረም። አዲስ ቡድን ለመፍጠር ቁልፉን ይጫኑ።",
+      createFirstTeam: "የመጀመሪያ ቡድን ፍጠር",
+      openReport: "ሪፖርት ክፈት",
+      backToTeams: "ወደ ቡድኖች ተመለስ",
+      addNewTeam: "አዲስ ቡድን ጨምር",
+      teamName: "የቡድን ስም",
+      teamDescription: "የቡድን መግለጫ",
+      teamLeader: "የቡድን መሪ",
+      createTeam: "ቡድን ፍጠር",
+      selectTeamPrompt: "ሪፖርት ለመጀመር ከጎን ባር ላይ ቡድን ይምረጡ",
     },
     evaluation: {
       title: "የአቻ ፎረም ምዘና",
@@ -221,6 +253,9 @@ export const translations = {
       "ያጋጠሙ ችግሮች",
       "የተፈታበት አግባብ",
     ],
+    common: {
+      cancel: "ሰርዝ",
+    },
   },
   or: {
     appName: "A-Mesob",
@@ -278,6 +313,21 @@ export const translations = {
       newReport: "Gabaasa Haaraa ➤",
       saved: "Gabaasni Ol Kaa'ame!",
       savedSub: "Gabaasni Foramii milkaa'inaan xumurameera.",
+      // NEW KEYS FOR TEAM FUNCTIONALITY (OROMO)
+      teamsTitle: "Gabaasaalee Foramii Gareen",
+      addTeam: "+ Garee Dabali",
+      selectTeamToReport: "Gabaasa guutuf garee filadhu",
+      noTeamsYet:
+        "Gareen tokko illee hin uumamne. Garee haaraa uumuuf bantii gaditti cuqaasi.",
+      createFirstTeam: "Garee Jalqabaa Uumi",
+      openReport: "Gabaasa Bani",
+      backToTeams: "Gareewwanitti Deebi'i",
+      addNewTeam: "Garee Haaraa Dabali",
+      teamName: "Maqaa Garee",
+      teamDescription: "Ibsa Garee",
+      teamLeader: "Hoggantuu Garee",
+      createTeam: "Garee Uumi",
+      selectTeamPrompt: "Gabaasa eegaluuf sidebar irraa garee filadhu",
     },
     evaluation: {
       title: "Madaallii Foramii",
@@ -332,6 +382,9 @@ export const translations = {
       "Rakkoolee muudatan",
       "Akkamitti furamuu",
     ],
+    common: {
+      cancel: "Haqi",
+    },
   },
 };
 

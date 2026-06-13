@@ -1,8 +1,11 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 // ════════════════════════════════════════════════════════════
 // components/layout/Sidebar
 // ════════════════════════════════════════════════════════════
+import { useState, useEffect } from "react";
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
+import { ArrowDown01Icon } from "hugeicons-react";
 
 const NAV = [
   { id: "dashboard", icon: "⬢" },
@@ -20,11 +23,86 @@ export default function Sidebar({
   t,
   collapsed,
   setCollapsed,
+  selectedTeam,
+  setSelectedTeam,
 }) {
+  const [forumExpanded, setForumExpanded] = useState(false);
+  const [teams, setTeams] = useState([]);
+  const [showAddTeamModal, setShowAddTeamModal] = useState(false);
+  const [newTeamName, setNewTeamName] = useState("");
+
+  // Load teams from localStorage
+  useEffect(() => {
+    const savedTeams = localStorage.getItem("forumTeams");
+    if (savedTeams) {
+      setTeams(JSON.parse(savedTeams));
+    } else {
+      // Sample teams
+      setTeams([
+        {
+          id: 1,
+          name: "Customer Service Team",
+          description: "Frontline customer support",
+          leader: "Selam Tesfaye",
+          members: ["Abebe", "Bekele", "Chaltu"],
+          lastReport: "2024-03-15",
+          reports: [],
+        },
+        {
+          id: 2,
+          name: "Technical Support Team",
+          description: "IT and technical assistance",
+          leader: "Dawit Mekonnen",
+          members: ["Eden", "Fikru", "Genet"],
+          lastReport: "2024-03-10",
+          reports: [],
+        },
+        {
+          id: 3,
+          name: "Administration Team",
+          description: "Office administration",
+          leader: "Helen Assefa",
+          members: ["Lemma", "Meron", "Nati"],
+          lastReport: "2024-03-12",
+          reports: [],
+        },
+      ]);
+    }
+  }, []);
+
+  // Save teams to localStorage
+  useEffect(() => {
+    if (teams.length > 0) {
+      localStorage.setItem("forumTeams", JSON.stringify(teams));
+    }
+  }, [teams]);
+
+  const handleTeamClick = (team) => {
+    setSelectedTeam(team);
+    setTab("forum");
+  };
+
+  const handleAddTeam = () => {
+    if (newTeamName.trim()) {
+      const newTeam = {
+        id: Date.now(),
+        name: newTeamName,
+        description: "",
+        leader: "",
+        members: [],
+        lastReport: "No reports yet",
+        reports: [],
+      };
+      setTeams([...teams, newTeam]);
+      setNewTeamName("");
+      setShowAddTeamModal(false);
+    }
+  };
+
   return (
     <aside
       style={{
-        width: collapsed ? 56 : 160,
+        width: collapsed ? 56 : window.innerWidth >= 768 ? 200 : 160, // ← Desktop: 200px, Mobile: 160px
         minHeight: "100vh",
         background: C.dark,
         display: "flex",
@@ -35,7 +113,7 @@ export default function Sidebar({
         zIndex: 50,
       }}
     >
-      {/* Collapse Toggle - NOW AT TOP */}
+      {/* Collapse Toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
         style={{
@@ -125,41 +203,146 @@ export default function Sidebar({
       {/* Nav items */}
       <nav style={{ flex: 1, padding: "4px 0" }}>
         {NAV.map((n) => {
-          const active = tab === n.id;
+          const active = tab === n.id && !(n.id === "forum" && selectedTeam);
+          const isForum = n.id === "forum";
+
           return (
-            <button
-              key={n.id}
-              onClick={() => setTab(n.id)}
-              title={t.nav[n.id]}
-              style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                gap: collapsed ? 0 : 10,
-                justifyContent: collapsed ? "center" : "flex-start",
-                padding: collapsed ? "10px 0" : "8px 12px",
-                background: active ? "#1a6b4a22" : "none",
-                border: "none",
-                borderLeft: active
-                  ? `3px solid ${C.light}`
-                  : "3px solid transparent",
-                color: active ? C.light : "#7a9a88",
-                cursor: "pointer",
-                fontSize: 12,
-                fontWeight: active ? 700 : 500,
-                fontFamily: F.sans,
-                transition: "all .18s",
-                marginBottom: 1,
-              }}
-            >
-              <span style={{ fontSize: 16 }}>{n.icon}</span>
-              {!collapsed && <span>{t.nav[n.id]}</span>}
-            </button>
+            <div key={n.id}>
+              <button
+                onClick={() => {
+                  if (isForum) {
+                    setForumExpanded(!forumExpanded);
+                    setSelectedTeam(null);
+                    setTab("forum");
+                  } else {
+                    setTab(n.id);
+                    setSelectedTeam(null);
+                    setForumExpanded(false);
+                  }
+                }}
+                title={t.nav[n.id]}
+                style={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: collapsed ? 0 : 10,
+                  justifyContent: collapsed ? "center" : "space-between",
+                  padding: collapsed ? "10px 0" : "8px 12px",
+                  background: active ? "#1a6b4a22" : "none",
+                  border: "none",
+                  borderLeft: active
+                    ? `3px solid ${C.light}`
+                    : "3px solid transparent",
+                  color: active ? C.light : "#7a9a88",
+                  cursor: "pointer",
+                  fontSize: 14,
+                  fontWeight: active ? 700 : 500,
+                  fontFamily: F.sans,
+                  transition: "all .18s",
+                  marginBottom: 1,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: collapsed ? 0 : 10,
+                  }}
+                >
+                  <span style={{ fontSize: 16 }}>{n.icon}</span>
+                  {!collapsed && <span>{t.nav[n.id]}</span>}
+                </div>
+                {isForum && !collapsed && (
+                  <ArrowDown01Icon
+                    size={12}
+                    style={{
+                      transform: forumExpanded
+                        ? "rotate(0deg)"
+                        : "rotate(-90deg)",
+                      transition: "transform 0.2s ease",
+                      color: "#4a7a5a",
+                    }}
+                  />
+                )}
+              </button>
+
+              {/* Team list under Forum */}
+              {isForum && forumExpanded && !collapsed && (
+                <div style={{ paddingLeft: 28, marginTop: 4, marginBottom: 8 }}>
+                  {teams.map((team) => (
+                    <button
+                      key={team.id}
+                      onClick={() => handleTeamClick(team)}
+                      style={{
+                        width: "100%",
+                        textAlign: "left",
+                        padding: "6px 8px",
+                        margin: "2px 0",
+                        background:
+                          selectedTeam?.id === team.id ? "#1a6b4a22" : "none",
+                        border: "none",
+                        borderRadius: 4,
+                        color:
+                          selectedTeam?.id === team.id ? C.light : "#7a9a88",
+                        cursor: "pointer",
+                        fontSize: 10,
+                        fontFamily: F.sans,
+                        transition: "all 0.15s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#1a6b4a22";
+                      }}
+                      onMouseLeave={(e) => {
+                        if (selectedTeam?.id !== team.id) {
+                          e.currentTarget.style.background = "none";
+                        }
+                      }}
+                    >
+                      {team.name.length > 12
+                        ? team.name.substring(0, 10) + "..."
+                        : team.name}
+                    </button>
+                  ))}
+
+                  {/* Add Team button */}
+                  <button
+                    onClick={() => setShowAddTeamModal(true)}
+                    style={{
+                      width: "100%",
+                      textAlign: "left",
+                      padding: "6px 8px",
+                      marginTop: 4,
+                      background: "none",
+                      border: "none",
+                      borderRadius: 4,
+                      color: "#4a7a5a",
+                      cursor: "pointer",
+                      fontSize: 10,
+                      fontFamily: F.sans,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#1a3a26";
+                      e.currentTarget.style.color = C.light;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "none";
+                      e.currentTarget.style.color = "#4a7a5a";
+                    }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: "bold" }}>+</span>{" "}
+                    Add Team
+                  </button>
+                </div>
+              )}
+            </div>
           );
         })}
       </nav>
 
-      {/* Language switcher - Now at bottom */}
+      {/* Language switcher */}
       <div
         style={{
           borderTop: "1px solid #1a3a26",
@@ -213,6 +396,80 @@ export default function Sidebar({
           ))}
         </div>
       </div>
+
+      {/* Add Team Modal */}
+      {showAddTeamModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+          onClick={() => setShowAddTeamModal(false)}
+        >
+          <div
+            style={{
+              background: C.white,
+              borderRadius: 12,
+              padding: 20,
+              width: 300,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: 16, color: C.dark }}>Add New Team</h3>
+            <input
+              type="text"
+              placeholder="Team Name"
+              value={newTeamName}
+              onChange={(e) => setNewTeamName(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px 12px",
+                border: `1px solid ${C.border}`,
+                borderRadius: 6,
+                marginBottom: 16,
+              }}
+              onKeyPress={(e) => e.key === "Enter" && handleAddTeam()}
+            />
+            <div
+              style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
+            >
+              <button
+                onClick={() => setShowAddTeamModal(false)}
+                style={{
+                  padding: "6px 12px",
+                  background: "#e5e7eb",
+                  border: "none",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddTeam}
+                style={{
+                  padding: "6px 12px",
+                  background: C.primary,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                }}
+              >
+                Add Team
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

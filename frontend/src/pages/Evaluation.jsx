@@ -78,23 +78,83 @@ export default function Evaluation({ t }) {
   const lowestScore = sortedMembers[sortedMembers.length - 1]?.total || 0;
   const bestPerformer = sortedMembers[0]?.name || "—";
 
-  // ✅ Keyboard navigation: Next (Enter/ArrowDown) and Back (ArrowUp)
-  const handleKeyDown = (e, currentId) => {
+  // ✅ Keyboard navigation: Visual order (top-to-bottom, left-to-right) with wrapping
+  const handleKeyDown = (e, cId, itemIdx, member) => {
+    const allMembers = members.filter((m) => m.trim() !== "");
+    const currentMemberIndex = allMembers.indexOf(member);
+
+    // Next: Enter or ArrowDown
     if (e.key === "Enter" || e.key === "ArrowDown") {
       e.preventDefault();
-      const ids = Object.keys(inputRefs.current).sort();
-      const currentIndex = ids.indexOf(currentId);
-      if (currentIndex < ids.length - 1) {
-        inputRefs.current[ids[currentIndex + 1]]?.focus();
+
+      let nextCriterionId = cId;
+      let nextItemIdx = itemIdx;
+      let nextMemberIndex = currentMemberIndex + 1;
+
+      // If last member, move to next item (row) in same criterion
+      if (nextMemberIndex >= allMembers.length) {
+        nextMemberIndex = 0;
+        nextItemIdx = itemIdx + 1;
+
+        // If last item, move to first item of next criterion
+        if (nextItemIdx >= CRITERIA[cId - 1].items.length) {
+          nextItemIdx = 0;
+          nextCriterionId = cId + 1;
+
+          // If last criterion, wrap to first criterion
+          if (nextCriterionId > CRITERIA.length) {
+            nextCriterionId = 1;
+          }
+        }
+      }
+
+      const nextMember = allMembers[nextMemberIndex];
+      if (nextMember) {
+        const nextInputId = getInputId(
+          nextCriterionId,
+          nextItemIdx,
+          nextMember,
+        );
+        inputRefs.current[nextInputId]?.focus();
       }
     }
 
+    // Previous: ArrowUp
     if (e.key === "ArrowUp") {
       e.preventDefault();
-      const ids = Object.keys(inputRefs.current).sort();
-      const currentIndex = ids.indexOf(currentId);
-      if (currentIndex > 0) {
-        inputRefs.current[ids[currentIndex - 1]]?.focus();
+
+      let prevCriterionId = cId;
+      let prevItemIdx = itemIdx;
+      let prevMemberIndex = currentMemberIndex - 1;
+
+      // If first member, move to previous item (row) in same criterion
+      if (prevMemberIndex < 0) {
+        prevMemberIndex = allMembers.length - 1;
+        prevItemIdx = itemIdx - 1;
+
+        // If first item, move to last item of previous criterion
+        if (prevItemIdx < 0) {
+          const prevCriterion = CRITERIA[cId - 2];
+          if (prevCriterion) {
+            prevItemIdx = prevCriterion.items.length - 1;
+            prevCriterionId = cId - 1;
+          } else {
+            // If first criterion, wrap to last criterion
+            const lastCriterion = CRITERIA[CRITERIA.length - 1];
+            prevItemIdx = lastCriterion.items.length - 1;
+            prevCriterionId = CRITERIA.length;
+          }
+        }
+      }
+
+      const prevMember = allMembers[prevMemberIndex];
+      if (prevMember) {
+        const prevInputId = getInputId(
+          prevCriterionId,
+          prevItemIdx,
+          prevMember,
+        );
+        inputRefs.current[prevInputId]?.focus();
       }
     }
   };
@@ -438,7 +498,7 @@ export default function Evaluation({ t }) {
                               onChange={(e) =>
                                 setScore(c.id, idx, m, e.target.value)
                               }
-                              onKeyDown={(e) => handleKeyDown(e, inputId)}
+                              onKeyDown={(e) => handleKeyDown(e, c.id, idx, m)}
                             />
                           </td>
                         );

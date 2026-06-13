@@ -1,3 +1,6 @@
+// ════════════════════════════════════════════════════════════
+// pages/ForumReport - Shows report form for selected team
+// ════════════════════════════════════════════════════════════
 import { useState } from "react";
 // eslint-disable-next-line no-unused-vars
 import { btn, card, C, F, inp } from "../styles/theme";
@@ -44,7 +47,6 @@ function DynamicFieldGroup({
             )}
           </div>
 
-          {/* Remove button - shows only "-", text on hover */}
           {values.length > 1 && (
             <button
               onClick={() => onRemove(idx)}
@@ -61,7 +63,6 @@ function DynamicFieldGroup({
                 alignItems: "center",
                 justifyContent: "center",
                 transition: "all 0.2s",
-                position: "relative",
               }}
               title="Remove this item"
               onMouseEnter={(e) => {
@@ -69,7 +70,6 @@ function DynamicFieldGroup({
                 e.currentTarget.style.width = "auto";
                 e.currentTarget.style.padding = "0 12px";
                 e.currentTarget.style.gap = "6px";
-                // Add text on hover
                 const span = e.currentTarget.querySelector(".button-text");
                 if (span) span.style.display = "inline";
               }}
@@ -78,7 +78,6 @@ function DynamicFieldGroup({
                 e.currentTarget.style.width = "32px";
                 e.currentTarget.style.padding = "0";
                 e.currentTarget.style.gap = "0";
-                // Hide text on leave
                 const span = e.currentTarget.querySelector(".button-text");
                 if (span) span.style.display = "none";
               }}
@@ -95,7 +94,6 @@ function DynamicFieldGroup({
         </div>
       ))}
 
-      {/* Add button - shows only "+", text on hover */}
       <button
         onClick={onAdd}
         style={{
@@ -116,13 +114,11 @@ function DynamicFieldGroup({
         title={`Add new ${title.toLowerCase()}`}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = "#059669";
-          // Show text on hover
           const span = e.currentTarget.querySelector(".button-text");
           if (span) span.style.display = "inline";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "#10b981";
-          // Hide text on leave
           const span = e.currentTarget.querySelector(".button-text");
           if (span) span.style.display = "none";
         }}
@@ -139,10 +135,10 @@ function DynamicFieldGroup({
   );
 }
 
-export default function ForumReport({ t, lang }) {
+export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
   const tf = t.forum;
   const [form, setForm] = useState({
-    date: "",
+    date: new Date().toISOString().split("T")[0],
     timeStart: "",
     timeEnd: "",
     present: [""],
@@ -194,7 +190,21 @@ export default function ForumReport({ t, lang }) {
     });
   };
 
-  if (submitted)
+  const handleSaveReport = () => {
+    // Save report logic here
+    if (onReportSaved) {
+      onReportSaved(selectedTeam.id, form);
+    }
+    setSubmitted(true);
+  };
+
+  const g3Responsive = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
+    gap: "clamp(10px, 3vw, 16px)",
+  };
+
+  if (submitted) {
     return (
       <div style={{ maxWidth: 600, margin: "60px auto", padding: "0 20px" }}>
         <div
@@ -249,12 +259,35 @@ export default function ForumReport({ t, lang }) {
         </div>
       </div>
     );
+  }
 
-  const g3Responsive = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
-    gap: "clamp(10px, 3vw, 16px)",
-  };
+  if (!selectedTeam) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "60vh",
+          color: C.muted,
+          fontFamily: F.sans,
+          textAlign: "center",
+          padding: "20px",
+        }}
+      >
+        <div>
+          <p style={{ fontSize: "clamp(14px, 4vw, 18px)", marginBottom: 12 }}>
+            📋{" "}
+            {tf.selectTeamPrompt ||
+              "Select a team from the sidebar to start a report"}
+          </p>
+          <p style={{ fontSize: "clamp(12px, 3vw, 14px)" }}>
+            👈 Click on "Peer Forum" in the sidebar, then choose a team
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -284,7 +317,7 @@ export default function ForumReport({ t, lang }) {
             margin: 0,
           }}
         >
-          {tf.title}
+          {tf.title} - {selectedTeam.name}
         </h1>
         <span
           style={{
@@ -321,7 +354,6 @@ export default function ForumReport({ t, lang }) {
           boxShadow: "0 2px 16px #0003",
         }}
       >
-        {/* Meeting Time Section */}
         <Section title={tf.meetingTime}>
           <div style={g3Responsive}>
             <Field
@@ -345,7 +377,6 @@ export default function ForumReport({ t, lang }) {
           </div>
         </Section>
 
-        {/* Present Members */}
         <DynamicFieldGroup
           title={tf.presentMembers}
           values={form.present}
@@ -370,7 +401,6 @@ export default function ForumReport({ t, lang }) {
           )}
         />
 
-        {/* Absent Members - Horizontal layout with remove button aligned */}
         <Section title={tf.absentMembers}>
           {form.absent.map((item, idx) => (
             <div
@@ -393,8 +423,6 @@ export default function ForumReport({ t, lang }) {
               >
                 {tf.absentMemberLabel || "Absent Member"} #{idx + 1}
               </div>
-
-              {/* Horizontal layout on mobile and desktop */}
               <div
                 style={{
                   display: "flex",
@@ -402,18 +430,9 @@ export default function ForumReport({ t, lang }) {
                   flexWrap: "wrap",
                   gap: "clamp(10px, 3vw, 12px)",
                   alignItems: "flex-start",
-                  padding: "0 clamp(4px, 2vw,8px)",
                 }}
               >
-                {/* Name Field */}
-                <div
-                  style={{
-                    flex: "2",
-                    minWidth: "120px",
-                    maxWidth: "100%",
-                    overflow: "hidden",
-                  }}
-                >
+                <div style={{ flex: "2", minWidth: "120px" }}>
                   <Field
                     label={`${idx + 1} ${tf.name}`}
                     value={item.name}
@@ -421,16 +440,7 @@ export default function ForumReport({ t, lang }) {
                     placeholder="Name"
                   />
                 </div>
-
-                {/* Reason Field */}
-                <div
-                  style={{
-                    flex: "3",
-                    minWidth: "120px",
-                    maxWidth: "100%",
-                    overflow: "hidden",
-                  }}
-                >
+                <div style={{ flex: "3", minWidth: "120px" }}>
                   <Field
                     label={tf.reason}
                     value={item.reason}
@@ -438,8 +448,6 @@ export default function ForumReport({ t, lang }) {
                     placeholder="Reason for absence"
                   />
                 </div>
-
-                {/* Remove Button - horizontally aligned with fields */}
                 {form.absent.length > 1 && (
                   <button
                     onClick={() => removeAbsent(idx)}
@@ -452,47 +460,16 @@ export default function ForumReport({ t, lang }) {
                       height: "32px",
                       fontSize: "18px",
                       cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      marginTop: "28px", // Aligns with Field labels
+                      marginTop: "28px",
                       flexShrink: 0,
-                      transition: "all 0.2s",
-                    }}
-                    title="Remove this absent member"
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#b91c1c";
-                      e.currentTarget.style.width = "auto";
-                      e.currentTarget.style.padding = "0 12px";
-                      e.currentTarget.style.gap = "6px";
-                      const span =
-                        e.currentTarget.querySelector(".remove-text");
-                      if (span) span.style.display = "inline";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "#dc2626";
-                      e.currentTarget.style.width = "32px";
-                      e.currentTarget.style.padding = "0";
-                      e.currentTarget.style.gap = "0";
-                      const span =
-                        e.currentTarget.querySelector(".remove-text");
-                      if (span) span.style.display = "none";
                     }}
                   >
-                    <span style={{ fontSize: "16px" }}>−</span>
-                    <span
-                      className="remove-text"
-                      style={{ display: "none", fontSize: "12px" }}
-                    >
-                      Remove
-                    </span>
+                    −
                   </button>
                 )}
               </div>
             </div>
           ))}
-
-          {/* Add Button - only "+", text on hover */}
           <button
             onClick={addAbsent}
             style={{
@@ -508,27 +485,9 @@ export default function ForumReport({ t, lang }) {
               alignItems: "center",
               gap: "6px",
               marginTop: "clamp(8px, 3vw, 12px)",
-              transition: "all 0.2s",
-            }}
-            title="Add absent member"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#059669";
-              const span = e.currentTarget.querySelector(".add-text");
-              if (span) span.style.display = "inline";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#10b981";
-              const span = e.currentTarget.querySelector(".add-text");
-              if (span) span.style.display = "none";
             }}
           >
-            <span style={{ fontSize: "16px", fontWeight: "bold" }}>+</span>
-            <span
-              className="add-text"
-              style={{ display: "none", fontSize: "12px" }}
-            >
-              Add
-            </span>
+            <span>+</span> Add
           </button>
         </Section>
 
@@ -560,7 +519,6 @@ export default function ForumReport({ t, lang }) {
           placeholderPrefix="Topic"
         />
 
-        {/* Explanation */}
         <Section title={tf.explanation}>
           <textarea
             style={{
@@ -576,7 +534,6 @@ export default function ForumReport({ t, lang }) {
           />
         </Section>
 
-        {/* Gaps */}
         <DynamicFieldGroup
           title={tf.gaps}
           values={form.gaps}
@@ -591,7 +548,6 @@ export default function ForumReport({ t, lang }) {
           placeholderPrefix="Gap"
         />
 
-        {/* Agreements */}
         <DynamicFieldGroup
           title={tf.agreements}
           values={form.agreements}
@@ -606,7 +562,6 @@ export default function ForumReport({ t, lang }) {
           placeholderPrefix="Agreement"
         />
 
-        {/* Signatures */}
         <Section title={tf.signatures}>
           {form.signatures.map((sig, idx) => (
             <div
@@ -643,38 +598,9 @@ export default function ForumReport({ t, lang }) {
                     height: "32px",
                     fontSize: "18px",
                     cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    transition: "all 0.2s",
-                  }}
-                  title="Remove signature line"
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#b91c1c";
-                    e.currentTarget.style.width = "auto";
-                    e.currentTarget.style.padding = "0 12px";
-                    e.currentTarget.style.gap = "6px";
-                    const span =
-                      e.currentTarget.querySelector(".sig-remove-text");
-                    if (span) span.style.display = "inline";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#dc2626";
-                    e.currentTarget.style.width = "32px";
-                    e.currentTarget.style.padding = "0";
-                    e.currentTarget.style.gap = "0";
-                    const span =
-                      e.currentTarget.querySelector(".sig-remove-text");
-                    if (span) span.style.display = "none";
                   }}
                 >
-                  <span style={{ fontSize: "16px" }}>−</span>
-                  <span
-                    className="sig-remove-text"
-                    style={{ display: "none", fontSize: "12px" }}
-                  >
-                    Remove
-                  </span>
+                  −
                 </button>
               )}
             </div>
@@ -694,31 +620,12 @@ export default function ForumReport({ t, lang }) {
               alignItems: "center",
               gap: "6px",
               marginTop: "8px",
-              transition: "all 0.2s",
-            }}
-            title="Add signature line"
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#059669";
-              const span = e.currentTarget.querySelector(".sig-add-text");
-              if (span) span.style.display = "inline";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#10b981";
-              const span = e.currentTarget.querySelector(".sig-add-text");
-              if (span) span.style.display = "none";
             }}
           >
-            <span style={{ fontSize: "16px", fontWeight: "bold" }}>+</span>
-            <span
-              className="sig-add-text"
-              style={{ display: "none", fontSize: "12px" }}
-            >
-              Add
-            </span>
+            <span>+</span> Add
           </button>
         </Section>
 
-        {/* Action Buttons */}
         <div
           style={{
             textAlign: "center",
@@ -741,11 +648,13 @@ export default function ForumReport({ t, lang }) {
               cursor: "pointer",
               fontFamily: F.sans,
             }}
-            onClick={() => exportForumReportToPDF(form, t, lang)}
+            onClick={() =>
+              exportForumReportToPDF(form, t, lang, selectedTeam?.name)
+            }
           >
             📄 Export PDF
           </button>
-          <button style={btn.primary} onClick={() => setSubmitted(true)}>
+          <button style={btn.primary} onClick={handleSaveReport}>
             {tf.save}
           </button>
         </div>
