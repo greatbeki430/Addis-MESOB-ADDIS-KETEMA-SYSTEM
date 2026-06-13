@@ -1,3 +1,6 @@
+/* eslint-disable no-unused-vars */
+/* eslint-disable react-hooks/immutability */
+/* eslint-disable react-hooks/set-state-in-effect */
 import {
   createContext,
   useContext,
@@ -17,41 +20,54 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem("token"));
 
-  // ✅ No separate loadUser function - logic directly in useEffect
+  // Check token expiration on load
   useEffect(() => {
-    let isMounted = true;
-
-    const initAuth = async () => {
-      if (!token) {
-        if (isMounted) setLoading(false);
-        return;
-      }
-
+    if (token) {
       try {
-        const response = await authAPI.getMe();
-        if (isMounted) {
-          setUser(response.data);
-        }
-      } catch (error) {
-        console.error("Failed to load user:", error);
-        if (isMounted) {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        const expTime = payload.exp * 1000;
+        const now = Date.now();
+
+        if (now >= expTime) {
+          console.log("Token expired on load, logging out...");
           localStorage.removeItem("token");
           setToken(null);
-          setUser(null);
-        }
-      } finally {
-        if (isMounted) {
           setLoading(false);
+          return;
         }
+      } catch (e) {
+        console.error("Invalid token:", e);
+        localStorage.removeItem("token");
+        setToken(null);
+        setLoading(false);
+        return;
       }
-    };
+    }
 
-    initAuth();
-
-    return () => {
-      isMounted = false;
-    };
+    // Only load user if token exists and is valid
+    if (token) {
+      loadUser();
+    } else {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  const loadUser = useCallback(async () => {
+    try {
+      const response = await authAPI.getMe();
+      setUser(response.data);
+    } catch (error) {
+      console.error("Failed to load user:", error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem("token");
+        setToken(null);
+      }
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   const register = async (userData) => {
     try {
@@ -69,6 +85,17 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authAPI.login(credentials);
       const { token: newToken, ...userInfo } = response.data;
+
+      // Decode token to check expiration
+      try {
+        const payload = JSON.parse(atob(newToken.split(".")[1]));
+        const expTime = payload.exp * 1000;
+        console.log(
+          `Token expires at: ${new Date(expTime).toLocaleTimeString()}`,
+        );
+        // eslint-disable-next-line no-empty
+      } catch (e) {}
+
       localStorage.setItem("token", newToken);
       setToken(newToken);
       setUser(userInfo);

@@ -1,8 +1,9 @@
 // ════════════════════════════════════════════════════════════
-// components/layout/Header - Fully Responsive
+// components/layout/Header - Fully Responsive with Logout
 // ════════════════════════════════════════════════════════════
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
+import { useAuth } from "../../context/AuthContext";
 
 export default function Header({ tab, t, lang, setLang }) {
   const icons = {
@@ -12,6 +13,7 @@ export default function Header({ tab, t, lang, setLang }) {
     report: "◫",
     services: "◧",
   };
+  const { logout, user } = useAuth();
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-GB", {
@@ -20,6 +22,12 @@ export default function Header({ tab, t, lang, setLang }) {
     month: "short",
     day: "numeric",
   });
+
+  // Get user initial for avatar
+  const getUserInitial = () => {
+    if (!user?.name) return "U";
+    return user.name.charAt(0).toUpperCase();
+  };
 
   return (
     <header
@@ -100,7 +108,7 @@ export default function Header({ tab, t, lang, setLang }) {
         </span>
       </div>
 
-      {/* RIGHT SECTION - Date, Language, Profile - SIDE BY SIDE */}
+      {/* RIGHT SECTION - Date, Language, Logout, Profile */}
       <div
         style={{
           display: "flex",
@@ -202,8 +210,43 @@ export default function Header({ tab, t, lang, setLang }) {
           </select>
         </div>
 
-        {/* Profile avatar */}
+        {/* ✅ LOGOUT BUTTON - Added here */}
+        <button
+          onClick={logout}
+          className="header-logout-btn"
+          style={{
+            background: "transparent",
+            border: `1px solid ${C.border}`,
+            borderRadius: 5,
+            padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 2vw, 12px)",
+            fontSize: "clamp(10px, 2.5vw, 12px)",
+            fontWeight: 600,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            color: C.muted,
+            transition: "all 0.2s ease",
+            whiteSpace: "nowrap",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#dc2626";
+            e.currentTarget.style.borderColor = "#dc2626";
+            e.currentTarget.style.color = "#fff";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.borderColor = C.border;
+            e.currentTarget.style.color = C.muted;
+          }}
+        >
+          <span style={{ fontSize: "clamp(12px, 3vw, 14px)" }}>🚪</span>
+          <span style={{ display: "inline-block" }}>Logout</span>
+        </button>
+
+        {/* Profile avatar - now shows user initial */}
         <div
+          className="header-avatar"
           style={{
             width: "clamp(28px, 6vw, 36px)",
             height: "clamp(28px, 6vw, 36px)",
@@ -220,8 +263,9 @@ export default function Header({ tab, t, lang, setLang }) {
             boxShadow: `0 2px 6px ${C.primary}44`,
             flexShrink: 0,
           }}
+          title={user?.name || "User"}
         >
-          አ
+          {getUserInitial()}
         </div>
       </div>
     </header>

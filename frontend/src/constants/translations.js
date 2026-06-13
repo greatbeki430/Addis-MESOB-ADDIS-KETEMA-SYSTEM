@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════
 export const translations = {
   en: {
-    appName: "Addis MESOB",
+    appName: "A-MESOB",
     appSub: "Addis Ketema · One-Stop Service",
     year: "2018 E.C.",
     nav: {
@@ -223,7 +223,7 @@ export const translations = {
     ],
   },
   or: {
-    appName: "Addis Mesob",
+    appName: "A-Mesob",
     appSub: "Addis Ketema · Tajaajila Tokkicha",
     year: "2018 A.L.",
     nav: {
@@ -307,7 +307,7 @@ export const translations = {
       save: "💾 Gabaasa Olkaa'i",
     },
     services: {
-      title: "Addis Mesob · Tajaajila",
+      title: "A-MESOB · Tajaajila",
       subtitle: "Wiirtuu Dijitaalaa · Tajaajila",
       search: "➤ Tajaajila barbaadi...",
       all: "Hunda",

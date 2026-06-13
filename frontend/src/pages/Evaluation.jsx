@@ -1,16 +1,53 @@
-import { useState } from "react";
+// ════════════════════════════════════════════════════════════
+// pages/Evaluation - Dynamic with Collapsible Rankings
+// ════════════════════════════════════════════════════════════
+import { useState, useRef } from "react";
 import { btn, card, C, F, inp } from "../styles/theme";
 import { CRITERIA } from "../constants/criteria";
 import { exportEvaluationReportToPDF } from "../utils/pdfExport";
+import { useAuth } from "../context/AuthContext";
+import { ArrowDown01Icon } from "hugeicons-react";
 
-export default function Evaluation({ t, lang }) {
+export default function Evaluation({ t }) {
   const te = t.evaluation;
+  // eslint-disable-next-line no-unused-vars
+  const { user } = useAuth();
   const [scores, setScores] = useState({});
-  const [members, setMembers] = useState([
-    lang === "en" ? "Member 1" : "አባል 1",
-    lang === "en" ? "Member 2" : "አባል 2",
-    lang === "en" ? "Member 3" : "አባል 3",
-  ]);
+  const [members, setMembers] = useState(["", "", ""]);
+  const [teamName, setTeamName] = useState("");
+  const [showRankings, setShowRankings] = useState(false);
+
+  // ✅ Create refs for all input fields for keyboard navigation
+  const inputRefs = useRef({});
+
+  // Add new member (max 7)
+  const addMember = () => {
+    if (members.length < 7) {
+      setMembers([...members, ""]);
+    }
+  };
+
+  // Remove member
+  const removeMember = (index) => {
+    if (members.length > 1) {
+      const newMembers = members.filter((_, i) => i !== index);
+      setMembers(newMembers);
+      const newScores = { ...scores };
+      Object.keys(newScores).forEach((key) => {
+        if (key.endsWith(`-${members[index]}`)) {
+          delete newScores[key];
+        }
+      });
+      setScores(newScores);
+    }
+  };
+
+  // Update member name
+  const updateMemberName = (index, name) => {
+    const newMembers = [...members];
+    newMembers[index] = name;
+    setMembers(newMembers);
+  };
 
   const setScore = (cId, iIdx, m, v) => {
     const key = `${cId}-${iIdx}-${m}`;
@@ -23,16 +60,97 @@ export default function Evaluation({ t, lang }) {
       c.items.map((_, i) => scores[`${c.id}-${i}-${m}`] || 0),
     ).reduce((a, b) => a + b, 0);
 
-  const totals = members.map((m) => ({ name: m, total: total(m) }));
-  const best = totals.reduce((a, b) => (b.total > a ? b.total : a), 0);
+  const totals = members
+    .filter((m) => m.trim() !== "")
+    .map((m) => ({ name: m, total: total(m) }));
 
-  const totalScores = (member) => {
-    return CRITERIA.flatMap((c) =>
-      c.items.map((_, i) => scores[`${c.id}-${i}-${member}`] || 0),
-    ).reduce((a, b) => a + b, 0);
+  const sortedMembers = [...totals].sort((a, b) => b.total - a.total);
+
+  // Calculate summary stats for collapsed view
+  const totalMembers = sortedMembers.length;
+  const averageScore =
+    totalMembers > 0
+      ? Math.round(
+          sortedMembers.reduce((sum, m) => sum + m.total, 0) / totalMembers,
+        )
+      : 0;
+  const highestScore = sortedMembers[0]?.total || 0;
+  const lowestScore = sortedMembers[sortedMembers.length - 1]?.total || 0;
+  const bestPerformer = sortedMembers[0]?.name || "—";
+
+  // ✅ Keyboard navigation: Next (Enter/ArrowDown) and Back (ArrowUp)
+  const handleKeyDown = (e, currentId) => {
+    if (e.key === "Enter" || e.key === "ArrowDown") {
+      e.preventDefault();
+      const ids = Object.keys(inputRefs.current).sort();
+      const currentIndex = ids.indexOf(currentId);
+      if (currentIndex < ids.length - 1) {
+        inputRefs.current[ids[currentIndex + 1]]?.focus();
+      }
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const ids = Object.keys(inputRefs.current).sort();
+      const currentIndex = ids.indexOf(currentId);
+      if (currentIndex > 0) {
+        inputRefs.current[ids[currentIndex - 1]]?.focus();
+      }
+    }
   };
 
-  // Responsive table cell styles
+  // Generate input ID for each score field
+  const getInputId = (cId, iIdx, m) =>
+    `score-${cId}-${iIdx}-${m.replace(/\s/g, "")}`;
+
+  const getRankInfo = (index, total, totalMembers) => {
+    const percentage = totalMembers > 0 ? (index + 1) / totalMembers : 0;
+
+    if (index === 0 && total > 0) {
+      return {
+        rank: "🥇 1st Place",
+        level: "🏆 Excellent",
+        color: "#fbbf24",
+        bg: "#fffbeb",
+      };
+    } else if (index === 1 && total > 0) {
+      return {
+        rank: "🥈 2nd Place",
+        level: "⭐ Very Good",
+        color: "#9ca3af",
+        bg: "#f3f4f6",
+      };
+    } else if (index === 2 && total > 0) {
+      return {
+        rank: "🥉 3rd Place",
+        level: "👍 Good",
+        color: "#cd7a32",
+        bg: "#fff7ed",
+      };
+    } else if (percentage <= 0.5) {
+      return {
+        rank: `#${index + 1}`,
+        level: "📈 Above Average",
+        color: "#3b82f6",
+        bg: "#eff6ff",
+      };
+    } else if (total >= 50) {
+      return {
+        rank: `#${index + 1}`,
+        level: "📊 Average",
+        color: "#8b5cf6",
+        bg: "#f5f3ff",
+      };
+    } else {
+      return {
+        rank: `#${index + 1}`,
+        level: "📉 Needs Improvement",
+        color: "#ef4444",
+        bg: "#fef2f2",
+      };
+    }
+  };
+
   const thS = {
     background: C.dark,
     color: C.light,
@@ -72,7 +190,7 @@ export default function Evaluation({ t, lang }) {
       >
         <h1
           style={{
-            fontSize: "clamp(16px, 5vw, 22px)",
+            fontSize: "clamp(20px, 6vw, 24px)",
             fontWeight: 900,
             color: C.dark,
             fontFamily: F.serif,
@@ -107,43 +225,109 @@ export default function Evaluation({ t, lang }) {
         {te.subtitle}
       </p>
 
-      {/* Team Members Section */}
+      {/* Team Name Input */}
       <div style={card}>
-        <h3
+        <label
           style={{
-            margin: "0 0 12px",
-            fontSize: "clamp(13px, 4vw, 15px)",
-            fontWeight: 800,
+            display: "block",
+            fontSize: "clamp(12px, 3.5vw, 13px)",
+            fontWeight: 600,
+            marginBottom: 8,
             color: C.dark,
-            fontFamily: F.sans,
           }}
         >
-          {te.teamMembers}
-        </h3>
+          Team Name / Department
+        </label>
+        <input
+          type="text"
+          style={inp}
+          placeholder="e.g., Addis Ketema Service Team"
+          value={teamName}
+          onChange={(e) => setTeamName(e.target.value)}
+        />
+      </div>
+
+      {/* Dynamic Team Members Section */}
+      <div style={card}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            marginBottom: 16,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: "clamp(13px, 4vw, 15px)",
+              fontWeight: 800,
+              color: C.dark,
+              fontFamily: F.sans,
+              margin: 0,
+            }}
+          >
+            👥 {te.teamMembers} (Max 7)
+          </h3>
+          {members.length < 7 && (
+            <button
+              onClick={addMember}
+              style={{
+                background: C.primary,
+                color: "#fff",
+                border: "none",
+                borderRadius: 20,
+                padding: "6px 16px",
+                fontSize: "12px",
+                fontWeight: 600,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              + Add Member
+            </button>
+          )}
+        </div>
+
         <div
           style={{
             display: "grid",
             gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
-            gap: "clamp(8px, 2.5vw, 12px)",
+              "repeat(auto-fill, minmax(min(100%, 200px), 1fr))",
+            gap: 12,
           }}
         >
-          {members.map((m, i) => (
-            <input
-              key={i}
-              style={{
-                ...inp,
-                padding: "clamp(6px, 2vw, 10px) clamp(8px, 2.5vw, 12px)",
-                fontSize: "clamp(11px, 3vw, 13px)",
-              }}
-              value={m}
-              onChange={(e) => {
-                const a = [...members];
-                a[i] = e.target.value;
-                setMembers(a);
-              }}
-              placeholder={`Member ${i + 1}`}
-            />
+          {members.map((member, idx) => (
+            <div
+              key={idx}
+              style={{ display: "flex", gap: 8, alignItems: "center" }}
+            >
+              <input
+                style={{ ...inp, flex: 1 }}
+                placeholder={`Member ${idx + 1}`}
+                value={member}
+                onChange={(e) => updateMemberName(idx, e.target.value)}
+              />
+              {members.length > 1 && (
+                <button
+                  onClick={() => removeMember(idx)}
+                  style={{
+                    background: "#fee2e2",
+                    color: "#dc2626",
+                    border: "none",
+                    borderRadius: 6,
+                    width: 32,
+                    height: 32,
+                    cursor: "pointer",
+                    fontSize: 16,
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           ))}
         </div>
       </div>
@@ -157,7 +341,6 @@ export default function Evaluation({ t, lang }) {
             borderLeft: `5px solid ${c.color}`,
             paddingLeft: "clamp(12px, 3vw, 20px)",
             overflowX: "auto",
-            marginBottom: "20px",
           }}
         >
           <h3
@@ -170,10 +353,10 @@ export default function Evaluation({ t, lang }) {
               display: "flex",
               flexWrap: "wrap",
               alignItems: "baseline",
-              gap: "6px",
+              gap: 6,
             }}
           >
-            {t.criteria && t.criteria[c.key] ? t.criteria[c.key] : c.key}
+            {t.criteria[c.key]}
             <span
               style={{
                 fontWeight: 400,
@@ -185,30 +368,33 @@ export default function Evaluation({ t, lang }) {
             </span>
           </h3>
 
-          {/* Table Container Wrapper */}
           <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
             <table
               style={{
                 width: "100%",
                 borderCollapse: "collapse",
                 fontSize: "clamp(10px, 3vw, 12px)",
-                minWidth: "500px",
+                minWidth: 500,
               }}
-            />
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            >
               <thead>
                 <tr>
-                  {/* <th style={thS}>መስፈርት / Criterion</th> */}
-                  <th style={thS}>{lang === "en" ? "Criterion" : "መስፈርት"}</th>
+                  <th style={thS}>መስፈርት / Criterion</th>
                   <th style={{ ...thS, textAlign: "center" }}>{te.maxPts}</th>
-                  {members.map((m) => (
-                    <th
-                      key={m}
-                      style={{ ...thS, textAlign: "center", minWidth: "80px" }}
-                    >
-                      {m.length > 15 ? m.substring(0, 12) + "..." : m}
-                    </th>
-                  ))}
+                  {members
+                    .filter((m) => m.trim() !== "")
+                    .map((m) => (
+                      <th
+                        key={m}
+                        style={{
+                          ...thS,
+                          textAlign: "center",
+                          minWidth: "80px",
+                        }}
+                      >
+                        {m.length > 15 ? m.substring(0, 12) + "..." : m}
+                      </th>
+                    ))}
                 </tr>
               </thead>
               <tbody>
@@ -217,12 +403,7 @@ export default function Evaluation({ t, lang }) {
                     key={idx}
                     style={idx % 2 === 0 ? { background: C.cardBg } : {}}
                   >
-                    <td style={tdS}>
-                      <span style={{ fontSize: "clamp(10px, 2.5vw, 11px)" }}>
-                        {/* If items array has multi-lang layout, fetch it here, else fallback to baseline item string text context */}
-                        {lang === "en" && item.textEn ? item.textEn : item.text}
-                      </span>
-                    </td>
+                    <td style={tdS}>{item.text}</td>
                     <td
                       style={{
                         ...tdS,
@@ -233,28 +414,35 @@ export default function Evaluation({ t, lang }) {
                     >
                       {item.points}
                     </td>
-                    {members.map((m) => (
-                      <td key={m} style={{ ...tdS, textAlign: "center" }}>
-                        <input
-                          type="number"
-                          min="0"
-                          max={item.points}
-                          style={{
-                            width: "clamp(50px, 12vw, 60px)",
-                            border: `1.5px solid ${C.border}`,
-                            borderRadius: 6,
-                            padding:
-                              "clamp(3px, 1.5vw, 6px) clamp(4px, 2vw, 8px)",
-                            textAlign: "center",
-                            fontSize: "clamp(11px, 3vw, 13px)",
-                          }}
-                          value={scores[`${c.id}-${idx}-${m}`] || ""}
-                          onChange={(e) =>
-                            setScore(c.id, idx, m, e.target.value)
-                          }
-                        />
-                      </td>
-                    ))}
+                    {members
+                      .filter((m) => m.trim() !== "")
+                      .map((m) => {
+                        const inputId = getInputId(c.id, idx, m);
+                        return (
+                          <td key={m} style={{ ...tdS, textAlign: "center" }}>
+                            <input
+                              ref={(el) => (inputRefs.current[inputId] = el)}
+                              id={inputId}
+                              type="number"
+                              min="0"
+                              max={item.points}
+                              style={{
+                                width: "clamp(50px, 12vw, 60px)",
+                                border: `1.5px solid ${C.border}`,
+                                borderRadius: 6,
+                                padding: "clamp(3px, 1.5vw, 6px)",
+                                textAlign: "center",
+                                fontSize: "clamp(11px, 3vw, 13px)",
+                              }}
+                              value={scores[`${c.id}-${idx}-${m}`] || ""}
+                              onChange={(e) =>
+                                setScore(c.id, idx, m, e.target.value)
+                              }
+                              onKeyDown={(e) => handleKeyDown(e, inputId)}
+                            />
+                          </td>
+                        );
+                      })}
                   </tr>
                 ))}
               </tbody>
@@ -263,138 +451,347 @@ export default function Evaluation({ t, lang }) {
         </div>
       ))}
 
-      {/* Results Summary */}
+      {/* ✅ COLLAPSIBLE RANKINGS SECTION with Hugeicons Icon */}
       <div style={card}>
-        <h3
-          style={{
-            margin: "0 0 12px",
-            fontSize: "clamp(13px, 4vw, 15px)",
-            fontWeight: 800,
-            color: C.dark,
-            fontFamily: F.sans,
-          }}
-        >
-          📊 {te.total}
-        </h3>
+        {/* Clickable header with Hugeicons Arrow Down */}
         <div
+          onClick={() => setShowRankings(!showRankings)}
           style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fit, minmax(min(100%, 140px), 1fr))",
-            gap: "clamp(10px, 3vw, 14px)",
-            marginBottom: "clamp(16px, 4vw, 20px)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            cursor: "pointer",
+            padding: "8px 4px",
+            borderRadius: 8,
+            transition: "background 0.2s",
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = C.bg)}
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.background = "transparent")
+          }
         >
-          {totals.map(({ name }) => {
-            const isBest = total(name) === best && best > 0;
-            return (
-              <div
-                key={name}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* ✅ Hugeicons ArrowDown01Icon instead of text arrow */}
+            <ArrowDown01Icon
+              size={20}
+              style={{
+                transform: showRankings ? "rotate(0deg)" : "rotate(-90deg)",
+                transition: "transform 0.2s ease",
+                color: C.primary,
+              }}
+            />
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "clamp(14px, 4vw, 18px)",
+                fontWeight: 800,
+                color: C.dark,
+                fontFamily: F.sans,
+              }}
+            >
+              📊 ጠቅላላ & Rankings
+            </h3>
+            {!showRankings && sortedMembers.length > 0 && (
+              <span
                 style={{
-                  background: isBest ? "#f0f9f4" : C.cardBg,
+                  background: C.primary,
+                  color: "#fff",
+                  padding: "2px 8px",
+                  borderRadius: 20,
+                  fontSize: "11px",
+                  fontWeight: 600,
+                }}
+              >
+                {sortedMembers.length} Members
+              </span>
+            )}
+          </div>
+          {!showRankings && sortedMembers.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                gap: 16,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{ fontSize: "clamp(11px, 3vw, 13px)", color: C.muted }}
+              >
+                ⭐ Best: {bestPerformer}
+              </span>
+              <span
+                style={{ fontSize: "clamp(11px, 3vw, 13px)", color: C.muted }}
+              >
+                📊 Avg: {averageScore}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Expanded content - only shown when showRankings is true */}
+        {showRankings && (
+          <div style={{ marginTop: 20 }}>
+            {/* Summary Stats */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+                gap: 12,
+                marginBottom: 24,
+              }}
+            >
+              <div
+                style={{
+                  background: C.bg,
                   borderRadius: 10,
-                  padding: "clamp(12px, 4vw, 18px)",
+                  padding: 12,
                   textAlign: "center",
-                  border: `2px solid ${isBest ? C.primary : "#e0eee8"}`,
                 }}
               >
                 <div
                   style={{
-                    fontSize: "clamp(11px, 3vw, 12px)",
-                    fontWeight: 700,
-                    fontFamily: F.sans,
-                    marginBottom: 6,
-                    wordBreak: "break-word",
-                  }}
-                >
-                  {name}
-                </div>
-                <div
-                  style={{
-                    fontSize: "clamp(28px, 8vw, 36px)",
+                    fontSize: "clamp(24px, 5vw, 28px)",
                     fontWeight: 900,
                     color: C.primary,
                   }}
                 >
-                  {total(name)}
+                  {totalMembers}
                 </div>
+                <div style={{ fontSize: "11px", color: C.muted }}>
+                  Total Members
+                </div>
+              </div>
+              <div
+                style={{
+                  background: C.bg,
+                  borderRadius: 10,
+                  padding: 12,
+                  textAlign: "center",
+                }}
+              >
                 <div
                   style={{
-                    fontSize: "clamp(10px, 2.5vw, 11px)",
-                    color: "#999",
+                    fontSize: "clamp(24px, 5vw, 28px)",
+                    fontWeight: 900,
+                    color: C.primary,
                   }}
                 >
-                  /100
+                  {averageScore}
                 </div>
-                {isBest && (
+                <div style={{ fontSize: "11px", color: C.muted }}>
+                  Average Score
+                </div>
+              </div>
+              <div
+                style={{
+                  background: C.bg,
+                  borderRadius: 10,
+                  padding: 12,
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "clamp(24px, 5vw, 28px)",
+                    fontWeight: 900,
+                    color: C.primary,
+                  }}
+                >
+                  {highestScore}
+                </div>
+                <div style={{ fontSize: "11px", color: C.muted }}>
+                  Highest Score
+                </div>
+              </div>
+              <div
+                style={{
+                  background: C.bg,
+                  borderRadius: 10,
+                  padding: 12,
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "clamp(24px, 5vw, 28px)",
+                    fontWeight: 900,
+                    color: C.primary,
+                  }}
+                >
+                  {lowestScore}
+                </div>
+                <div style={{ fontSize: "11px", color: C.muted }}>
+                  Lowest Score
+                </div>
+              </div>
+            </div>
+
+            {/* Detailed Rankings Cards */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(min(100%, 250px), 1fr))",
+                gap: 14,
+              }}
+            >
+              {sortedMembers.map(({ name, total: memberTotal }, idx) => {
+                const rankInfo = getRankInfo(
+                  idx,
+                  memberTotal,
+                  sortedMembers.length,
+                );
+                return (
                   <div
+                    key={name}
                     style={{
-                      marginTop: 6,
-                      background: C.primary,
-                      color: "#fff",
-                      borderRadius: 10,
-                      padding: "2px 8px",
-                      fontSize: "clamp(9px, 2.5vw, 10px)",
-                      fontWeight: 700,
-                      display: "inline-block",
+                      background: rankInfo.bg,
+                      borderRadius: 12,
+                      padding: 16,
+                      border: `2px solid ${rankInfo.color}20`,
                     }}
                   >
-                    ★ Best
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 12,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "clamp(14px, 4vw, 16px)",
+                          fontWeight: 800,
+                          color: C.dark,
+                        }}
+                      >
+                        {name}
+                      </span>
+                      <span
+                        style={{
+                          background: rankInfo.color,
+                          color: "#fff",
+                          padding: "2px 10px",
+                          borderRadius: 20,
+                          fontSize: "clamp(10px, 2.5vw, 11px)",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {rankInfo.rank}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "baseline",
+                        gap: 8,
+                        marginBottom: 8,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: "clamp(28px, 8vw, 36px)",
+                          fontWeight: 900,
+                          color: C.primary,
+                        }}
+                      >
+                        {memberTotal}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: "clamp(12px, 3vw, 14px)",
+                          color: "#999",
+                        }}
+                      >
+                        / 100
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        marginTop: 8,
+                      }}
+                    >
+                      <span style={{ fontSize: "clamp(12px, 3vw, 14px)" }}>
+                        {rankInfo.level}
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        marginTop: 10,
+                        background: `${rankInfo.color}20`,
+                        borderRadius: 8,
+                        height: 6,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: `${memberTotal}%`,
+                          height: "100%",
+                          background: rankInfo.color,
+                          borderRadius: 8,
+                        }}
+                      />
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
 
-        {/* Action Buttons */}
-        <div
+      {/* Action Buttons */}
+      <div
+        style={{
+          display: "flex",
+          gap: "clamp(8px, 3vw, 12px)",
+          justifyContent: "center",
+          marginTop: "clamp(20px, 5vw, 28px)",
+          flexWrap: "wrap",
+        }}
+      >
+        <button
           style={{
-            display: "flex",
-            gap: "clamp(8px, 3vw, 12px)",
-            justifyContent: "center",
-            marginTop: "clamp(16px, 4vw, 24px)",
-            flexWrap: "wrap",
+            background: "#dc2626",
+            color: "#fff",
+            border: "none",
+            padding: "clamp(8px, 2.5vw, 11px) clamp(16px, 5vw, 26px)",
+            borderRadius: 8,
+            fontSize: "clamp(12px, 3.5vw, 14px)",
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+          onClick={() => {
+            const bestPerformer =
+              sortedMembers.length > 0 ? sortedMembers[0].name : null;
+            exportEvaluationReportToPDF(
+              scores,
+              members.filter((m) => m.trim() !== ""),
+              (m) => total(m),
+              bestPerformer,
+              t,
+            );
           }}
         >
-          <button
-            style={{
-              background: "#dc2626",
-              color: "#fff",
-              border: "none",
-              padding: "clamp(8px, 2.5vw, 11px) clamp(16px, 5vw, 26px)",
-              borderRadius: 8,
-              fontSize: "clamp(12px, 3.5vw, 14px)",
-              fontWeight: 700,
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-            onClick={() => {
-              const bestPerformer =
-                members.length > 0
-                  ? members.reduce((a, b) => {
-                      return totalScores(a) > totalScores(b) ? a : b;
-                    }, members[0])
-                  : null;
-              exportEvaluationReportToPDF(
-                scores,
-                members,
-                totalScores,
-                bestPerformer,
-                t,
-                lang,
-              );
-            }}
-          >
-            📄 Export PDF
-          </button>
-          <button style={btn.primary}> {te.save}</button>
-          <button style={btn.secondary} onClick={() => setScores({})}>
-            ↺ {te.reset}
-          </button>
-        </div>
+          📄 Export PDF
+        </button>
+        <button style={btn.primary}>💾 {te.save}</button>
+        <button
+          style={btn.secondary}
+          onClick={() => {
+            setScores({});
+            setMembers(["", "", ""]);
+            setTeamName("");
+          }}
+        >
+          ↺ {te.reset}
+        </button>
       </div>
     </div>
   );
