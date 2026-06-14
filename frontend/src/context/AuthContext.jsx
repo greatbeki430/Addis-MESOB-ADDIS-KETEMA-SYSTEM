@@ -1,6 +1,4 @@
 /* eslint-disable no-unused-vars */
-/* eslint-disable react-hooks/immutability */
-/* eslint-disable react-hooks/set-state-in-effect */
 import {
   createContext,
   useContext,
@@ -12,6 +10,7 @@ import { authAPI } from "../services/api";
 
 const AuthContext = createContext();
 
+// Hook
 // eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
 
@@ -20,55 +19,72 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem("token"));
 
-  // Check token expiration on load
-  useEffect(() => {
-    if (token) {
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        const expTime = payload.exp * 1000;
-        const now = Date.now();
+  // ========================
+  // LOGOUT (must be first)
+  // ========================
+  const logout = useCallback(() => {
+    localStorage.removeItem("token");
+    setToken(null);
+    setUser(null);
+    setLoading(false);
+  }, []);
 
-        if (now >= expTime) {
-          console.log("Token expired on load, logging out...");
-          localStorage.removeItem("token");
-          setToken(null);
-          setLoading(false);
-          return;
-        }
-      } catch (e) {
-        console.error("Invalid token:", e);
-        localStorage.removeItem("token");
-        setToken(null);
-        setLoading(false);
-        return;
-      }
-    }
-
-    // Only load user if token exists and is valid
-    if (token) {
-      loadUser();
-    } else {
-      setLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
+  // ========================
+  // LOAD USER
+  // ========================
   const loadUser = useCallback(async () => {
     try {
       const response = await authAPI.getMe();
       setUser(response.data);
     } catch (error) {
       console.error("Failed to load user:", error);
+
       if (error.response?.status === 401) {
-        localStorage.removeItem("token");
-        setToken(null);
+        logout();
+      } else {
+        setUser(null);
       }
-      setUser(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [logout]);
 
+  // ========================
+  // TOKEN CHECK ON LOAD
+  // ========================
+  useEffect(() => {
+    if (!token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const payload = JSON.parse(atob(token.split(".")[1]));
+
+      if (!payload?.exp) {
+        throw new Error("Invalid token: no exp field");
+      }
+
+      const expTime = payload.exp * 1000;
+      const now = Date.now();
+
+      if (now >= expTime) {
+        console.log("Token expired, logging out...");
+        logout();
+        return;
+      }
+
+      loadUser();
+    } catch (err) {
+      console.error("Invalid token:", err);
+      logout();
+    }
+  }, [token, loadUser, logout]);
+
+  // ========================
+  // REGISTER
+  // ========================
   const register = async (userData) => {
     try {
       const response = await authAPI.register(userData);
@@ -81,24 +97,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // ========================
+  // LOGIN
+  // ========================
   const login = async (credentials) => {
     try {
       const response = await authAPI.login(credentials);
       const { token: newToken, ...userInfo } = response.data;
 
-      // Decode token to check expiration
-      try {
-        const payload = JSON.parse(atob(newToken.split(".")[1]));
-        const expTime = payload.exp * 1000;
-        console.log(
-          `Token expires at: ${new Date(expTime).toLocaleTimeString()}`,
-        );
-        // eslint-disable-next-line no-empty
-      } catch (e) {}
-
+      // Save token
       localStorage.setItem("token", newToken);
       setToken(newToken);
       setUser(userInfo);
+
+      // Debug expiry (optional)
+      try {
+        const payload = JSON.parse(atob(newToken.split(".")[1]));
+        console.log(
+          "Token expires at:",
+          new Date(payload.exp * 1000).toLocaleTimeString(),
+        );
+      } catch (e) {
+        console.error("Token decode error:", e);
+      }
+
       return { success: true, data: userInfo };
     } catch (error) {
       return {
@@ -108,18 +130,15 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = useCallback(() => {
-    localStorage.removeItem("token");
-    setToken(null);
-    setUser(null);
-    setLoading(false);
-  }, []);
-
+  // ========================
+  // STATE VALUES
+  // ========================
   const isAdmin = user?.role === "admin";
 
   const value = {
     user,
     loading,
+    token,
     isAuthenticated: !!user,
     isAdmin,
     register,
