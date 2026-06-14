@@ -215,16 +215,27 @@ export default function Login({ onSwitchToRegister }) {
   }, []);
 
   const handleSubmit = async (e) => {
+    console.log("=== HANDLE SUBMIT FIRED ===");
+    console.log("Email:", email, "Password length:", password?.length);
+
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const result = await login({ email, password });
+    try {
+      console.log("Calling login from context...");
+      const result = await login({ email, password });
+      console.log("Login result:", result);
 
-    if (!result.success) {
-      setError(result.error);
+      if (!result.success) {
+        setError(result.error || "Login failed");
+      }
+    } catch (err) {
+      console.error("Unexpected error in handleSubmit:", err);
+      setError("Unexpected error occurred");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // ✅ Toggle password visibility

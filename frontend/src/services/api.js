@@ -4,6 +4,9 @@ import axios from "axios";
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
+console.log("VITE_API_BASE_URL =", import.meta.env.VITE_API_BASE_URL);
+console.log("API_BASE_URL =", API_BASE_URL);
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -15,30 +18,11 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
+
     if (token) {
-      // Check if token is expired
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        const expTime = payload.exp * 1000; // Convert to milliseconds
-        const now = Date.now();
-
-        if (now >= expTime) {
-          // Token expired
-          console.log("Token expired, clearing...");
-          localStorage.removeItem("token");
-          // Redirect to login page
-          window.location.href = "/";
-          return Promise.reject(new Error("Token expired"));
-        }
-      } catch (e) {
-        console.error("Invalid token:", e);
-        localStorage.removeItem("token");
-        window.location.href = "/";
-        return Promise.reject(new Error("Invalid token"));
-      }
-
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
   },
   (error) => Promise.reject(error),
@@ -47,14 +31,7 @@ api.interceptors.request.use(
 // Response interceptor to handle 401 errors
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      console.log("Unauthorized - token may be expired");
-      localStorage.removeItem("token");
-      window.location.href = "/";
-    }
-    return Promise.reject(error);
-  },
+  (error) => Promise.reject(error),
 );
 
 // Auth API
