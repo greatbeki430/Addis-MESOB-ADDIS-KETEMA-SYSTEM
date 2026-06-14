@@ -5,13 +5,15 @@ const registerStyles = {
   container: {
     background: "#fff",
     borderRadius: 16,
-    padding: "40px",
+    padding: "clamp(20px, 5vw, 40px)",
     width: "100%",
     maxWidth: 480,
     boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+    margin: "0 auto",
+    boxSizing: "border-box",
   },
   title: {
-    fontSize: 28,
+    fontSize: "clamp(20px, 5vw, 28px)",
     fontWeight: 900,
     color: "#1a6b4a",
     marginBottom: 8,
@@ -21,14 +23,14 @@ const registerStyles = {
     fontSize: 13,
     color: "#666",
     textAlign: "center",
-    marginBottom: 32,
+    marginBottom: 24,
   },
-  inputGroup: { marginBottom: 16 },
+  inputGroup: { marginBottom: 14 },
   row: {
     display: "grid",
-    gridTemplateColumns: "1fr 1fr",
+    gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   label: {
     display: "block",
@@ -42,19 +44,21 @@ const registerStyles = {
     padding: "10px 12px",
     border: "1.5px solid #d0ddd6",
     borderRadius: 8,
-    fontSize: 13,
+    fontSize: 14,
     outline: "none",
+    boxSizing: "border-box",
   },
   select: {
     width: "100%",
     padding: "10px 12px",
     border: "1.5px solid #d0ddd6",
     borderRadius: 8,
-    fontSize: 13,
+    fontSize: 14,
     background: "#fff",
+    boxSizing: "border-box",
   },
   button: {
-    width: "100%",
+    flex: 1,
     padding: "12px",
     background: "linear-gradient(135deg, #1a6b4a, #2aaa78)",
     color: "#fff",
@@ -63,7 +67,7 @@ const registerStyles = {
     fontSize: 14,
     fontWeight: 700,
     cursor: "pointer",
-    marginTop: 16,
+    minHeight: 44,
   },
   error: {
     background: "#fee2e2",
@@ -92,8 +96,36 @@ const registerStyles = {
     fontSize: 14,
     fontWeight: 600,
     cursor: "pointer",
+    minHeight: 44,
   },
 };
+
+// Inject responsive CSS once
+const styleTag = document.createElement("style");
+styleTag.innerHTML = `
+  .register-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+    background: rgba(0,0,0,0.05);
+  }
+  .register-card {
+    width: 100%;
+    max-width: 480px;
+  }
+  @media (max-width: 480px) {
+    .register-card {
+      border-radius: 12px !important;
+    }
+  }
+`;
+if (!document.head.querySelector("#register-styles")) {
+  styleTag.id = "register-styles";
+  document.head.appendChild(styleTag);
+}
 
 export default function Register({ onClose }) {
   const [formData, setFormData] = useState({
@@ -118,22 +150,18 @@ export default function Register({ onClose }) {
     setError("");
     setSuccess("");
 
-    // Check if passwords match
     if (formData.password !== formData.confirmPassword) {
       setError("Passwords do not match");
       return;
     }
 
     setLoading(true);
-
-    // Create new object without confirmPassword
     // eslint-disable-next-line no-unused-vars
     const { confirmPassword, ...registerData } = formData;
     const result = await register(registerData);
 
     if (result.success) {
       setSuccess(`User ${formData.name} created successfully!`);
-      // Reset form
       setFormData({
         name: "",
         email: "",
@@ -142,7 +170,6 @@ export default function Register({ onClose }) {
         role: "member",
         phone: "",
       });
-      // Close modal after 1.5 seconds
       setTimeout(() => {
         if (onClose) onClose();
       }, 1500);
@@ -153,106 +180,108 @@ export default function Register({ onClose }) {
   };
 
   return (
-    <div style={registerStyles.container}>
-      <h1 style={registerStyles.title}>Create User Account</h1>
-      <p style={registerStyles.subtitle}>Add a new team member</p>
+    <div className="register-wrapper">
+      <div className="register-card" style={registerStyles.container}>
+        <h1 style={registerStyles.title}>Create User Account</h1>
+        <p style={registerStyles.subtitle}>Add a new team member</p>
 
-      {error && <div style={registerStyles.error}>{error}</div>}
-      {success && <div style={registerStyles.success}>{success}</div>}
+        {error && <div style={registerStyles.error}>{error}</div>}
+        {success && <div style={registerStyles.success}>{success}</div>}
 
-      <form onSubmit={handleSubmit}>
-        <div style={registerStyles.inputGroup}>
-          <label style={registerStyles.label}>Full Name</label>
-          <input
-            type="text"
-            name="name"
-            style={registerStyles.input}
-            value={formData.name}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <div style={registerStyles.inputGroup}>
-          <label style={registerStyles.label}>Email</label>
-          <input
-            type="email"
-            name="email"
-            style={registerStyles.input}
-            value={formData.email}
-            onChange={handleChange}
-            required
-          />
-        </div>
-
-        <div style={registerStyles.row}>
-          <div>
-            <label style={registerStyles.label}>Password</label>
+        <form onSubmit={handleSubmit}>
+          <div style={registerStyles.inputGroup}>
+            <label style={registerStyles.label}>Full Name</label>
             <input
-              type="password"
-              name="password"
+              type="text"
+              name="name"
               style={registerStyles.input}
-              value={formData.password}
+              value={formData.name}
               onChange={handleChange}
               required
             />
           </div>
-          <div>
-            <label style={registerStyles.label}>Confirm Password</label>
+
+          <div style={registerStyles.inputGroup}>
+            <label style={registerStyles.label}>Email</label>
             <input
-              type="password"
-              name="confirmPassword"
+              type="email"
+              name="email"
               style={registerStyles.input}
-              value={formData.confirmPassword}
+              value={formData.email}
               onChange={handleChange}
               required
             />
           </div>
-        </div>
 
-        <div style={registerStyles.row}>
-          <div>
-            <label style={registerStyles.label}>Role</label>
-            <select
-              name="role"
-              style={registerStyles.select}
-              value={formData.role}
-              onChange={handleChange}
+          <div style={registerStyles.row}>
+            <div>
+              <label style={registerStyles.label}>Password</label>
+              <input
+                type="password"
+                name="password"
+                style={registerStyles.input}
+                value={formData.password}
+                onChange={handleChange}
+                required
+              />
+            </div>
+            <div>
+              <label style={registerStyles.label}>Confirm Password</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                style={registerStyles.input}
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          </div>
+
+          <div style={registerStyles.row}>
+            <div>
+              <label style={registerStyles.label}>Role</label>
+              <select
+                name="role"
+                style={registerStyles.select}
+                value={formData.role}
+                onChange={handleChange}
+              >
+                <option value="member">Member</option>
+                <option value="leader">Team Leader</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div>
+              <label style={registerStyles.label}>Phone (Optional)</label>
+              <input
+                type="tel"
+                name="phone"
+                style={registerStyles.input}
+                value={formData.phone}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div style={registerStyles.buttonRow}>
+            <button
+              type="button"
+              style={registerStyles.cancelButton}
+              onClick={onClose}
             >
-              <option value="member">Member</option>
-              <option value="leader">Team Leader</option>
-              <option value="admin">Admin</option>
-            </select>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              style={registerStyles.button}
+              disabled={loading}
+            >
+              {loading ? "Creating..." : "Create User"}
+            </button>
           </div>
-          <div>
-            <label style={registerStyles.label}>Phone (Optional)</label>
-            <input
-              type="tel"
-              name="phone"
-              style={registerStyles.input}
-              value={formData.phone}
-              onChange={handleChange}
-            />
-          </div>
-        </div>
-
-        <div style={registerStyles.buttonRow}>
-          <button
-            type="button"
-            style={registerStyles.cancelButton}
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            style={registerStyles.button}
-            disabled={loading}
-          >
-            {loading ? "Creating..." : "Create User"}
-          </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 }
