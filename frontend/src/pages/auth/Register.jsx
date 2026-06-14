@@ -5,7 +5,7 @@ const registerStyles = {
   container: {
     background: "#fff",
     borderRadius: 16,
-    padding: "clamp(20px, 5vw, 40px)",
+    padding: "40px",
     width: "100%",
     maxWidth: 480,
     boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
@@ -13,7 +13,7 @@ const registerStyles = {
     boxSizing: "border-box",
   },
   title: {
-    fontSize: "clamp(20px, 5vw, 28px)",
+    fontSize: 28,
     fontWeight: 900,
     color: "#1a6b4a",
     marginBottom: 8,
@@ -100,7 +100,7 @@ const registerStyles = {
   },
 };
 
-// Inject responsive CSS once
+// Inject responsive CSS once — mobile only tweaks
 const styleTag = document.createElement("style");
 styleTag.innerHTML = `
   .register-wrapper {
@@ -117,8 +117,12 @@ styleTag.innerHTML = `
     max-width: 480px;
   }
   @media (max-width: 480px) {
+    .register-wrapper {
+      padding: 10px;
+    }
     .register-card {
       border-radius: 12px !important;
+      padding: 24px 16px !important;
     }
   }
 `;
