@@ -80,7 +80,8 @@ export const AuthProvider = ({ children }) => {
       console.error("Invalid token:", err);
       logout();
     }
-  }, [token, loadUser, logout]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ========================
   // REGISTER
