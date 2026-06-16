@@ -6,7 +6,11 @@ const {
   updateMeeting,
   deleteMeeting,
 } = require("../controllers/meetingController");
-const { protect } = require("../middleware/auth");
+const {
+  protect,
+  leaderOrAdmin,
+  adminOrSuperAdmin,
+} = require("../middleware/auth"); // ✅ Add leaderOrAdmin and adminOrSuperAdmin here
 
 const router = express.Router();
 
