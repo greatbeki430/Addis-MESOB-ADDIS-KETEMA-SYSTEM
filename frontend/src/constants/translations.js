@@ -12,6 +12,9 @@ export const translations = {
       evaluation: "Evaluation",
       report: "Daily Report",
       services: "Services",
+      analytics: "Analytics",
+      users: "User Management",
+      teams: "Team Management",
     },
     sidebar: {
       main: "Main Menu",
@@ -140,6 +143,9 @@ export const translations = {
       evaluation: "ምዘና",
       report: "ዕለታዊ ሪፖርት",
       services: "አገልግሎቶች",
+      analytics: "ትንታኔ",
+      users: "ተጠቃሚዎች",
+      teams: "ቡድኖች",
     },
     sidebar: {
       main: "ዋና ምናሌ",
@@ -267,6 +273,9 @@ export const translations = {
       evaluation: "Madaallii",
       report: "Gabaasa",
       services: "Tajaajila",
+      analytics: "Xiinxala",
+      users: "Fayyadamaa",
+      teams: "Gareewwan",
     },
     sidebar: {
       main: "Filannoowwan",
