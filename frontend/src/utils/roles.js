@@ -96,6 +96,12 @@ export const NAV_ITEMS = [
     label: "Team Management",
     roles: [ROLES.SUPER_ADMIN],
   },
+  {
+    id: "reports",
+    icon: "📊",
+    label: "Reports",
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.TEAM_LEADER],
+  },
 ];
 
 // ✅ ADD THIS FUNCTION - Filter nav items based on user role
