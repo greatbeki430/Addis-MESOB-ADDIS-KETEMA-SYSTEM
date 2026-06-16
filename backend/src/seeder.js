@@ -26,7 +26,9 @@ const seedData = async () => {
       role: "admin",
       phone: "0912345678",
     });
-    // Add after admin user:
+    console.log("✅ Admin created:", admin.email);
+
+    // 2. Create Super Admin
     const superAdmin = await User.create({
       name: "Manager Name",
       email: "superadmin@mesob.gov.et",
@@ -34,7 +36,9 @@ const seedData = async () => {
       role: "superadmin",
       phone: "0911111111",
     });
+    console.log("✅ Super Admin created:", superAdmin.email);
 
+    // 3. Create Employee
     const employee = await User.create({
       name: "Sample Employee",
       email: "employee@mesob.gov.et",
@@ -42,8 +46,9 @@ const seedData = async () => {
       role: "employee",
       phone: "0922222222",
     });
+    console.log("✅ Employee created:", employee.email);
 
-    // 2. Create Team Leader
+    // 4. Create Team Leader
     const leader = await User.create({
       name: "Bayisa Bekele",
       email: "leader@mesob.gov.et",
@@ -51,18 +56,18 @@ const seedData = async () => {
       role: "leader",
       phone: "0918765432",
     });
+    console.log("✅ Team Leader created:", leader.email);
 
-    // 3. Create Sample Team
+    // 5. Create Sample Team
     const team = await Team.create({
       name: "አዲስ መሶብ አቻ ፎረም ቡድን",
       leader: leader._id,
       members: [leader._id],
       department: "Public Service & Human Resource",
     });
-
     console.log("👥 Team created");
 
-    // 4. Seed Services (from your documents)
+    // 6. Seed Services (from your documents)
     const servicesData = [
       {
         dept: "ገቢዎች",
@@ -106,8 +111,12 @@ const seedData = async () => {
 
     console.log("\n🎉 Database seeded successfully!");
     console.log("\n🔑 Login Credentials:");
-    console.log("Admin  → admin@mesob.gov.et / admin123");
-    console.log("Leader → leader@mesob.gov.et / leader123");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    console.log("🟣 Super Admin → superadmin@mesob.gov.et / superadmin123");
+    console.log("🟢 Admin       → admin@mesob.gov.et / admin123");
+    console.log("🟠 Team Leader → leader@mesob.gov.et / leader123");
+    console.log("🔵 Employee    → employee@mesob.gov.et / employee123");
+    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     process.exit(0);
   } catch (error) {
