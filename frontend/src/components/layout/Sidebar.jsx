@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { ArrowDown01Icon } from "hugeicons-react";
+import { teamAPI } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 
 const NAV = [
   { id: "dashboard", icon: "⬢" },
@@ -27,7 +29,10 @@ export default function Sidebar({
   const [teams, setTeams] = useState([]);
   const [showAddTeamModal, setShowAddTeamModal] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");
+  const [newTeamDepartment, setNewTeamDepartment] = useState("");
+  const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const { user } = useAuth();
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -35,69 +40,102 @@ export default function Sidebar({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Load teams from localStorage
-  useEffect(() => {
-    const savedTeams = localStorage.getItem("forumTeams");
-    if (savedTeams) {
-      setTeams(JSON.parse(savedTeams));
-    } else {
-      setTeams([
-        {
-          id: 1,
-          name: "Customer Service Team",
-          description: "Frontline customer support",
-          leader: "Selam Tesfaye",
-          members: ["Abebe", "Bekele", "Chaltu"],
-          lastReport: "2024-03-15",
+  // Load teams from Backend API
+  const loadTeams = async () => {
+    try {
+      setLoading(true);
+      console.log("🔄 Loading teams from backend...");
+      const response = await teamAPI.getAll();
+
+      console.log("📦 API Response:", response.data);
+
+      if (response.data && Array.isArray(response.data)) {
+        const formattedTeams = response.data.map((team) => ({
+          id: team._id,
+          name: team.name,
+          description: team.department || "",
+          leader: team.leader?.name || "Not assigned",
+          members: team.members || [],
+          lastReport: team.updatedAt
+            ? new Date(team.updatedAt).toLocaleDateString()
+            : "No reports yet",
           reports: [],
-        },
-        {
-          id: 2,
-          name: "Technical Support Team",
-          description: "IT and technical assistance",
-          leader: "Dawit Mekonnen",
-          members: ["Eden", "Fikru", "Genet"],
-          lastReport: "2024-03-10",
-          reports: [],
-        },
-        {
-          id: 3,
-          name: "Administration Team",
-          description: "Office administration",
-          leader: "Helen Assefa",
-          members: ["Lemma", "Meron", "Nati"],
-          lastReport: "2024-03-12",
-          reports: [],
-        },
-      ]);
+          department: team.department,
+        }));
+
+        console.log("✅ Formatted teams:", formattedTeams);
+        setTeams(formattedTeams);
+      } else {
+        console.warn("⚠️ Response data is not an array:", response.data);
+      }
+    } catch (error) {
+      console.error("❌ Failed to load teams:", error);
+      const savedTeams = localStorage.getItem("forumTeams");
+      if (savedTeams) {
+        console.log("📀 Using localStorage fallback");
+        setTeams(JSON.parse(savedTeams));
+      }
+    } finally {
+      setLoading(false);
     }
+  };
+
+  // Load teams on component mount
+  useEffect(() => {
+    loadTeams();
   }, []);
 
-  useEffect(() => {
-    if (teams.length > 0) {
-      localStorage.setItem("forumTeams", JSON.stringify(teams));
-    }
-  }, [teams]);
-
+  // Handle team selection
   const handleTeamClick = (team) => {
     setSelectedTeam(team);
     setTab("forum");
   };
 
-  const handleAddTeam = () => {
-    if (newTeamName.trim()) {
-      const newTeam = {
-        id: Date.now(),
+  // Add new team to backend
+  const handleAddTeam = async () => {
+    if (!newTeamName.trim()) {
+      alert("Please enter a team name");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log("➕ Creating new team:", newTeamName);
+      const response = await teamAPI.create({
         name: newTeamName,
-        description: "",
-        leader: "",
+        department: newTeamDepartment,
+      });
+
+      console.log("✅ Team created response:", response.data);
+
+      const newTeam = {
+        id: response.data._id,
+        name: response.data.name,
+        description: response.data.department || "",
+        leader: user?.name || "Current User",
         members: [],
         lastReport: "No reports yet",
         reports: [],
+        department: response.data.department,
       };
+
       setTeams([...teams, newTeam]);
       setNewTeamName("");
+      setNewTeamDepartment("");
       setShowAddTeamModal(false);
+      // Temporary
+      setForumExpanded(true);
+      console.log("🔄 Refreshing teams list...");
+      await loadTeams();
+      console.log("✅ Teams refresh complete");
+    } catch (error) {
+      console.error("❌ Failed to create team:", error);
+      alert(
+        error.response?.data?.message ||
+          "Failed to create team. Please try again.",
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -292,6 +330,32 @@ export default function Sidebar({
                     marginLeft: 20,
                   }}
                 >
+                  {loading && (
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        color: "#4a7a5a",
+                        fontSize: 12,
+                        textAlign: "center",
+                      }}
+                    >
+                      Loading...
+                    </div>
+                  )}
+
+                  {!loading && teams.length === 0 && (
+                    <div
+                      style={{
+                        padding: "8px 12px",
+                        color: "#4a7a5a",
+                        fontSize: 12,
+                        textAlign: "center",
+                      }}
+                    >
+                      No teams yet
+                    </div>
+                  )}
+
                   {teams.map((team) => (
                     <button
                       key={team.id}
@@ -481,7 +545,23 @@ export default function Sidebar({
                 padding: "10px 14px",
                 border: `1.5px solid ${C.border}`,
                 borderRadius: 8,
-                marginBottom: 16,
+                marginBottom: 12,
+                fontSize: 14,
+                boxSizing: "border-box",
+              }}
+              onKeyPress={(e) => e.key === "Enter" && handleAddTeam()}
+            />
+            <input
+              type="text"
+              placeholder="Department (Optional)"
+              value={newTeamDepartment}
+              onChange={(e) => setNewTeamDepartment(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                border: `1.5px solid ${C.border}`,
+                borderRadius: 8,
+                marginBottom: 20,
                 fontSize: 14,
                 boxSizing: "border-box",
               }}
@@ -505,18 +585,20 @@ export default function Sidebar({
               </button>
               <button
                 onClick={handleAddTeam}
+                disabled={loading}
                 style={{
                   padding: "8px 16px",
                   background: C.primary,
                   color: "#fff",
                   border: "none",
                   borderRadius: 6,
-                  cursor: "pointer",
+                  cursor: loading ? "not-allowed" : "pointer",
                   fontSize: 14,
                   fontWeight: 600,
+                  opacity: loading ? 0.7 : 1,
                 }}
               >
-                Add Team
+                {loading ? "Adding..." : "Add Team"}
               </button>
             </div>
           </div>
