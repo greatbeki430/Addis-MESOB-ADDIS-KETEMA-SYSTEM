@@ -14,7 +14,7 @@ import Register from "./pages/auth/Register";
 import UserManagement from "./pages/admin/UserManagement";
 import TeamManagement from "./pages/admin/TeamManagement";
 // import Reports from "./pages/Reports";
-import Report from "./pages/Report"; // ✅ ADD THIS - Import Report page
+import Report from "./pages/Report";
 
 // This component handles the authenticated app
 function AuthenticatedApp() {
