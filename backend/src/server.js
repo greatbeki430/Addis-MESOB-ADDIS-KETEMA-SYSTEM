@@ -12,6 +12,7 @@ const meetingRoutes = require("./routes/meetingRoutes");
 const evaluationRoutes = require("./routes/evaluationRoutes");
 const dailyReportRoutes = require("./routes/dailyReportRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
