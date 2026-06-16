@@ -97,7 +97,7 @@ export const NAV_ITEMS = [
     roles: [ROLES.SUPER_ADMIN],
   },
   {
-    id: "reports",
+    id: "analytics",
     icon: "📊",
     label: "Reports",
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.TEAM_LEADER],
