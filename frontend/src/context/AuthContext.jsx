@@ -135,6 +135,11 @@ export const AuthProvider = ({ children }) => {
   // STATE VALUES
   // ========================
   const isAdmin = user?.role === "admin";
+  const isSuperAdmin = user?.role === "superadmin";
+  const isLeader = user?.role === "leader";
+  const isEmployee = user?.role === "employee";
+  const isAdminOrSuperAdmin = isAdmin || isSuperAdmin;
+  const isLeaderOrAbove = isLeader || isAdmin || isSuperAdmin;
 
   const value = {
     user,
@@ -142,6 +147,11 @@ export const AuthProvider = ({ children }) => {
     token,
     isAuthenticated: !!user,
     isAdmin,
+    isSuperAdmin,
+    isLeader,
+    isEmployee,
+    isAdminOrSuperAdmin,
+    isLeaderOrAbove,
     register,
     login,
     logout,

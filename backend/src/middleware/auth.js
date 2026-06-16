@@ -49,4 +49,25 @@ const leaderOrAdmin = (req, res, next) => {
   }
 };
 
-module.exports = { protect, admin, leaderOrAdmin };
+// Super Admin or Admin
+const adminOrSuperAdmin = (req, res, next) => {
+  if (
+    req.user &&
+    (req.user.role === "admin" || req.user.role === "superadmin")
+  ) {
+    next();
+  } else {
+    res.status(403).json({ message: "Not authorized" });
+  }
+};
+// Any authenticated user (employee and above)
+const anyRole = (req, res, next) => {
+  if (req.user) {
+    next();
+  } else {
+    res.status(403).json({ message: "Not authorized" });
+  }
+};
+
+// module.exports = { protect, admin, leaderOrAdmin };
+module.exports = { protect, admin, leaderOrAdmin, adminOrSuperAdmin, anyRole };

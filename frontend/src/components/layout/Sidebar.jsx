@@ -5,14 +5,7 @@ import { LANGUAGES } from "../../constants/translations";
 import { ArrowDown01Icon } from "hugeicons-react";
 import { teamAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
-
-const NAV = [
-  { id: "dashboard", icon: "⬢" },
-  { id: "forum", icon: "◈" },
-  { id: "evaluation", icon: "◉" },
-  { id: "report", icon: "◫" },
-  { id: "services", icon: "◧" },
-];
+import { getFilteredNavItems } from "../../utils/roles"; // ✅ Remove hasMinRole
 
 export default function Sidebar({
   tab,
@@ -33,6 +26,7 @@ export default function Sidebar({
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const { user } = useAuth();
+  const filteredNavItems = getFilteredNavItems(user?.role || "employee");
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -123,7 +117,6 @@ export default function Sidebar({
       setNewTeamName("");
       setNewTeamDepartment("");
       setShowAddTeamModal(false);
-      // Temporary
       setForumExpanded(true);
       console.log("🔄 Refreshing teams list...");
       await loadTeams();
@@ -244,7 +237,7 @@ export default function Sidebar({
 
       {/* Nav items */}
       <nav style={{ flex: 1, padding: "6px 0" }}>
-        {NAV.map((n) => {
+        {filteredNavItems.map((n) => {
           const active = tab === n.id && !(n.id === "forum" && selectedTeam);
           const isForum = n.id === "forum";
 

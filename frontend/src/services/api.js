@@ -39,6 +39,11 @@ export const authAPI = {
   register: (userData) => api.post("/auth/register", userData),
   login: (credentials) => api.post("/auth/login", credentials),
   getMe: () => api.get("/auth/me"),
+  // NEW: User management endpoints
+  getUsers: () => api.get("/auth/users"),
+  getUser: (id) => api.get(`/auth/users/${id}`),
+  updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
+  deleteUser: (id) => api.delete(`/auth/users/${id}`),
 };
 
 // Meetings API (Forum Reports)

@@ -11,23 +11,55 @@ import Services from "./pages/Services";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import UserManagement from "./pages/admin/UserManagement";
+import TeamManagement from "./pages/admin/TeamManagement";
 
 // This component handles the authenticated app
 function AuthenticatedApp() {
   const [tab, setTab] = useState("dashboard");
   const [lang, setLang] = useState("am");
   const [collapsed, setCollapsed] = useState(false);
-  const [selectedTeam, setSelectedTeam] = useState(null); // ✅ New state for selected team
+  const [selectedTeam, setSelectedTeam] = useState(null);
   const t = translations[lang] || translations.am;
-  const { isAdmin } = useAuth();
+
+  // Get all role-based authentication helpers
+  const {
+    user,
+    isAdmin,
+    isSuperAdmin,
+    isLeader,
+    isEmployee,
+    isAdminOrSuperAdmin,
+    isLeaderOrAbove,
+  } = useAuth();
+
   const [showRegister, setShowRegister] = useState(false);
 
   // Handle forum tab - reset selected team when not on forum
   const handleSetTab = (newTab) => {
     setTab(newTab);
     if (newTab !== "forum") {
-      setSelectedTeam(null); // Clear selected team when leaving forum
+      setSelectedTeam(null);
     }
+  };
+
+  // Get user role display for the header
+  const getRoleDisplay = () => {
+    if (isSuperAdmin) return "Super Admin 👑";
+    if (isAdmin) return "Admin ⚙️";
+    if (isLeader) return "Team Leader ⭐";
+    return "Employee 👤";
+  };
+
+  // Get user initials for avatar
+  const getUserInitials = () => {
+    if (!user?.name) return "U";
+    return user.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   return (
@@ -163,19 +195,87 @@ function AuthenticatedApp() {
               lang={lang}
               selectedTeam={selectedTeam}
               onReportSaved={(teamId, reportData) => {
-                // Optional: Handle report save if needed
                 console.log("Report saved for team:", teamId, reportData);
               }}
             />
           )}
           {tab === "evaluation" && <Evaluation t={t} />}
-          {tab === "report" && <DailyReport t={t} />}
-          {tab === "services" && <Services t={t} />}
+
+          {/* Daily Report - Only Team Leaders and above */}
+          {tab === "report" && isLeaderOrAbove && <DailyReport t={t} />}
+
+          {/* Services - Only Admins and Super Admins */}
+          {tab === "services" && isAdminOrSuperAdmin && <Services t={t} />}
+
+          {/* User Management - Only Admins and Super Admins */}
+          {tab === "users" && isAdminOrSuperAdmin && (
+            <UserManagement
+              t={t}
+              isSuperAdmin={isSuperAdmin}
+              isAdmin={isAdmin}
+            />
+          )}
+
+          {/* Team Management - Only Super Admins */}
+          {tab === "teams" && isSuperAdmin && (
+            <TeamManagement t={t} isSuperAdmin={isSuperAdmin} />
+          )}
         </main>
       </div>
 
+      {/* Display user info in a floating badge (uses all role variables) */}
+      <div
+        style={{
+          position: "fixed",
+          bottom: 80,
+          right: 20,
+          background: C.white,
+          borderRadius: 12,
+          padding: "10px 16px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+          fontSize: 11,
+          zIndex: 99,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          border: `1px solid ${C.border}`,
+        }}
+      >
+        <div
+          style={{
+            width: 28,
+            height: 28,
+            background: `linear-gradient(135deg,${C.primary},${C.light})`,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#fff",
+            fontWeight: 700,
+            fontSize: 12,
+          }}
+        >
+          {getUserInitials()}
+        </div>
+        <div>
+          <div style={{ fontWeight: 600, color: C.dark, fontSize: 12 }}>
+            {user?.name || "User"}
+          </div>
+          <div style={{ color: C.muted, fontSize: 10 }}>
+            {getRoleDisplay()} •{" "}
+            {isEmployee
+              ? "Employee"
+              : isLeader
+                ? "Leader"
+                : isAdmin
+                  ? "Admin"
+                  : "Super Admin"}
+          </div>
+        </div>
+      </div>
+
       {/* Admin-only Register Modal */}
-      {isAdmin && showRegister && (
+      {isAdminOrSuperAdmin && showRegister && (
         <div
           style={{
             position: "fixed",
@@ -198,7 +298,7 @@ function AuthenticatedApp() {
       )}
 
       {/* Admin-only Add User Button */}
-      {isAdmin && (
+      {isAdminOrSuperAdmin && (
         <button
           onClick={() => setShowRegister(true)}
           style={{

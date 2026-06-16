@@ -26,6 +26,22 @@ const seedData = async () => {
       role: "admin",
       phone: "0912345678",
     });
+    // Add after admin user:
+    const superAdmin = await User.create({
+      name: "Manager Name",
+      email: "superadmin@mesob.gov.et",
+      password: "superadmin123",
+      role: "superadmin",
+      phone: "0911111111",
+    });
+
+    const employee = await User.create({
+      name: "Sample Employee",
+      email: "employee@mesob.gov.et",
+      password: "employee123",
+      role: "employee",
+      phone: "0922222222",
+    });
 
     // 2. Create Team Leader
     const leader = await User.create({

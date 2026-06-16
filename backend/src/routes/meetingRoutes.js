@@ -10,10 +10,13 @@ const { protect } = require("../middleware/auth");
 
 const router = express.Router();
 
-router.post("/", protect, createMeeting);
-router.get("/team/:teamId", protect, getMeetings);
+// router.post("/", protect, createMeeting);
+router.post("/", protect, leaderOrAdmin, createMeeting); // only leaders/admins can create
+// router.get("/team/:teamId", protect, getMeetings);
+router.get("/team/:teamId", protect, getMeetings); // all can view
 router.get("/:id", protect, getMeetingById);
 router.put("/:id", protect, updateMeeting);
-router.delete("/:id", protect, deleteMeeting);
+// router.delete("/:id", protect, deleteMeeting);
+router.delete("/:id", protect, adminOrSuperAdmin, deleteMeeting); // only admin can delete
 
 module.exports = router;

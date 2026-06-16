@@ -251,9 +251,13 @@ export default function Register({ onClose }) {
                 value={formData.role}
                 onChange={handleChange}
               >
-                <option value="member">Member</option>
+                {/* <option value="member">Member</option>
+                <option value="leader">Team Leader</option>
+                <option value="admin">Admin</option> */}
+                <option value="employee">Employee</option>
                 <option value="leader">Team Leader</option>
                 <option value="admin">Admin</option>
+                <option value="superadmin">Super Admin</option>
               </select>
             </div>
             <div>

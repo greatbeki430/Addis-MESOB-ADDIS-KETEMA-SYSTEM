@@ -35,6 +35,7 @@ app.use("/api/meetings", meetingRoutes);
 app.use("/api/evaluations", evaluationRoutes);
 app.use("/api/daily-reports", dailyReportRoutes);
 app.use("/api/services", serviceRoutes);
+app.use("/api/auth/users", userRoutes);
 
 // Health check
 app.get("/", (req, res) => {
