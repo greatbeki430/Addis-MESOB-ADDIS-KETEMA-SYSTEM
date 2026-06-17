@@ -52,7 +52,7 @@ export const getRoleIcon = (role) => {
   return icons[role] || "👥";
 };
 
-// Navigation items with role requirements
+// ✅ CORRECTED: Navigation items with proper role requirements
 export const NAV_ITEMS = [
   {
     id: "dashboard",
@@ -76,35 +76,35 @@ export const NAV_ITEMS = [
     id: "report",
     icon: "📄",
     label: "Daily Report",
-    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN], // ✅ Team Leader+ only
   },
   {
     id: "services",
     icon: "🔧",
     label: "Services",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN], // ✅ Admin+ only
   },
   {
     id: "users",
     icon: "👥",
     label: "User Management",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN], // ✅ Admin+ only
   },
   {
     id: "teams",
     icon: "👥",
     label: "Team Management",
-    roles: [ROLES.SUPER_ADMIN],
+    roles: [ROLES.SUPER_ADMIN], // ✅ Super Admin only
   },
   {
     id: "analytics",
     icon: "📊",
-    label: "Reports",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN, ROLES.TEAM_LEADER],
+    label: "Analytics",
+    // roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN], // ✅ Admin+ only
+    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
 ];
 
-// ✅ ADD THIS FUNCTION - Filter nav items based on user role
 export const getFilteredNavItems = (userRole) => {
   return NAV_ITEMS.filter((item) =>
     item.roles.some((role) => hasMinRole(userRole, role)),

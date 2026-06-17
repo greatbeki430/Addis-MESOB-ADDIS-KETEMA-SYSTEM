@@ -227,6 +227,8 @@ function AuthenticatedApp() {
           {tab === "analytics" && isAdminOrSuperAdmin && <Report t={t} />}
 
           {/* {tab === "reports" && <Reports t={t} />} */}
+          {/* Analytics/Report Generator - Team Leaders, Admins and Super Admins */}
+          {tab === "analytics" && isLeaderOrAbove && <Report t={t} />}
         </main>
       </div>
 
