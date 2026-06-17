@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/immutability */
 import { useState, useEffect, useCallback } from "react";
 import { btn, card, C, F, inp } from "../styles/theme";
-import { meetingAPI, dailyReportAPI } from "../services/api";
+import { meetingAPI, dailyReportAPI, reportAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
 // ✅ Import export utilities
@@ -22,6 +23,12 @@ export default function Report({ t }) {
   const [userTeam, setUserTeam] = useState(null);
   const [error, setError] = useState(null);
   const [showExportOptions, setShowExportOptions] = useState(false);
+
+  // ✅ Report History states
+  const [savedReports, setSavedReports] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [selectedSavedReport, setSelectedSavedReport] = useState(null);
 
   const reportTypes = [
     { value: "daily", label: t?.report?.daily || "Daily Report" },
@@ -73,6 +80,7 @@ export default function Report({ t }) {
     const loadInitialData = () => {
       if (isMounted) {
         loadTeamsAndUserTeam();
+        loadSavedReports();
       }
     };
     loadInitialData();
@@ -80,6 +88,19 @@ export default function Report({ t }) {
       isMounted = false;
     };
   }, [loadTeamsAndUserTeam]);
+
+  // ✅ Load saved reports from database
+  const loadSavedReports = async () => {
+    try {
+      setLoadingHistory(true);
+      const response = await reportAPI.getAll();
+      setSavedReports(response.data);
+    } catch (error) {
+      console.error("Failed to load saved reports:", error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   // ✅ Get team display name for header
   const getTeamDisplayName = () => {
@@ -122,7 +143,6 @@ export default function Report({ t }) {
         count = 10;
     }
 
-    // ✅ Get the specific team name if filtered
     let targetTeamName = null;
     if (teamFilter) {
       const filteredTeam = teams.find((t) => (t.id || t._id) === teamFilter);
@@ -131,12 +151,10 @@ export default function Report({ t }) {
       }
     }
 
-    // ✅ If Team Leader, only show their team
     if (isLeader && userTeam) {
       targetTeamName = userTeam.name;
     }
 
-    // ✅ If no specific team, use all teams
     const allTeamNames = [
       "Customer Service",
       "Technical Support",
@@ -167,7 +185,6 @@ export default function Report({ t }) {
         date.setFullYear(date.getFullYear() - i);
       }
 
-      // ✅ If specific team is selected, only use that team
       const teamName = targetTeamName || allTeamNames[i % allTeamNames.length];
 
       data.push({
@@ -183,7 +200,8 @@ export default function Report({ t }) {
     return data;
   };
 
-  const generateReport = async () => {
+  // ✅ Generate and save report
+  const generateReport = async (saveToDatabase = true) => {
     setLoading(true);
     setError(null);
 
@@ -194,7 +212,6 @@ export default function Report({ t }) {
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
 
-      // ✅ If Team Leader, force their team ID
       const teamId =
         isLeader && userTeam ? userTeam.id || userTeam._id : selectedTeam;
       if (teamId) params.append("teamId", teamId);
@@ -222,6 +239,12 @@ export default function Report({ t }) {
 
       const data = processReportData(responseData, reportType, period);
       setReportData(data);
+
+      // ✅ Save to database if requested
+      if (saveToDatabase) {
+        await saveReportToDatabase(data, teamId);
+        await loadSavedReports(); // Refresh history
+      }
     } catch (error) {
       console.error("Failed to generate report:", error);
       setError(
@@ -231,6 +254,42 @@ export default function Report({ t }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ Save report to database
+  const saveReportToDatabase = async (data, teamId) => {
+    try {
+      // eslint-disable-next-line no-unused-vars
+      const teamName = teamId
+        ? teams.find((t) => (t.id || t._id) === teamId)?.name
+        : null;
+
+      await reportAPI.create({
+        title: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report - ${new Date().toLocaleDateString()}`,
+        type: reportType,
+        period: period,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        team: teamId || null,
+        data: data.data,
+        summary: data.summary,
+      });
+
+      console.log("✅ Report saved to database");
+    } catch (error) {
+      console.error("Failed to save report:", error);
+    }
+  };
+
+  // ✅ Load a saved report
+  const loadSavedReport = (report) => {
+    setSelectedSavedReport(report);
+    setReportData({
+      data: report.data,
+      summary: report.summary,
+      generatedAt: report.createdAt,
+    });
+    setShowHistory(false);
   };
 
   const processReportData = (data, type, period) => {
@@ -261,7 +320,6 @@ export default function Report({ t }) {
 
   // ✅ EXPORT FUNCTIONS
 
-  // Export to Excel
   const exportToExcel = () => {
     if (!reportData || !reportData.data.length) return;
 
@@ -282,15 +340,14 @@ export default function Report({ t }) {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Report");
 
-    // Auto column widths
     const colWidths = [
-      { wch: 5 }, // #
-      { wch: 15 }, // Date
-      { wch: 25 }, // Team
-      { wch: 20 }, // Type
-      { wch: 30 }, // Description
-      { wch: 12 }, // Value
-      { wch: 15 }, // Status
+      { wch: 5 },
+      { wch: 15 },
+      { wch: 25 },
+      { wch: 20 },
+      { wch: 30 },
+      { wch: 12 },
+      { wch: 15 },
     ];
     ws["!cols"] = colWidths;
 
@@ -305,7 +362,6 @@ export default function Report({ t }) {
     setShowExportOptions(false);
   };
 
-  // Export to Word
   const exportToWord = () => {
     if (!reportData || !reportData.data.length) return;
 
@@ -350,43 +406,20 @@ export default function Report({ t }) {
           <p><strong>Period:</strong> ${period}</p>
           
           <div class="summary">
-            <div class="summary-card">
-              <h3>Total Records</h3>
-              <p>${reportData.summary.total}</p>
-            </div>
-            <div class="summary-card">
-              <h3>Completed</h3>
-              <p>${reportData.summary.completed}</p>
-            </div>
-            <div class="summary-card">
-              <h3>Pending</h3>
-              <p>${reportData.summary.pending}</p>
-            </div>
-            <div class="summary-card">
-              <h3>Average Value</h3>
-              <p>${reportData.summary.average}</p>
-            </div>
+            <div class="summary-card"><h3>Total Records</h3><p>${reportData.summary.total}</p></div>
+            <div class="summary-card"><h3>Completed</h3><p>${reportData.summary.completed}</p></div>
+            <div class="summary-card"><h3>Pending</h3><p>${reportData.summary.pending}</p></div>
+            <div class="summary-card"><h3>Average Value</h3><p>${reportData.summary.average}</p></div>
           </div>
 
           <table>
             <thead>
-              <tr>
-                <th>#</th>
-                <th>Date</th>
-                <th>Team</th>
-                <th>Type</th>
-                <th>Description</th>
-                <th>Value</th>
-                <th>Status</th>
-              </tr>
+              <tr><th>#</th><th>Date</th><th>Team</th><th>Type</th>
+              <th>Description</th><th>Value</th><th>Status</th></tr>
             </thead>
-            <tbody>
-              ${tableRows}
-            </tbody>
+            <tbody>${tableRows}</tbody>
           </table>
-          <div class="footer">
-            Generated by A-MESOB Report Generator © ${new Date().getFullYear()}
-          </div>
+          <div class="footer">Generated by A-MESOB Report Generator © ${new Date().getFullYear()}</div>
         </body>
       </html>
     `;
@@ -399,21 +432,18 @@ export default function Report({ t }) {
     setShowExportOptions(false);
   };
 
-  // Export to PDF
   const exportToPDF = () => {
     if (!reportData || !reportData.data.length) return;
 
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
-    // Title
     doc.setFontSize(18);
     doc.setTextColor("#1a6b4a");
     doc.text(`📊 ${reportType.toUpperCase()} Report`, pageWidth / 2, 20, {
       align: "center",
     });
 
-    // Metadata
     doc.setFontSize(10);
     doc.setTextColor("#666");
     doc.text(
@@ -424,7 +454,6 @@ export default function Report({ t }) {
     doc.text(`Team: ${getTeamDisplayName() || "All Teams"}`, 14, 42);
     doc.text(`Period: ${period}`, 14, 49);
 
-    // Summary Cards (simulated)
     const summaryY = 60;
     doc.setFontSize(10);
     doc.setTextColor("#333");
@@ -433,7 +462,6 @@ export default function Report({ t }) {
     doc.text(`Pending: ${reportData.summary.pending}`, 145, summaryY);
     doc.text(`Average Value: ${reportData.summary.average}`, 14, summaryY + 10);
 
-    // Table
     const tableData = reportData.data.map((item) => [
       item.date,
       item.team,
@@ -453,9 +481,7 @@ export default function Report({ t }) {
         textColor: [255, 255, 255],
         fontSize: 9,
       },
-      bodyStyles: {
-        fontSize: 8,
-      },
+      bodyStyles: { fontSize: 8 },
       columnStyles: {
         0: { cellWidth: 25 },
         1: { cellWidth: 30 },
@@ -466,7 +492,6 @@ export default function Report({ t }) {
       },
     });
 
-    // Footer
     const finalY = doc.lastAutoTable.finalY + 10;
     doc.setFontSize(8);
     doc.setTextColor("#999");
@@ -481,6 +506,19 @@ export default function Report({ t }) {
       `${reportType}_report_${new Date().toISOString().split("T")[0]}.pdf`,
     );
     setShowExportOptions(false);
+  };
+
+  // ✅ Delete saved report
+  const deleteSavedReport = async (reportId) => {
+    if (window.confirm("Are you sure you want to delete this saved report?")) {
+      try {
+        await reportAPI.delete(reportId);
+        await loadSavedReports();
+      } catch (error) {
+        console.error("Failed to delete report:", error);
+        alert("Failed to delete report");
+      }
+    }
   };
 
   return (
@@ -500,7 +538,7 @@ export default function Report({ t }) {
           alignItems: "center",
           justifyContent: "space-between",
           gap: "clamp(8px, 3vw, 14px)",
-          marginBottom: "clamp(12px, 3vw, 20px)",
+          marginBottom: "clamp(8px, 3vw, 12px)",
         }}
       >
         <h1
@@ -521,20 +559,143 @@ export default function Report({ t }) {
             </span>
           )}
         </h1>
-        <span
+        <div style={{ display: "flex", gap: 8 }}>
+          <span
+            style={{
+              background: C.primary,
+              color: "#fff",
+              padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 3vw, 12px)",
+              borderRadius: 20,
+              fontSize: "clamp(10px, 3vw, 11px)",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {t?.report?.analytics || "Analytics"}
+          </span>
+          {/* ✅ History Toggle Button */}
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            style={{
+              background: "#8b5cf6",
+              color: "#fff",
+              border: "none",
+              padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 3vw, 12px)",
+              borderRadius: 20,
+              fontSize: "clamp(10px, 3vw, 11px)",
+              fontWeight: 700,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            📜 History
+          </button>
+        </div>
+      </div>
+
+      {/* Description */}
+      <p
+        style={{
+          color: "#555",
+          marginBottom: "clamp(16px, 4vw, 22px)",
+          fontSize: "clamp(12px, 3.5vw, 13px)",
+          fontFamily: F.sans,
+        }}
+      >
+        {t?.report?.description ||
+          "Generate comprehensive reports by merging data from all modules"}
+      </p>
+
+      {/* ✅ Saved Reports History */}
+      {showHistory && (
+        <div
           style={{
-            background: C.primary,
-            color: "#fff",
-            padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 3vw, 12px)",
-            borderRadius: 20,
-            fontSize: "clamp(10px, 3vw, 11px)",
-            fontWeight: 700,
-            whiteSpace: "nowrap",
+            ...card,
+            marginBottom: 16,
+            maxHeight: 300,
+            overflow: "auto",
           }}
         >
-          {t?.report?.analytics || "Analytics"}
-        </span>
-      </div>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 12,
+            }}
+          >
+            <h4 style={{ margin: 0, color: C.dark }}>📜 Saved Reports</h4>
+            <button
+              onClick={() => setShowHistory(false)}
+              style={{
+                background: "none",
+                border: "none",
+                fontSize: 18,
+                cursor: "pointer",
+                color: "#999",
+              }}
+            >
+              ✕
+            </button>
+          </div>
+          {loadingHistory ? (
+            <p style={{ textAlign: "center", color: C.muted }}>Loading...</p>
+          ) : savedReports.length === 0 ? (
+            <p style={{ textAlign: "center", color: C.muted }}>
+              No saved reports found. Generate a report to save it.
+            </p>
+          ) : (
+            savedReports.map((report) => (
+              <div
+                key={report._id}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "10px 12px",
+                  borderBottom: `1px solid ${C.border}`,
+                  cursor: "pointer",
+                  transition: "background 0.15s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = C.bg;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                <div
+                  onClick={() => loadSavedReport(report)}
+                  style={{ flex: 1 }}
+                >
+                  <div style={{ fontWeight: 600, fontSize: 13 }}>
+                    {report.title}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.muted }}>
+                    {report.type} • {report.period} •{" "}
+                    {report.teamName || "All Teams"} •{" "}
+                    {new Date(report.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <button
+                  onClick={() => deleteSavedReport(report._id)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: 16,
+                    color: "#dc2626",
+                    padding: "4px 8px",
+                  }}
+                  title="Delete report"
+                >
+                  🗑️
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
       {/* Team Leader Info Banner */}
       {isLeader && userTeam && (
@@ -566,18 +727,6 @@ export default function Report({ t }) {
         </div>
       )}
 
-      <p
-        style={{
-          color: "#555",
-          marginBottom: "clamp(16px, 4vw, 22px)",
-          fontSize: "clamp(12px, 3.5vw, 13px)",
-          fontFamily: F.sans,
-        }}
-      >
-        {t?.report?.description ||
-          "Generate comprehensive reports by merging data from all modules"}
-      </p>
-
       {/* Error Message */}
       {error && (
         <div
@@ -604,7 +753,6 @@ export default function Report({ t }) {
             gap: "clamp(12px, 3vw, 16px)",
           }}
         >
-          {/* Report Type */}
           <div>
             <label
               style={{
@@ -630,7 +778,6 @@ export default function Report({ t }) {
             </select>
           </div>
 
-          {/* Period */}
           <div>
             <label
               style={{
@@ -656,7 +803,6 @@ export default function Report({ t }) {
             </select>
           </div>
 
-          {/* Team Filter - Admins/Super Admins only */}
           {(isAdmin || isSuperAdmin) && (
             <div>
               <label
@@ -685,7 +831,6 @@ export default function Report({ t }) {
             </div>
           )}
 
-          {/* Team Leader - Show their team (disabled) */}
           {isLeader && userTeam && (
             <div>
               <label
@@ -713,7 +858,6 @@ export default function Report({ t }) {
             </div>
           )}
 
-          {/* Start Date */}
           <div>
             <label
               style={{
@@ -734,7 +878,6 @@ export default function Report({ t }) {
             />
           </div>
 
-          {/* End Date */}
           <div>
             <label
               style={{
@@ -756,7 +899,6 @@ export default function Report({ t }) {
           </div>
         </div>
 
-        {/* Buttons */}
         <div
           style={{
             display: "flex",
@@ -767,7 +909,7 @@ export default function Report({ t }) {
           }}
         >
           <button
-            onClick={generateReport}
+            onClick={() => generateReport(true)}
             disabled={loading}
             style={{
               ...btn.primary,
@@ -778,10 +920,9 @@ export default function Report({ t }) {
           >
             {loading
               ? t?.report?.generating || "⏳ Generating..."
-              : t?.report?.generateBtn || "Generate Report"}
+              : "🔍 Generate & Save Report"}
           </button>
 
-          {/* ✅ Export Button with dropdown options */}
           {reportData && (
             <div style={{ position: "relative" }}>
               <button
@@ -803,7 +944,6 @@ export default function Report({ t }) {
                 {t?.report?.exportBtn || "Export Report"} ▼
               </button>
 
-              {/* Export Dropdown */}
               {showExportOptions && (
                 <div
                   style={{
@@ -925,6 +1065,12 @@ export default function Report({ t }) {
               }}
             >
               📋 {t?.report?.results || "Report Results"}
+              {selectedSavedReport && (
+                <span style={{ fontSize: 12, color: C.muted, fontWeight: 400 }}>
+                  {" "}
+                  (Loaded from history)
+                </span>
+              )}
             </h3>
             <span
               style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
