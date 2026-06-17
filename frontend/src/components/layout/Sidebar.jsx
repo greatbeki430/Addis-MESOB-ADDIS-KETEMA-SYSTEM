@@ -5,7 +5,7 @@ import { LANGUAGES } from "../../constants/translations";
 import { ArrowDown01Icon } from "hugeicons-react";
 import { teamAPI } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
-import { getFilteredNavItems } from "../../utils/roles"; // ✅ Remove hasMinRole
+import { getFilteredNavItems } from "../../utils/roles";
 
 export default function Sidebar({
   tab,
@@ -25,7 +25,7 @@ export default function Sidebar({
   const [newTeamDepartment, setNewTeamDepartment] = useState("");
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const { user } = useAuth();
+  const { user, isAdminOrSuperAdmin } = useAuth(); // ✅ Get user role
   const filteredNavItems = getFilteredNavItems(user?.role || "employee");
 
   useEffect(() => {
@@ -392,48 +392,50 @@ export default function Sidebar({
                     </button>
                   ))}
 
-                  {/* Add Team button */}
-                  <button
-                    onClick={() => setShowAddTeamModal(true)}
-                    style={{
-                      width: "100%",
-                      textAlign: "left",
-                      padding: isMobile ? "7px 10px" : "8px 12px",
-                      marginTop: 6,
-                      background: "none",
-                      border: "1px dashed #2a5a3a",
-                      borderRadius: 6,
-                      color: "#4a7a5a",
-                      cursor: "pointer",
-                      fontSize: isMobile ? 12 : 13,
-                      fontFamily: F.sans,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                      transition: "all 0.15s",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#1a3a26";
-                      e.currentTarget.style.color = C.light;
-                      e.currentTarget.style.borderColor = C.light;
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "none";
-                      e.currentTarget.style.color = "#4a7a5a";
-                      e.currentTarget.style.borderColor = "#2a5a3a";
-                    }}
-                  >
-                    <span
+                  {/* ✅ Add Team button - Only Admins and Super Admins */}
+                  {isAdminOrSuperAdmin && (
+                    <button
+                      onClick={() => setShowAddTeamModal(true)}
                       style={{
-                        fontSize: 16,
-                        fontWeight: "bold",
-                        lineHeight: 1,
+                        width: "100%",
+                        textAlign: "left",
+                        padding: isMobile ? "7px 10px" : "8px 12px",
+                        marginTop: 6,
+                        background: "none",
+                        border: "1px dashed #2a5a3a",
+                        borderRadius: 6,
+                        color: "#4a7a5a",
+                        cursor: "pointer",
+                        fontSize: isMobile ? 12 : 13,
+                        fontFamily: F.sans,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        transition: "all 0.15s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#1a3a26";
+                        e.currentTarget.style.color = C.light;
+                        e.currentTarget.style.borderColor = C.light;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "none";
+                        e.currentTarget.style.color = "#4a7a5a";
+                        e.currentTarget.style.borderColor = "#2a5a3a";
                       }}
                     >
-                      +
-                    </span>
-                    Add Team
-                  </button>
+                      <span
+                        style={{
+                          fontSize: 16,
+                          fontWeight: "bold",
+                          lineHeight: 1,
+                        }}
+                      >
+                        +
+                      </span>
+                      Add Team
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -496,7 +498,7 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Add Team Modal */}
+      {/* Add Team Modal - Only visible when button is clicked */}
       {showAddTeamModal && (
         <div
           style={{
