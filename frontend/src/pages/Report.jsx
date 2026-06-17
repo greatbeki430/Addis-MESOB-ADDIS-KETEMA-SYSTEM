@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/immutability */
 import { useState, useEffect, useCallback } from "react";
 import { btn, card, C, F, inp } from "../styles/theme";
 import { meetingAPI, dailyReportAPI, reportAPI } from "../services/api";
@@ -80,6 +79,7 @@ export default function Report({ t }) {
     const loadInitialData = () => {
       if (isMounted) {
         loadTeamsAndUserTeam();
+        // eslint-disable-next-line react-hooks/immutability
         loadSavedReports();
       }
     };
@@ -319,7 +319,6 @@ export default function Report({ t }) {
   };
 
   // ✅ EXPORT FUNCTIONS
-
   const exportToExcel = () => {
     if (!reportData || !reportData.data.length) return;
 
@@ -521,6 +520,9 @@ export default function Report({ t }) {
     }
   };
 
+  // ✅ Determine if we should show the empty state
+  const showEmptyState = !reportData && !loading;
+
   return (
     <div
       style={{
@@ -573,7 +575,6 @@ export default function Report({ t }) {
           >
             {t?.report?.analytics || "Analytics"}
           </span>
-          {/* ✅ History Toggle Button */}
           <button
             onClick={() => setShowHistory(!showHistory)}
             style={{
@@ -593,18 +594,50 @@ export default function Report({ t }) {
         </div>
       </div>
 
-      {/* Description */}
-      <p
-        style={{
-          color: "#555",
-          marginBottom: "clamp(16px, 4vw, 22px)",
-          fontSize: "clamp(12px, 3.5vw, 13px)",
-          fontFamily: F.sans,
-        }}
-      >
-        {t?.report?.description ||
-          "Generate comprehensive reports by merging data from all modules"}
-      </p>
+      {/* ✅ Description - Only show when no report has been generated yet */}
+      {showEmptyState && (
+        <p
+          style={{
+            color: "#555",
+            marginBottom: "clamp(16px, 4vw, 22px)",
+            fontSize: "clamp(12px, 3.5vw, 13px)",
+            fontFamily: F.sans,
+          }}
+        >
+          {t?.report?.description ||
+            "Generate comprehensive reports by merging data from all modules"}
+        </p>
+      )}
+
+      {/* Team Leader Info Banner */}
+      {isLeader && userTeam && (
+        <div
+          style={{
+            background: `${C.primary}10`,
+            border: `1px solid ${C.primary}30`,
+            borderRadius: 10,
+            padding: "12px 16px",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 20 }}>👑</span>
+          <div>
+            <span style={{ fontWeight: 600, color: C.dark }}>
+              {t?.report?.leadingTeam || "Leading Team"}:
+            </span>
+            <span style={{ color: C.primary, fontWeight: 700, marginLeft: 6 }}>
+              {userTeam.name}
+            </span>
+            <span style={{ fontSize: 12, color: C.muted, marginLeft: 12 }}>
+              {t?.report?.teamLeaderAccess ||
+                "You have access to your team's analytics only"}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* ✅ Saved Reports History */}
       {showHistory && (
@@ -697,36 +730,6 @@ export default function Report({ t }) {
         </div>
       )}
 
-      {/* Team Leader Info Banner */}
-      {isLeader && userTeam && (
-        <div
-          style={{
-            background: `${C.primary}10`,
-            border: `1px solid ${C.primary}30`,
-            borderRadius: 10,
-            padding: "12px 16px",
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-          }}
-        >
-          <span style={{ fontSize: 20 }}>👑</span>
-          <div>
-            <span style={{ fontWeight: 600, color: C.dark }}>
-              {t?.report?.leadingTeam || "Leading Team"}:
-            </span>
-            <span style={{ color: C.primary, fontWeight: 700, marginLeft: 6 }}>
-              {userTeam.name}
-            </span>
-            <span style={{ fontSize: 12, color: C.muted, marginLeft: 12 }}>
-              {t?.report?.teamLeaderAccess ||
-                "You have access to your team's analytics only"}
-            </span>
-          </div>
-        </div>
-      )}
-
       {/* Error Message */}
       {error && (
         <div
@@ -743,7 +746,7 @@ export default function Report({ t }) {
         </div>
       )}
 
-      {/* Report Controls */}
+      {/* ✅ Report Controls - Always visible */}
       <div style={card}>
         <div
           style={{
@@ -1044,7 +1047,7 @@ export default function Report({ t }) {
         </div>
       </div>
 
-      {/* Report Results */}
+      {/* ✅ Report Results - Only show when reportData exists */}
       {reportData && (
         <div style={{ ...card, marginTop: "clamp(16px, 4vw, 20px)" }}>
           <div
@@ -1288,8 +1291,8 @@ export default function Report({ t }) {
         </div>
       )}
 
-      {/* Empty State */}
-      {!reportData && !loading && (
+      {/* ✅ Empty State - Only show when no report and not loading */}
+      {showEmptyState && (
         <div
           style={{
             ...card,
