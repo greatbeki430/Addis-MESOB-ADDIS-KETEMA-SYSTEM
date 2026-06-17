@@ -3,6 +3,12 @@ import { btn, card, C, F, inp } from "../styles/theme";
 import { meetingAPI, dailyReportAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
+// ✅ Import export utilities
+import * as XLSX from "xlsx";
+import { saveAs } from "file-saver";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+
 export default function Report({ t }) {
   const { user, isLeader, isAdmin, isSuperAdmin } = useAuth();
   const [reportType, setReportType] = useState("daily");
@@ -15,6 +21,7 @@ export default function Report({ t }) {
   const [teams, setTeams] = useState([]);
   const [userTeam, setUserTeam] = useState(null);
   const [error, setError] = useState(null);
+  const [showExportOptions, setShowExportOptions] = useState(false);
 
   const reportTypes = [
     { value: "daily", label: t?.report?.daily || "Daily Report" },
@@ -43,9 +50,7 @@ export default function Report({ t }) {
         const parsed = JSON.parse(savedTeams);
         setTeams(parsed);
 
-        // ✅ If user is a Team Leader, find their team
         if (isLeader && user) {
-          // Try to find team where user is the leader
           const userTeamFound = parsed.find(
             (team) =>
               team.leader === user.name ||
@@ -63,23 +68,18 @@ export default function Report({ t }) {
     }
   }, [isLeader, user]);
 
-  // === ADDED: Clean effect wrapper to fix "setState in effect" warning ===
   useEffect(() => {
     let isMounted = true;
-
     const loadInitialData = () => {
       if (isMounted) {
         loadTeamsAndUserTeam();
       }
     };
-
     loadInitialData();
-
     return () => {
       isMounted = false;
     };
   }, [loadTeamsAndUserTeam]);
-  // =====================================================================
 
   // ✅ Get team display name for header
   const getTeamDisplayName = () => {
@@ -93,12 +93,11 @@ export default function Report({ t }) {
     return "";
   };
 
-  // ✅ Generate sample data based on report type and period
+  // ✅ Generate sample data - FILTERED by selected team
   const generateSampleData = (type, period, teamFilter) => {
     const data = [];
     const now = new Date();
 
-    // Determine count based on period (no useless initial assignment)
     let count;
     switch (period) {
       case "daily":
@@ -123,24 +122,28 @@ export default function Report({ t }) {
         count = 10;
     }
 
-    // ✅ Get team names (filtered if Team Leader)
-    let teamNames = [
+    // ✅ Get the specific team name if filtered
+    let targetTeamName = null;
+    if (teamFilter) {
+      const filteredTeam = teams.find((t) => (t.id || t._id) === teamFilter);
+      if (filteredTeam) {
+        targetTeamName = filteredTeam.name;
+      }
+    }
+
+    // ✅ If Team Leader, only show their team
+    if (isLeader && userTeam) {
+      targetTeamName = userTeam.name;
+    }
+
+    // ✅ If no specific team, use all teams
+    const allTeamNames = [
       "Customer Service",
       "Technical Support",
       "Administration",
       "Sales",
       "Marketing",
     ];
-
-    // ✅ If Team Leader, only show their team
-    if (isLeader && userTeam) {
-      teamNames = [userTeam.name];
-    } else if (teamFilter) {
-      const filteredTeam = teams.find((t) => (t.id || t._id) === teamFilter);
-      if (filteredTeam) {
-        teamNames = [filteredTeam.name];
-      }
-    }
 
     const types = [
       "Forum Report",
@@ -164,13 +167,13 @@ export default function Report({ t }) {
         date.setFullYear(date.getFullYear() - i);
       }
 
-      // ✅ Randomly assign team from available teams
-      const teamIndex = i % teamNames.length;
+      // ✅ If specific team is selected, only use that team
+      const teamName = targetTeamName || allTeamNames[i % allTeamNames.length];
 
       data.push({
         id: i + 1,
         date: date.toISOString().split("T")[0],
-        team: teamNames[teamIndex],
+        team: teamName,
         type: types[i % types.length],
         value: Math.floor(Math.random() * 50) + 50,
         status: Math.random() > 0.3 ? "Completed" : "Pending",
@@ -213,7 +216,6 @@ export default function Report({ t }) {
         responseData = generateSampleData(reportType, period, teamId);
       }
 
-      // If no data from API, use sample data
       if (!responseData || responseData.length === 0) {
         responseData = generateSampleData(reportType, period, teamId);
       }
@@ -257,16 +259,228 @@ export default function Report({ t }) {
     };
   };
 
-  const exportReport = () => {
-    if (!reportData) return;
-    const jsonStr = JSON.stringify(reportData, null, 2);
-    const blob = new Blob([jsonStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${reportType}_report_${new Date().toISOString().split("T")[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  // ✅ EXPORT FUNCTIONS
+
+  // Export to Excel
+  const exportToExcel = () => {
+    if (!reportData || !reportData.data.length) return;
+
+    const wsData = [
+      ["#", "Date", "Team", "Type", "Description", "Value", "Status"],
+      ...reportData.data.map((item, idx) => [
+        idx + 1,
+        item.date,
+        item.team,
+        item.type,
+        item.description,
+        item.value,
+        item.status,
+      ]),
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Report");
+
+    // Auto column widths
+    const colWidths = [
+      { wch: 5 }, // #
+      { wch: 15 }, // Date
+      { wch: 25 }, // Team
+      { wch: 20 }, // Type
+      { wch: 30 }, // Description
+      { wch: 12 }, // Value
+      { wch: 15 }, // Status
+    ];
+    ws["!cols"] = colWidths;
+
+    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    saveAs(
+      blob,
+      `${reportType}_report_${new Date().toISOString().split("T")[0]}.xlsx`,
+    );
+    setShowExportOptions(false);
+  };
+
+  // Export to Word
+  const exportToWord = () => {
+    if (!reportData || !reportData.data.length) return;
+
+    let tableRows = reportData.data
+      .map(
+        (item, idx) => `
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;">${idx + 1}</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">${item.date}</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">${item.team}</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">${item.type}</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">${item.description}</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">${item.value}</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">${item.status}</td>
+      </tr>
+    `,
+      )
+      .join("");
+
+    const htmlContent = `
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            h1 { color: #1a6b4a; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background-color: #1a6b4a; color: white; padding: 10px; text-align: left; border: 1px solid #ddd; }
+            td { padding: 8px; border: 1px solid #ddd; }
+            .summary { margin-top: 20px; display: flex; gap: 20px; flex-wrap: wrap; }
+            .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; min-width: 120px; }
+            .summary-card h3 { margin: 0; color: #666; font-size: 12px; }
+            .summary-card p { margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #1a6b4a; }
+            .footer { margin-top: 30px; color: #999; font-size: 12px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h1>📊 ${reportType.toUpperCase()} Report</h1>
+          <p><strong>Generated:</strong> ${new Date(reportData.generatedAt).toLocaleString()}</p>
+          <p><strong>Team:</strong> ${getTeamDisplayName() || "All Teams"}</p>
+          <p><strong>Period:</strong> ${period}</p>
+          
+          <div class="summary">
+            <div class="summary-card">
+              <h3>Total Records</h3>
+              <p>${reportData.summary.total}</p>
+            </div>
+            <div class="summary-card">
+              <h3>Completed</h3>
+              <p>${reportData.summary.completed}</p>
+            </div>
+            <div class="summary-card">
+              <h3>Pending</h3>
+              <p>${reportData.summary.pending}</p>
+            </div>
+            <div class="summary-card">
+              <h3>Average Value</h3>
+              <p>${reportData.summary.average}</p>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Team</th>
+                <th>Type</th>
+                <th>Description</th>
+                <th>Value</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+            </tbody>
+          </table>
+          <div class="footer">
+            Generated by A-MESOB Report Generator © ${new Date().getFullYear()}
+          </div>
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: "application/msword" });
+    saveAs(
+      blob,
+      `${reportType}_report_${new Date().toISOString().split("T")[0]}.doc`,
+    );
+    setShowExportOptions(false);
+  };
+
+  // Export to PDF
+  const exportToPDF = () => {
+    if (!reportData || !reportData.data.length) return;
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Title
+    doc.setFontSize(18);
+    doc.setTextColor("#1a6b4a");
+    doc.text(`📊 ${reportType.toUpperCase()} Report`, pageWidth / 2, 20, {
+      align: "center",
+    });
+
+    // Metadata
+    doc.setFontSize(10);
+    doc.setTextColor("#666");
+    doc.text(
+      `Generated: ${new Date(reportData.generatedAt).toLocaleString()}`,
+      14,
+      35,
+    );
+    doc.text(`Team: ${getTeamDisplayName() || "All Teams"}`, 14, 42);
+    doc.text(`Period: ${period}`, 14, 49);
+
+    // Summary Cards (simulated)
+    const summaryY = 60;
+    doc.setFontSize(10);
+    doc.setTextColor("#333");
+    doc.text(`Total Records: ${reportData.summary.total}`, 14, summaryY);
+    doc.text(`Completed: ${reportData.summary.completed}`, 80, summaryY);
+    doc.text(`Pending: ${reportData.summary.pending}`, 145, summaryY);
+    doc.text(`Average Value: ${reportData.summary.average}`, 14, summaryY + 10);
+
+    // Table
+    const tableData = reportData.data.map((item) => [
+      item.date,
+      item.team,
+      item.type,
+      item.description || "",
+      item.value.toString(),
+      item.status,
+    ]);
+
+    doc.autoTable({
+      startY: summaryY + 20,
+      head: [["Date", "Team", "Type", "Description", "Value", "Status"]],
+      body: tableData,
+      theme: "striped",
+      headStyles: {
+        fillColor: [26, 107, 74],
+        textColor: [255, 255, 255],
+        fontSize: 9,
+      },
+      bodyStyles: {
+        fontSize: 8,
+      },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 40 },
+        4: { cellWidth: 15 },
+        5: { cellWidth: 20 },
+      },
+    });
+
+    // Footer
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(8);
+    doc.setTextColor("#999");
+    doc.text(
+      `Generated by A-MESOB Report Generator © ${new Date().getFullYear()}`,
+      pageWidth / 2,
+      finalY + 10,
+      { align: "center" },
+    );
+
+    doc.save(
+      `${reportType}_report_${new Date().toISOString().split("T")[0]}.pdf`,
+    );
+    setShowExportOptions(false);
   };
 
   return (
@@ -390,6 +604,7 @@ export default function Report({ t }) {
             gap: "clamp(12px, 3vw, 16px)",
           }}
         >
+          {/* Report Type */}
           <div>
             <label
               style={{
@@ -415,6 +630,7 @@ export default function Report({ t }) {
             </select>
           </div>
 
+          {/* Period */}
           <div>
             <label
               style={{
@@ -440,7 +656,7 @@ export default function Report({ t }) {
             </select>
           </div>
 
-          {/* ✅ Team Filter - Only show for Admins/Super Admins */}
+          {/* Team Filter - Admins/Super Admins only */}
           {(isAdmin || isSuperAdmin) && (
             <div>
               <label
@@ -469,7 +685,7 @@ export default function Report({ t }) {
             </div>
           )}
 
-          {/* ✅ Team Leader - Show their team but disabled */}
+          {/* Team Leader - Show their team (disabled) */}
           {isLeader && userTeam && (
             <div>
               <label
@@ -497,6 +713,7 @@ export default function Report({ t }) {
             </div>
           )}
 
+          {/* Start Date */}
           <div>
             <label
               style={{
@@ -517,6 +734,7 @@ export default function Report({ t }) {
             />
           </div>
 
+          {/* End Date */}
           <div>
             <label
               style={{
@@ -538,12 +756,14 @@ export default function Report({ t }) {
           </div>
         </div>
 
+        {/* Buttons */}
         <div
           style={{
             display: "flex",
             gap: "clamp(8px, 3vw, 12px)",
             marginTop: "clamp(16px, 4vw, 20px)",
             flexWrap: "wrap",
+            alignItems: "center",
           }}
         >
           <button
@@ -561,22 +781,125 @@ export default function Report({ t }) {
               : t?.report?.generateBtn || "🔍 Generate Report"}
           </button>
 
+          {/* ✅ Export Button with dropdown options */}
           {reportData && (
-            <button
-              onClick={exportReport}
-              style={{
-                background: "#10b981",
-                color: "#fff",
-                border: "none",
-                padding: "clamp(8px, 2.5vw, 11px) clamp(20px, 5vw, 32px)",
-                borderRadius: 8,
-                fontSize: "clamp(12px, 3.5vw, 14px)",
-                fontWeight: 700,
-                cursor: "pointer",
-              }}
-            >
-              📥 {t?.report?.exportBtn || "Export Report"}
-            </button>
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowExportOptions(!showExportOptions)}
+                style={{
+                  background: "#10b981",
+                  color: "#fff",
+                  border: "none",
+                  padding: "clamp(8px, 2.5vw, 11px) clamp(20px, 5vw, 32px)",
+                  borderRadius: 8,
+                  fontSize: "clamp(12px, 3.5vw, 14px)",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                📥 {t?.report?.exportBtn || "Export Report"} ▼
+              </button>
+
+              {/* Export Dropdown */}
+              {showExportOptions && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "100%",
+                    left: 0,
+                    marginTop: 4,
+                    background: C.white,
+                    borderRadius: 8,
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                    minWidth: 180,
+                    zIndex: 100,
+                    overflow: "hidden",
+                  }}
+                >
+                  <button
+                    onClick={exportToExcel}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      width: "100%",
+                      padding: "10px 16px",
+                      border: "none",
+                      background: "none",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      color: C.dark,
+                      transition: "background 0.15s",
+                      fontFamily: F.sans,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f0f7f4";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "none";
+                    }}
+                  >
+                    <span style={{ fontSize: 20 }}>📊</span>
+                    Export as Excel
+                  </button>
+                  <button
+                    onClick={exportToWord}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      width: "100%",
+                      padding: "10px 16px",
+                      border: "none",
+                      background: "none",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      color: C.dark,
+                      transition: "background 0.15s",
+                      fontFamily: F.sans,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f0f7f4";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "none";
+                    }}
+                  >
+                    <span style={{ fontSize: 20 }}>📄</span>
+                    Export as Word
+                  </button>
+                  <button
+                    onClick={exportToPDF}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      width: "100%",
+                      padding: "10px 16px",
+                      border: "none",
+                      background: "none",
+                      cursor: "pointer",
+                      fontSize: 13,
+                      color: C.dark,
+                      transition: "background 0.15s",
+                      fontFamily: F.sans,
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#f0f7f4";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "none";
+                    }}
+                  >
+                    <span style={{ fontSize: 20 }}>📕</span>
+                    Export as PDF
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
