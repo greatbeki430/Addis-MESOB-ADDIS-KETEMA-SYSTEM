@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { C, btn, card } from "../../styles/theme";
 import { teamAPI, authAPI } from "../../services/api";
 import { getRoleDisplayName } from "../../utils/roles";
+import { Modal, useToast } from "../../components/ui/Modal";
 
 // eslint-disable-next-line no-unused-vars
 export default function TeamManagement({ t, isSuperAdmin }) {
@@ -16,7 +17,20 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     leader: "",
   });
 
-  // Core data fetching function (no loading state changes)
+  // ✅ Modal states
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    teamId: null,
+    teamName: "",
+  });
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+  const { showToast, ToastContainer } = useToast();
+
   const fetchData = useCallback(async () => {
     try {
       const [teamsRes, usersRes] = await Promise.all([
@@ -30,20 +44,20 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     }
   }, []);
 
-  // Refresh function with loading indicator (used by user actions)
   const refreshData = useCallback(async () => {
     setLoading(true);
     try {
       await fetchData();
+      showToast("Data refreshed successfully", "success");
+    } catch {
+      showToast("Failed to refresh data", "error");
     } finally {
       setLoading(false);
     }
-  }, [fetchData]);
+  }, [fetchData, showToast]);
 
-  // Initial data load - Clean effect (no setState inside effect body)
   useEffect(() => {
     let isMounted = true;
-
     const loadInitialData = async () => {
       try {
         await fetchData();
@@ -53,9 +67,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         }
       }
     };
-
     loadInitialData();
-
     return () => {
       isMounted = false;
     };
@@ -66,8 +78,10 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     try {
       if (editingTeam) {
         await teamAPI.update(editingTeam._id, formData);
+        showToast("Team updated successfully!", "success");
       } else {
         await teamAPI.create(formData);
+        showToast("Team created successfully!", "success");
       }
       setShowModal(false);
       setEditingTeam(null);
@@ -75,24 +89,77 @@ export default function TeamManagement({ t, isSuperAdmin }) {
       await refreshData();
     } catch (error) {
       console.error("Failed to save team:", error);
-      alert(error.response?.data?.message || "Operation failed");
+      setAlertModal({
+        isOpen: true,
+        title: "Error",
+        message:
+          error.response?.data?.message ||
+          "Operation failed. Please try again.",
+        type: "error",
+      });
     }
   };
 
-  const handleDelete = async (teamId) => {
-    if (window.confirm("Are you sure you want to delete this team?")) {
-      try {
-        await teamAPI.delete(teamId);
-        await refreshData();
-      } catch (error) {
-        console.error("Failed to delete team:", error);
-        alert(error.response?.data?.message || "Delete failed");
-      }
+  const handleDelete = async () => {
+    try {
+      await teamAPI.delete(confirmModal.teamId);
+      setConfirmModal({ isOpen: false, teamId: null, teamName: "" });
+      showToast("Team deleted successfully!", "success");
+      await refreshData();
+    } catch (error) {
+      console.error("Failed to delete team:", error);
+      setConfirmModal({ isOpen: false, teamId: null, teamName: "" });
+      setAlertModal({
+        isOpen: true,
+        title: "Error",
+        message:
+          error.response?.data?.message || "Delete failed. Please try again.",
+        type: "error",
+      });
     }
+  };
+
+  const openDeleteConfirm = (teamId, teamName) => {
+    setConfirmModal({
+      isOpen: true,
+      teamId: teamId,
+      teamName: teamName,
+    });
   };
 
   return (
     <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
+      {/* ✅ Toast Container */}
+      <ToastContainer />
+
+      {/* ✅ Alert Modal */}
+      <Modal
+        isOpen={alertModal.isOpen}
+        onClose={() =>
+          setAlertModal({ isOpen: false, title: "", message: "", type: "info" })
+        }
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
+
+      {/* ✅ Confirm Delete Modal */}
+      <Modal
+        isOpen={confirmModal.isOpen}
+        onClose={() =>
+          setConfirmModal({ isOpen: false, teamId: null, teamName: "" })
+        }
+        title="Confirm Delete"
+        message={`Are you sure you want to delete "${confirmModal.teamName}"? This action cannot be undone.`}
+        type="confirm"
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleDelete}
+        onCancel={() =>
+          setConfirmModal({ isOpen: false, teamId: null, teamName: "" })
+        }
+      />
+
       <div
         style={{
           display: "flex",
@@ -193,7 +260,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                         ✏️
                       </button>
                       <button
-                        onClick={() => handleDelete(team._id)}
+                        onClick={() => openDeleteConfirm(team._id, team.name)}
                         style={{
                           background: "none",
                           border: "none",
@@ -245,7 +312,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 style={{ marginBottom: 20 }}>
-              {editingTeam ? "Edit Team" : "Add New Team"}
+              {editingTeam ? "✏️ Edit Team" : "➕ Add New Team"}
             </h2>
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 12 }}>

@@ -7,8 +7,9 @@ import {
   getRoleDisplayName,
   getRoleBadgeColor,
   getRoleIcon,
-  ROLES, // ✅ KEEP - used for role validation
+  ROLES,
 } from "../../utils/roles";
+import { Modal, useToast } from "../../components/ui/Modal";
 
 // ✅ Reusable Action Button Component with improved styling
 const ActionButton = ({ onClick, icon, label, color = C.primary, title }) => (
@@ -68,7 +69,6 @@ const RoleDescription = ({ role }) => {
 };
 
 export default function UserManagement({ t }) {
-  // ✅ KEEP - used for translations
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -84,6 +84,24 @@ export default function UserManagement({ t }) {
   });
   const { user: currentUser, isSuperAdmin, isAdmin } = useAuth();
 
+  // ✅ Modal states
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    userId: null,
+    userName: "",
+  });
+  const [viewModal, setViewModal] = useState({
+    isOpen: false,
+    user: null,
+  });
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+  const { showToast, ToastContainer } = useToast();
+
   // ✅ Load users on mount
   useEffect(() => {
     loadUsers();
@@ -96,6 +114,12 @@ export default function UserManagement({ t }) {
       setUsers(response.data);
     } catch (error) {
       console.error("Failed to load users:", error);
+      setAlertModal({
+        isOpen: true,
+        title: "Error",
+        message: "Failed to load users. Please refresh the page.",
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -111,8 +135,10 @@ export default function UserManagement({ t }) {
           role: formData.role,
           phone: formData.phone,
         });
+        showToast("User updated successfully!", "success");
       } else {
         await authAPI.register(formData);
+        showToast("User created successfully!", "success");
       }
       setShowModal(false);
       setEditingUser(null);
@@ -126,20 +152,49 @@ export default function UserManagement({ t }) {
       loadUsers();
     } catch (error) {
       console.error("Failed to save user:", error);
-      alert(error.response?.data?.message || "Operation failed");
+      setAlertModal({
+        isOpen: true,
+        title: "Error",
+        message:
+          error.response?.data?.message ||
+          "Operation failed. Please try again.",
+        type: "error",
+      });
     }
   };
 
-  const handleDelete = async (userId) => {
-    if (window.confirm("Are you sure you want to delete this user?")) {
-      try {
-        await authAPI.deleteUser(userId);
-        loadUsers();
-      } catch (error) {
-        console.error("Failed to delete user:", error);
-        alert(error.response?.data?.message || "Delete failed");
-      }
+  const handleDelete = async () => {
+    try {
+      await authAPI.deleteUser(confirmModal.userId);
+      setConfirmModal({ isOpen: false, userId: null, userName: "" });
+      showToast("User deleted successfully!", "success");
+      loadUsers();
+    } catch (error) {
+      console.error("Failed to delete user:", error);
+      setConfirmModal({ isOpen: false, userId: null, userName: "" });
+      setAlertModal({
+        isOpen: true,
+        title: "Error",
+        message:
+          error.response?.data?.message || "Delete failed. Please try again.",
+        type: "error",
+      });
     }
+  };
+
+  const openDeleteConfirm = (userId, userName) => {
+    setConfirmModal({
+      isOpen: true,
+      userId: userId,
+      userName: userName,
+    });
+  };
+
+  const openViewModal = (user) => {
+    setViewModal({
+      isOpen: true,
+      user: user,
+    });
   };
 
   // ✅ Filter users based on search and role
@@ -151,7 +206,6 @@ export default function UserManagement({ t }) {
     return matchesSearch && matchesRole;
   });
 
-  // ✅ Role options based on current user's permissions using ROLES constant
   const getAvailableRoles = () => {
     if (isSuperAdmin) {
       return [
@@ -170,14 +224,12 @@ export default function UserManagement({ t }) {
     return [];
   };
 
-  // ✅ Check if user can be deleted (super admin protection)
   const canDeleteUser = (user) => {
     if (user._id === currentUser._id) return false;
     if (user.role === ROLES.SUPER_ADMIN && !isSuperAdmin) return false;
     return true;
   };
 
-  // ✅ Get role statistics
   const getRoleStats = () => {
     const stats = {
       total: users.length,
@@ -191,12 +243,10 @@ export default function UserManagement({ t }) {
 
   const roleStats = getRoleStats();
 
-  // ✅ Get translated text using t prop
   const getTranslation = (key) => {
     if (t && t.userManagement) {
       return t.userManagement[key] || key;
     }
-    // Fallback translations
     const fallback = {
       title: "User Management",
       subtitle: "Manage all users in the system",
@@ -233,6 +283,140 @@ export default function UserManagement({ t }) {
 
   return (
     <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
+      {/* ✅ Toast Container */}
+      <ToastContainer />
+
+      {/* ✅ Alert Modal */}
+      <Modal
+        isOpen={alertModal.isOpen}
+        onClose={() =>
+          setAlertModal({ isOpen: false, title: "", message: "", type: "info" })
+        }
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
+
+      {/* ✅ Confirm Delete Modal */}
+      <Modal
+        isOpen={confirmModal.isOpen}
+        onClose={() =>
+          setConfirmModal({ isOpen: false, userId: null, userName: "" })
+        }
+        title="Confirm Delete"
+        message={`Are you sure you want to delete "${confirmModal.userName}"? This action cannot be undone.`}
+        type="confirm"
+        confirmText="Delete"
+        cancelText="Cancel"
+        onConfirm={handleDelete}
+        onCancel={() =>
+          setConfirmModal({ isOpen: false, userId: null, userName: "" })
+        }
+      />
+
+      {/* ✅ View User Modal */}
+      <Modal
+        isOpen={viewModal.isOpen}
+        onClose={() => setViewModal({ isOpen: false, user: null })}
+        title={`👤 User Details - ${viewModal.user?.name || ""}`}
+        type="info"
+        size="md"
+      >
+        {viewModal.user && (
+          <div style={{ fontFamily: F.sans }}>
+            <div style={{ display: "grid", gap: 12 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderBottom: `1px solid ${C.border}`,
+                  paddingBottom: 8,
+                }}
+              >
+                <span style={{ color: C.muted }}>Name</span>
+                <span style={{ fontWeight: 600, color: C.dark }}>
+                  {viewModal.user.name}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderBottom: `1px solid ${C.border}`,
+                  paddingBottom: 8,
+                }}
+              >
+                <span style={{ color: C.muted }}>Email</span>
+                <span style={{ fontWeight: 600, color: C.dark }}>
+                  {viewModal.user.email}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderBottom: `1px solid ${C.border}`,
+                  paddingBottom: 8,
+                }}
+              >
+                <span style={{ color: C.muted }}>Role</span>
+                <span style={{ fontWeight: 600, color: C.dark }}>
+                  {getRoleIcon(viewModal.user.role)}{" "}
+                  {getRoleDisplayName(viewModal.user.role)}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderBottom: `1px solid ${C.border}`,
+                  paddingBottom: 8,
+                }}
+              >
+                <span style={{ color: C.muted }}>Phone</span>
+                <span style={{ fontWeight: 600, color: C.dark }}>
+                  {viewModal.user.phone || "N/A"}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderBottom: `1px solid ${C.border}`,
+                  paddingBottom: 8,
+                }}
+              >
+                <span style={{ color: C.muted }}>User ID</span>
+                <span style={{ fontWeight: 400, color: "#999", fontSize: 12 }}>
+                  {viewModal.user._id}
+                </span>
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  borderBottom: `1px solid ${C.border}`,
+                  paddingBottom: 8,
+                }}
+              >
+                <span style={{ color: C.muted }}>Created</span>
+                <span style={{ fontWeight: 600, color: C.dark }}>
+                  {new Date(viewModal.user.createdAt).toLocaleDateString()} at{" "}
+                  {new Date(viewModal.user.createdAt).toLocaleTimeString()}
+                </span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: C.muted }}>Last Updated</span>
+                <span style={{ fontWeight: 600, color: C.dark }}>
+                  {new Date(viewModal.user.updatedAt).toLocaleDateString()} at{" "}
+                  {new Date(viewModal.user.updatedAt).toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </Modal>
+
       {/* Header with Stats */}
       <div
         style={{
@@ -293,7 +477,7 @@ export default function UserManagement({ t }) {
         </button>
       </div>
 
-      {/* ✅ Statistics Cards */}
+      {/* Statistics Cards */}
       <div
         style={{
           display: "grid",
@@ -374,7 +558,7 @@ export default function UserManagement({ t }) {
         </div>
       </div>
 
-      {/* ✅ Search and Filter */}
+      {/* Search and Filter */}
       <div
         style={{
           display: "flex",
@@ -427,7 +611,7 @@ export default function UserManagement({ t }) {
         </select>
       </div>
 
-      {/* ✅ User Table */}
+      {/* User Table */}
       {loading ? (
         <div
           style={{
@@ -597,20 +781,9 @@ export default function UserManagement({ t }) {
                       title={getTranslation("edit")}
                     />
 
-                    {/* 👁️ View Button */}
+                    {/* 👁️ View Button - Now opens professional modal */}
                     <ActionButton
-                      onClick={() => {
-                        alert(
-                          `👤 User Details\n\n` +
-                            `Name: ${user.name}\n` +
-                            `Email: ${user.email}\n` +
-                            `Role: ${getRoleDisplayName(user.role)}\n` +
-                            `Phone: ${user.phone || "N/A"}\n` +
-                            `ID: ${user._id}\n` +
-                            `Created: ${new Date(user.createdAt).toLocaleDateString()}\n` +
-                            `Last Updated: ${new Date(user.updatedAt).toLocaleDateString()}`,
-                        );
-                      }}
+                      onClick={() => openViewModal(user)}
                       icon="👁️"
                       label={getTranslation("view")}
                       color="#8b5cf6"
@@ -641,7 +814,6 @@ export default function UserManagement({ t }) {
                                 role: newRole,
                                 phone: user.phone || "",
                               });
-                              // Auto-submit the update
                               const submitEvent = new Event("submit", {
                                 bubbles: true,
                               });
@@ -649,9 +821,13 @@ export default function UserManagement({ t }) {
                                 .querySelector("#user-form")
                                 ?.dispatchEvent(submitEvent);
                             } else {
-                              alert(
-                                "Invalid role. Use: employee, leader, admin",
-                              );
+                              setAlertModal({
+                                isOpen: true,
+                                title: "Invalid Role",
+                                message:
+                                  "Please use: employee, leader, or admin",
+                                type: "warning",
+                              });
                             }
                           }
                         }}
@@ -665,7 +841,7 @@ export default function UserManagement({ t }) {
                     {/* 🗑️ Delete Button */}
                     {canDeleteUser(user) && (
                       <ActionButton
-                        onClick={() => handleDelete(user._id)}
+                        onClick={() => openDeleteConfirm(user._id, user.name)}
                         icon="🗑️"
                         label={getTranslation("delete")}
                         color="#ef4444"
@@ -704,7 +880,7 @@ export default function UserManagement({ t }) {
         </div>
       )}
 
-      {/* ✅ User Modal */}
+      {/* User Modal */}
       {showModal && (
         <div
           style={{
