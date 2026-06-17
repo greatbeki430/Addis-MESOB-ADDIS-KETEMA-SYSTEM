@@ -25,7 +25,7 @@ export default function Sidebar({
   const [newTeamDepartment, setNewTeamDepartment] = useState("");
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const { user, isAdminOrSuperAdmin } = useAuth(); // ✅ Get user role
+  const { user, isAdminOrSuperAdmin, isLeader, isEmployee } = useAuth();
   const filteredNavItems = getFilteredNavItems(user?.role || "employee");
 
   useEffect(() => {
@@ -44,7 +44,7 @@ export default function Sidebar({
       console.log("📦 API Response:", response.data);
 
       if (response.data && Array.isArray(response.data)) {
-        const formattedTeams = response.data.map((team) => ({
+        let formattedTeams = response.data.map((team) => ({
           id: team._id,
           name: team.name,
           description: team.department || "",
@@ -57,6 +57,22 @@ export default function Sidebar({
           department: team.department,
         }));
 
+        // If Employee or Team Leader, only show their team
+        if ((isEmployee || isLeader) && user) {
+          const userTeam = formattedTeams.find(
+            (team) =>
+              team.members?.includes(user.name) ||
+              team.members?.includes(user._id) ||
+              team.leader === user.name ||
+              team.leader === user._id,
+          );
+          if (userTeam) {
+            formattedTeams = [userTeam];
+          } else {
+            formattedTeams = [];
+          }
+        }
+
         console.log("✅ Formatted teams:", formattedTeams);
         setTeams(formattedTeams);
       } else {
@@ -66,8 +82,23 @@ export default function Sidebar({
       console.error("❌ Failed to load teams:", error);
       const savedTeams = localStorage.getItem("forumTeams");
       if (savedTeams) {
-        console.log("📀 Using localStorage fallback");
-        setTeams(JSON.parse(savedTeams));
+        let parsedTeams = JSON.parse(savedTeams);
+        // If Employee or Team Leader, only show their team
+        if ((isEmployee || isLeader) && user) {
+          const userTeam = parsedTeams.find(
+            (team) =>
+              team.members?.includes(user.name) ||
+              team.members?.includes(user._id) ||
+              team.leader === user.name ||
+              team.leader === user._id,
+          );
+          if (userTeam) {
+            parsedTeams = [userTeam];
+          } else {
+            parsedTeams = [];
+          }
+        }
+        setTeams(parsedTeams);
       }
     } finally {
       setLoading(false);
@@ -77,7 +108,7 @@ export default function Sidebar({
   // Load teams on component mount
   useEffect(() => {
     loadTeams();
-  }, []);
+  }, [isEmployee, isLeader, user]);
 
   // Handle team selection
   const handleTeamClick = (team) => {
@@ -345,7 +376,9 @@ export default function Sidebar({
                         textAlign: "center",
                       }}
                     >
-                      No teams yet
+                      {isEmployee || isLeader
+                        ? "You are not assigned to any team"
+                        : "No teams yet"}
                     </div>
                   )}
 
@@ -389,10 +422,27 @@ export default function Sidebar({
                       {team.name.length > 18
                         ? team.name.substring(0, 16) + "…"
                         : team.name}
+                      {/* Show role badge for the user's team */}
+                      {(isEmployee || isLeader) &&
+                        team.members?.includes(user?.name) && (
+                          <span
+                            style={{
+                              marginLeft: 6,
+                              fontSize: 8,
+                              background: isLeader ? "#C25A00" : "#1E4D8C",
+                              color: "#fff",
+                              padding: "1px 6px",
+                              borderRadius: 10,
+                              fontWeight: 600,
+                            }}
+                          >
+                            {isLeader ? "Your Team" : "Your Team"}
+                          </span>
+                        )}
                     </button>
                   ))}
 
-                  {/* ✅ Add Team button - Only Admins and Super Admins */}
+                  {/* Add Team button - Only Admins and Super Admins */}
                   {isAdminOrSuperAdmin && (
                     <button
                       onClick={() => setShowAddTeamModal(true)}
@@ -498,7 +548,7 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Add Team Modal - Only visible when button is clicked */}
+      {/* Add Team Modal */}
       {showAddTeamModal && (
         <div
           style={{
