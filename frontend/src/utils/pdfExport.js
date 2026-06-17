@@ -93,7 +93,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     yPos += 8;
   }
 
-  // Absent Members
+  // ✅ FIXED: Absent Members
   if (yPos > 250) {
     doc.addPage();
     yPos = margin;
@@ -108,16 +108,18 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
   doc.setTextColor(0, 0, 0);
   yPos += 8;
 
-  // eslint-disable-next-line no-unused-vars
-  const absentMembers = formData.absent.filter((m, i) => m && m.trim() !== "");
+  // ✅ FIXED: Filter absent members correctly (they are objects with name and reason)
+  const absentMembers = formData.absent.filter(
+    (item) => item.name && item.name.trim() !== "",
+  );
   if (absentMembers.length > 0) {
     doc.autoTable({
       startY: yPos,
       head: [[t.forum.memberN, t.forum.name, t.forum.reason]],
-      body: absentMembers.map((name, idx) => [
+      body: absentMembers.map((item, idx) => [
         `${idx + 1}`,
-        name,
-        formData.absentReason[idx] || "—",
+        item.name,
+        item.reason || "—",
       ]),
       margin: { left: margin, right: margin },
       theme: "striped",
@@ -479,8 +481,7 @@ export const exportEvaluationReportToPDF = (
   doc.setTextColor(0, 0, 0);
   yPos += 8;
 
-  // eslint-disable-next-line no-unused-vars
-  const memberTotals = members.map((m, idx) => ({
+  const memberTotals = members.map((m) => ({
     name: m,
     total: totalScores(m),
   }));
