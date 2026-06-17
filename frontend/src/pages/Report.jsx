@@ -778,7 +778,7 @@ export default function Report({ t }) {
           >
             {loading
               ? t?.report?.generating || "⏳ Generating..."
-              : t?.report?.generateBtn || "🔍 Generate Report"}
+              : t?.report?.generateBtn || "Generate Report"}
           </button>
 
           {/* ✅ Export Button with dropdown options */}
@@ -800,7 +800,7 @@ export default function Report({ t }) {
                   gap: 8,
                 }}
               >
-                📥 {t?.report?.exportBtn || "Export Report"} ▼
+                {t?.report?.exportBtn || "Export Report"} ▼
               </button>
 
               {/* Export Dropdown */}
