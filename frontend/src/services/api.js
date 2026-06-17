@@ -81,5 +81,13 @@ export const teamAPI = {
 export const serviceAPI = {
   getAll: () => api.get("/services"),
 };
+export const reportAPI = {
+  create: (data) => api.post("/reports", data),
+  getAll: (params) => api.get("/reports", { params }),
+  getById: (id) => api.get(`/reports/${id}`),
+  getByTeam: (teamId) => api.get(`/reports/team/${teamId}`),
+  getByUser: (userId) => api.get(`/reports/user/${userId}`),
+  delete: (id) => api.delete(`/reports/${id}`),
+};
 
 export default api;
