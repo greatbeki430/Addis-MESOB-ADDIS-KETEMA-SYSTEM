@@ -13,6 +13,8 @@ const evaluationRoutes = require("./routes/evaluationRoutes");
 const dailyReportRoutes = require("./routes/dailyReportRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 const userRoutes = require("./routes/userRoutes");
+// ✅ ADDED: Import report routes
+const reportRoutes = require("./routes/reportRoutes");
 
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
@@ -37,6 +39,8 @@ app.use("/api/evaluations", evaluationRoutes);
 app.use("/api/daily-reports", dailyReportRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/auth/users", userRoutes);
+// ✅ ADDED: Report routes
+app.use("/api/reports", reportRoutes);
 
 // Health check
 app.get("/", (req, res) => {
