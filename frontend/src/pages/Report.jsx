@@ -524,84 +524,82 @@ export default function Report({ t }) {
       }}
     >
       {/* Header */}
-      <div style={{ marginBottom: "clamp(24px, 5vw, 32px)" }}>
-        <div
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "clamp(8px, 3vw, 14px)",
+          marginBottom: "clamp(8px, 3vw, 12px)",
+        }}
+      >
+        <h1
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: 12,
+            fontSize: "clamp(18px, 5vw, 24px)",
+            fontWeight: 900,
+            color: C.dark,
+            fontFamily: F.serif,
+            margin: 0,
           }}
         >
-          <h1
-            style={{
-              fontSize: "clamp(24px, 6vw, 32px)",
-              fontWeight: 900,
-              color: C.dark,
-              fontFamily: F.serif,
-              margin: 0,
-            }}
-          >
-            📊 {t?.report?.title || "Report Generator"}
-            {getTeamDisplayName()}
-            {isLeader && userTeam && (
-              <span style={{ fontSize: 16, color: C.primary, fontWeight: 600 }}>
-                {" "}
-                - {t?.report?.myTeam || "My Team"}
-              </span>
-            )}
-          </h1>
-
-          <div style={{ display: "flex", gap: 8 }}>
-            <span
-              style={{
-                background: C.primary,
-                color: "#fff",
-                padding: "6px 16px",
-                borderRadius: 9999,
-                fontSize: "clamp(12px, 3.5vw, 13px)",
-                fontWeight: 700,
-                whiteSpace: "nowrap",
-              }}
-            >
-              {t?.report?.analytics || "Analytics"}
+          📊 {t?.report?.title || "Report Generator"}
+          {getTeamDisplayName()}
+          {isLeader && userTeam && (
+            <span style={{ fontSize: 16, color: C.primary, fontWeight: 600 }}>
+              {" "}
+              - {t?.report?.myTeam || "My Team"}
             </span>
-            <button
-              onClick={() => setShowHistory(!showHistory)}
-              style={{
-                background: "#8b5cf6",
-                color: "#fff",
-                border: "none",
-                padding: "6px 16px",
-                borderRadius: 9999,
-                fontSize: "clamp(12px, 3.5vw, 13px)",
-                fontWeight: 700,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-              }}
-            >
-              📜 History
-            </button>
-          </div>
-        </div>
-
-        {/* ✅ Description - Only show when no report has been generated yet */}
-        {showEmptyState && (
-          <p
+          )}
+        </h1>
+        <div style={{ display: "flex", gap: 8 }}>
+          <span
             style={{
-              color: "#555",
-              marginTop: "12px",
-              fontSize: "clamp(14px, 3.5vw, 16px)",
-              fontFamily: F.sans,
-              lineHeight: 1.6,
+              background: C.primary,
+              color: "#fff",
+              padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 3vw, 12px)",
+              borderRadius: 20,
+              fontSize: "clamp(10px, 3vw, 11px)",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
             }}
           >
-            {t?.report?.description ||
-              "Generate comprehensive reports by merging data from all modules"}
-          </p>
-        )}
+            {t?.report?.analytics || "Analytics"}
+          </span>
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            style={{
+              background: "#8b5cf6",
+              color: "#fff",
+              border: "none",
+              padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 3vw, 12px)",
+              borderRadius: 20,
+              fontSize: "clamp(10px, 3vw, 11px)",
+              fontWeight: 700,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+          >
+            📜 History
+          </button>
+        </div>
       </div>
+
+      {/* ✅ Description - Only show when no report has been generated yet */}
+      {!reportData && !loading && (
+        <p
+          style={{
+            color: "#555",
+            marginBottom: "clamp(16px, 4vw, 22px)",
+            fontSize: "clamp(12px, 3.5vw, 13px)",
+            fontFamily: F.sans,
+          }}
+        >
+          {t?.report?.description ||
+            "Generate comprehensive reports by merging data from all modules"}
+        </p>
+      )}
 
       {/* Team Leader Info Banner */}
       {isLeader && userTeam && (
