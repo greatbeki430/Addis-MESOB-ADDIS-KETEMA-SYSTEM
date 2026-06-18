@@ -15,7 +15,7 @@ import UserManagement from "./pages/admin/UserManagement";
 import TeamManagement from "./pages/admin/TeamManagement";
 import Report from "./pages/Report";
 import { setToastFunction } from "./utils/toastHelper";
-import { useToast } from "./components/ui/Modal";
+import { useToast, ToastContainer } from "./components/ui/Modal"; // ✅ Import ToastContainer
 
 // This component handles the authenticated app
 function AuthenticatedApp() {
@@ -24,8 +24,9 @@ function AuthenticatedApp() {
   const [collapsed, setCollapsed] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const t = translations[lang] || translations.am;
-  const { showToast, ToastContainer } = useToast();
+  const { showToast, toasts, removeToast } = useToast(); // ✅ Get toasts and removeToast
 
+  // Set toast function for non-React files (pdfExport, etc.)
   useEffect(() => {
     setToastFunction(showToast);
   }, [showToast]);
@@ -165,7 +166,8 @@ function AuthenticatedApp() {
         }
       `}</style>
 
-      <ToastContainer />
+      {/* ✅ ToastContainer - Pass toasts and removeToast */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       <Sidebar
         tab={tab}

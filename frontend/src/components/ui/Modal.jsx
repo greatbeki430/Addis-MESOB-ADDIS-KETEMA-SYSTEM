@@ -402,7 +402,7 @@ export const Toast = ({
   );
 };
 
-// ✅ ToastContainer - Separate component (moved outside useToast)
+// ✅ ToastContainer - Separate component
 export const ToastContainer = ({ toasts, removeToast }) => {
   if (!toasts || toasts.length === 0) return null;
 
