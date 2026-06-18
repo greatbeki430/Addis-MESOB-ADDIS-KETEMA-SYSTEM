@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { translations } from "./constants/translations";
 import { C, F } from "./styles/theme";
 import Sidebar from "./components/layout/Sidebar";
@@ -14,6 +14,8 @@ import Register from "./pages/auth/Register";
 import UserManagement from "./pages/admin/UserManagement";
 import TeamManagement from "./pages/admin/TeamManagement";
 import Report from "./pages/Report";
+import { setToastFunction } from "./utils/toastHelper";
+import { useToast } from "./components/ui/Modal";
 
 // This component handles the authenticated app
 function AuthenticatedApp() {
@@ -22,6 +24,11 @@ function AuthenticatedApp() {
   const [collapsed, setCollapsed] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const t = translations[lang] || translations.am;
+  const { showToast, ToastContainer } = useToast();
+
+  useEffect(() => {
+    setToastFunction(showToast);
+  }, [showToast]);
 
   // Get all role-based authentication helpers
   const {
@@ -157,6 +164,8 @@ function AuthenticatedApp() {
           }
         }
       `}</style>
+
+      <ToastContainer />
 
       <Sidebar
         tab={tab}

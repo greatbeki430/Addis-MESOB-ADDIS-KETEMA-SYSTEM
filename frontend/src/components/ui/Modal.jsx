@@ -402,20 +402,11 @@ export const Toast = ({
   );
 };
 
-// ✅ Hook for using Toast
-export const useToast = () => {
-  const [toasts, setToasts] = useState([]);
+// ✅ ToastContainer - Separate component (moved outside useToast)
+export const ToastContainer = ({ toasts, removeToast }) => {
+  if (!toasts || toasts.length === 0) return null;
 
-  const showToast = (message, type = "success", duration = 3000) => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type, duration }]);
-  };
-
-  const removeToast = (id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  const ToastContainer = () => (
+  return (
     <div
       style={{
         position: "fixed",
@@ -434,12 +425,26 @@ export const useToast = () => {
           key={toast.id}
           message={toast.message}
           type={toast.type}
-          onClose={() => removeToast(toast.id)}
+          onClose={() => removeToast?.(toast.id)}
           duration={toast.duration}
         />
       ))}
     </div>
   );
+};
 
-  return { showToast, ToastContainer };
+// ✅ Hook for using Toast
+export const useToast = () => {
+  const [toasts, setToasts] = useState([]);
+
+  const showToast = (message, type = "success", duration = 3000) => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, message, type, duration }]);
+  };
+
+  const removeToast = (id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  return { showToast, toasts, removeToast };
 };
