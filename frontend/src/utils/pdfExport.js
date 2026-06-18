@@ -1,7 +1,7 @@
 // frontend/src/utils/pdfExport.js
 import jsPDF from "jspdf";
-// ✅ IMPORTANT: jspdf-autotable must be imported to add autoTable to jsPDF
-import "jspdf-autotable";
+// ✅ IMPORTANT: Import autoTable from jspdf-autotable
+import autoTable from "jspdf-autotable";
 
 // Helper: Get Ethiopian date
 const getEthiopianDate = () => {
@@ -23,6 +23,7 @@ const formatTime = (timeStr) => {
 export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
   try {
     console.log("📄 Generating Forum Report PDF...");
+    console.log("📊 FormData:", formData);
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -37,14 +38,14 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     // Header
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text(t.forum.title || "Peer Forum Report", pageWidth / 2, yPos, {
+    doc.text(t.forum?.title || "Peer Forum Report", pageWidth / 2, yPos, {
       align: "center",
     });
     yPos += 8;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(t.forum.subtitle || "", pageWidth / 2, yPos, { align: "center" });
+    doc.text(t.forum?.subtitle || "", pageWidth / 2, yPos, { align: "center" });
     yPos += 10;
 
     doc.setDrawColor(26, 107, 74);
@@ -56,7 +57,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text(`Meeting #${meetingNumber || 1}`, margin, yPos);
-    const displayDate = formData.date || getEthiopianDate();
+    const displayDate = formData?.date || getEthiopianDate();
     doc.text(`Date: ${displayDate}`, pageWidth - margin - 50, yPos, {
       align: "right",
     });
@@ -65,7 +66,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.text(
-      `⏰ Time: ${formatTime(formData.timeStart)} - ${formatTime(formData.timeEnd)}`,
+      `⏰ Time: ${formatTime(formData?.timeStart)} - ${formatTime(formData?.timeEnd)}`,
       margin,
       yPos,
     );
@@ -77,23 +78,23 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum.presentMembers || "Present Members", margin + 2, yPos);
+    doc.text(t.forum?.presentMembers || "Present Members", margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
     const presentMembers =
-      formData.present?.filter((m) => m && m.trim() !== "") || [];
+      formData?.present?.filter((m) => m && m.trim() !== "") || [];
     if (presentMembers.length > 0) {
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPos,
-        head: [[t.forum.memberN || "No.", t.forum.name || "Name"]],
+        head: [[t.forum?.memberN || "No.", t.forum?.name || "Name"]],
         body: presentMembers.map((name, idx) => [`${idx + 1}`, name]),
         margin: { left: margin, right: margin },
         theme: "striped",
         headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
         bodyStyles: { fontSize: 9 },
       });
-      yPos = doc.lastAutoTable.finalY + 8;
+      yPos = doc.lastAutoTable?.finalY + 8 || yPos + 20;
     } else {
       doc.setFontSize(10);
       doc.text("—", margin, yPos);
@@ -111,22 +112,22 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum.absentMembers || "Absent Members", margin + 2, yPos);
+    doc.text(t.forum?.absentMembers || "Absent Members", margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
     const absentMembers =
-      formData.absent?.filter(
+      formData?.absent?.filter(
         (item) => item?.name && item.name.trim() !== "",
       ) || [];
     if (absentMembers.length > 0) {
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPos,
         head: [
           [
-            t.forum.memberN || "No.",
-            t.forum.name || "Name",
-            t.forum.reason || "Reason",
+            t.forum?.memberN || "No.",
+            t.forum?.name || "Name",
+            t.forum?.reason || "Reason",
           ],
         ],
         body: absentMembers.map((item, idx) => [
@@ -139,7 +140,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
         headStyles: { fillColor: [139, 26, 26], textColor: [255, 255, 255] },
         bodyStyles: { fontSize: 9 },
       });
-      yPos = doc.lastAutoTable.finalY + 8;
+      yPos = doc.lastAutoTable?.finalY + 8 || yPos + 20;
     } else {
       doc.setFontSize(10);
       doc.text("All members present", margin, yPos);
@@ -157,14 +158,14 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum.prevResults || "Previous Results", margin + 2, yPos);
+    doc.text(t.forum?.prevResults || "Previous Results", margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
     const prevResults =
-      formData.prevResults?.filter((r) => r && r.trim() !== "") || [];
+      formData?.prevResults?.filter((r) => r && r.trim() !== "") || [];
     if (prevResults.length > 0) {
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPos,
         head: [["#", "Result"]],
         body: prevResults.map((result, idx) => [`${idx + 1}`, result]),
@@ -172,7 +173,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
         theme: "plain",
         bodyStyles: { fontSize: 9 },
       });
-      yPos = doc.lastAutoTable.finalY + 8;
+      yPos = doc.lastAutoTable?.finalY + 8 || yPos + 20;
     } else {
       doc.setFontSize(10);
       doc.text("—", margin, yPos);
@@ -190,31 +191,35 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum.todayTopics || "Discussion Topics", margin + 2, yPos);
+    doc.text(t.forum?.todayTopics || "Discussion Topics", margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
     const topics =
-      formData.topics?.filter((topic) => topic && topic.trim() !== "") || [];
+      formData?.topics?.filter((topic) => topic && topic.trim() !== "") || [];
     if (topics.length > 0) {
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPos,
-        head: [["#", t.forum.topic || "Topic"]],
+        head: [["#", t.forum?.topic || "Topic"]],
         body: topics.map((topic, idx) => [`${idx + 1}`, topic]),
         margin: { left: margin, right: margin },
         theme: "striped",
         bodyStyles: { fontSize: 9 },
       });
-      yPos = doc.lastAutoTable.finalY + 6;
+      yPos = doc.lastAutoTable?.finalY + 6 || yPos + 20;
     }
 
     // Standing Agendas
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
-    doc.text(`${t.forum.standingAgendas || "Standing Agendas:"}`, margin, yPos);
+    doc.text(
+      `${t.forum?.standingAgendas || "Standing Agendas:"}`,
+      margin,
+      yPos,
+    );
     yPos += 5;
 
-    const standingAgendas = t.agendas || [];
+    const standingAgendas = t?.agendas || [];
     const agendasPerRow = 2;
     const agendaWidth = (pageWidth - margin * 2) / agendasPerRow;
     let agendaX = margin;
@@ -240,13 +245,13 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum.explanation || "Explanation", margin + 2, yPos);
+    doc.text(t.forum?.explanation || "Explanation", margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    const explanationText = formData.explanation || "—";
+    const explanationText = formData?.explanation || "—";
     const splitExplanation = doc.splitTextToSize(
       explanationText,
       pageWidth - margin * 2,
@@ -265,13 +270,13 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum.gaps || "Identified Gaps", margin + 2, yPos);
+    doc.text(t.forum?.gaps || "Identified Gaps", margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
-    const gaps = formData.gaps?.filter((g) => g && g.trim() !== "") || [];
+    const gaps = formData?.gaps?.filter((g) => g && g.trim() !== "") || [];
     if (gaps.length > 0) {
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPos,
         head: [["#", "Gap Identified"]],
         body: gaps.map((gap, idx) => [`${idx + 1}`, gap]),
@@ -280,7 +285,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
         headStyles: { fillColor: [194, 90, 0], textColor: [255, 255, 255] },
         bodyStyles: { fontSize: 9 },
       });
-      yPos = doc.lastAutoTable.finalY + 8;
+      yPos = doc.lastAutoTable?.finalY + 8 || yPos + 20;
     } else {
       doc.setFontSize(10);
       doc.text("—", margin, yPos);
@@ -298,14 +303,14 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum.agreements || "Agreed Points", margin + 2, yPos);
+    doc.text(t.forum?.agreements || "Agreed Points", margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
     const agreements =
-      formData.agreements?.filter((a) => a && a.trim() !== "") || [];
+      formData?.agreements?.filter((a) => a && a.trim() !== "") || [];
     if (agreements.length > 0) {
-      doc.autoTable({
+      autoTable(doc, {
         startY: yPos,
         head: [["#", "Agreed Point"]],
         body: agreements.map((agreement, idx) => [`${idx + 1}`, agreement]),
@@ -314,7 +319,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
         headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
         bodyStyles: { fontSize: 9 },
       });
-      yPos = doc.lastAutoTable.finalY + 8;
+      yPos = doc.lastAutoTable?.finalY + 8 || yPos + 20;
     } else {
       doc.setFontSize(10);
       doc.text("—", margin, yPos);
@@ -329,7 +334,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
 
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text(t.forum.signatures || "Signatures", margin, yPos);
+    doc.text(t.forum?.signatures || "Signatures", margin, yPos);
     yPos += 10;
 
     const signatureCount = 7;
@@ -347,7 +352,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.text(
-        `${i + 1}${t.forum.signatureN || "th Signature"}`,
+        `${i + 1}${t.forum?.signatureN || "th Signature"}`,
         sigX,
         yPos - 3,
       );
@@ -377,10 +382,11 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
 
     doc.save(`forum_report_${displayDate.replace(/\//g, "-")}.pdf`);
     console.log("✅ Forum Report PDF generated successfully!");
+    alert("✅ PDF generated successfully!");
     return true;
   } catch (error) {
     console.error("❌ Forum Report PDF Error:", error);
-    alert("Failed to generate PDF. Please try again.");
+    alert(`Failed to generate PDF: ${error.message}`);
     return false;
   }
 };
@@ -407,7 +413,7 @@ export const exportDailyReportToPDF = (rows, date, t) => {
 
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text(t.dailyReport.title || "Daily Report", pageWidth / 2, yPos, {
+    doc.text(t.dailyReport?.title || "Daily Report", pageWidth / 2, yPos, {
       align: "center",
     });
     yPos += 8;
@@ -424,16 +430,16 @@ export const exportDailyReportToPDF = (rows, date, t) => {
     const grandMale = rows.reduce((sum, row) => sum + (row.male || 0), 0);
     const grandFemale = rows.reduce((sum, row) => sum + (row.female || 0), 0);
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: yPos,
       head: [
         [
-          t.dailyReport.colNo || "#",
-          t.dailyReport.colDept || "Department",
-          t.dailyReport.colService || "Service",
-          t.dailyReport.colMale || "Male",
-          t.dailyReport.colFemale || "Female",
-          t.dailyReport.colTotal || "Total",
+          t.dailyReport?.colNo || "#",
+          t.dailyReport?.colDept || "Department",
+          t.dailyReport?.colService || "Service",
+          t.dailyReport?.colMale || "Male",
+          t.dailyReport?.colFemale || "Female",
+          t.dailyReport?.colTotal || "Total",
         ],
       ],
       body: rows.map((row, idx) => [
@@ -448,7 +454,7 @@ export const exportDailyReportToPDF = (rows, date, t) => {
         [
           "",
           "",
-          t.dailyReport.grandTotal || "Grand Total",
+          t.dailyReport?.grandTotal || "Grand Total",
           grandMale,
           grandFemale,
           grandTotal,
@@ -477,10 +483,11 @@ export const exportDailyReportToPDF = (rows, date, t) => {
 
     doc.save(`daily_report_${reportDate.replace(/\//g, "-")}.pdf`);
     console.log("✅ Daily Report PDF generated successfully!");
+    alert("✅ PDF generated successfully!");
     return true;
   } catch (error) {
     console.error("❌ Daily Report PDF Error:", error);
-    alert("Failed to generate PDF. Please try again.");
+    alert(`Failed to generate PDF: ${error.message}`);
     return false;
   }
 };
@@ -513,14 +520,14 @@ export const exportEvaluationReportToPDF = (
 
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text(t.evaluation.title || "Evaluation Report", pageWidth / 2, yPos, {
+    doc.text(t.evaluation?.title || "Evaluation Report", pageWidth / 2, yPos, {
       align: "center",
     });
     yPos += 8;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(t.evaluation.subtitle || "", pageWidth / 2, yPos, {
+    doc.text(t.evaluation?.subtitle || "", pageWidth / 2, yPos, {
       align: "center",
     });
     yPos += 10;
@@ -548,7 +555,7 @@ export const exportEvaluationReportToPDF = (
       total: totalScores(m),
     }));
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: yPos,
       head: [["#", "Member Name", "Total Score (0-100)"]],
       body: memberTotals.map((m, idx) => [idx + 1, m.name, m.total]),
@@ -558,7 +565,7 @@ export const exportEvaluationReportToPDF = (
       bodyStyles: { fontSize: 10 },
     });
 
-    yPos = doc.lastAutoTable.finalY + 12;
+    yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
 
     // Best performer
     if (bestPerformer) {
@@ -582,10 +589,11 @@ export const exportEvaluationReportToPDF = (
 
     doc.save(`evaluation_report_${getEthiopianDate().replace(/\//g, "-")}.pdf`);
     console.log("✅ Evaluation Report PDF generated successfully!");
+    alert("✅ PDF generated successfully!");
     return true;
   } catch (error) {
     console.error("❌ Evaluation Report PDF Error:", error);
-    alert("Failed to generate PDF. Please try again.");
+    alert(`Failed to generate PDF: ${error.message}`);
     return false;
   }
 };
