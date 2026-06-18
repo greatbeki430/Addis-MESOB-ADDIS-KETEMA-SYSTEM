@@ -13,7 +13,6 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import UserManagement from "./pages/admin/UserManagement";
 import TeamManagement from "./pages/admin/TeamManagement";
-// import Reports from "./pages/Reports";
 import Report from "./pages/Report";
 
 // This component handles the authenticated app
@@ -223,11 +222,7 @@ function AuthenticatedApp() {
             <TeamManagement t={t} isSuperAdmin={isSuperAdmin} />
           )}
 
-          {/* ✅ ADD THIS - Reports/Analytics page for Admins and Super Admins */}
-          {tab === "analytics" && isAdminOrSuperAdmin && <Report t={t} />}
-
-          {/* {tab === "reports" && <Reports t={t} />} */}
-          {/* Analytics/Report Generator - Team Leaders, Admins and Super Admins */}
+          {/* ✅ Analytics/Report Generator - Team Leaders, Admins and Super Admins */}
           {tab === "analytics" && isLeaderOrAbove && <Report t={t} />}
         </main>
       </div>
