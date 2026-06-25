@@ -1,3 +1,4 @@
+// src/App.jsx
 import { useState, useEffect } from "react";
 import { C, F } from "./styles/theme";
 import Sidebar from "./components/layout/Sidebar";
@@ -7,7 +8,8 @@ import ForumReport from "./pages/ForumReport";
 import Evaluation from "./pages/Evaluation";
 import DailyReport from "./pages/DailyReport";
 import Services from "./pages/Services";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthContext";
+import { useAuth } from "./hooks/useAuth";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import UserManagement from "./pages/admin/UserManagement";
@@ -16,7 +18,6 @@ import Report from "./pages/Report";
 import { setToastFunction } from "./utils/toastHelper";
 import { ToastContainer } from "./components/ui/Modal";
 import { useToast } from "./hooks/useToast";
-// ✅ FIXED: Import LanguageProvider from context, useLanguage from hooks
 import { LanguageProvider } from "./context/LanguageContext";
 import { useLanguage } from "./hooks/useLanguage";
 

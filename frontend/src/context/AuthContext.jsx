@@ -1,18 +1,7 @@
-/* eslint-disable no-unused-vars */
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-} from "react";
+// src/context/AuthContext.jsx
+import { useState, useEffect, useCallback } from "react";
 import { authAPI } from "../services/api";
-
-const AuthContext = createContext();
-
-// Hook
-// eslint-disable-next-line react-refresh/only-export-components
-export const useAuth = () => useContext(AuthContext);
+import { AuthContext } from "./AuthContext";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -53,35 +42,43 @@ export const AuthProvider = ({ children }) => {
   // TOKEN CHECK ON LOAD
   // ========================
   useEffect(() => {
-    if (!token) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLoading(false);
-      return;
-    }
+    let isMounted = true;
 
-    try {
-      const payload = JSON.parse(atob(token.split(".")[1]));
-
-      if (!payload?.exp) {
-        throw new Error("Invalid token: no exp field");
-      }
-
-      const expTime = payload.exp * 1000;
-      const now = Date.now();
-
-      if (now >= expTime) {
-        console.log("Token expired, logging out...");
-        logout();
+    const checkToken = async () => {
+      if (!token) {
+        if (isMounted) setLoading(false);
         return;
       }
 
-      loadUser();
-    } catch (err) {
-      console.error("Invalid token:", err);
-      logout();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+
+        if (!payload?.exp) {
+          throw new Error("Invalid token: no exp field");
+        }
+
+        const expTime = payload.exp * 1000;
+        const now = Date.now();
+
+        if (now >= expTime) {
+          console.log("Token expired, logging out...");
+          logout();
+          return;
+        }
+
+        await loadUser();
+      } catch (err) {
+        console.error("Invalid token:", err);
+        logout();
+      }
+    };
+
+    checkToken();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token, loadUser, logout]);
 
   // ========================
   // REGISTER
@@ -106,21 +103,9 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.login(credentials);
       const { token: newToken, ...userInfo } = response.data;
 
-      // Save token
       localStorage.setItem("token", newToken);
       setToken(newToken);
       setUser(userInfo);
-
-      // Debug expiry (optional)
-      try {
-        const payload = JSON.parse(atob(newToken.split(".")[1]));
-        console.log(
-          "Token expires at:",
-          new Date(payload.exp * 1000).toLocaleTimeString(),
-        );
-      } catch (e) {
-        console.error("Token decode error:", e);
-      }
 
       return { success: true, data: userInfo };
     } catch (error) {
