@@ -14,14 +14,14 @@ import UserManagement from "./pages/admin/UserManagement";
 import TeamManagement from "./pages/admin/TeamManagement";
 import Report from "./pages/Report";
 import { setToastFunction } from "./utils/toastHelper";
-// import { useToast, ToastContainer } from "./components/ui/Modal";
 import { ToastContainer } from "./components/ui/Modal";
 import { useToast } from "./hooks/useToast";
-import { LanguageProvider, useLanguage } from "./context/LanguageContext";
+// ✅ FIXED: Import LanguageProvider from context, useLanguage from hooks
+import { LanguageProvider } from "./context/LanguageContext";
+import { useLanguage } from "./hooks/useLanguage";
 
 // =============================================
 // ANIMATED A-MESOB TITLE COMPONENT
-// Used in Sidebar for the logo animation
 // =============================================
 export const AnimatedTitle = ({ t, collapsed }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -169,7 +169,6 @@ function AuthenticatedApp() {
       .slice(0, 2);
   };
 
-  // Get user's role name for display
   const getUserRoleName = () => {
     if (isSuperAdmin) return "Super Admin";
     if (isAdmin) return "Admin";
@@ -345,7 +344,7 @@ function AuthenticatedApp() {
         </main>
       </div>
 
-      {/* Floating User Badge - Now shows role name properly */}
+      {/* Floating User Badge */}
       <div
         style={{
           position: "fixed",
