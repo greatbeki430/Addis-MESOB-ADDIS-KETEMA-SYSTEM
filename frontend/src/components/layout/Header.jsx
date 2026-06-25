@@ -1,9 +1,7 @@
-// ════════════════════════════════════════════════════════════
-// components/layout/Header - Fully Responsive with Logout
-// ════════════════════════════════════════════════════════════
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { useAuth } from "../../context/AuthContext";
+import { useState } from "react";
 
 export default function Header({ tab, t, lang, setLang }) {
   const icons = {
@@ -12,8 +10,12 @@ export default function Header({ tab, t, lang, setLang }) {
     evaluation: "◉",
     report: "◫",
     services: "◧",
+    users: "👥",
+    teams: "👥",
+    analytics: "📊",
   };
   const { logout, user } = useAuth();
+  const [isLogoutHovered, setIsLogoutHovered] = useState(false);
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("en-GB", {
@@ -23,11 +25,12 @@ export default function Header({ tab, t, lang, setLang }) {
     day: "numeric",
   });
 
-  // Get user initial for avatar
   const getUserInitial = () => {
     if (!user?.name) return "U";
     return user.name.charAt(0).toUpperCase();
   };
+
+  const tabLabel = t.nav?.[tab] || tab;
 
   return (
     <header
@@ -49,7 +52,7 @@ export default function Header({ tab, t, lang, setLang }) {
         flexWrap: "wrap",
       }}
     >
-      {/* LEFT SECTION - Navigation info */}
+      {/* LEFT SECTION */}
       <div
         style={{
           display: "flex",
@@ -65,12 +68,12 @@ export default function Header({ tab, t, lang, setLang }) {
             fontSize: "clamp(16px, 4vw, 20px)",
             color: C.primary,
             flexShrink: 0,
+            animation: "pulseGlow 3s ease-in-out infinite",
           }}
         >
           {icons[tab] || "◈"}
         </span>
 
-        {/* App name - hide on very small screens */}
         <span
           className="header-appname"
           style={{
@@ -80,9 +83,6 @@ export default function Header({ tab, t, lang, setLang }) {
             display: "inline-flex",
             alignItems: "center",
             gap: 4,
-            "@media (max-width: 480px)": {
-              display: "none",
-            },
           }}
         >
           {t.appName}
@@ -92,7 +92,6 @@ export default function Header({ tab, t, lang, setLang }) {
           ›
         </span>
 
-        {/* Current page name */}
         <span
           style={{
             fontWeight: 700,
@@ -102,13 +101,17 @@ export default function Header({ tab, t, lang, setLang }) {
             whiteSpace: "normal",
             wordBreak: "break-word",
             maxWidth: "min(200px, 40vw)",
+            background: `linear-gradient(90deg, ${C.primary}, ${C.light})`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
           }}
         >
-          {t.nav[tab]}
+          {tabLabel}
         </span>
       </div>
 
-      {/* RIGHT SECTION - Date, Language, Logout, Profile */}
+      {/* RIGHT SECTION */}
       <div
         style={{
           display: "flex",
@@ -119,7 +122,6 @@ export default function Header({ tab, t, lang, setLang }) {
           justifyContent: "flex-end",
         }}
       >
-        {/* Date - Hide on small screens */}
         <span
           className="header-date"
           style={{
@@ -130,15 +132,12 @@ export default function Header({ tab, t, lang, setLang }) {
             display: "inline-flex",
             alignItems: "center",
             gap: 4,
-            "@media (max-width: 550px)": {
-              display: "none",
-            },
           }}
         >
           📅 {dateStr}
         </span>
 
-        {/* Language buttons - Desktop: Show all buttons, Mobile: Dropdown */}
+        {/* Language Buttons */}
         <div
           style={{
             display: "flex",
@@ -146,16 +145,7 @@ export default function Header({ tab, t, lang, setLang }) {
             flexShrink: 0,
           }}
         >
-          {/* Desktop: Show all buttons */}
-          <div
-            style={{
-              display: "flex",
-              gap: "clamp(2px, 1.5vw, 6px)",
-              "@media (max-width: 500px)": {
-                display: "none",
-              },
-            }}
-          >
+          <div style={{ display: "flex", gap: "clamp(2px, 1.5vw, 6px)" }}>
             {LANGUAGES.map((l) => (
               <button
                 key={l.code}
@@ -175,6 +165,19 @@ export default function Header({ tab, t, lang, setLang }) {
                   transition: "all 0.2s ease",
                   whiteSpace: "nowrap",
                   minWidth: "clamp(24px, 6vw, 32px)",
+                  transform: lang === l.code ? "scale(1.05)" : "scale(1)",
+                }}
+                onMouseEnter={(e) => {
+                  if (lang !== l.code) {
+                    e.currentTarget.style.background = C.primary + "22";
+                    e.currentTarget.style.transform = "scale(1.05)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (lang !== l.code) {
+                    e.currentTarget.style.background = "#f0f7f4";
+                    e.currentTarget.style.transform = "scale(1)";
+                  }
                 }}
               >
                 {l.flag}
@@ -182,7 +185,7 @@ export default function Header({ tab, t, lang, setLang }) {
             ))}
           </div>
 
-          {/* Mobile: Show dropdown selector */}
+          {/* Mobile Language Selector */}
           <select
             value={lang}
             onChange={(e) => setLang(e.target.value)}
@@ -197,9 +200,6 @@ export default function Header({ tab, t, lang, setLang }) {
               cursor: "pointer",
               fontFamily: F.sans,
               display: "none",
-              "@media (max-width: 500px)": {
-                display: "block",
-              },
             }}
           >
             {LANGUAGES.map((l) => (
@@ -210,13 +210,13 @@ export default function Header({ tab, t, lang, setLang }) {
           </select>
         </div>
 
-        {/* ✅ LOGOUT BUTTON - Added here */}
+        {/* Logout Button */}
         <button
           onClick={logout}
           className="header-logout-btn"
           style={{
-            background: "transparent",
-            border: `1px solid ${C.border}`,
+            background: isLogoutHovered ? "#dc2626" : "transparent",
+            border: `1px solid ${isLogoutHovered ? "#dc2626" : C.border}`,
             borderRadius: 5,
             padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 2vw, 12px)",
             fontSize: "clamp(10px, 2.5vw, 12px)",
@@ -225,32 +225,26 @@ export default function Header({ tab, t, lang, setLang }) {
             display: "flex",
             alignItems: "center",
             gap: 6,
-            color: C.muted,
-            transition: "all 0.2s ease",
+            color: isLogoutHovered ? "#fff" : C.muted,
+            transition: "all 0.3s ease",
             whiteSpace: "nowrap",
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#dc2626";
-            e.currentTarget.style.borderColor = "#dc2626";
-            e.currentTarget.style.color = "#fff";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "transparent";
-            e.currentTarget.style.borderColor = C.border;
-            e.currentTarget.style.color = C.muted;
-          }}
+          onMouseEnter={() => setIsLogoutHovered(true)}
+          onMouseLeave={() => setIsLogoutHovered(false)}
         >
           <span style={{ fontSize: "clamp(12px, 3vw, 14px)" }}>🚪</span>
-          <span style={{ display: "inline-block" }}>Logout</span>
+          <span style={{ display: "inline-block" }}>
+            {t.auth?.logout || "Logout"}
+          </span>
         </button>
 
-        {/* Profile avatar - now shows user initial */}
+        {/* Profile Avatar */}
         <div
           className="header-avatar"
           style={{
             width: "clamp(28px, 6vw, 36px)",
             height: "clamp(28px, 6vw, 36px)",
-            background: `linear-gradient(135deg,${C.primary},${C.light})`,
+            background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
@@ -262,8 +256,17 @@ export default function Header({ tab, t, lang, setLang }) {
             cursor: "pointer",
             boxShadow: `0 2px 6px ${C.primary}44`,
             flexShrink: 0,
+            transition: "transform 0.3s ease, box-shadow 0.3s ease",
           }}
           title={user?.name || "User"}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "scale(1.1)";
+            e.currentTarget.style.boxShadow = `0 4px 12px ${C.primary}66`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.boxShadow = `0 2px 6px ${C.primary}44`;
+          }}
         >
           {getUserInitial()}
         </div>

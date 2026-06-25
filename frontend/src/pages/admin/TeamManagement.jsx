@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback } from "react";
 import { C, btn, card } from "../../styles/theme";
 import { teamAPI, authAPI } from "../../services/api";
 import { getRoleDisplayName } from "../../utils/roles";
-import { Modal, useToast } from "../../components/ui/Modal";
+// import { Modal, useToast } from "../../components/ui/Modal";
+import { Modal } from "../../components/ui/Modal";
+import { useToast } from "../../hooks/useToast";
 
 // eslint-disable-next-line no-unused-vars
 export default function TeamManagement({ t, isSuperAdmin }) {

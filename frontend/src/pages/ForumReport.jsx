@@ -1,16 +1,10 @@
-// ════════════════════════════════════════════════════════════
-// pages/ForumReport - Shows report form for selected team
-// ════════════════════════════════════════════════════════════
 import { useState } from "react";
-// eslint-disable-next-line no-unused-vars
-import { btn, card, C, F, inp } from "../styles/theme";
+import { btn, C, F, inp } from "../styles/theme";
 import Field from "../components/ui/Field";
 import Section from "../components/ui/Section";
 import { exportForumReportToPDF } from "../utils/pdfExport";
+import { meetingAPI } from "../services/api";
 
-// =============================================
-// REUSABLE COMPONENT FOR DYNAMIC FIELDS
-// =============================================
 function DynamicFieldGroup({
   title,
   values,
@@ -20,9 +14,10 @@ function DynamicFieldGroup({
   renderField,
   labelPrefix = "",
   placeholderPrefix = "",
+  icon = "📝",
 }) {
   return (
-    <Section title={title}>
+    <Section title={title} icon={icon}>
       {values.map((value, idx) => (
         <div
           key={idx}
@@ -32,6 +27,7 @@ function DynamicFieldGroup({
             gap: "8px",
             marginBottom: "12px",
             flexWrap: "wrap",
+            animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
           }}
         >
           <div style={{ flex: 1 }}>
@@ -64,31 +60,16 @@ function DynamicFieldGroup({
                 justifyContent: "center",
                 transition: "all 0.2s",
               }}
-              title="Remove this item"
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "#b91c1c";
-                e.currentTarget.style.width = "auto";
-                e.currentTarget.style.padding = "0 12px";
-                e.currentTarget.style.gap = "6px";
-                const span = e.currentTarget.querySelector(".button-text");
-                if (span) span.style.display = "inline";
+                e.currentTarget.style.transform = "scale(1.1)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "#dc2626";
-                e.currentTarget.style.width = "32px";
-                e.currentTarget.style.padding = "0";
-                e.currentTarget.style.gap = "0";
-                const span = e.currentTarget.querySelector(".button-text");
-                if (span) span.style.display = "none";
+                e.currentTarget.style.transform = "scale(1)";
               }}
             >
-              <span style={{ fontSize: "16px" }}>−</span>
-              <span
-                className="button-text"
-                style={{ display: "none", fontSize: "12px" }}
-              >
-                Remove
-              </span>
+              ✕
             </button>
           )}
         </div>
@@ -101,7 +82,7 @@ function DynamicFieldGroup({
           color: "white",
           border: "none",
           borderRadius: "6px",
-          padding: "6px 12px",
+          padding: "6px 14px",
           fontSize: "13px",
           fontWeight: "bold",
           cursor: "pointer",
@@ -111,25 +92,18 @@ function DynamicFieldGroup({
           marginTop: "8px",
           transition: "all 0.2s",
         }}
-        title={`Add new ${title.toLowerCase()}`}
         onMouseEnter={(e) => {
           e.currentTarget.style.background = "#059669";
-          const span = e.currentTarget.querySelector(".button-text");
-          if (span) span.style.display = "inline";
+          e.currentTarget.style.transform = "translateY(-2px)";
+          e.currentTarget.style.boxShadow = "0 4px 12px rgba(16,185,129,0.3)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "#10b981";
-          const span = e.currentTarget.querySelector(".button-text");
-          if (span) span.style.display = "none";
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "none";
         }}
       >
-        <span style={{ fontSize: "16px", fontWeight: "bold" }}>+</span>
-        <span
-          className="button-text"
-          style={{ display: "none", fontSize: "12px" }}
-        >
-          Add
-        </span>
+        <span style={{ fontSize: "16px", fontWeight: "bold" }}>+</span> Add
       </button>
     </Section>
   );
@@ -151,14 +125,12 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
     signatures: [""],
   });
   const [submitted, setSubmitted] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const upd = (f, v) => setForm((p) => ({ ...p, [f]: v }));
 
   const addItem = (field, defaultValue = "") => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: [...prev[field], defaultValue],
-    }));
+    setForm((prev) => ({ ...prev, [field]: [...prev[field], defaultValue] }));
   };
 
   const removeItem = (field, index) => {
@@ -190,12 +162,24 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
     });
   };
 
-  const handleSaveReport = () => {
-    // Save report logic here
-    if (onReportSaved) {
-      onReportSaved(selectedTeam.id, form);
+  const handleSaveReport = async () => {
+    try {
+      setSaving(true);
+      const reportData = {
+        ...form,
+        teamId: selectedTeam?.id,
+        teamName: selectedTeam?.name,
+      };
+      await meetingAPI.create(reportData);
+      if (onReportSaved) {
+        onReportSaved(selectedTeam.id, form);
+      }
+      setSubmitted(true);
+    } catch (error) {
+      console.error("Failed to save report:", error);
+    } finally {
+      setSaving(false);
     }
-    setSubmitted(true);
   };
 
   const g3Responsive = {
@@ -210,31 +194,33 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         <div
           style={{
             textAlign: "center",
-            padding: "clamp(30px, 8vw, 60px) clamp(20px, 5vw, 40px)",
+            padding: "clamp(40px, 8vw, 60px) clamp(20px, 5vw, 40px)",
             background: C.white,
             borderRadius: 16,
             boxShadow: "0 4px 24px #0002",
+            animation: "fadeInUp 0.5s ease",
           }}
         >
           <div
             style={{
-              width: "clamp(50px, 15vw, 72px)",
-              height: "clamp(50px, 15vw, 72px)",
-              background: C.primary,
+              width: "clamp(60px, 15vw, 80px)",
+              height: "clamp(60px, 15vw, 80px)",
+              background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
               borderRadius: "50%",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "clamp(28px, 8vw, 36px)",
+              fontSize: "clamp(32px, 8vw, 40px)",
               color: "#fff",
               margin: "0 auto 18px",
+              animation: "pulseGlow 2s ease-in-out infinite",
             }}
           >
             ✓
           </div>
           <h2
             style={{
-              fontSize: "clamp(18px, 5vw, 22px)",
+              fontSize: "clamp(20px, 5vw, 26px)",
               fontWeight: 900,
               color: C.primary,
               fontFamily: F.serif,
@@ -246,14 +232,26 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           <p
             style={{
               color: C.muted,
-              marginBottom: 22,
+              marginBottom: 24,
               fontFamily: F.sans,
-              fontSize: "clamp(12px, 3.5vw, 14px)",
+              fontSize: "clamp(13px, 3.5vw, 15px)",
             }}
           >
             {tf.savedSub}
           </p>
-          <button style={btn.primary} onClick={() => setSubmitted(false)}>
+          <button
+            style={btn.primary}
+            onClick={() => setSubmitted(false)}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow =
+                "0 6px 20px rgba(26,107,74,0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
             {tf.newReport}
           </button>
         </div>
@@ -273,15 +271,26 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           fontFamily: F.sans,
           textAlign: "center",
           padding: "20px",
+          animation: "fadeInUp 0.5s ease",
         }}
       >
         <div>
-          <p style={{ fontSize: "clamp(14px, 4vw, 18px)", marginBottom: 12 }}>
-            📋{" "}
+          <div
+            style={{ fontSize: "clamp(48px, 12vw, 64px)", marginBottom: 16 }}
+          >
+            📋
+          </div>
+          <p
+            style={{
+              fontSize: "clamp(16px, 4vw, 20px)",
+              marginBottom: 12,
+              color: C.dark,
+            }}
+          >
             {tf.selectTeamPrompt ||
               "Select a team from the sidebar to start a report"}
           </p>
-          <p style={{ fontSize: "clamp(12px, 3vw, 14px)" }}>
+          <p style={{ fontSize: "clamp(13px, 3vw, 15px)" }}>
             👈 Click on "Peer Forum" in the sidebar, then choose a team
           </p>
         </div>
@@ -295,6 +304,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         maxWidth: 1000,
         margin: "0 auto",
         padding: "clamp(16px, 4vw, 28px) clamp(12px, 4vw, 20px)",
+        animation: "fadeInUp 0.5s ease",
       }}
     >
       <div
@@ -308,43 +318,50 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           marginBottom: "clamp(12px, 3vw, 20px)",
         }}
       >
-        <h1
-          style={{
-            fontSize: "clamp(16px, 5vw, 22px)",
-            fontWeight: 900,
-            color: C.dark,
-            fontFamily: F.serif,
-            margin: 0,
-          }}
-        >
-          {tf.title} - {selectedTeam.name}
-        </h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: "clamp(28px, 7vw, 36px)" }}>💬</span>
+          <div>
+            <h1
+              style={{
+                fontSize: "clamp(18px, 5vw, 24px)",
+                fontWeight: 900,
+                color: C.dark,
+                fontFamily: F.serif,
+                margin: 0,
+                background: `linear-gradient(90deg, ${C.dark}, ${C.primary})`,
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}
+            >
+              {tf.title} - {selectedTeam.name}
+            </h1>
+            <p
+              style={{
+                fontSize: "clamp(12px, 3vw, 13px)",
+                color: C.muted,
+                margin: "2px 0 0",
+              }}
+            >
+              {tf.subtitle}
+            </p>
+          </div>
+        </div>
         <span
           style={{
-            background: C.primary,
+            background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
             color: "#fff",
-            padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 3vw, 12px)",
+            padding: "clamp(4px, 1.5vw, 6px) clamp(12px, 3vw, 18px)",
             borderRadius: 20,
-            fontSize: "clamp(10px, 3vw, 11px)",
+            fontSize: "clamp(11px, 3vw, 13px)",
             fontWeight: 700,
             whiteSpace: "nowrap",
+            boxShadow: `0 4px 15px ${C.primary}44`,
           }}
         >
           {t.year}
         </span>
       </div>
-
-      <p
-        style={{
-          color: "#555",
-          marginBottom: "clamp(16px, 4vw, 24px)",
-          fontSize: "clamp(12px, 3.5vw, 13px)",
-          fontFamily: F.sans,
-          lineHeight: 1.4,
-        }}
-      >
-        {tf.subtitle}
-      </p>
 
       <div
         style={{
@@ -354,7 +371,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           boxShadow: "0 2px 16px #0003",
         }}
       >
-        <Section title={tf.meetingTime}>
+        <Section title={tf.meetingTime} icon="📅">
           <div style={g3Responsive}>
             <Field
               label={tf.date}
@@ -379,6 +396,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
 
         <DynamicFieldGroup
           title={tf.presentMembers}
+          icon="👥"
           values={form.present}
           onAdd={() => addItem("present", "")}
           onRemove={(idx) => removeItem("present", idx)}
@@ -389,7 +407,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           }}
           renderField={(value, idx) => (
             <Field
-              label={`${idx + 1} ${tf.memberN}`}
+              label={`${idx + 1}${tf.memberN}`}
               value={value}
               onChange={(v) => {
                 const updated = [...form.present];
@@ -401,16 +419,18 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           )}
         />
 
-        <Section title={tf.absentMembers}>
+        <Section title={tf.absentMembers} icon="🚫">
           {form.absent.map((item, idx) => (
             <div
               key={idx}
               style={{
                 marginBottom: "clamp(12px, 4vw, 16px)",
-                padding: "clamp(10px, 3vw, 12px)",
+                padding: "clamp(10px, 3vw, 14px)",
                 border: "1px solid #e5e7eb",
                 borderRadius: "8px",
                 backgroundColor: "#f9fafb",
+                animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
+                transition: "all 0.3s ease",
               }}
             >
               <div
@@ -462,9 +482,18 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
                       cursor: "pointer",
                       marginTop: "28px",
                       flexShrink: 0,
+                      transition: "all 0.2s",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#b91c1c";
+                      e.currentTarget.style.transform = "scale(1.1)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#dc2626";
+                      e.currentTarget.style.transform = "scale(1)";
                     }}
                   >
-                    −
+                    ✕
                   </button>
                 )}
               </div>
@@ -477,7 +506,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               color: "white",
               border: "none",
               borderRadius: "6px",
-              padding: "6px 12px",
+              padding: "6px 14px",
               fontSize: "13px",
               fontWeight: "bold",
               cursor: "pointer",
@@ -485,6 +514,15 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               alignItems: "center",
               gap: "6px",
               marginTop: "clamp(8px, 3vw, 12px)",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#059669";
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#10b981";
+              e.currentTarget.style.transform = "translateY(0)";
             }}
           >
             <span>+</span> Add
@@ -493,6 +531,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
 
         <DynamicFieldGroup
           title={tf.prevResults}
+          icon="📋"
           values={form.prevResults}
           onAdd={() => addItem("prevResults", "")}
           onRemove={(idx) => removeItem("prevResults", idx)}
@@ -507,6 +546,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
 
         <DynamicFieldGroup
           title={tf.todayTopics}
+          icon="💬"
           values={form.topics}
           onAdd={() => addItem("topics", "")}
           onRemove={(idx) => removeItem("topics", idx)}
@@ -519,23 +559,33 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           placeholderPrefix="Topic"
         />
 
-        <Section title={tf.explanation}>
+        <Section title={tf.explanation} icon="📝">
           <textarea
             style={{
               ...inp,
               resize: "vertical",
               minHeight: "clamp(80px, 20vw, 100px)",
-              fontSize: "clamp(12px, 3vw, 13px)",
+              fontSize: "clamp(13px, 3.5vw, 14px)",
+              transition: "all 0.3s ease",
             }}
             rows={3}
             value={form.explanation}
             onChange={(e) => upd("explanation", e.target.value)}
             placeholder={tf.explanationPlaceholder}
+            onFocus={(e) => {
+              e.currentTarget.borderColor = C.primary;
+              e.currentTarget.boxShadow = `0 0 0 3px ${C.primary}22`;
+            }}
+            onBlur={(e) => {
+              e.currentTarget.borderColor = C.border;
+              e.currentTarget.boxShadow = "none";
+            }}
           />
         </Section>
 
         <DynamicFieldGroup
           title={tf.gaps}
+          icon="⚠️"
           values={form.gaps}
           onAdd={() => addItem("gaps", "")}
           onRemove={(idx) => removeItem("gaps", idx)}
@@ -550,6 +600,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
 
         <DynamicFieldGroup
           title={tf.agreements}
+          icon="✅"
           values={form.agreements}
           onAdd={() => addItem("agreements", "")}
           onRemove={(idx) => removeItem("agreements", idx)}
@@ -562,7 +613,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           placeholderPrefix="Agreement"
         />
 
-        <Section title={tf.signatures}>
+        <Section title={tf.signatures} icon="✍️">
           {form.signatures.map((sig, idx) => (
             <div
               key={idx}
@@ -572,6 +623,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
                 gap: "8px",
                 marginBottom: "12px",
                 flexWrap: "wrap",
+                animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
               }}
             >
               <div style={{ flex: 1 }}>
@@ -598,9 +650,18 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
                     height: "32px",
                     fontSize: "18px",
                     cursor: "pointer",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#b91c1c";
+                    e.currentTarget.style.transform = "scale(1.1)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#dc2626";
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
-                  −
+                  ✕
                 </button>
               )}
             </div>
@@ -612,7 +673,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               color: "white",
               border: "none",
               borderRadius: "6px",
-              padding: "6px 12px",
+              padding: "6px 14px",
               fontSize: "13px",
               fontWeight: "bold",
               cursor: "pointer",
@@ -620,6 +681,15 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               alignItems: "center",
               gap: "6px",
               marginTop: "8px",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#059669";
+              e.currentTarget.style.transform = "translateY(-2px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#10b981";
+              e.currentTarget.style.transform = "translateY(0)";
             }}
           >
             <span>+</span> Add
@@ -641,21 +711,39 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               background: "#dc2626",
               color: "#fff",
               border: "none",
-              padding: "clamp(8px, 2.5vw, 11px) clamp(16px, 5vw, 26px)",
-              borderRadius: 8,
-              fontSize: "clamp(12px, 3.5vw, 14px)",
+              padding: "clamp(10px, 2.5vw, 14px) clamp(20px, 5vw, 32px)",
+              borderRadius: 10,
+              fontSize: "clamp(13px, 3.5vw, 15px)",
               fontWeight: 700,
               cursor: "pointer",
               fontFamily: F.sans,
+              transition: "all 0.3s ease",
             }}
             onClick={() =>
               exportForumReportToPDF(form, t, lang, selectedTeam?.name)
             }
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow =
+                "0 6px 20px rgba(220,38,38,0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
           >
             📄 Export PDF
           </button>
-          <button style={btn.primary} onClick={handleSaveReport}>
-            {tf.save}
+          <button
+            style={{
+              ...btn.primary,
+              padding: "clamp(10px, 2.5vw, 14px) clamp(20px, 5vw, 32px)",
+              fontSize: "clamp(13px, 3.5vw, 15px)",
+            }}
+            onClick={handleSaveReport}
+            disabled={saving}
+          >
+            {saving ? "⏳ Saving..." : tf.save}
           </button>
         </div>
       </div>

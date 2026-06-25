@@ -1,75 +1,30 @@
-// function Section({ title, children }) {
-//   return (
-//     <div
-//       style={{
-//         marginBottom: 24,
-//         paddingBottom: 18,
-//         borderBottom: "1px solid #eee",
-//       }}
-//     >
-//       <h3
-//         style={{
-//           fontSize: 14,
-//           fontWeight: 800,
-//           color: C.primary,
-//           marginBottom: 12,
-//           fontFamily: F.sans,
-//         }}
-//       >
-//         {title}
-//       </h3>
-//       {children}
-//     </div>
-//   );
-// }
-
-// import { C, F } from "../../styles/theme";
-
-// export default function Section({ title, children }) {
-//   return (
-//     <div
-//       style={{
-//         marginBottom: 24,
-//         paddingBottom: 18,
-//         borderBottom: "1px solid #eee",
-//       }}
-//     >
-//       <h3
-//         style={{
-//           fontSize: 14,
-//           fontWeight: 800,
-//           color: C.primary,
-//           marginBottom: 12,
-//           fontFamily: F.sans,
-//         }}
-//       >
-//         {title}
-//       </h3>
-//       {children}
-//     </div>
-//   );
-// }
-
 import { C, F } from "../../styles/theme";
 
-export default function Section({ title, children }) {
+export default function Section({ title, children, icon }) {
   return (
     <div
       style={{
-        marginBottom: "clamp(16px, 5vw, 24px)",
-        paddingBottom: "clamp(12px, 3vw, 18px)",
-        borderBottom: "1px solid #eee",
+        marginBottom: "clamp(20px, 5vw, 28px)",
+        paddingBottom: "clamp(14px, 3vw, 20px)",
+        borderBottom: "2px solid #f0f0f0",
+        animation: "fadeInUp 0.4s ease",
       }}
     >
       <h3
         style={{
-          fontSize: "clamp(13px, 4vw, 15px)",
+          fontSize: "clamp(14px, 4vw, 16px)",
           fontWeight: 800,
           color: C.primary,
-          marginBottom: "clamp(10px, 3vw, 14px)",
+          marginBottom: "clamp(12px, 3vw, 16px)",
           fontFamily: F.sans,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
         }}
       >
+        {icon && (
+          <span style={{ fontSize: "clamp(18px, 4.5vw, 22px)" }}>{icon}</span>
+        )}
         {title}
       </h3>
       {children}

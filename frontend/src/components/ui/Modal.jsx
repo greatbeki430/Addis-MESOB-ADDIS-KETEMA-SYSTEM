@@ -1,6 +1,4 @@
-/* eslint-disable react-refresh/only-export-components */
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { C, F } from "../../styles/theme";
 
 export const Modal = ({
@@ -8,30 +6,53 @@ export const Modal = ({
   onClose,
   title,
   message,
-  type = "info", // info, success, warning, error, confirm
+  type = "info",
   confirmText = "Confirm",
   cancelText = "Cancel",
   onConfirm,
   onCancel,
   children,
-  size = "md", // sm, md, lg
+  size = "md",
   showCloseButton = true,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
+  const isOpenRef = useRef(isOpen);
 
+  // Update ref when isOpen changes
   useEffect(() => {
-    if (isOpen) {
-      setIsVisible(true);
-      document.body.style.overflow = "hidden";
-    } else {
-      setIsVisible(false);
-      document.body.style.overflow = "unset";
-    }
+    isOpenRef.current = isOpen;
+  }, [isOpen]);
+
+  // Handle body scroll and visibility - using a different approach
+  useEffect(() => {
+    // Use a timeout to avoid the cascading render warning
+    const timer = setTimeout(() => {
+      if (isOpen) {
+        setIsVisible(true);
+        document.body.style.overflow = "hidden";
+      } else {
+        document.body.style.overflow = "unset";
+      }
+    }, 0);
+
     return () => {
+      clearTimeout(timer);
+      // Cleanup on unmount
       document.body.style.overflow = "unset";
     };
   }, [isOpen]);
 
+  // Handle closing with animation
+  const handleClose = () => {
+    document.body.style.overflow = "unset";
+    setIsVisible(false);
+    // Call onClose after animation completes
+    setTimeout(() => {
+      if (onClose) onClose();
+    }, 300);
+  };
+
+  // Don't render if not open and not visible
   if (!isOpen && !isVisible) return null;
 
   const getIcon = () => {
@@ -91,9 +112,23 @@ export const Modal = ({
   };
 
   const handleOverlayClick = (e) => {
-    if (e.target === e.currentTarget && onClose) {
-      onClose();
+    if (e.target === e.currentTarget) {
+      handleClose();
     }
+  };
+
+  const handleConfirm = () => {
+    if (onConfirm) {
+      onConfirm();
+    }
+    handleClose();
+  };
+
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();
+    }
+    handleClose();
   };
 
   return (
@@ -111,18 +146,30 @@ export const Modal = ({
         zIndex: 9999,
         padding: "16px",
         backdropFilter: "blur(4px)",
-        animation: "fadeIn 0.2s ease",
+        animation: isVisible ? "fadeIn 0.2s ease" : "fadeOut 0.2s ease",
       }}
       onClick={handleOverlayClick}
     >
       <style>{`
         @keyframes fadeIn {
-          from { opacity: 0; transform: scale(0.95); }
-          to { opacity: 1; transform: scale(1); }
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes fadeOut {
+          from { opacity: 1; }
+          to { opacity: 0; }
         }
         @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-20px); }
-          to { opacity: 1; transform: translateY(0); }
+          from { opacity: 0; transform: translateY(-30px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes slideUp {
+          from { opacity: 1; transform: translateY(0) scale(1); }
+          to { opacity: 0; transform: translateY(-30px) scale(0.95); }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.02); }
         }
       `}</style>
       <div
@@ -134,7 +181,7 @@ export const Modal = ({
           maxHeight: "90vh",
           overflow: "auto",
           boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-          animation: "slideDown 0.25s ease",
+          animation: isVisible ? "slideDown 0.3s ease" : "slideUp 0.3s ease",
           display: "flex",
           flexDirection: "column",
         }}
@@ -152,7 +199,14 @@ export const Modal = ({
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: 22 }}>{getIcon()}</span>
+            <span
+              style={{
+                fontSize: 22,
+                animation: "pulse 2s ease-in-out infinite",
+              }}
+            >
+              {getIcon()}
+            </span>
             <h3
               style={{
                 fontSize: "clamp(16px, 4vw, 18px)",
@@ -167,7 +221,7 @@ export const Modal = ({
           </div>
           {showCloseButton && (
             <button
-              onClick={onClose}
+              onClick={handleClose}
               style={{
                 background: "none",
                 border: "none",
@@ -181,10 +235,12 @@ export const Modal = ({
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "#f3f4f6";
                 e.currentTarget.style.color = "#333";
+                e.currentTarget.style.transform = "rotate(90deg)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
                 e.currentTarget.style.color = "#999";
+                e.currentTarget.style.transform = "rotate(0deg)";
               }}
             >
               ✕
@@ -193,13 +249,7 @@ export const Modal = ({
         </div>
 
         {/* Body */}
-        <div
-          style={{
-            padding: "20px 24px",
-            flex: 1,
-            overflow: "auto",
-          }}
-        >
+        <div style={{ padding: "20px 24px", flex: 1, overflow: "auto" }}>
           {children ? (
             children
           ) : (
@@ -232,7 +282,7 @@ export const Modal = ({
         >
           {onCancel && (
             <button
-              onClick={onCancel}
+              onClick={handleCancel}
               style={{
                 padding: "8px 20px",
                 background: "transparent",
@@ -247,9 +297,11 @@ export const Modal = ({
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "#f3f4f6";
+                e.currentTarget.style.transform = "translateY(-1px)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.transform = "translateY(0)";
               }}
             >
               {cancelText}
@@ -257,7 +309,35 @@ export const Modal = ({
           )}
           {onConfirm && (
             <button
-              onClick={onConfirm}
+              onClick={handleConfirm}
+              style={{
+                padding: "8px 20px",
+                ...getButtonStyle(),
+                border: "none",
+                borderRadius: 8,
+                fontSize: 13,
+                fontWeight: 600,
+                cursor: "pointer",
+                transition: "all 0.2s",
+                fontFamily: F.sans,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.opacity = "0.85";
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.15)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.opacity = "1";
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              {confirmText}
+            </button>
+          )}
+          {!onConfirm && !onCancel && (
+            <button
+              onClick={handleClose}
               style={{
                 padding: "8px 20px",
                 ...getButtonStyle(),
@@ -278,30 +358,6 @@ export const Modal = ({
                 e.currentTarget.style.transform = "translateY(0)";
               }}
             >
-              {confirmText}
-            </button>
-          )}
-          {!onConfirm && (
-            <button
-              onClick={onClose}
-              style={{
-                padding: "8px 20px",
-                ...getButtonStyle(),
-                border: "none",
-                borderRadius: 8,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: "pointer",
-                transition: "all 0.2s",
-                fontFamily: F.sans,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.opacity = "0.85";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.opacity = "1";
-              }}
-            >
               OK
             </button>
           )}
@@ -311,17 +367,24 @@ export const Modal = ({
   );
 };
 
-// ✅ Toast notification component for success/error messages
+// ✅ Toast notification component
 export const Toast = ({
   message,
   type = "success",
   onClose,
   duration = 3000,
 }) => {
+  const [isVisible, setIsVisible] = useState(true);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (onClose) onClose();
+      setIsVisible(false);
+      // Call onClose after fade out animation
+      setTimeout(() => {
+        if (onClose) onClose();
+      }, 300);
     }, duration);
+
     return () => clearTimeout(timer);
   }, [duration, onClose]);
 
@@ -340,6 +403,8 @@ export const Toast = ({
 
   const colors = getColors();
 
+  if (!isVisible) return null;
+
   return (
     <div
       style={{
@@ -352,16 +417,6 @@ export const Toast = ({
         width: "100%",
       }}
     >
-      <style>{`
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeOut {
-          from { opacity: 1; }
-          to { opacity: 0; }
-        }
-      `}</style>
       <div
         style={{
           background: colors.bg,
@@ -378,7 +433,12 @@ export const Toast = ({
         <span style={{ fontSize: 20 }}>{colors.icon}</span>
         <span style={{ fontSize: 13, flex: 1 }}>{message}</span>
         <button
-          onClick={onClose}
+          onClick={() => {
+            setIsVisible(false);
+            setTimeout(() => {
+              if (onClose) onClose();
+            }, 300);
+          }}
           style={{
             background: "none",
             border: "none",
@@ -387,6 +447,7 @@ export const Toast = ({
             fontSize: 16,
             opacity: 0.7,
             padding: "4px",
+            transition: "opacity 0.2s",
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.opacity = "1";
@@ -402,7 +463,7 @@ export const Toast = ({
   );
 };
 
-// ✅ ToastContainer - Separate component
+// ✅ ToastContainer component
 export const ToastContainer = ({ toasts, removeToast }) => {
   if (!toasts || toasts.length === 0) return null;
 
@@ -431,20 +492,4 @@ export const ToastContainer = ({ toasts, removeToast }) => {
       ))}
     </div>
   );
-};
-
-// ✅ Hook for using Toast
-export const useToast = () => {
-  const [toasts, setToasts] = useState([]);
-
-  const showToast = (message, type = "success", duration = 3000) => {
-    const id = Date.now();
-    setToasts((prev) => [...prev, { id, message, type, duration }]);
-  };
-
-  const removeToast = (id) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id));
-  };
-
-  return { showToast, toasts, removeToast };
 };

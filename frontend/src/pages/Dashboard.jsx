@@ -1,21 +1,87 @@
+import { useState, useEffect } from "react";
 import { C, F, card } from "../styles/theme";
 import StatCard from "../components/ui/StatCard";
 import { CRITERIA } from "../constants/criteria";
-import { SAMPLE_DATA } from "../constants/sampleData";
 import { useAuth } from "../context/AuthContext";
+import { dailyReportAPI } from "../services/api";
 
 export default function Dashboard({ t }) {
   const td = t.dashboard;
-  const { user } = useAuth(); // Get user from auth context
+  const { user } = useAuth();
+  const [stats, setStats] = useState({
+    total: 0,
+    male: 0,
+    female: 0,
+    departments: [],
+  });
+  const [loading, setLoading] = useState(true);
+  const [animatedStats, setAnimatedStats] = useState({
+    total: 0,
+    male: 0,
+    female: 0,
+  });
 
-  const total = SAMPLE_DATA.reduce((a, r) => a + r.total, 0);
-  const males = SAMPLE_DATA.reduce((a, r) => a + r.male, 0);
-  const females = SAMPLE_DATA.reduce((a, r) => a + r.female, 0);
-  const depts = SAMPLE_DATA.reduce((acc, r) => {
-    acc[r.dept] = (acc[r.dept] || 0) + r.total;
-    return acc;
-  }, {});
-  const maxD = Math.max(...Object.values(depts));
+  // Animation helper - MOVED BEFORE useEffect
+  const animateNumber = (start, end, setter, key) => {
+    const duration = 1000;
+    const steps = 30;
+    const increment = (end - start) / steps;
+    let current = start;
+    let step = 0;
+
+    const timer = setInterval(() => {
+      step++;
+      current += increment;
+      if (step >= steps) {
+        current = end;
+        clearInterval(timer);
+      }
+      setter((prev) => ({ ...prev, [key]: Math.round(current) }));
+    }, duration / steps);
+
+    return timer;
+  };
+
+  // Load real data from API
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        setLoading(true);
+        const response = await dailyReportAPI.getAll();
+        const data = response.data || [];
+
+        const total = data.reduce((sum, r) => sum + (r.total || 0), 0);
+        const male = data.reduce((sum, r) => sum + (r.male || 0), 0);
+        const female = data.reduce((sum, r) => sum + (r.female || 0), 0);
+
+        // Group by department
+        const deptMap = {};
+        data.forEach((r) => {
+          if (r.dept) {
+            deptMap[r.dept] = (deptMap[r.dept] || 0) + (r.total || 0);
+          }
+        });
+
+        const departments = Object.entries(deptMap).map(([name, value]) => ({
+          name,
+          value,
+        }));
+
+        setStats({ total, male, female, departments });
+
+        // Animate numbers
+        animateNumber(0, total, setAnimatedStats, "total");
+        animateNumber(0, male, setAnimatedStats, "male");
+        animateNumber(0, female, setAnimatedStats, "female");
+      } catch (error) {
+        console.error("Failed to load dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, []);
 
   // Get time-based greeting
   const getGreeting = () => {
@@ -28,25 +94,36 @@ export default function Dashboard({ t }) {
   // Get role badge styling
   const getRoleBadge = (role) => {
     switch (role) {
+      case "superadmin":
+        return {
+          bg: "#8B1A1A",
+          color: "#fff",
+          label: "Super Admin",
+          icon: "👑",
+        };
       case "admin":
-        return { bg: "#dc2626", color: "#fff", label: "Admin", icon: "👑" };
+        return { bg: "#1A6B4A", color: "#fff", label: "Admin", icon: "⚙️" };
       case "leader":
         return {
-          bg: "#1a6b4a",
+          bg: "#C25A00",
           color: "#fff",
           label: "Team Leader",
           icon: "⭐",
         };
       default:
-        return { bg: "#e8f5ee", color: "#1a6b4a", label: "Member", icon: "👤" };
+        return {
+          bg: "#e8f5ee",
+          color: "#1a6b4a",
+          label: "Employee",
+          icon: "👤",
+        };
     }
   };
 
   const roleBadge = getRoleBadge(user?.role);
   const greeting = getGreeting();
-  const userName = user?.name?.split(" ")[0] || "User"; // Get first name only
+  const userName = user?.name?.split(" ")[0] || "User";
 
-  // Get user initials for avatar
   const getUserInitials = () => {
     if (!user?.name) return "U";
     return user.name
@@ -56,6 +133,11 @@ export default function Dashboard({ t }) {
       .toUpperCase()
       .slice(0, 2);
   };
+
+  const maxDeptValue =
+    stats.departments.length > 0
+      ? Math.max(...stats.departments.map((d) => d.value))
+      : 1;
 
   return (
     <div style={{ width: "100%", padding: "20px" }}>
@@ -67,6 +149,7 @@ export default function Dashboard({ t }) {
           padding: "clamp(16px, 4vw, 24px)",
           marginBottom: 24,
           border: `1px solid ${C.border}`,
+          animation: "fadeInUp 0.5s ease",
         }}
       >
         <div
@@ -86,7 +169,6 @@ export default function Dashboard({ t }) {
               flexWrap: "wrap",
             }}
           >
-            {/* User Avatar */}
             <div
               style={{
                 width: "clamp(50px, 10vw, 64px)",
@@ -100,6 +182,7 @@ export default function Dashboard({ t }) {
                 fontWeight: 900,
                 color: "#fff",
                 boxShadow: `0 4px 12px ${C.primary}44`,
+                animation: "pulseGlow 3s ease-in-out infinite",
               }}
             >
               {getUserInitials()}
@@ -155,7 +238,6 @@ export default function Dashboard({ t }) {
             </div>
           </div>
 
-          {/* Year Badge */}
           <span
             style={{
               background: C.primary,
@@ -172,7 +254,7 @@ export default function Dashboard({ t }) {
         </div>
       </div>
 
-      {/* Stat Cards - Fully Responsive to container width */}
+      {/* Stat Cards - Animated */}
       <div
         style={{
           display: "grid",
@@ -184,21 +266,35 @@ export default function Dashboard({ t }) {
       >
         <StatCard
           label={td.todayServices}
-          value={total}
+          value={animatedStats.total}
           icon="◈"
           color={C.primary}
+          loading={loading}
         />
-        <StatCard label={td.male} value={males} icon="◉" color={C.blue} />
-        <StatCard label={td.female} value={females} icon="◉" color={C.purple} />
+        <StatCard
+          label={td.male}
+          value={animatedStats.male}
+          icon="◉"
+          color={C.blue}
+          loading={loading}
+        />
+        <StatCard
+          label={td.female}
+          value={animatedStats.female}
+          icon="◉"
+          color={C.purple}
+          loading={loading}
+        />
         <StatCard
           label={td.departments}
-          value={Object.keys(depts).length}
+          value={stats.departments.length}
           icon="⬢"
           color={C.orange}
+          loading={loading}
         />
       </div>
 
-      {/* Two Column Section - Fully Responsive */}
+      {/* Two Column Section */}
       <div
         style={{
           display: "grid",
@@ -221,55 +317,69 @@ export default function Dashboard({ t }) {
           >
             {td.deptReport}
           </h3>
-          {Object.entries(depts).map(([dept, val]) => (
-            <div key={dept} style={{ marginBottom: 12 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  marginBottom: 4,
-                  flexWrap: "wrap",
-                  gap: 8,
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: "clamp(11px, 3.5vw, 12px)",
-                    color: "#444",
-                    fontFamily: F.sans,
-                  }}
-                >
-                  {dept}
-                </span>
-                <span
-                  style={{
-                    fontSize: "clamp(11px, 3.5vw, 12px)",
-                    fontWeight: 700,
-                    color: C.dark,
-                  }}
-                >
-                  {val}
-                </span>
-              </div>
-              <div
-                style={{
-                  background: C.bg,
-                  height: 8,
-                  borderRadius: 4,
-                  overflow: "hidden",
-                }}
-              >
+          {stats.departments.length === 0 ? (
+            <p
+              style={{
+                color: C.muted,
+                fontSize: 13,
+                textAlign: "center",
+                padding: 20,
+              }}
+            >
+              {t.common?.noData || "No data available"}
+            </p>
+          ) : (
+            stats.departments.map(({ name, value }) => (
+              <div key={name} style={{ marginBottom: 12 }}>
                 <div
                   style={{
-                    width: `${(val / maxD) * 100}%`,
-                    height: "100%",
-                    borderRadius: 4,
-                    background: `linear-gradient(90deg,${C.primary},${C.light})`,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    marginBottom: 4,
+                    flexWrap: "wrap",
+                    gap: 8,
                   }}
-                />
+                >
+                  <span
+                    style={{
+                      fontSize: "clamp(11px, 3.5vw, 12px)",
+                      color: "#444",
+                      fontFamily: F.sans,
+                    }}
+                  >
+                    {name}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "clamp(11px, 3.5vw, 12px)",
+                      fontWeight: 700,
+                      color: C.dark,
+                    }}
+                  >
+                    {value}
+                  </span>
+                </div>
+                <div
+                  style={{
+                    background: C.bg,
+                    height: 8,
+                    borderRadius: 4,
+                    overflow: "hidden",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: `${(value / maxDeptValue) * 100}%`,
+                      height: "100%",
+                      borderRadius: 4,
+                      background: `linear-gradient(90deg, ${C.primary}, ${C.light})`,
+                      transition: "width 1s ease",
+                    }}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
 
         {/* Forum Agendas */}
@@ -285,7 +395,7 @@ export default function Dashboard({ t }) {
           >
             {td.forumAgendas}
           </h3>
-          {t.agendas.map((a, i) => (
+          {t.agendas?.map((a, i) => (
             <div
               key={i}
               style={{
@@ -294,6 +404,7 @@ export default function Dashboard({ t }) {
                 gap: 10,
                 padding: "8px 0",
                 borderBottom: "1px solid #eee",
+                animation: `fadeInUp ${0.3 + i * 0.1}s ease`,
               }}
             >
               <span
@@ -329,7 +440,7 @@ export default function Dashboard({ t }) {
         </div>
       </div>
 
-      {/* Criteria Overview - Fully Responsive */}
+      {/* Criteria Overview */}
       <div style={card}>
         <h3
           style={{
@@ -350,7 +461,7 @@ export default function Dashboard({ t }) {
             gap: 12,
           }}
         >
-          {CRITERIA.map((c) => (
+          {CRITERIA.map((c, idx) => (
             <div
               key={c.id}
               style={{
@@ -359,6 +470,16 @@ export default function Dashboard({ t }) {
                 padding: "14px 10px",
                 textAlign: "center",
                 borderTop: `4px solid ${c.color}`,
+                animation: `fadeInUp ${0.2 + idx * 0.1}s ease`,
+                transition: "transform 0.3s ease, box-shadow 0.3s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-4px)";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.1)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
               }}
             >
               <div

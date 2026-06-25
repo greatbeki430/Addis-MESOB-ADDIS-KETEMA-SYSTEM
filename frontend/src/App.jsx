@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { translations } from "./constants/translations";
 import { C, F } from "./styles/theme";
 import Sidebar from "./components/layout/Sidebar";
 import Header from "./components/layout/Header";
@@ -15,23 +14,122 @@ import UserManagement from "./pages/admin/UserManagement";
 import TeamManagement from "./pages/admin/TeamManagement";
 import Report from "./pages/Report";
 import { setToastFunction } from "./utils/toastHelper";
-import { useToast, ToastContainer } from "./components/ui/Modal"; // ✅ Import ToastContainer
+// import { useToast, ToastContainer } from "./components/ui/Modal";
+import { ToastContainer } from "./components/ui/Modal";
+import { useToast } from "./hooks/useToast";
+import { LanguageProvider, useLanguage } from "./context/LanguageContext";
 
-// This component handles the authenticated app
+// =============================================
+// ANIMATED A-MESOB TITLE COMPONENT
+// Used in Sidebar for the logo animation
+// =============================================
+export const AnimatedTitle = ({ t, collapsed }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [rotation, setRotation] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRotation((prev) => (prev + 0.5) % 360);
+    }, 50);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (collapsed) {
+    return (
+      <div
+        style={{
+          width: 38,
+          height: 38,
+          minWidth: 38,
+          background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+          borderRadius: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 20,
+          fontWeight: 900,
+          color: "#fff",
+          fontFamily: F.serif,
+          animation: "pulseGlow 2s ease-in-out infinite",
+        }}
+      >
+        አ
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{ display: "flex", alignItems: "center", gap: 12 }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div
+        style={{
+          width: 42,
+          height: 42,
+          minWidth: 42,
+          background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+          borderRadius: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 22,
+          fontWeight: 900,
+          color: "#fff",
+          fontFamily: F.serif,
+          transform: isHovered
+            ? `rotate(${rotation}deg) scale(1.1)`
+            : "rotate(0deg) scale(1)",
+          transition: "transform 0.3s ease",
+          boxShadow: isHovered ? `0 0 30px ${C.primary}66` : "none",
+        }}
+      >
+        አ
+      </div>
+      <div>
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 800,
+            color: C.light,
+            fontFamily: F.serif,
+            background: `linear-gradient(90deg, ${C.light}, ${C.primary})`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+            transition: "all 0.3s ease",
+            letterSpacing: isHovered ? "2px" : "0px",
+          }}
+        >
+          {t.appName}
+        </div>
+        <div
+          style={{
+            fontSize: 9,
+            color: "#6aaa88",
+            letterSpacing: 1.5,
+            textTransform: "uppercase",
+            opacity: isHovered ? 1 : 0.7,
+            transition: "opacity 0.3s ease",
+          }}
+        >
+          {t.appSub}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =============================================
+// AUTHENTICATED APP
+// =============================================
 function AuthenticatedApp() {
+  const { language, t, changeLanguage } = useLanguage();
   const [tab, setTab] = useState("dashboard");
-  const [lang, setLang] = useState("am");
   const [collapsed, setCollapsed] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
-  const t = translations[lang] || translations.am;
-  const { showToast, toasts, removeToast } = useToast(); // ✅ Get toasts and removeToast
-
-  // Set toast function for non-React files (pdfExport, etc.)
-  useEffect(() => {
-    setToastFunction(showToast);
-  }, [showToast]);
-
-  // Get all role-based authentication helpers
+  const { showToast, toasts, removeToast } = useToast();
   const {
     user,
     isAdmin,
@@ -41,10 +139,12 @@ function AuthenticatedApp() {
     isAdminOrSuperAdmin,
     isLeaderOrAbove,
   } = useAuth();
-
   const [showRegister, setShowRegister] = useState(false);
 
-  // Handle forum tab - reset selected team when not on forum
+  useEffect(() => {
+    setToastFunction(showToast);
+  }, [showToast]);
+
   const handleSetTab = (newTab) => {
     setTab(newTab);
     if (newTab !== "forum") {
@@ -52,7 +152,6 @@ function AuthenticatedApp() {
     }
   };
 
-  // Get user role display for the header
   const getRoleDisplay = () => {
     if (isSuperAdmin) return "Super Admin 👑";
     if (isAdmin) return "Admin ⚙️";
@@ -60,7 +159,6 @@ function AuthenticatedApp() {
     return "Employee 👤";
   };
 
-  // Get user initials for avatar
   const getUserInitials = () => {
     if (!user?.name) return "U";
     return user.name
@@ -69,6 +167,15 @@ function AuthenticatedApp() {
       .join("")
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  // Get user's role name for display
+  const getUserRoleName = () => {
+    if (isSuperAdmin) return "Super Admin";
+    if (isAdmin) return "Admin";
+    if (isLeader) return "Leader";
+    if (isEmployee) return "Employee";
+    return "User";
   };
 
   return (
@@ -82,15 +189,55 @@ function AuthenticatedApp() {
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700;800&family=Noto+Serif+Ethiopic:wght@700;900&display=swap');
-        *{box-sizing:border-box;margin:0;}
-        input:focus,textarea:focus,select:focus{border-color:#1a6b4a!important;outline:none;box-shadow:0 0 0 3px #1a6b4a22;}
-        button{transition:opacity .15s,transform .15s;}
-        button:hover{opacity:.88;transform:translateY(-1px);}
-        ::-webkit-scrollbar{width:5px;height:5px;}
-        ::-webkit-scrollbar-track{background:#f0f7f4;}
-        ::-webkit-scrollbar-thumb{background:#a0d4b8;border-radius:3px;}
-
-        /* Smooth scrolling for tables on mobile */
+        * { box-sizing: border-box; margin: 0; }
+        
+        @keyframes pulseGlow {
+          0%, 100% { box-shadow: 0 0 20px ${C.primary}44; }
+          50% { box-shadow: 0 0 40px ${C.primary}88; }
+        }
+        
+        @keyframes slideIn {
+          from { opacity: 0; transform: translateY(-20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        
+        .page-enter {
+          animation: fadeInUp 0.4s ease forwards;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+          border-color: #1a6b4a !important;
+          outline: none;
+          box-shadow: 0 0 0 3px #1a6b4a22;
+        }
+        
+        button {
+          transition: opacity 0.15s, transform 0.15s;
+        }
+        button:hover {
+          opacity: 0.88;
+          transform: translateY(-1px);
+        }
+        
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: #f0f7f4; }
+        ::-webkit-scrollbar-thumb { background: #a0d4b8; border-radius: 3px; }
+        
         .daily-report-table-wrapper {
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
@@ -99,81 +246,38 @@ function AuthenticatedApp() {
           padding: 0 8px;
         }
         
-        /* Better touch targets on mobile */
         @media (max-width: 768px) {
-          .services-search,
-          .services-filter {
-            min-height: 44px;
-          }
-          
-          .service-card {
-            cursor: pointer;
-            transition: transform 0.2s ease;
-          }
-          
-          .service-card:active {
-            transform: scale(0.98);
-            background-color: #f5f5f5;
-          }
-        }
-
-        /* Improve select dropdown on mobile */
-        @media (max-width: 480px) {
-          select {
-            font-size: 16px !important;
-          }
-        }
-
-        /* Better touch scrolling */
-        @media (max-width: 768px) {
-          .daily-report-table-wrapper {
-            margin: 0 -12px;
-            padding: 0 12px;
-          }
-          
-          input[type="number"] {
-            min-height: 32px;
-          }
+          .services-search, .services-filter { min-height: 44px; }
+          .service-card:active { transform: scale(0.98); }
         }
         
-        /* ===== Header Responsive CSS ===== */
+        @media (max-width: 480px) {
+          select { font-size: 16px !important; }
+          input[type="number"] { min-height: 32px; }
+        }
+        
         @media (max-width: 600px) {
-          .header-date {
-            display: none !important;
-          }
+          .header-date { display: none !important; }
         }
-        
         @media (max-width: 480px) {
-          .header-appname {
-            display: none !important;
-          }
+          .header-appname { display: none !important; }
         }
-        
         @media (max-width: 400px) {
-          .header-lang-btn {
-            padding: 2px 5px !important;
-            font-size: 9px !important;
-          }
+          .header-lang-btn { padding: 2px 5px !important; font-size: 9px !important; }
         }
-        
         @media (max-width: 550px) {
-          header {
-            gap: 6px !important;
-          }
-          header > div {
-            gap: 6px !important;
-          }
+          header { gap: 6px !important; }
+          header > div { gap: 6px !important; }
         }
       `}</style>
 
-      {/* ✅ ToastContainer - Pass toasts and removeToast */}
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       <Sidebar
         tab={tab}
         setTab={handleSetTab}
-        lang={lang}
-        setLang={setLang}
+        lang={language}
+        setLang={changeLanguage}
         t={t}
         collapsed={collapsed}
         setCollapsed={setCollapsed}
@@ -190,7 +294,7 @@ function AuthenticatedApp() {
           overflow: "hidden",
         }}
       >
-        <Header tab={tab} t={t} lang={lang} setLang={setLang} />
+        <Header tab={tab} t={t} lang={language} setLang={changeLanguage} />
 
         <main
           style={{
@@ -200,45 +304,48 @@ function AuthenticatedApp() {
             padding: "0",
           }}
         >
-          {tab === "dashboard" && <Dashboard t={t} />}
-          {tab === "forum" && (
-            <ForumReport
-              t={t}
-              lang={lang}
-              selectedTeam={selectedTeam}
-              onReportSaved={(teamId, reportData) => {
-                console.log("Report saved for team:", teamId, reportData);
-              }}
-            />
-          )}
-          {tab === "evaluation" && <Evaluation t={t} />}
-
-          {/* Daily Report - Only Team Leaders and above */}
-          {tab === "report" && isLeaderOrAbove && <DailyReport t={t} />}
-
-          {/* Services - Only Admins and Super Admins */}
-          {tab === "services" && isAdminOrSuperAdmin && <Services t={t} />}
-
-          {/* User Management - Only Admins and Super Admins */}
-          {tab === "users" && isAdminOrSuperAdmin && (
-            <UserManagement
-              t={t}
-              isSuperAdmin={isSuperAdmin}
-              isAdmin={isAdmin}
-            />
-          )}
-
-          {/* Team Management - Only Super Admins */}
-          {tab === "teams" && isSuperAdmin && (
-            <TeamManagement t={t} isSuperAdmin={isSuperAdmin} />
-          )}
-
-          {/* ✅ Analytics/Report Generator - Team Leaders, Admins and Super Admins */}
-          {tab === "analytics" && isLeaderOrAbove && <Report t={t} />}
+          <div className="page-enter">
+            {tab === "dashboard" && <Dashboard t={t} lang={language} />}
+            {tab === "forum" && (
+              <ForumReport
+                t={t}
+                lang={language}
+                selectedTeam={selectedTeam}
+                onReportSaved={(teamId, reportData) =>
+                  console.log("Report saved:", teamId, reportData)
+                }
+              />
+            )}
+            {tab === "evaluation" && <Evaluation t={t} lang={language} />}
+            {tab === "report" && isLeaderOrAbove && (
+              <DailyReport t={t} lang={language} />
+            )}
+            {tab === "services" && isAdminOrSuperAdmin && (
+              <Services t={t} lang={language} />
+            )}
+            {tab === "users" && isAdminOrSuperAdmin && (
+              <UserManagement
+                t={t}
+                isSuperAdmin={isSuperAdmin}
+                isAdmin={isAdmin}
+                lang={language}
+              />
+            )}
+            {tab === "teams" && isSuperAdmin && (
+              <TeamManagement
+                t={t}
+                isSuperAdmin={isSuperAdmin}
+                lang={language}
+              />
+            )}
+            {tab === "analytics" && isLeaderOrAbove && (
+              <Report t={t} lang={language} />
+            )}
+          </div>
         </main>
       </div>
 
-      {/* Display user info in a floating badge (uses all role variables) */}
+      {/* Floating User Badge - Now shows role name properly */}
       <div
         style={{
           position: "fixed",
@@ -254,13 +361,14 @@ function AuthenticatedApp() {
           alignItems: "center",
           gap: 10,
           border: `1px solid ${C.border}`,
+          animation: "fadeInUp 0.5s ease",
         }}
       >
         <div
           style={{
             width: 28,
             height: 28,
-            background: `linear-gradient(135deg,${C.primary},${C.light})`,
+            background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
@@ -277,19 +385,12 @@ function AuthenticatedApp() {
             {user?.name || "User"}
           </div>
           <div style={{ color: C.muted, fontSize: 10 }}>
-            {getRoleDisplay()} •{" "}
-            {isEmployee
-              ? "Employee"
-              : isLeader
-                ? "Leader"
-                : isAdmin
-                  ? "Admin"
-                  : "Super Admin"}
+            {getRoleDisplay()} • {getUserRoleName()}
           </div>
         </div>
       </div>
 
-      {/* Admin-only Register Modal */}
+      {/* Register Modal */}
       {isAdminOrSuperAdmin && showRegister && (
         <div
           style={{
@@ -303,16 +404,17 @@ function AuthenticatedApp() {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
+            animation: "fadeIn 0.3s ease",
           }}
           onClick={() => setShowRegister(false)}
         >
           <div onClick={(e) => e.stopPropagation()}>
-            <Register onClose={() => setShowRegister(false)} />
+            <Register onClose={() => setShowRegister(false)} t={t} />
           </div>
         </div>
       )}
 
-      {/* Admin-only Add User Button */}
+      {/* Add User Button */}
       {isAdminOrSuperAdmin && (
         <button
           onClick={() => setShowRegister(true)}
@@ -333,6 +435,15 @@ function AuthenticatedApp() {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 100,
+            transition: "transform 0.3s ease, box-shadow 0.3s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "scale(1.1)";
+            e.currentTarget.style.boxShadow = "0 6px 20px rgba(26,107,74,0.4)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
           }}
         >
           +
@@ -342,7 +453,9 @@ function AuthenticatedApp() {
   );
 }
 
-// This component handles authentication state
+// =============================================
+// APP ROUTER
+// =============================================
 function AppRouter() {
   const { isAuthenticated, loading } = useAuth();
 
@@ -358,8 +471,16 @@ function AppRouter() {
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 24, marginBottom: 10 }}>⏳</div>
-          <p>Loading...</p>
+          <div
+            style={{
+              fontSize: 32,
+              marginBottom: 10,
+              animation: "pulseGlow 1.5s ease-in-out infinite",
+            }}
+          >
+            ⏳
+          </div>
+          <p style={{ color: C.muted }}>Loading...</p>
         </div>
       </div>
     );
@@ -372,11 +493,15 @@ function AppRouter() {
   return <AuthenticatedApp />;
 }
 
-// Main App component with AuthProvider
+// =============================================
+// MAIN APP
+// =============================================
 export default function App() {
   return (
     <AuthProvider>
-      <AppRouter />
+      <LanguageProvider>
+        <AppRouter />
+      </LanguageProvider>
     </AuthProvider>
   );
 }
