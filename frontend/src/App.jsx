@@ -8,7 +8,7 @@ import ForumReport from "./pages/ForumReport";
 import Evaluation from "./pages/Evaluation";
 import DailyReport from "./pages/DailyReport";
 import Services from "./pages/Services";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider } from "./context/AuthProvider";
 import { useAuth } from "./hooks/useAuth";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
@@ -18,7 +18,8 @@ import Report from "./pages/Report";
 import { setToastFunction } from "./utils/toastHelper";
 import { ToastContainer } from "./components/ui/Modal";
 import { useToast } from "./hooks/useToast";
-import { LanguageProvider } from "./context/LanguageContext";
+import { LanguageProvider } from "./context/LanguageProvider";
+// // import { useAuth } from "./hooks/useAuth";
 import { useLanguage } from "./hooks/useLanguage";
 
 // =============================================

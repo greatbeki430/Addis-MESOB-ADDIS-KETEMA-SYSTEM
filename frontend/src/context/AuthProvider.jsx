@@ -1,16 +1,13 @@
-// src/context/AuthContext.jsx
+// src/context/AuthProvider.jsx
 import { useState, useEffect, useCallback } from "react";
-import { authAPI } from "../services/api";
 import { AuthContext } from "./AuthContext";
+import { authAPI } from "../services/api";
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem("token"));
 
-  // ========================
-  // LOGOUT (must be first)
-  // ========================
   const logout = useCallback(() => {
     localStorage.removeItem("token");
     setToken(null);
@@ -18,16 +15,12 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  // ========================
-  // LOAD USER
-  // ========================
   const loadUser = useCallback(async () => {
     try {
       const response = await authAPI.getMe();
       setUser(response.data);
     } catch (error) {
       console.error("Failed to load user:", error);
-
       if (error.response?.status === 401) {
         logout();
       } else {
@@ -38,9 +31,6 @@ export const AuthProvider = ({ children }) => {
     }
   }, [logout]);
 
-  // ========================
-  // TOKEN CHECK ON LOAD
-  // ========================
   useEffect(() => {
     let isMounted = true;
 
@@ -49,40 +39,29 @@ export const AuthProvider = ({ children }) => {
         if (isMounted) setLoading(false);
         return;
       }
-
       try {
         const payload = JSON.parse(atob(token.split(".")[1]));
+        if (!payload?.exp) throw new Error("Invalid token: no exp field");
 
-        if (!payload?.exp) {
-          throw new Error("Invalid token: no exp field");
-        }
-
-        const expTime = payload.exp * 1000;
-        const now = Date.now();
-
-        if (now >= expTime) {
+        if (Date.now() >= payload.exp * 1000) {
           console.log("Token expired, logging out...");
-          logout();
+          if (isMounted) logout();
           return;
         }
 
-        await loadUser();
+        if (isMounted) await loadUser();
       } catch (err) {
         console.error("Invalid token:", err);
-        logout();
+        if (isMounted) logout();
       }
     };
 
     checkToken();
-
     return () => {
       isMounted = false;
     };
-  }, [token, loadUser, logout]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ========================
-  // REGISTER
-  // ========================
   const register = async (userData) => {
     try {
       const response = await authAPI.register(userData);
@@ -95,9 +74,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ========================
-  // LOGIN
-  // ========================
   const login = async (credentials) => {
     try {
       const response = await authAPI.login(credentials);
@@ -106,6 +82,16 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("token", newToken);
       setToken(newToken);
       setUser(userInfo);
+
+      try {
+        const payload = JSON.parse(atob(newToken.split(".")[1]));
+        console.log(
+          "Token expires at:",
+          new Date(payload.exp * 1000).toLocaleTimeString(),
+        );
+      } catch (e) {
+        console.error("Token decode error:", e);
+      }
 
       return { success: true, data: userInfo };
     } catch (error) {
@@ -116,9 +102,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ========================
-  // STATE VALUES
-  // ========================
   const isAdmin = user?.role === "admin";
   const isSuperAdmin = user?.role === "superadmin";
   const isLeader = user?.role === "leader";

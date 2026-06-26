@@ -1,7 +1,7 @@
-// src/context/LanguageContext.jsx
+// src/context/LanguageProvider.jsx
 import { useState, useEffect } from "react";
-import { translations } from "../constants/translations";
 import { LanguageContext } from "./LanguageContext";
+import { translations } from "../constants/translations";
 
 export const LanguageProvider = ({ children }) => {
   const [language, setLanguage] = useState(
@@ -12,7 +12,6 @@ export const LanguageProvider = ({ children }) => {
     localStorage.setItem("app_lang", language);
   }, [language]);
 
-  // Translation function - supports nested keys like "nav.dashboard"
   const t = (path) => {
     const keys = path.split(".");
     let result = translations[language];
@@ -21,7 +20,6 @@ export const LanguageProvider = ({ children }) => {
       if (result && result[key] !== undefined && result[key] !== null) {
         result = result[key];
       } else {
-        // Fallback to English if key missing in current language
         let fallback = translations["en"];
         for (const fKey of keys) {
           if (
@@ -41,9 +39,7 @@ export const LanguageProvider = ({ children }) => {
     return result;
   };
 
-  const changeLanguage = (lang) => {
-    setLanguage(lang);
-  };
+  const changeLanguage = (lang) => setLanguage(lang);
 
   const availableLanguages = [
     { code: "en", name: "English", flag: "🇺🇸" },
@@ -51,12 +47,7 @@ export const LanguageProvider = ({ children }) => {
     { code: "om", name: "Afaan Oromo", flag: "🇪🇹" },
   ];
 
-  const value = {
-    language,
-    changeLanguage,
-    t,
-    availableLanguages,
-  };
+  const value = { language, changeLanguage, t, availableLanguages };
 
   return (
     <LanguageContext.Provider value={value}>
