@@ -6,7 +6,11 @@ import { useAuth } from "../hooks/useAuth";
 import { dailyReportAPI } from "../services/api";
 
 export default function Dashboard({ t }) {
-  const td = t.dashboard;
+  // ✅ t is a FUNCTION — call it with dot-path strings
+  const td = (key, fb = "") => t?.(`dashboard.${key}`) || fb;
+  const tc = (key, fb = "") => t?.(`criteria.${key}`) || fb;
+  const tcm = (key, fb = "") => t?.(`common.${key}`) || fb;
+
   const { user } = useAuth();
   const [stats, setStats] = useState({
     total: 0,
@@ -21,14 +25,12 @@ export default function Dashboard({ t }) {
     female: 0,
   });
 
-  // Animation helper
   const animateNumber = (start, end, setter, key) => {
-    const duration = 1000;
-    const steps = 30;
-    const increment = (end - start) / steps;
-    let current = start;
-    let step = 0;
-
+    const duration = 1000,
+      steps = 30,
+      increment = (end - start) / steps;
+    let current = start,
+      step = 0;
     const timer = setInterval(() => {
       step++;
       current += increment;
@@ -38,34 +40,26 @@ export default function Dashboard({ t }) {
       }
       setter((prev) => ({ ...prev, [key]: Math.round(current) }));
     }, duration / steps);
-
     return timer;
   };
 
-  // Load real data from API
   useEffect(() => {
     const loadDashboardData = async () => {
       try {
         setLoading(true);
         const response = await dailyReportAPI.getAll();
         const data = response.data || [];
-
         const total = data.reduce((sum, r) => sum + (r.total || 0), 0);
         const male = data.reduce((sum, r) => sum + (r.male || 0), 0);
         const female = data.reduce((sum, r) => sum + (r.female || 0), 0);
-
         const deptMap = {};
         data.forEach((r) => {
-          if (r.dept) {
-            deptMap[r.dept] = (deptMap[r.dept] || 0) + (r.total || 0);
-          }
+          if (r.dept) deptMap[r.dept] = (deptMap[r.dept] || 0) + (r.total || 0);
         });
-
         const departments = Object.entries(deptMap).map(([name, value]) => ({
           name,
           value,
         }));
-
         setStats({ total, male, female, departments });
         animateNumber(0, total, setAnimatedStats, "total");
         animateNumber(0, male, setAnimatedStats, "male");
@@ -76,14 +70,13 @@ export default function Dashboard({ t }) {
         setLoading(false);
       }
     };
-
     loadDashboardData();
   }, []);
 
   const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "🌅 Good morning";
-    if (hour < 18) return "☀️ Good afternoon";
+    const h = new Date().getHours();
+    if (h < 12) return "🌅 Good morning";
+    if (h < 18) return "☀️ Good afternoon";
     return "🌙 Good evening";
   };
 
@@ -123,6 +116,9 @@ export default function Dashboard({ t }) {
     stats.departments.length > 0
       ? Math.max(...stats.departments.map((d) => d.value))
       : 1;
+
+  // ✅ agendas is an array — call t("agendas") which returns the array directly
+  const agendas = t?.("agendas") || [];
 
   return (
     <div style={{ width: "100%", padding: "20px" }}>
@@ -172,7 +168,6 @@ export default function Dashboard({ t }) {
             >
               {getUserInitials()}
             </div>
-
             <div>
               <div
                 style={{
@@ -222,7 +217,6 @@ export default function Dashboard({ t }) {
               </p>
             </div>
           </div>
-
           <span
             style={{
               background: C.primary,
@@ -234,12 +228,12 @@ export default function Dashboard({ t }) {
               whiteSpace: "nowrap",
             }}
           >
-            {t.year}
+            {t?.("year") || "2018 E.C."}
           </span>
         </div>
       </div>
 
-      {/* Stat Cards — all colors now use valid C.* values */}
+      {/* Stat Cards */}
       <div
         style={{
           display: "grid",
@@ -250,36 +244,36 @@ export default function Dashboard({ t }) {
         }}
       >
         <StatCard
-          label={td.todayServices}
+          label={td("todayServices", "Today's Services")}
           value={animatedStats.total}
           icon="◈"
-          color={C.primary} // Deep Royal Blue
+          color={C.primary}
           loading={loading}
         />
         <StatCard
-          label={td.male}
+          label={td("male", "Male")}
           value={animatedStats.male}
           icon="◉"
-          color={C.light} // Royal Blue (was C.blue — doesn't exist)
+          color={C.light}
           loading={loading}
         />
         <StatCard
-          label={td.female}
+          label={td("female", "Female")}
           value={animatedStats.female}
           icon="◉"
-          color={C.gold} // Gold (was C.purple — doesn't exist)
+          color={C.gold}
           loading={loading}
         />
         <StatCard
-          label={td.departments}
+          label={td("departments", "Departments")}
           value={stats.departments.length}
           icon="⬢"
-          color={C.orange} // Orange (unchanged — exists in theme)
+          color={C.orange}
           loading={loading}
         />
       </div>
 
-      {/* Two Column Section */}
+      {/* Two Column */}
       <div
         style={{
           display: "grid",
@@ -300,7 +294,7 @@ export default function Dashboard({ t }) {
               fontFamily: F.sans,
             }}
           >
-            {td.deptReport}
+            {td("deptReport", "Daily Department Report")}
           </h3>
           {stats.departments.length === 0 ? (
             <p
@@ -311,7 +305,7 @@ export default function Dashboard({ t }) {
                 padding: 20,
               }}
             >
-              {t.common?.noData || "No data available"}
+              {tcm("noData", "No data available")}
             </p>
           ) : (
             stats.departments.map(({ name, value }) => (
@@ -378,50 +372,51 @@ export default function Dashboard({ t }) {
               fontFamily: F.sans,
             }}
           >
-            {td.forumAgendas}
+            {td("forumAgendas", "Standing Forum Agendas")}
           </h3>
-          {t.agendas?.map((a, i) => (
-            <div
-              key={i}
-              style={{
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 10,
-                padding: "8px 0",
-                borderBottom: "1px solid #eee",
-                animation: `fadeInUp ${0.3 + i * 0.1}s ease`,
-              }}
-            >
-              <span
+          {Array.isArray(agendas) &&
+            agendas.map((a, i) => (
+              <div
+                key={i}
                 style={{
-                  width: 24,
-                  height: 24,
-                  minWidth: 24,
-                  background: C.primary,
-                  color: "#fff",
-                  borderRadius: "50%",
                   display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "clamp(10px, 3vw, 11px)",
-                  fontWeight: 700,
+                  alignItems: "flex-start",
+                  gap: 10,
+                  padding: "8px 0",
+                  borderBottom: "1px solid #eee",
+                  animation: `fadeInUp ${0.3 + i * 0.1}s ease`,
                 }}
               >
-                {i + 1}
-              </span>
-              <span
-                style={{
-                  fontSize: "clamp(11px, 3.5vw, 12px)",
-                  color: "#333",
-                  fontFamily: F.sans,
-                  lineHeight: 1.4,
-                  flex: 1,
-                }}
-              >
-                {a}
-              </span>
-            </div>
-          ))}
+                <span
+                  style={{
+                    width: 24,
+                    height: 24,
+                    minWidth: 24,
+                    background: C.primary,
+                    color: "#fff",
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "clamp(10px, 3vw, 11px)",
+                    fontWeight: 700,
+                  }}
+                >
+                  {i + 1}
+                </span>
+                <span
+                  style={{
+                    fontSize: "clamp(11px, 3.5vw, 12px)",
+                    color: "#333",
+                    fontFamily: F.sans,
+                    lineHeight: 1.4,
+                    flex: 1,
+                  }}
+                >
+                  {a}
+                </span>
+              </div>
+            ))}
         </div>
       </div>
 
@@ -436,7 +431,7 @@ export default function Dashboard({ t }) {
             fontFamily: F.sans,
           }}
         >
-          {td.criteriaOverview}
+          {td("criteriaOverview", "Evaluation Criteria Overview")}
         </h3>
         <div
           style={{
@@ -487,7 +482,7 @@ export default function Dashboard({ t }) {
                   lineHeight: 1.3,
                 }}
               >
-                {t.criteria[c.key]}
+                {tc(c.key, c.key)}
               </div>
               <div style={{ fontSize: "9px", color: "#999", marginBottom: 8 }}>
                 {c.titleEn}
@@ -502,7 +497,7 @@ export default function Dashboard({ t }) {
                   display: "inline-block",
                 }}
               >
-                {c.items.length} {td.subCriteria}
+                {c.items.length} {td("subCriteria", "sub-criteria")}
               </div>
             </div>
           ))}

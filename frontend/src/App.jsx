@@ -103,7 +103,7 @@ export const AnimatedTitle = ({ t, collapsed }) => {
             letterSpacing: isHovered ? "2px" : "0px",
           }}
         >
-          {t?.appName || "A-MESOB"}
+          {t?.("appName") || "A-MESOB"}
         </div>
         <div
           style={{
@@ -115,7 +115,7 @@ export const AnimatedTitle = ({ t, collapsed }) => {
             transition: "opacity 0.3s ease",
           }}
         >
-          {t?.appSub || "One-Stop"}
+          {t?.("appSub") || "One-Stop"}
         </div>
       </div>
     </div>
@@ -126,7 +126,6 @@ export const AnimatedTitle = ({ t, collapsed }) => {
 // AUTHENTICATED APP
 // =============================================
 function AuthenticatedApp() {
-  // ✅ ALL HOOKS CALLED UNCONDITIONALLY AT THE TOP
   const { language, t, changeLanguage } = useLanguage();
   const { showToast, toasts, removeToast } = useToast();
   const {
@@ -148,29 +147,8 @@ function AuthenticatedApp() {
     setToastFunction(showToast);
   }, [showToast]);
 
-  // ✅ FIX: t is a plain translations OBJECT, not a function.
-  // Check that it exists and has at least one expected key.
-  const isTranslationReady = t && typeof t === "object" && !!t.appName;
-
-  if (!isTranslationReady) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100vh",
-          background: C.gray,
-          fontFamily: F.sans,
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 10 }}>⏳</div>
-          <p style={{ color: C.muted }}>Loading translations...</p>
-        </div>
-      </div>
-    );
-  }
+  // ✅ FIX: t is a FUNCTION from LanguageProvider — no readiness gate needed.
+  // It is always available synchronously. Remove the broken typeof check entirely.
 
   const handleSetTab = (newTab) => {
     setTab(newTab);
@@ -243,7 +221,6 @@ function AuthenticatedApp() {
           outline: none;
           box-shadow: 0 0 0 3px ${C.primary}22;
         }
-
         button { transition: opacity 0.15s, transform 0.15s; }
         button:hover { opacity: 0.88; transform: translateY(-1px); }
 
@@ -252,11 +229,8 @@ function AuthenticatedApp() {
         ::-webkit-scrollbar-thumb { background: #a0d4b8; border-radius: 3px; }
 
         .daily-report-table-wrapper {
-          overflow-x: auto;
-          -webkit-overflow-scrolling: touch;
-          scrollbar-width: thin;
-          margin: 0 -8px;
-          padding: 0 8px;
+          overflow-x: auto; -webkit-overflow-scrolling: touch;
+          scrollbar-width: thin; margin: 0 -8px; padding: 0 8px;
         }
 
         @media (max-width: 768px) {
@@ -267,14 +241,14 @@ function AuthenticatedApp() {
           select { font-size: 16px !important; }
           input[type="number"] { min-height: 32px; }
         }
-        @media (max-width: 600px) { .header-date   { display: none !important; } }
+        @media (max-width: 600px) { .header-date    { display: none !important; } }
         @media (max-width: 480px) { .header-appname { display: none !important; } }
         @media (max-width: 400px) {
           .header-lang-btn { padding: 2px 5px !important; font-size: 9px !important; }
         }
         @media (max-width: 550px) {
-          header         { gap: 6px !important; }
-          header > div   { gap: 6px !important; }
+          header       { gap: 6px !important; }
+          header > div { gap: 6px !important; }
         }
       `}</style>
 
@@ -318,8 +292,8 @@ function AuthenticatedApp() {
                 t={t}
                 lang={language}
                 selectedTeam={selectedTeam}
-                onReportSaved={(teamId, reportData) =>
-                  console.log("Report saved:", teamId, reportData)
+                onReportSaved={(teamId, data) =>
+                  console.log("Report saved:", teamId, data)
                 }
               />
             )}

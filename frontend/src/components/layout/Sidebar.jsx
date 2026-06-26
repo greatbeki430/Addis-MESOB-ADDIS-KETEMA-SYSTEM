@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect, useCallback } from "react"; // ✅ useCallback imported here
+import { useState, useEffect, useCallback } from "react";
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { ArrowDown01Icon } from "hugeicons-react";
@@ -28,14 +28,15 @@ export default function Sidebar({
   const { user, isAdminOrSuperAdmin, isLeader, isEmployee } = useAuth();
   const filteredNavItems = getFilteredNavItems(user?.role || "employee");
 
-  // ✅ Safe translation access with fallbacks
-  const safeT = t || {};
-  const safeSidebar = safeT.sidebar || {};
-  const safeNav = safeT.nav || {};
-  const safeAppName = safeT.appName || "A-MESOB";
-  const safeAppSub = safeT.appSub || "One-Stop";
+  // ✅ t is a function — call it with dot-path strings
+  const safeT = (path, fallback = "") => {
+    try {
+      return t?.(path) || fallback;
+    } catch {
+      return fallback;
+    }
+  };
 
-  // Addis MESOB Brand Colors
   const DARK_BG = "#0d1a5e";
   const BORDER_COLOR = "#1a3aad";
   const ACTIVE_BG = "#1a3aad33";
@@ -50,12 +51,10 @@ export default function Sidebar({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // ✅ FIX: useCallback with stable deps so it doesn't re-create on every render
   const loadTeams = useCallback(async () => {
     try {
       setLoading(true);
       const response = await teamAPI.getAll();
-
       if (response.data && Array.isArray(response.data)) {
         let formattedTeams = response.data.map((team) => ({
           id: team._id,
@@ -69,8 +68,6 @@ export default function Sidebar({
           reports: [],
           department: team.department,
         }));
-
-        // Employees and Leaders only see their own team
         if ((isEmployee || isLeader) && user) {
           const userTeam = formattedTeams.find(
             (team) =>
@@ -81,7 +78,6 @@ export default function Sidebar({
           );
           formattedTeams = userTeam ? [userTeam] : [];
         }
-
         setTeams(formattedTeams);
       }
     } catch (error) {
@@ -104,7 +100,7 @@ export default function Sidebar({
     } finally {
       setLoading(false);
     }
-  }, [isEmployee, isLeader, user]); // ✅ stable deps — only recreate when role/user changes
+  }, [isEmployee, isLeader, user]);
 
   useEffect(() => {
     loadTeams();
@@ -126,26 +122,25 @@ export default function Sidebar({
         name: newTeamName,
         department: newTeamDepartment,
       });
-
-      const newTeam = {
-        id: response.data._id,
-        name: response.data.name,
-        description: response.data.department || "",
-        leader: user?.name || "Current User",
-        members: [],
-        lastReport: "No reports yet",
-        reports: [],
-        department: response.data.department,
-      };
-
-      setTeams((prev) => [...prev, newTeam]);
+      setTeams((prev) => [
+        ...prev,
+        {
+          id: response.data._id,
+          name: response.data.name,
+          description: response.data.department || "",
+          leader: user?.name || "Current User",
+          members: [],
+          lastReport: "No reports yet",
+          reports: [],
+          department: response.data.department,
+        },
+      ]);
       setNewTeamName("");
       setNewTeamDepartment("");
       setShowAddTeamModal(false);
       setForumExpanded(true);
       await loadTeams();
     } catch (error) {
-      console.error("❌ Failed to create team:", error);
       alert(
         error.response?.data?.message ||
           "Failed to create team. Please try again.",
@@ -197,7 +192,7 @@ export default function Sidebar({
       {/* Logo */}
       <div
         style={{
-          padding: collapsed ? "18px 0" : "16px 16px",
+          padding: collapsed ? "18px 0" : "16px",
           display: "flex",
           alignItems: "center",
           justifyContent: collapsed ? "center" : "flex-start",
@@ -237,18 +232,18 @@ export default function Sidebar({
                 fontFamily: F.serif,
               }}
             >
-              {safeAppName}
+              {safeT("appName", "A-MESOB")}
             </div>
             <div
               style={{ fontSize: 10, color: MUTED_TEXT, letterSpacing: 0.5 }}
             >
-              {safeAppSub}
+              {safeT("appSub", "One-Stop")}
             </div>
           </div>
         )}
       </div>
 
-      {/* Nav Section Label */}
+      {/* Nav Label */}
       {!collapsed && (
         <div
           style={{
@@ -260,7 +255,7 @@ export default function Sidebar({
             textTransform: "uppercase",
           }}
         >
-          {safeSidebar.main || "Main Menu"}
+          {safeT("sidebar.main", "Main Menu")}
         </div>
       )}
 
@@ -269,6 +264,7 @@ export default function Sidebar({
         {filteredNavItems.map((n) => {
           const active = tab === n.id && !(n.id === "forum" && selectedTeam);
           const isForum = n.id === "forum";
+          const navLabel = safeT(`nav.${n.id}`, n.id);
 
           return (
             <div key={n.id}>
@@ -284,7 +280,7 @@ export default function Sidebar({
                     setForumExpanded(false);
                   }
                 }}
-                title={safeNav[n.id] || n.id}
+                title={navLabel}
                 style={{
                   width: "100%",
                   display: "flex",
@@ -324,7 +320,7 @@ export default function Sidebar({
                   }}
                 >
                   <span style={{ fontSize: isMobile ? 18 : 20 }}>{n.icon}</span>
-                  {!collapsed && <span>{safeNav[n.id] || n.id}</span>}
+                  {!collapsed && <span>{navLabel}</span>}
                 </div>
                 {isForum && !collapsed && (
                   <ArrowDown01Icon
@@ -340,7 +336,7 @@ export default function Sidebar({
                 )}
               </button>
 
-              {/* Team list under Forum */}
+              {/* Forum team list */}
               {isForum && forumExpanded && !collapsed && (
                 <div
                   style={{
@@ -438,7 +434,6 @@ export default function Sidebar({
                         )}
                     </button>
                   ))}
-
                   {isAdminOrSuperAdmin && (
                     <button
                       onClick={() => setShowAddTeamModal(true)}
@@ -478,7 +473,7 @@ export default function Sidebar({
                         }}
                       >
                         +
-                      </span>
+                      </span>{" "}
                       Add Team
                     </button>
                   )}
@@ -507,7 +502,7 @@ export default function Sidebar({
               textTransform: "uppercase",
             }}
           >
-            {safeSidebar.language || "Language"}
+            {safeT("sidebar.language", "Language")}
           </div>
         )}
         <div
