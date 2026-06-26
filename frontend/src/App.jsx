@@ -148,8 +148,11 @@ function AuthenticatedApp() {
     setToastFunction(showToast);
   }, [showToast]);
 
-  // ✅ FALLBACK: Check if translations are loaded (after all hooks)
-  if (!t || typeof t !== "object") {
+  // ✅ FIXED: Check if t is a function (which means translations are ready)
+  // t is a function that returns translation values
+  const isTranslationReady = typeof t === "function";
+
+  if (!isTranslationReady) {
     return (
       <div
         style={{
