@@ -1,21 +1,22 @@
 // ════════════════════════════════════════════════════════════
-// styles/theme.js - Enhanced with animations & utilities
+// styles/theme.js - Addis MESOB Brand Colors (Blue & Gold)
 // ════════════════════════════════════════════════════════════
 
 export const C = {
-  primary: "#1a6b4a",
-  light: "#2aaa78",
-  bg: "#e8f5ee",
-  dark: "#0d1f14",
-  gray: "#f2f6f3",
+  primary: "#1a3aad", // Deep Royal Blue (logo background)
+  light: "#2952cc", // Royal Blue (hover/gradient end)
+  gold: "#f5c518", // Golden Yellow (logo ring accent)
+  goldLight: "#fde98a", // Light Gold (subtle gold tints)
+  bg: "#eef1fc", // Light Blue Background (page bg)
+  dark: "#0d1a5e", // Dark Navy (deep shadows / headers)
+  gray: "#f2f4fb", // Light Gray with blue tint (section bg)
   white: "#fff",
-  muted: "#666",
-  border: "#d0ddd6",
-  cardBg: "#f8faf9",
-  blue: "#1e4d8c",
-  purple: "#7b2d8b",
-  orange: "#c25a00",
-  red: "#8b1a1a",
+  muted: "#5a6a99", // Muted Blue-Gray (secondary text)
+  border: "#c8d0ef", // Blue-tinted border
+  cardBg: "#f8f9fe", // Card background
+  red: "#dc2626", // Danger/error
+  orange: "#c25a00", // Warning
+  purple: "#7b2d8b", // Accent purple
 };
 
 export const F = {
@@ -23,7 +24,10 @@ export const F = {
   serif: "'Noto Serif Ethiopic', serif",
 };
 
-// Responsive breakpoints
+// ============================================================
+// RESPONSIVE BREAKPOINTS
+// ============================================================
+
 export const BREAKPOINTS = {
   mobile: "480px",
   tablet: "768px",
@@ -31,7 +35,10 @@ export const BREAKPOINTS = {
   wide: "1200px",
 };
 
-// Responsive font sizes
+// ============================================================
+// RESPONSIVE FONT SIZES
+// ============================================================
+
 export const FONT_SIZES = {
   h1: "clamp(22px, 5vw, 28px)",
   h2: "clamp(18px, 4vw, 24px)",
@@ -41,7 +48,10 @@ export const FONT_SIZES = {
   tiny: "clamp(8px, 2vw, 10px)",
 };
 
-// Spacing utilities
+// ============================================================
+// SPACING UTILITIES
+// ============================================================
+
 export const SPACING = {
   xs: "clamp(4px, 1vw, 8px)",
   sm: "clamp(8px, 2vw, 12px)",
@@ -51,7 +61,10 @@ export const SPACING = {
   xxl: "clamp(24px, 6vw, 40px)",
 };
 
-// Grid utilities
+// ============================================================
+// GRID COLUMN TEMPLATES
+// ============================================================
+
 export const GRID = {
   cols1: "1fr",
   cols2: "repeat(auto-fit, minmax(min(100%, 250px), 1fr))",
@@ -61,27 +74,22 @@ export const GRID = {
 };
 
 // ============================================================
-// ANIMATION UTILITIES (new)
+// ANIMATION UTILITIES
 // ============================================================
 
 export const ANIMATIONS = {
-  // Duration
   duration: {
     fast: "0.15s",
     normal: "0.3s",
     slow: "0.5s",
     slower: "0.8s",
   },
-
-  // Easing
   ease: {
     default: "ease",
     inOut: "cubic-bezier(0.4, 0, 0.2, 1)",
     out: "cubic-bezier(0, 0, 0.2, 1)",
     in: "cubic-bezier(0.4, 0, 1, 1)",
   },
-
-  // Combined transition
   transition: (
     property = "all",
     duration = "0.3s",
@@ -92,7 +100,7 @@ export const ANIMATIONS = {
 };
 
 // ============================================================
-// BUTTON STYLES (enhanced)
+// BUTTON STYLES
 // ============================================================
 
 export const btn = {
@@ -172,6 +180,35 @@ export const btn = {
       transform: "translateY(0)",
     },
   },
+  gold: {
+    background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
+    color: C.dark,
+    border: "none",
+    padding: "clamp(9px, 2.5vw, 11px) clamp(18px, 5vw, 26px)",
+    borderRadius: 8,
+    fontSize: "clamp(12px, 3vw, 14px)",
+    fontWeight: 700,
+    cursor: "pointer",
+    fontFamily: F.sans,
+    boxShadow: `0 4px 14px ${C.gold}55`,
+    transition: ANIMATIONS.transition(),
+    whiteSpace: "nowrap",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "8px",
+    "&:hover": {
+      transform: "translateY(-2px)",
+      boxShadow: `0 6px 20px ${C.gold}77`,
+    },
+    "&:active": {
+      transform: "translateY(0)",
+    },
+    "&:disabled": {
+      opacity: 0.6,
+      cursor: "not-allowed",
+      transform: "none !important",
+    },
+  },
   small: {
     background: "transparent",
     color: C.primary,
@@ -209,7 +246,7 @@ export const btn = {
 };
 
 // ============================================================
-// INPUT STYLES (enhanced)
+// INPUT STYLES
 // ============================================================
 
 export const inp = {
@@ -237,7 +274,7 @@ export const inp = {
 };
 
 // ============================================================
-// CARD STYLES (enhanced)
+// CARD STYLES
 // ============================================================
 
 export const card = {
@@ -253,7 +290,7 @@ export const card = {
 };
 
 // ============================================================
-// CONTAINER (enhanced)
+// CONTAINER
 // ============================================================
 
 export const container = {
@@ -264,7 +301,7 @@ export const container = {
 };
 
 // ============================================================
-// FLEX UTILITIES (enhanced)
+// FLEX UTILITIES
 // ============================================================
 
 export const flex = {
@@ -272,41 +309,41 @@ export const flex = {
     display: "flex",
     flexDirection: "row",
     alignItems: "center",
-    gap: gap,
+    gap,
   }),
   column: (gap = SPACING.md) => ({
     display: "flex",
     flexDirection: "column",
-    gap: gap,
+    gap,
   }),
   between: (gap = SPACING.md) => ({
     display: "flex",
     justifyContent: "space-between",
     alignItems: "center",
-    gap: gap,
+    gap,
   }),
   wrap: (gap = SPACING.md) => ({
     display: "flex",
     flexWrap: "wrap",
-    gap: gap,
+    gap,
   }),
   center: (gap = SPACING.md) => ({
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    gap: gap,
+    gap,
   }),
   evenly: (gap = SPACING.md) => ({
     display: "flex",
     justifyContent: "space-evenly",
     alignItems: "center",
-    gap: gap,
+    gap,
     flexWrap: "wrap",
   }),
 };
 
 // ============================================================
-// GRID UTILITIES (enhanced)
+// GRID UTILITIES
 // ============================================================
 
 export const grid = {
@@ -338,12 +375,18 @@ export const grid = {
 };
 
 // ============================================================
-// TEXT UTILITIES (new)
+// TEXT UTILITIES
 // ============================================================
 
 export const text = {
   gradient: {
     background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
+  },
+  gradientGold: {
+    background: `linear-gradient(135deg, ${C.dark}, ${C.primary}, ${C.gold})`,
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     backgroundClip: "text",
@@ -367,7 +410,7 @@ export const text = {
 };
 
 // ============================================================
-// SHADOW UTILITIES (new)
+// SHADOW UTILITIES
 // ============================================================
 
 export const shadows = {
@@ -376,11 +419,12 @@ export const shadows = {
   lg: "0 4px 24px rgba(0,0,0,0.12)",
   xl: "0 8px 40px rgba(0,0,0,0.16)",
   glow: `0 0 30px ${C.primary}33`,
+  glowGold: `0 0 30px ${C.gold}44`,
   none: "none",
 };
 
 // ============================================================
-// BORDER RADIUS UTILITIES (new)
+// BORDER RADIUS UTILITIES
 // ============================================================
 
 export const radius = {
@@ -394,7 +438,7 @@ export const radius = {
 };
 
 // ============================================================
-// MEDIA QUERY HELPER
+// MEDIA QUERY HELPERS
 // ============================================================
 
 export const media = {

@@ -34,15 +34,10 @@ export default function Sidebar({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Load teams from Backend API
   const loadTeams = async () => {
     try {
       setLoading(true);
-      console.log("🔄 Loading teams from backend...");
       const response = await teamAPI.getAll();
-
-      console.log("📦 API Response:", response.data);
-
       if (response.data && Array.isArray(response.data)) {
         let formattedTeams = response.data.map((team) => ({
           id: team._id,
@@ -56,8 +51,6 @@ export default function Sidebar({
           reports: [],
           department: team.department,
         }));
-
-        // If Employee or Team Leader, only show their team
         if ((isEmployee || isLeader) && user) {
           const userTeam = formattedTeams.find(
             (team) =>
@@ -66,24 +59,15 @@ export default function Sidebar({
               team.leader === user.name ||
               team.leader === user._id,
           );
-          if (userTeam) {
-            formattedTeams = [userTeam];
-          } else {
-            formattedTeams = [];
-          }
+          formattedTeams = userTeam ? [userTeam] : [];
         }
-
-        console.log("✅ Formatted teams:", formattedTeams);
         setTeams(formattedTeams);
-      } else {
-        console.warn("⚠️ Response data is not an array:", response.data);
       }
     } catch (error) {
       console.error("❌ Failed to load teams:", error);
       const savedTeams = localStorage.getItem("forumTeams");
       if (savedTeams) {
         let parsedTeams = JSON.parse(savedTeams);
-        // If Employee or Team Leader, only show their team
         if ((isEmployee || isLeader) && user) {
           const userTeam = parsedTeams.find(
             (team) =>
@@ -92,11 +76,7 @@ export default function Sidebar({
               team.leader === user.name ||
               team.leader === user._id,
           );
-          if (userTeam) {
-            parsedTeams = [userTeam];
-          } else {
-            parsedTeams = [];
-          }
+          parsedTeams = userTeam ? [userTeam] : [];
         }
         setTeams(parsedTeams);
       }
@@ -105,34 +85,26 @@ export default function Sidebar({
     }
   };
 
-  // Load teams on component mount
   useEffect(() => {
     loadTeams();
   }, [isEmployee, isLeader, user]);
 
-  // Handle team selection
   const handleTeamClick = (team) => {
     setSelectedTeam(team);
     setTab("forum");
   };
 
-  // Add new team to backend
   const handleAddTeam = async () => {
     if (!newTeamName.trim()) {
       alert("Please enter a team name");
       return;
     }
-
     try {
       setLoading(true);
-      console.log("➕ Creating new team:", newTeamName);
       const response = await teamAPI.create({
         name: newTeamName,
         department: newTeamDepartment,
       });
-
-      console.log("✅ Team created response:", response.data);
-
       const newTeam = {
         id: response.data._id,
         name: response.data.name,
@@ -143,15 +115,12 @@ export default function Sidebar({
         reports: [],
         department: response.data.department,
       };
-
       setTeams([...teams, newTeam]);
       setNewTeamName("");
       setNewTeamDepartment("");
       setShowAddTeamModal(false);
       setForumExpanded(true);
-      console.log("🔄 Refreshing teams list...");
       await loadTeams();
-      console.log("✅ Teams refresh complete");
     } catch (error) {
       console.error("❌ Failed to create team:", error);
       alert(
@@ -165,16 +134,25 @@ export default function Sidebar({
 
   const sidebarWidth = collapsed ? 64 : isMobile ? 200 : 260;
 
+  // Brand colors
+  const DARK_BG = "#0d1a5e"; // Dark navy sidebar bg
+  const BORDER_COLOR = "#1a3aad"; // Blue border
+  const ACTIVE_BG = "#1a3aad33"; // Active item tint
+  const ACTIVE_TEXT = "#f5c518"; // Gold for active items
+  const MUTED_TEXT = "#7a8fc8"; // Muted blue text
+  const SECTION_BG = "#0f2070"; // Slightly lighter than dark
+  const HOVER_BG = "#1a3aad22";
+
   return (
     <aside
       style={{
         width: sidebarWidth,
         minHeight: "100vh",
-        background: C.dark,
+        background: DARK_BG,
         display: "flex",
         flexDirection: "column",
         transition: "width 0.25s ease",
-        borderRight: `2px solid ${C.primary}`,
+        borderRight: `2px solid ${BORDER_COLOR}`,
         flexShrink: 0,
         zIndex: 50,
       }}
@@ -183,21 +161,21 @@ export default function Sidebar({
       <button
         onClick={() => setCollapsed(!collapsed)}
         style={{
-          background: "#162c1e",
+          background: SECTION_BG,
           border: "none",
-          color: "#4a7a5a",
+          color: MUTED_TEXT,
           padding: "14px 0",
           cursor: "pointer",
           fontSize: 16,
-          borderBottom: "1px solid #1a3a26",
+          borderBottom: `1px solid ${BORDER_COLOR}33`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           width: "100%",
           transition: "all 0.2s",
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = "#1a3a26")}
-        onMouseLeave={(e) => (e.currentTarget.style.background = "#162c1e")}
+        onMouseEnter={(e) => (e.currentTarget.style.background = "#1a3aad44")}
+        onMouseLeave={(e) => (e.currentTarget.style.background = SECTION_BG)}
       >
         {collapsed ? "▶" : "◀"}
       </button>
@@ -210,7 +188,7 @@ export default function Sidebar({
           alignItems: "center",
           justifyContent: collapsed ? "center" : "flex-start",
           gap: 12,
-          borderBottom: "1px solid #1a3a26",
+          borderBottom: `1px solid ${BORDER_COLOR}33`,
         }}
       >
         <div
@@ -218,7 +196,7 @@ export default function Sidebar({
             width: 38,
             height: 38,
             minWidth: 38,
-            background: `linear-gradient(135deg,${C.primary},${C.light})`,
+            background: "linear-gradient(135deg, #1a3aad, #f5c518)",
             borderRadius: 10,
             display: "flex",
             alignItems: "center",
@@ -227,6 +205,7 @@ export default function Sidebar({
             fontWeight: 900,
             color: "#fff",
             fontFamily: F.serif,
+            boxShadow: "0 4px 12px rgba(26,58,173,0.4)",
           }}
         >
           አ
@@ -237,13 +216,18 @@ export default function Sidebar({
               style={{
                 fontSize: isMobile ? 14 : 16,
                 fontWeight: 800,
-                color: C.light,
+                background: "linear-gradient(90deg, #f5c518, #fff)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
                 fontFamily: F.serif,
               }}
             >
               {t.appName}
             </div>
-            <div style={{ fontSize: 10, color: "#6aaa88", letterSpacing: 0.5 }}>
+            <div
+              style={{ fontSize: 10, color: MUTED_TEXT, letterSpacing: 0.5 }}
+            >
               One-Stop
             </div>
           </div>
@@ -256,7 +240,7 @@ export default function Sidebar({
           style={{
             padding: "12px 16px 6px",
             fontSize: 10,
-            color: "#4a7a5a",
+            color: MUTED_TEXT,
             fontWeight: 700,
             letterSpacing: 1,
             textTransform: "uppercase",
@@ -298,12 +282,12 @@ export default function Sidebar({
                     : isMobile
                       ? "10px 16px"
                       : "11px 16px",
-                  background: active ? "#1a6b4a33" : "none",
+                  background: active ? ACTIVE_BG : "none",
                   border: "none",
                   borderLeft: active
-                    ? `4px solid ${C.light}`
+                    ? `4px solid ${C.gold}`
                     : "4px solid transparent",
-                  color: active ? C.light : "#7a9a88",
+                  color: active ? ACTIVE_TEXT : MUTED_TEXT,
                   cursor: "pointer",
                   fontSize: isMobile ? 13 : 14,
                   fontWeight: active ? 700 : 500,
@@ -312,7 +296,7 @@ export default function Sidebar({
                   marginBottom: 2,
                 }}
                 onMouseEnter={(e) => {
-                  if (!active) e.currentTarget.style.background = "#1a6b4a22";
+                  if (!active) e.currentTarget.style.background = HOVER_BG;
                 }}
                 onMouseLeave={(e) => {
                   if (!active) e.currentTarget.style.background = "none";
@@ -336,13 +320,13 @@ export default function Sidebar({
                         ? "rotate(0deg)"
                         : "rotate(-90deg)",
                       transition: "transform 0.2s ease",
-                      color: "#4a7a5a",
+                      color: MUTED_TEXT,
                     }}
                   />
                 )}
               </button>
 
-              {/* Team list under Forum */}
+              {/* Team list */}
               {isForum && forumExpanded && !collapsed && (
                 <div
                   style={{
@@ -350,7 +334,7 @@ export default function Sidebar({
                     paddingRight: 8,
                     marginTop: 4,
                     marginBottom: 8,
-                    borderLeft: "2px solid #1a3a26",
+                    borderLeft: `2px solid ${BORDER_COLOR}33`,
                     marginLeft: 20,
                   }}
                 >
@@ -358,7 +342,7 @@ export default function Sidebar({
                     <div
                       style={{
                         padding: "8px 12px",
-                        color: "#4a7a5a",
+                        color: MUTED_TEXT,
                         fontSize: 12,
                         textAlign: "center",
                       }}
@@ -366,12 +350,11 @@ export default function Sidebar({
                       Loading...
                     </div>
                   )}
-
                   {!loading && teams.length === 0 && (
                     <div
                       style={{
                         padding: "8px 12px",
-                        color: "#4a7a5a",
+                        color: MUTED_TEXT,
                         fontSize: 12,
                         textAlign: "center",
                       }}
@@ -381,7 +364,6 @@ export default function Sidebar({
                         : "No teams yet"}
                     </div>
                   )}
-
                   {teams.map((team) => (
                     <button
                       key={team.id}
@@ -392,15 +374,17 @@ export default function Sidebar({
                         padding: isMobile ? "7px 10px" : "8px 12px",
                         margin: "3px 0",
                         background:
-                          selectedTeam?.id === team.id ? "#1a6b4a33" : "none",
+                          selectedTeam?.id === team.id ? ACTIVE_BG : "none",
                         border: "none",
                         borderRadius: 6,
                         borderLeft:
                           selectedTeam?.id === team.id
-                            ? `3px solid ${C.light}`
+                            ? `3px solid ${C.gold}`
                             : "3px solid transparent",
                         color:
-                          selectedTeam?.id === team.id ? C.light : "#7a9a88",
+                          selectedTeam?.id === team.id
+                            ? ACTIVE_TEXT
+                            : MUTED_TEXT,
                         cursor: "pointer",
                         fontSize: isMobile ? 12 : 13,
                         fontFamily: F.sans,
@@ -409,40 +393,38 @@ export default function Sidebar({
                         lineHeight: 1.4,
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#1a6b4a22";
-                        e.currentTarget.style.color = C.light;
+                        e.currentTarget.style.background = HOVER_BG;
+                        e.currentTarget.style.color = ACTIVE_TEXT;
                       }}
                       onMouseLeave={(e) => {
                         if (selectedTeam?.id !== team.id) {
                           e.currentTarget.style.background = "none";
-                          e.currentTarget.style.color = "#7a9a88";
+                          e.currentTarget.style.color = MUTED_TEXT;
                         }
                       }}
                     >
                       {team.name.length > 18
                         ? team.name.substring(0, 16) + "…"
                         : team.name}
-                      {/* Show role badge for the user's team */}
                       {(isEmployee || isLeader) &&
                         team.members?.includes(user?.name) && (
                           <span
                             style={{
                               marginLeft: 6,
                               fontSize: 8,
-                              background: isLeader ? "#C25A00" : "#1E4D8C",
-                              color: "#fff",
+                              background: C.gold,
+                              color: C.dark,
                               padding: "1px 6px",
                               borderRadius: 10,
-                              fontWeight: 600,
+                              fontWeight: 700,
                             }}
                           >
-                            {isLeader ? "Your Team" : "Your Team"}
+                            Your Team
                           </span>
                         )}
                     </button>
                   ))}
 
-                  {/* Add Team button - Only Admins and Super Admins */}
                   {isAdminOrSuperAdmin && (
                     <button
                       onClick={() => setShowAddTeamModal(true)}
@@ -452,9 +434,9 @@ export default function Sidebar({
                         padding: isMobile ? "7px 10px" : "8px 12px",
                         marginTop: 6,
                         background: "none",
-                        border: "1px dashed #2a5a3a",
+                        border: `1px dashed ${BORDER_COLOR}66`,
                         borderRadius: 6,
-                        color: "#4a7a5a",
+                        color: MUTED_TEXT,
                         cursor: "pointer",
                         fontSize: isMobile ? 12 : 13,
                         fontFamily: F.sans,
@@ -464,14 +446,14 @@ export default function Sidebar({
                         transition: "all 0.15s",
                       }}
                       onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#1a3a26";
-                        e.currentTarget.style.color = C.light;
-                        e.currentTarget.style.borderColor = C.light;
+                        e.currentTarget.style.background = HOVER_BG;
+                        e.currentTarget.style.color = C.gold;
+                        e.currentTarget.style.borderColor = C.gold;
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "none";
-                        e.currentTarget.style.color = "#4a7a5a";
-                        e.currentTarget.style.borderColor = "#2a5a3a";
+                        e.currentTarget.style.color = MUTED_TEXT;
+                        e.currentTarget.style.borderColor = `${BORDER_COLOR}66`;
                       }}
                     >
                       <span
@@ -496,7 +478,7 @@ export default function Sidebar({
       {/* Language switcher */}
       <div
         style={{
-          borderTop: "1px solid #1a3a26",
+          borderTop: `1px solid ${BORDER_COLOR}33`,
           padding: collapsed ? "12px 0" : "14px 16px",
         }}
       >
@@ -504,7 +486,7 @@ export default function Sidebar({
           <div
             style={{
               fontSize: 10,
-              color: "#4a7a5a",
+              color: MUTED_TEXT,
               fontWeight: 700,
               letterSpacing: 1,
               marginBottom: 10,
@@ -530,13 +512,13 @@ export default function Sidebar({
               onClick={() => setLang(l.code)}
               title={l.label}
               style={{
-                background: lang === l.code ? C.primary : "transparent",
-                color: lang === l.code ? "#fff" : "#5a8a6a",
-                border: `1px solid ${lang === l.code ? C.primary : "#2a5a3a"}`,
+                background: lang === l.code ? C.gold : "transparent",
+                color: lang === l.code ? C.dark : MUTED_TEXT,
+                border: `1px solid ${lang === l.code ? C.gold : BORDER_COLOR + "55"}`,
                 borderRadius: 5,
                 padding: collapsed ? "5px 7px" : "4px 10px",
                 fontSize: 11,
-                fontWeight: 600,
+                fontWeight: 700,
                 cursor: "pointer",
                 fontFamily: F.sans,
                 transition: "all 0.15s",
@@ -557,7 +539,7 @@ export default function Sidebar({
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0,0,0,0.5)",
+            background: "rgba(13,26,94,0.7)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -574,11 +556,20 @@ export default function Sidebar({
               width: "100%",
               maxWidth: 340,
               boxSizing: "border-box",
+              border: `2px solid ${C.gold}`,
+              boxShadow: "0 20px 60px rgba(13,26,94,0.4)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 style={{ marginBottom: 16, color: C.dark, fontSize: 18 }}>
-              Add New Team
+            <h3
+              style={{
+                marginBottom: 16,
+                color: C.dark,
+                fontSize: 18,
+                fontFamily: F.sans,
+              }}
+            >
+              ➕ Add New Team
             </h3>
             <input
               type="text"
@@ -593,6 +584,7 @@ export default function Sidebar({
                 marginBottom: 12,
                 fontSize: 14,
                 boxSizing: "border-box",
+                fontFamily: F.sans,
               }}
               onKeyPress={(e) => e.key === "Enter" && handleAddTeam()}
             />
@@ -609,6 +601,7 @@ export default function Sidebar({
                 marginBottom: 20,
                 fontSize: 14,
                 boxSizing: "border-box",
+                fontFamily: F.sans,
               }}
               onKeyPress={(e) => e.key === "Enter" && handleAddTeam()}
             />
@@ -624,6 +617,7 @@ export default function Sidebar({
                   borderRadius: 6,
                   cursor: "pointer",
                   fontSize: 14,
+                  fontFamily: F.sans,
                 }}
               >
                 Cancel
@@ -633,7 +627,7 @@ export default function Sidebar({
                 disabled={loading}
                 style={{
                   padding: "8px 16px",
-                  background: C.primary,
+                  background: "linear-gradient(135deg, #1a3aad, #f5c518)",
                   color: "#fff",
                   border: "none",
                   borderRadius: 6,
@@ -641,6 +635,7 @@ export default function Sidebar({
                   fontSize: 14,
                   fontWeight: 600,
                   opacity: loading ? 0.7 : 1,
+                  fontFamily: F.sans,
                 }}
               >
                 {loading ? "Adding..." : "Add Team"}

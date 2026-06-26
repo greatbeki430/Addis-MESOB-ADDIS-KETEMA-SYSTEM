@@ -38,12 +38,12 @@ export default function Header({ tab, t, lang, setLang }) {
         height: "auto",
         minHeight: "clamp(48px, 8vh, 56px)",
         background: C.white,
-        borderBottom: "1px solid #e0ece4",
+        borderBottom: `2px solid ${C.primary}22`,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
         padding: "8px clamp(12px, 4vw, 24px)",
-        boxShadow: "0 1px 4px #0001",
+        boxShadow: `0 2px 12px rgba(26,58,173,0.08)`,
         position: "sticky",
         top: 0,
         zIndex: 40,
@@ -52,7 +52,7 @@ export default function Header({ tab, t, lang, setLang }) {
         flexWrap: "wrap",
       }}
     >
-      {/* LEFT SECTION */}
+      {/* LEFT */}
       <div
         style={{
           display: "flex",
@@ -68,7 +68,6 @@ export default function Header({ tab, t, lang, setLang }) {
             fontSize: "clamp(16px, 4vw, 20px)",
             color: C.primary,
             flexShrink: 0,
-            animation: "pulseGlow 3s ease-in-out infinite",
           }}
         >
           {icons[tab] || "◈"}
@@ -88,7 +87,13 @@ export default function Header({ tab, t, lang, setLang }) {
           {t.appName}
         </span>
 
-        <span style={{ color: "#ccc", fontSize: "clamp(10px, 3vw, 12px)" }}>
+        <span
+          style={{
+            color: C.gold,
+            fontSize: "clamp(10px, 3vw, 14px)",
+            fontWeight: 900,
+          }}
+        >
           ›
         </span>
 
@@ -96,12 +101,11 @@ export default function Header({ tab, t, lang, setLang }) {
           style={{
             fontWeight: 700,
             fontSize: "clamp(11px, 3.5vw, 13px)",
-            color: C.dark,
             fontFamily: F.sans,
             whiteSpace: "normal",
             wordBreak: "break-word",
             maxWidth: "min(200px, 40vw)",
-            background: `linear-gradient(90deg, ${C.primary}, ${C.light})`,
+            background: `linear-gradient(90deg, ${C.primary}, ${C.gold})`,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
@@ -111,7 +115,7 @@ export default function Header({ tab, t, lang, setLang }) {
         </span>
       </div>
 
-      {/* RIGHT SECTION */}
+      {/* RIGHT */}
       <div
         style={{
           display: "flex",
@@ -145,75 +149,48 @@ export default function Header({ tab, t, lang, setLang }) {
             flexShrink: 0,
           }}
         >
-          <div style={{ display: "flex", gap: "clamp(2px, 1.5vw, 6px)" }}>
-            {LANGUAGES.map((l) => (
-              <button
-                key={l.code}
-                className="header-lang-btn"
-                onClick={() => setLang(l.code)}
-                title={l.label}
-                style={{
-                  background: lang === l.code ? C.primary : "#f0f7f4",
-                  color: lang === l.code ? "#fff" : C.primary,
-                  border: `1px solid ${lang === l.code ? C.primary : C.border}`,
-                  borderRadius: 5,
-                  padding: "clamp(2px, 1.5vw, 4px) clamp(4px, 2vw, 8px)",
-                  fontSize: "clamp(9px, 2.5vw, 11px)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: F.sans,
-                  transition: "all 0.2s ease",
-                  whiteSpace: "nowrap",
-                  minWidth: "clamp(24px, 6vw, 32px)",
-                  transform: lang === l.code ? "scale(1.05)" : "scale(1)",
-                }}
-                onMouseEnter={(e) => {
-                  if (lang !== l.code) {
-                    e.currentTarget.style.background = C.primary + "22";
-                    e.currentTarget.style.transform = "scale(1.05)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (lang !== l.code) {
-                    e.currentTarget.style.background = "#f0f7f4";
-                    e.currentTarget.style.transform = "scale(1)";
-                  }
-                }}
-              >
-                {l.flag}
-              </button>
-            ))}
-          </div>
-
-          {/* Mobile Language Selector */}
-          <select
-            value={lang}
-            onChange={(e) => setLang(e.target.value)}
-            style={{
-              background: C.primary,
-              color: "#fff",
-              border: `1px solid ${C.primary}`,
-              borderRadius: 5,
-              padding: "clamp(2px, 1.5vw, 4px) clamp(4px, 2vw, 8px)",
-              fontSize: "clamp(9px, 2.5vw, 11px)",
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: F.sans,
-              display: "none",
-            }}
-          >
-            {LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.flag} {l.label}
-              </option>
-            ))}
-          </select>
+          {LANGUAGES.map((l) => (
+            <button
+              key={l.code}
+              className="header-lang-btn"
+              onClick={() => setLang(l.code)}
+              title={l.label}
+              style={{
+                background: lang === l.code ? C.primary : "#f0f3ff",
+                color: lang === l.code ? C.gold : C.primary,
+                border: `1px solid ${lang === l.code ? C.primary : C.border}`,
+                borderRadius: 5,
+                padding: "clamp(2px, 1.5vw, 4px) clamp(4px, 2vw, 8px)",
+                fontSize: "clamp(9px, 2.5vw, 11px)",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: F.sans,
+                transition: "all 0.2s ease",
+                whiteSpace: "nowrap",
+                minWidth: "clamp(24px, 6vw, 32px)",
+                transform: lang === l.code ? "scale(1.05)" : "scale(1)",
+              }}
+              onMouseEnter={(e) => {
+                if (lang !== l.code) {
+                  e.currentTarget.style.background = C.primary + "22";
+                  e.currentTarget.style.transform = "scale(1.05)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (lang !== l.code) {
+                  e.currentTarget.style.background = "#f0f3ff";
+                  e.currentTarget.style.transform = "scale(1)";
+                }
+              }}
+            >
+              {l.flag}
+            </button>
+          ))}
         </div>
 
-        {/* Logout Button */}
+        {/* Logout */}
         <button
           onClick={logout}
-          className="header-logout-btn"
           style={{
             background: isLogoutHovered ? "#dc2626" : "transparent",
             border: `1px solid ${isLogoutHovered ? "#dc2626" : C.border}`,
@@ -233,18 +210,15 @@ export default function Header({ tab, t, lang, setLang }) {
           onMouseLeave={() => setIsLogoutHovered(false)}
         >
           <span style={{ fontSize: "clamp(12px, 3vw, 14px)" }}>🚪</span>
-          <span style={{ display: "inline-block" }}>
-            {t.auth?.logout || "Logout"}
-          </span>
+          <span>{t.auth?.logout || "Logout"}</span>
         </button>
 
-        {/* Profile Avatar */}
+        {/* Avatar */}
         <div
-          className="header-avatar"
           style={{
             width: "clamp(28px, 6vw, 36px)",
             height: "clamp(28px, 6vw, 36px)",
-            background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+            background: "linear-gradient(135deg, #1a3aad, #f5c518)",
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
@@ -254,18 +228,18 @@ export default function Header({ tab, t, lang, setLang }) {
             fontWeight: 900,
             fontFamily: F.serif,
             cursor: "pointer",
-            boxShadow: `0 2px 6px ${C.primary}44`,
+            boxShadow: `0 2px 8px rgba(26,58,173,0.35)`,
             flexShrink: 0,
             transition: "transform 0.3s ease, box-shadow 0.3s ease",
           }}
           title={user?.name || "User"}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = "scale(1.1)";
-            e.currentTarget.style.boxShadow = `0 4px 12px ${C.primary}66`;
+            e.currentTarget.style.boxShadow = "0 4px 16px rgba(245,197,24,0.5)";
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = "scale(1)";
-            e.currentTarget.style.boxShadow = `0 2px 6px ${C.primary}44`;
+            e.currentTarget.style.boxShadow = "0 2px 8px rgba(26,58,173,0.35)";
           }}
         >
           {getUserInitial()}

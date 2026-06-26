@@ -14,7 +14,6 @@ const removeBodyMargins = () => {
   document.body.style.bottom = "0";
   document.body.style.width = "100%";
   document.body.style.height = "100%";
-
   const root = document.getElementById("root");
   if (root) {
     root.style.minHeight = "100vh";
@@ -40,7 +39,6 @@ const restoreBodyMargins = () => {
   document.body.style.bottom = "";
   document.body.style.width = "";
   document.body.style.height = "";
-
   const root = document.getElementById("root");
   if (root) {
     root.style.minHeight = "";
@@ -55,14 +53,12 @@ const restoreBodyMargins = () => {
   }
 };
 
-// ✅ Generate particles with deterministic values
 const generateParticles = () => {
   const seed = 12345;
   const pseudoRandom = (index) => {
     const x = Math.sin(index * 9301 + seed * 49297) * 49297;
     return x - Math.floor(x);
   };
-
   return Array.from({ length: 20 }, (_, i) => ({
     id: i,
     left: 5 + pseudoRandom(i) * 90,
@@ -75,18 +71,19 @@ const generateParticles = () => {
 
 const STATIC_PARTICLES = generateParticles();
 
-// Addis MESOB Brand Colors
+// ✅ Brand colors from logo
 const COLORS = {
-  primary: "#1a6b4a", // Dark Green
-  light: "#2aaa78", // Bright Green
-  gold: "#c9a84c", // Gold from logo
-  goldLight: "#e8d5a3", // Light Gold
-  dark: "#0d1f14",
+  primary: "#1a3aad",
+  secondary: "#2952cc",
+  gold: "#f5c518",
+  goldLight: "#fde98a",
+  dark: "#0d1a5e",
   white: "#ffffff",
 };
 
 export default function Login({ onSwitchToRegister }) {
   const { t } = useLanguage();
+  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -95,15 +92,12 @@ export default function Login({ onSwitchToRegister }) {
   const [isFocused, setIsFocused] = useState({ email: false, password: false });
   const [isHovered, setIsHovered] = useState(false);
   const [titleRotation, setTitleRotation] = useState(0);
-  const { login } = useAuth();
 
   useEffect(() => {
     removeBodyMargins();
-
     const interval = setInterval(() => {
       setTitleRotation((prev) => (prev + 0.3) % 360);
     }, 50);
-
     return () => {
       restoreBodyMargins();
       clearInterval(interval);
@@ -114,7 +108,6 @@ export default function Login({ onSwitchToRegister }) {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       const result = await login({ email, password });
       if (!result.success) {
@@ -127,116 +120,71 @@ export default function Login({ onSwitchToRegister }) {
     }
   };
 
-  const togglePasswordVisibility = () => {
-    setShowPassword(!showPassword);
-  };
-
   return (
-    <div style={loginStyles.container}>
-      <div style={loginStyles.overlay}></div>
+    <div style={S.container}>
+      <div style={S.overlay} />
 
-      {/* Animated Background Particles */}
-      <div style={loginStyles.particlesContainer}>
-        {STATIC_PARTICLES.map((particle) => (
+      {/* Particles */}
+      <div style={S.particlesContainer}>
+        {STATIC_PARTICLES.map((p) => (
           <div
-            key={particle.id}
+            key={p.id}
             style={{
-              ...loginStyles.particle,
-              left: `${particle.left}%`,
-              animationDuration: `${particle.duration}s`,
-              animationDelay: `${particle.delay}s`,
-              width: `${particle.width}px`,
-              height: `${particle.height}px`,
+              ...S.particle,
+              left: `${p.left}%`,
+              animationDuration: `${p.duration}s`,
+              animationDelay: `${p.delay}s`,
+              width: `${p.width}px`,
+              height: `${p.height}px`,
             }}
           />
         ))}
       </div>
 
-      <div style={loginStyles.card}>
-        {/* Animated Logo Section - Updated with Addis MESOB Colors */}
-        <div style={loginStyles.logoContainer}>
+      <div style={S.card}>
+        {/* Logo */}
+        <div style={S.logoContainer}>
           <div
             style={{
-              ...loginStyles.logoIcon,
+              ...S.logoIcon,
               transform: `rotate(${titleRotation}deg)`,
-              background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
-              boxShadow: `0 8px 30px ${COLORS.primary}66`,
             }}
           >
             አ
           </div>
-          <div style={loginStyles.logoTextContainer}>
-            <div
-              style={{
-                ...loginStyles.logoText,
-                background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-                fontSize: "clamp(32px, 8vw, 42px)",
-                fontWeight: 900,
-                fontFamily: "'Noto Serif Ethiopic', serif",
-                letterSpacing: "-0.5px",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = `linear-gradient(90deg, ${COLORS.gold}, ${COLORS.primary}, ${COLORS.gold})`;
-                e.currentTarget.style.backgroundSize = "200% 100%";
-                e.currentTarget.style.animation = "shimmer 2s linear infinite";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`;
-                e.currentTarget.style.backgroundSize = "100% 100%";
-                e.currentTarget.style.animation = "none";
-              }}
-            >
-              A-MESOB
-            </div>
-            <div style={loginStyles.logoSub}>
-              <span
-                style={{
-                  ...loginStyles.logoSubHighlight,
-                  color: COLORS.primary,
-                }}
-              >
-                Addis
-              </span>{" "}
-              MESOB
-              <span style={loginStyles.logoSubDot}> · </span>
-              <span
-                style={{
-                  ...loginStyles.logoSubHighlight,
-                  color: COLORS.primary,
-                }}
-              >
-                One
-              </span>
-              -Stop
+          <div style={S.logoTextContainer}>
+            <div style={S.logoText}>A-MESOB</div>
+            <div style={S.logoSub}>
+              <span style={S.logoSubHighlight}>Addis</span> MESOB
+              <span style={S.logoSubDot}> · </span>
+              <span style={S.logoSubHighlight}>One</span>-Stop
             </div>
           </div>
         </div>
 
-        <p style={loginStyles.subtitle}>
+        <p style={S.subtitle}>
           {t?.auth?.login || "Login"}{" "}
           {t?.auth?.toYourAccount || "to your account"}
         </p>
 
         {error && (
-          <div style={loginStyles.error}>
+          <div style={S.error}>
             <span style={{ marginRight: 8 }}>⚠️</span>
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          <div style={loginStyles.inputGroup}>
-            <label style={loginStyles.label}>{t?.auth?.email || "Email"}</label>
-            <div style={loginStyles.inputWrapper}>
-              <span style={loginStyles.inputIcon}>📧</span>
+          {/* Email */}
+          <div style={S.inputGroup}>
+            <label style={S.label}>{t?.auth?.email || "Email"}</label>
+            <div style={S.inputWrapper}>
+              <span style={S.inputIcon}>📧</span>
               <input
                 type="email"
                 style={{
-                  ...loginStyles.input,
-                  ...(isFocused.email ? loginStyles.inputFocused : {}),
+                  ...S.input,
+                  ...(isFocused.email ? S.inputFocused : {}),
                 }}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -248,17 +196,16 @@ export default function Login({ onSwitchToRegister }) {
             </div>
           </div>
 
-          <div style={loginStyles.inputGroup}>
-            <label style={loginStyles.label}>
-              {t?.auth?.password || "Password"}
-            </label>
-            <div style={loginStyles.inputWrapper}>
-              <span style={loginStyles.inputIcon}>🔒</span>
+          {/* Password */}
+          <div style={S.inputGroup}>
+            <label style={S.label}>{t?.auth?.password || "Password"}</label>
+            <div style={S.inputWrapper}>
+              <span style={S.inputIcon}>🔒</span>
               <input
                 type={showPassword ? "text" : "password"}
                 style={{
-                  ...loginStyles.input,
-                  ...(isFocused.password ? loginStyles.inputFocused : {}),
+                  ...S.input,
+                  ...(isFocused.password ? S.inputFocused : {}),
                 }}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -269,10 +216,10 @@ export default function Login({ onSwitchToRegister }) {
               />
               <button
                 type="button"
-                onClick={togglePasswordVisibility}
-                style={loginStyles.eyeButton}
+                onClick={() => setShowPassword(!showPassword)}
+                style={S.eyeButton}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.color = COLORS.primary;
+                  e.currentTarget.style.color = COLORS.gold;
                   e.currentTarget.style.transform = "scale(1.1)";
                 }}
                 onMouseLeave={(e) => {
@@ -285,12 +232,12 @@ export default function Login({ onSwitchToRegister }) {
             </div>
           </div>
 
+          {/* Submit */}
           <button
             type="submit"
             style={{
-              ...loginStyles.button,
-              ...(isHovered ? loginStyles.buttonHover : {}),
-              background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
+              ...S.button,
+              ...(isHovered ? S.buttonHover : {}),
             }}
             disabled={loading}
             onMouseEnter={() => setIsHovered(true)}
@@ -298,7 +245,7 @@ export default function Login({ onSwitchToRegister }) {
           >
             {loading ? (
               <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={loginStyles.spinner}></span>
+                <span style={S.spinner} />
                 {t?.auth?.loggingIn || "Logging in..."}
               </span>
             ) : (
@@ -310,14 +257,11 @@ export default function Login({ onSwitchToRegister }) {
           </button>
         </form>
 
-        <div style={loginStyles.link}>
+        <div style={S.link}>
           {t?.auth?.noAccount || "Don't have an account?"}{" "}
           <button
             onClick={onSwitchToRegister}
-            style={{
-              ...loginStyles.linkButton,
-              color: COLORS.primary,
-            }}
+            style={S.linkButton}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateX(4px)";
               e.currentTarget.style.color = COLORS.gold;
@@ -331,12 +275,12 @@ export default function Login({ onSwitchToRegister }) {
           </button>
         </div>
 
-        <div style={loginStyles.footer}>
-          <span style={loginStyles.footerText}>
+        <div style={S.footer}>
+          <span style={S.footerText}>
             {t?.appSub || "Addis Ketema · One-Stop Service"}
           </span>
-          <span style={loginStyles.footerDot}>•</span>
-          <span style={loginStyles.footerText}>{t?.year || "2018 E.C."}</span>
+          <span style={S.footerDot}>•</span>
+          <span style={S.footerText}>{t?.year || "2018 E.C."}</span>
         </div>
       </div>
 
@@ -345,13 +289,9 @@ export default function Login({ onSwitchToRegister }) {
           0% { background-position: -200% center; }
           100% { background-position: 200% center; }
         }
-        @keyframes float {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-10px) rotate(5deg); }
-        }
         @keyframes pulseGlow {
-          0%, 100% { box-shadow: 0 0 20px rgba(26,107,74,0.3); }
-          50% { box-shadow: 0 0 40px rgba(26,107,74,0.6); }
+          0%, 100% { box-shadow: 0 0 20px rgba(26,58,173,0.4); }
+          50% { box-shadow: 0 0 50px rgba(245,197,24,0.5); }
         }
         @keyframes spin {
           0% { transform: rotate(0deg); }
@@ -359,9 +299,9 @@ export default function Login({ onSwitchToRegister }) {
         }
         @keyframes particleFloat {
           0% { transform: translateY(0px) translateX(0px); opacity: 0; }
-          10% { opacity: 0.8; }
-          90% { opacity: 0.8; }
-          100% { transform: translateY(-100px) translateX(20px); opacity: 0; }
+          10% { opacity: 0.6; }
+          90% { opacity: 0.6; }
+          100% { transform: translateY(-120px) translateX(20px); opacity: 0; }
         }
         @keyframes shake {
           0%, 100% { transform: translateX(0); }
@@ -372,12 +312,16 @@ export default function Login({ onSwitchToRegister }) {
           from { opacity: 0; transform: translateY(30px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
+        @keyframes goldPulse {
+          0%, 100% { border-color: rgba(245,197,24,0.3); }
+          50% { border-color: rgba(245,197,24,0.8); }
+        }
       `}</style>
     </div>
   );
 }
 
-const loginStyles = {
+const S = {
   container: {
     position: "fixed",
     top: 0,
@@ -403,8 +347,9 @@ const loginStyles = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: "rgba(0, 0, 0, 0.7)",
-    backdropFilter: "blur(2px)",
+    background:
+      "linear-gradient(135deg, rgba(13,26,94,0.88) 0%, rgba(26,58,173,0.75) 50%, rgba(13,26,94,0.88) 100%)",
+    backdropFilter: "blur(3px)",
   },
   particlesContainer: {
     position: "absolute",
@@ -418,23 +363,24 @@ const loginStyles = {
   particle: {
     position: "absolute",
     bottom: "-10px",
-    background: "rgba(255,255,255,0.1)",
+    background: "rgba(245,197,24,0.15)",
     borderRadius: "50%",
     animation: "particleFloat linear infinite",
   },
   card: {
-    background: "rgba(255, 255, 255, 0.98)",
-    backdropFilter: "blur(10px)",
+    background: "rgba(255,255,255,0.97)",
+    backdropFilter: "blur(20px)",
     borderRadius: "clamp(20px, 5vw, 30px)",
     padding: "clamp(30px, 6vw, 50px)",
     width: "calc(100% - 40px)",
     maxWidth: 440,
-    boxShadow: "0 30px 80px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1)",
+    boxShadow: "0 30px 80px rgba(13,26,94,0.4), 0 0 0 1px rgba(245,197,24,0.2)",
     position: "relative",
     zIndex: 1,
     margin: "auto",
     boxSizing: "border-box",
     animation: "fadeInUp 0.6s ease",
+    border: "1px solid rgba(245,197,24,0.15)",
   },
   logoContainer: {
     display: "flex",
@@ -444,19 +390,20 @@ const loginStyles = {
     marginBottom: "clamp(16px, 4vw, 24px)",
   },
   logoIcon: {
-    width: "clamp(50px, 12vw, 65px)",
-    height: "clamp(50px, 12vw, 65px)",
-    background: "linear-gradient(135deg, #1a6b4a, #c9a84c)",
-    borderRadius: "clamp(14px, 3vw, 18px)",
+    width: "clamp(55px, 13vw, 70px)",
+    height: "clamp(55px, 13vw, 70px)",
+    minWidth: "clamp(55px, 13vw, 70px)",
+    background: "linear-gradient(135deg, #1a3aad, #f5c518)",
+    borderRadius: "clamp(14px, 3vw, 20px)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    fontSize: "clamp(28px, 7vw, 36px)",
+    fontSize: "clamp(28px, 7vw, 38px)",
     fontWeight: 900,
     color: "#fff",
     fontFamily: "'Noto Serif Ethiopic', serif",
-    boxShadow: "0 8px 30px rgba(26,107,74,0.4)",
-    transition: "transform 0.3s ease, box-shadow 0.3s ease",
+    boxShadow: "0 8px 30px rgba(26,58,173,0.4)",
+    transition: "transform 0.3s ease",
     animation: "pulseGlow 3s ease-in-out infinite",
   },
   logoTextContainer: {
@@ -465,15 +412,15 @@ const loginStyles = {
     alignItems: "flex-start",
   },
   logoText: {
-    fontSize: "clamp(28px, 7vw, 36px)",
+    fontSize: "clamp(30px, 8vw, 44px)",
     fontWeight: 900,
-    background: "linear-gradient(135deg, #1a6b4a, #c9a84c)",
+    background: "linear-gradient(135deg, #1a3aad, #f5c518)",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     backgroundClip: "text",
     fontFamily: "'Noto Serif Ethiopic', serif",
     letterSpacing: "-0.5px",
-    transition: "all 0.3s ease",
+    lineHeight: 1.1,
   },
   logoSub: {
     fontSize: "clamp(10px, 2.5vw, 12px)",
@@ -483,35 +430,31 @@ const loginStyles = {
     marginTop: 2,
   },
   logoSubHighlight: {
-    color: "#1a6b4a",
+    color: "#1a3aad",
     fontWeight: 700,
   },
   logoSubDot: {
-    color: "#ccc",
+    color: "#f5c518",
     margin: "0 4px",
+    fontWeight: 900,
   },
   subtitle: {
     fontSize: "clamp(13px, 3.5vw, 14px)",
-    color: "#888",
+    color: "#6a7aaa",
     textAlign: "center",
     marginBottom: "clamp(24px, 5vw, 32px)",
     fontFamily: "'Noto Sans Ethiopic', sans-serif",
   },
-  inputGroup: {
-    marginBottom: "clamp(16px, 4vw, 20px)",
-  },
+  inputGroup: { marginBottom: "clamp(16px, 4vw, 20px)" },
   label: {
     display: "block",
     fontSize: "clamp(11px, 3vw, 12px)",
     fontWeight: 600,
-    color: "#444",
+    color: "#1a3aad",
     marginBottom: 6,
     fontFamily: "'Noto Sans Ethiopic', sans-serif",
   },
-  inputWrapper: {
-    position: "relative",
-    width: "100%",
-  },
+  inputWrapper: { position: "relative", width: "100%" },
   inputIcon: {
     position: "absolute",
     left: "12px",
@@ -525,18 +468,19 @@ const loginStyles = {
     width: "100%",
     padding:
       "clamp(12px, 3vw, 14px) clamp(40px, 10vw, 50px) clamp(12px, 3vw, 14px) clamp(40px, 10vw, 45px)",
-    border: "2px solid #e0ece4",
+    border: "2px solid #c8d0ef",
     borderRadius: "clamp(10px, 2.5vw, 12px)",
     fontSize: "clamp(14px, 3.5vw, 15px)",
     outline: "none",
     transition: "all 0.3s ease",
     boxSizing: "border-box",
-    background: "#f8fbf9",
+    background: "#f5f7ff",
     fontFamily: "'Noto Sans Ethiopic', sans-serif",
+    color: "#0d1a5e",
   },
   inputFocused: {
-    borderColor: "#1a6b4a",
-    boxShadow: "0 0 0 4px rgba(26,107,74,0.1)",
+    borderColor: "#1a3aad",
+    boxShadow: "0 0 0 4px rgba(26,58,173,0.1)",
     background: "#fff",
   },
   eyeButton: {
@@ -558,7 +502,9 @@ const loginStyles = {
   button: {
     width: "100%",
     padding: "clamp(14px, 3.5vw, 16px)",
-    background: "linear-gradient(135deg, #1a6b4a, #c9a84c)",
+    background:
+      "linear-gradient(135deg, #1a3aad 0%, #2952cc 50%, #f5c518 100%)",
+    backgroundSize: "200% 100%",
     color: "#fff",
     border: "none",
     borderRadius: "clamp(10px, 2.5vw, 12px)",
@@ -570,17 +516,19 @@ const loginStyles = {
     fontFamily: "'Noto Sans Ethiopic', sans-serif",
     position: "relative",
     overflow: "hidden",
+    boxShadow: "0 4px 15px rgba(26,58,173,0.35)",
   },
   buttonHover: {
     transform: "translateY(-2px)",
-    boxShadow: "0 8px 30px rgba(26,107,74,0.35)",
+    boxShadow: "0 8px 30px rgba(26,58,173,0.45)",
+    backgroundPosition: "right center",
   },
   spinner: {
     display: "inline-block",
     width: "20px",
     height: "20px",
     border: "3px solid rgba(255,255,255,0.3)",
-    borderTop: "3px solid #fff",
+    borderTop: "3px solid #f5c518",
     borderRadius: "50%",
     animation: "spin 0.8s linear infinite",
   },
@@ -602,13 +550,13 @@ const loginStyles = {
     textAlign: "center",
     marginTop: "clamp(20px, 5vw, 24px)",
     fontSize: "clamp(12px, 3vw, 13px)",
-    color: "#888",
+    color: "#6a7aaa",
     fontFamily: "'Noto Sans Ethiopic', sans-serif",
   },
   linkButton: {
     background: "none",
     border: "none",
-    color: "#1a6b4a",
+    color: "#1a3aad",
     fontWeight: 700,
     cursor: "pointer",
     fontSize: "clamp(12px, 3vw, 13px)",
@@ -623,15 +571,12 @@ const loginStyles = {
     gap: "8px",
     marginTop: "clamp(20px, 5vw, 28px)",
     paddingTop: "clamp(16px, 4vw, 20px)",
-    borderTop: "1px solid #f0f0f0",
+    borderTop: "1px solid #e8ecf8",
   },
   footerText: {
     fontSize: "clamp(10px, 2.5vw, 11px)",
-    color: "#aaa",
+    color: "#8899bb",
     fontFamily: "'Noto Sans Ethiopic', sans-serif",
   },
-  footerDot: {
-    color: "#ddd",
-    fontSize: "8px",
-  },
+  footerDot: { color: "#f5c518", fontSize: "10px", fontWeight: 900 },
 };
