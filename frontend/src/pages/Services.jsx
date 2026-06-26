@@ -4,7 +4,11 @@ import { SERVICES } from "../constants/services";
 import { serviceAPI } from "../services/api";
 
 export default function Services({ t, lang }) {
-  const ts = t.services;
+  // ✅ FIX: Safe access to translations with fallback
+  const safeT = t || {};
+  const ts = safeT.services || {};
+  const safeCommon = safeT.common || {};
+
   const [search, setSearch] = useState("");
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +93,7 @@ export default function Services({ t, lang }) {
                 backgroundClip: "text",
               }}
             >
-              {ts.title}
+              {ts.title || "Addis Messob · Services"}
             </h1>
             <p
               style={{
@@ -98,7 +102,7 @@ export default function Services({ t, lang }) {
                 margin: "2px 0 0",
               }}
             >
-              {ts.subtitle}
+              {ts.subtitle || "Digital One-Stop · Services"}
             </p>
           </div>
         </div>
@@ -115,7 +119,7 @@ export default function Services({ t, lang }) {
             animation: "pulseGlow 3s ease-in-out infinite",
           }}
         >
-          {ts.catalogue} • {services.length}
+          {ts.catalogue || "Service Catalogue"} • {services.length}
         </span>
       </div>
 
@@ -161,7 +165,7 @@ export default function Services({ t, lang }) {
                 boxShadow: searchFocused ? `0 0 0 3px ${C.primary}22` : "none",
                 transition: "all 0.3s ease",
               }}
-              placeholder={ts.search}
+              placeholder={ts.search || "➤ Search services..."}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onFocus={() => setSearchFocused(true)}
@@ -338,7 +342,9 @@ export default function Services({ t, lang }) {
                   transform: hoveredCard === i ? "scale(1.05)" : "scale(1)",
                 }}
               >
-                {s.active ? ts.active : ts.inactive}
+                {s.active
+                  ? ts.active || "✓ Active"
+                  : ts.inactive || "✗ Inactive"}
               </span>
             </div>
           ))}
@@ -365,7 +371,9 @@ export default function Services({ t, lang }) {
           >
             ◎
           </div>
-          <p style={{ fontSize: "clamp(14px, 3.5vw, 16px)" }}>{ts.noneFound}</p>
+          <p style={{ fontSize: "clamp(14px, 3.5vw, 16px)" }}>
+            {ts.noneFound || "No services found"}
+          </p>
           <p
             style={{
               fontSize: "clamp(12px, 3vw, 13px)",
@@ -373,7 +381,7 @@ export default function Services({ t, lang }) {
               marginTop: 8,
             }}
           >
-            {t.common?.tryAdjusting || "Try adjusting your search or filter"}
+            {safeCommon.tryAdjusting || "Try adjusting your search or filter"}
           </p>
         </div>
       )}
