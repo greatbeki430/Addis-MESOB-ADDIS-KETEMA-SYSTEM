@@ -83,7 +83,6 @@ export default function Sidebar({
       const savedTeams = localStorage.getItem("forumTeams");
       if (savedTeams) {
         let parsedTeams = JSON.parse(savedTeams);
-        // If Employee or Team Leader, only show their team
         if ((isEmployee || isLeader) && user) {
           const userTeam = parsedTeams.find(
             (team) =>
@@ -166,13 +165,20 @@ export default function Sidebar({
   const sidebarWidth = collapsed ? 64 : isMobile ? 200 : 260;
 
   // Addis MESOB Brand Colors
-  const DARK_BG = "#0d1a5e"; // Dark navy sidebar bg
-  const BORDER_COLOR = "#1a3aad"; // Blue border
-  const ACTIVE_BG = "#1a3aad33"; // Active item tint
-  const ACTIVE_TEXT = "#f5c518"; // Gold for active items
-  const MUTED_TEXT = "#7a8fc8"; // Muted blue text
-  const SECTION_BG = "#0f2070"; // Slightly lighter than dark bg
+  const DARK_BG = "#0d1a5e";
+  const BORDER_COLOR = "#1a3aad";
+  const ACTIVE_BG = "#1a3aad33";
+  const ACTIVE_TEXT = "#f5c518";
+  const MUTED_TEXT = "#7a8fc8";
+  const SECTION_BG = "#0f2070";
   const HOVER_BG = "#1a3aad22";
+
+  // ✅ FALLBACK: If t is undefined or doesn't have sidebar, use empty object
+  const safeT = t || {};
+  const safeSidebar = safeT.sidebar || {};
+  const safeNav = safeT.nav || {};
+  const safeAppName = safeT.appName || "A-MESOB";
+  const safeAppSub = safeT.appSub || "One-Stop";
 
   return (
     <aside
@@ -254,12 +260,12 @@ export default function Sidebar({
                 fontFamily: F.serif,
               }}
             >
-              {t.appName}
+              {safeAppName}
             </div>
             <div
               style={{ fontSize: 10, color: MUTED_TEXT, letterSpacing: 0.5 }}
             >
-              One-Stop
+              {safeAppSub}
             </div>
           </div>
         )}
@@ -277,7 +283,7 @@ export default function Sidebar({
             textTransform: "uppercase",
           }}
         >
-          {t.sidebar.main}
+          {safeSidebar.main || "Main Menu"}
         </div>
       )}
 
@@ -301,7 +307,7 @@ export default function Sidebar({
                     setForumExpanded(false);
                   }
                 }}
-                title={t.nav[n.id]}
+                title={safeNav[n.id] || n.id}
                 style={{
                   width: "100%",
                   display: "flex",
@@ -341,7 +347,7 @@ export default function Sidebar({
                   }}
                 >
                   <span style={{ fontSize: isMobile ? 18 : 20 }}>{n.icon}</span>
-                  {!collapsed && <span>{t.nav[n.id]}</span>}
+                  {!collapsed && <span>{safeNav[n.id] || n.id}</span>}
                 </div>
                 {isForum && !collapsed && (
                   <ArrowDown01Icon
@@ -439,7 +445,6 @@ export default function Sidebar({
                       {team.name.length > 18
                         ? team.name.substring(0, 16) + "…"
                         : team.name}
-                      {/* Show role badge for the user's team */}
                       {(isEmployee || isLeader) &&
                         team.members?.includes(user?.name) && (
                           <span
@@ -459,7 +464,7 @@ export default function Sidebar({
                     </button>
                   ))}
 
-                  {/* Add Team button - Only Admins and Super Admins */}
+                  {/* Add Team button */}
                   {isAdminOrSuperAdmin && (
                     <button
                       onClick={() => setShowAddTeamModal(true)}
@@ -528,7 +533,7 @@ export default function Sidebar({
               textTransform: "uppercase",
             }}
           >
-            {t.sidebar.language}
+            {safeSidebar.language || "Language"}
           </div>
         )}
         <div

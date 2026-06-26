@@ -30,7 +30,13 @@ export default function Header({ tab, t, lang, setLang }) {
     return user.name.charAt(0).toUpperCase();
   };
 
-  const tabLabel = t.nav?.[tab] || tab;
+  // ✅ FALLBACK: Safe access to translations
+  const safeT = t || {};
+  const safeNav = safeT.nav || {};
+  const safeAuth = safeT.auth || {};
+  const safeAppName = safeT.appName || "A-MESOB";
+
+  const tabLabel = safeNav[tab] || tab;
 
   return (
     <header
@@ -85,7 +91,7 @@ export default function Header({ tab, t, lang, setLang }) {
             gap: 4,
           }}
         >
-          {t.appName}
+          {safeAppName}
         </span>
 
         <span
@@ -191,7 +197,7 @@ export default function Header({ tab, t, lang, setLang }) {
             ))}
           </div>
 
-          {/* Mobile Language Selector — hidden on desktop via CSS */}
+          {/* Mobile Language Selector */}
           <select
             value={lang}
             onChange={(e) => setLang(e.target.value)}
@@ -205,7 +211,7 @@ export default function Header({ tab, t, lang, setLang }) {
               fontWeight: 700,
               cursor: "pointer",
               fontFamily: F.sans,
-              display: "none", // shown via CSS media query: .header-lang-btn display:none + select display:block
+              display: "none",
             }}
           >
             {LANGUAGES.map((l) => (
@@ -240,7 +246,7 @@ export default function Header({ tab, t, lang, setLang }) {
         >
           <span style={{ fontSize: "clamp(12px, 3vw, 14px)" }}>🚪</span>
           <span style={{ display: "inline-block" }}>
-            {t.auth?.logout || "Logout"}
+            {safeAuth.logout || "Logout"}
           </span>
         </button>
 
@@ -277,6 +283,27 @@ export default function Header({ tab, t, lang, setLang }) {
           {getUserInitial()}
         </div>
       </div>
+
+      {/* ✅ Add responsive CSS for mobile language selector */}
+      <style>{`
+        @media (max-width: 500px) {
+          .header-lang-btn {
+            display: none !important;
+          }
+          .header-logout-btn span:last-child {
+            display: none !important;
+          }
+          .header-date {
+            display: none !important;
+          }
+          .header-appname {
+            display: none !important;
+          }
+          header select {
+            display: block !important;
+          }
+        }
+      `}</style>
     </header>
   );
 }
