@@ -9,7 +9,11 @@ import { useAuth } from "../hooks/useAuth";
 import { ArrowDown01Icon } from "hugeicons-react";
 
 export default function Evaluation({ t }) {
-  const te = t.evaluation;
+  // ✅ FIX: Safe access to translations with fallback
+  const safeT = t || {};
+  const te = safeT.evaluation || {};
+  const safeCriteria = safeT.criteria || {};
+
   // eslint-disable-next-line no-unused-vars
   const { user } = useAuth();
   const [scores, setScores] = useState({});
@@ -257,7 +261,7 @@ export default function Evaluation({ t }) {
             margin: 0,
           }}
         >
-          {te.title}
+          {te.title || "Peer Forum Evaluation"}
         </h1>
         <span
           style={{
@@ -270,7 +274,7 @@ export default function Evaluation({ t }) {
             whiteSpace: "nowrap",
           }}
         >
-          {te.outOf}
+          {te.outOf || "Out of 100 pts"}
         </span>
       </div>
 
@@ -282,7 +286,7 @@ export default function Evaluation({ t }) {
           fontFamily: F.sans,
         }}
       >
-        {te.subtitle}
+        {te.subtitle || "Addis Ababa City Admin · Public Service Bureau"}
       </p>
 
       {/* Team Name Input */}
@@ -327,7 +331,7 @@ export default function Evaluation({ t }) {
               margin: 0,
             }}
           >
-            👥 {te.teamMembers} (Max 7)
+            👥 {te.teamMembers || "Team Members"} (Max 7)
           </h3>
           {members.length < 7 && (
             <button
@@ -416,7 +420,7 @@ export default function Evaluation({ t }) {
               gap: 6,
             }}
           >
-            {t.criteria[c.key]}
+            {safeCriteria[c.key] || c.key}
             <span
               style={{
                 fontWeight: 400,
@@ -440,7 +444,9 @@ export default function Evaluation({ t }) {
               <thead>
                 <tr>
                   <th style={thS}>መስፈርት / Criterion</th>
-                  <th style={{ ...thS, textAlign: "center" }}>{te.maxPts}</th>
+                  <th style={{ ...thS, textAlign: "center" }}>
+                    {te.maxPts || "Max Pts"}
+                  </th>
                   {members
                     .filter((m) => m.trim() !== "")
                     .map((m) => (
@@ -841,7 +847,7 @@ export default function Evaluation({ t }) {
         >
           📄 Export PDF
         </button>
-        <button style={btn.primary}>💾 {te.save}</button>
+        <button style={btn.primary}>💾 {te.save || "Save Evaluation"}</button>
         <button
           style={btn.secondary}
           onClick={() => {
@@ -850,7 +856,7 @@ export default function Evaluation({ t }) {
             setTeamName("");
           }}
         >
-          ↺ {te.reset}
+          ↺ {te.reset || "Reset"}
         </button>
       </div>
     </div>
