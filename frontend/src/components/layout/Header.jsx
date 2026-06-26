@@ -1,6 +1,6 @@
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { useState } from "react";
 
 export default function Header({ tab, t, lang, setLang }) {

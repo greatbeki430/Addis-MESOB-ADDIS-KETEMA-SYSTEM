@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { C, F, card } from "../styles/theme";
 import StatCard from "../components/ui/StatCard";
 import { CRITERIA } from "../constants/criteria";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import { dailyReportAPI } from "../services/api";
 
 export default function Dashboard({ t }) {

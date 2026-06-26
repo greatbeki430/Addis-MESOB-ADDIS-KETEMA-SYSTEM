@@ -4,7 +4,7 @@ import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { ArrowDown01Icon } from "hugeicons-react";
 import { teamAPI } from "../../services/api";
-import { useAuth } from "../../context/AuthContext";
+import { useAuth } from "../../hooks/useAuth";
 import { getFilteredNavItems } from "../../utils/roles";
 
 export default function Sidebar({

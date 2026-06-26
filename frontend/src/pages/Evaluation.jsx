@@ -5,7 +5,7 @@ import { useState, useRef } from "react";
 import { btn, card, C, F, inp } from "../styles/theme";
 import { CRITERIA } from "../constants/criteria";
 import { exportEvaluationReportToPDF } from "../utils/pdfExport";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 import { ArrowDown01Icon } from "hugeicons-react";
 
 export default function Evaluation({ t }) {

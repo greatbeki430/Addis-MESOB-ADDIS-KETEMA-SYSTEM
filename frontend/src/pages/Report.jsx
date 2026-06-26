@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { btn, card, C, F, inp } from "../styles/theme";
 import { meetingAPI, dailyReportAPI, reportAPI } from "../services/api";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../hooks/useAuth";
 
 // ✅ Import export utilities
 import * as XLSX from "xlsx";
