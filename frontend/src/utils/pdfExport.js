@@ -19,6 +19,12 @@ const formatTime = (timeStr) => {
   return timeStr;
 };
 
+// ✅ Helper: Ensure text is properly encoded for PDF (Unicode/UTF-8 support)
+const encodeText = (text) => {
+  if (!text) return "";
+  return String(text);
+};
+
 // ✅ Export Forum Report to PDF
 export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
   try {
@@ -50,14 +56,21 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     // Header
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text(t.forum?.title || "Peer Forum Report", pageWidth / 2, yPos, {
-      align: "center",
-    });
+    doc.text(
+      encodeText(t.forum?.title || "Peer Forum Report"),
+      pageWidth / 2,
+      yPos,
+      {
+        align: "center",
+      },
+    );
     yPos += 8;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(t.forum?.subtitle || "", pageWidth / 2, yPos, { align: "center" });
+    doc.text(encodeText(t.forum?.subtitle || ""), pageWidth / 2, yPos, {
+      align: "center",
+    });
     yPos += 10;
 
     doc.setDrawColor(26, 107, 74);
@@ -90,7 +103,11 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum?.presentMembers || "Present Members", margin + 2, yPos);
+    doc.text(
+      encodeText(t.forum?.presentMembers || "Present Members"),
+      margin + 2,
+      yPos,
+    );
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
@@ -99,8 +116,16 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     if (presentMembers.length > 0) {
       autoTable(doc, {
         startY: yPos,
-        head: [[t.forum?.memberN || "No.", t.forum?.name || "Name"]],
-        body: presentMembers.map((name, idx) => [`${idx + 1}`, name]),
+        head: [
+          [
+            encodeText(t.forum?.memberN || "No."),
+            encodeText(t.forum?.name || "Name"),
+          ],
+        ],
+        body: presentMembers.map((name, idx) => [
+          `${idx + 1}`,
+          encodeText(name),
+        ]),
         margin: { left: margin, right: margin },
         theme: "striped",
         headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
@@ -124,7 +149,11 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum?.absentMembers || "Absent Members", margin + 2, yPos);
+    doc.text(
+      encodeText(t.forum?.absentMembers || "Absent Members"),
+      margin + 2,
+      yPos,
+    );
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
@@ -137,15 +166,15 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
         startY: yPos,
         head: [
           [
-            t.forum?.memberN || "No.",
-            t.forum?.name || "Name",
-            t.forum?.reason || "Reason",
+            encodeText(t.forum?.memberN || "No."),
+            encodeText(t.forum?.name || "Name"),
+            encodeText(t.forum?.reason || "Reason"),
           ],
         ],
         body: absentMembers.map((item, idx) => [
           `${idx + 1}`,
-          item.name,
-          item.reason || "—",
+          encodeText(item.name),
+          encodeText(item.reason || "—"),
         ]),
         margin: { left: margin, right: margin },
         theme: "striped",
@@ -170,7 +199,11 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum?.prevResults || "Previous Results", margin + 2, yPos);
+    doc.text(
+      encodeText(t.forum?.prevResults || "Previous Results"),
+      margin + 2,
+      yPos,
+    );
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
@@ -179,8 +212,11 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     if (prevResults.length > 0) {
       autoTable(doc, {
         startY: yPos,
-        head: [["#", "Result"]],
-        body: prevResults.map((result, idx) => [`${idx + 1}`, result]),
+        head: [["#", encodeText("Result")]],
+        body: prevResults.map((result, idx) => [
+          `${idx + 1}`,
+          encodeText(result),
+        ]),
         margin: { left: margin, right: margin },
         theme: "plain",
         bodyStyles: { fontSize: 9 },
@@ -203,7 +239,11 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum?.todayTopics || "Discussion Topics", margin + 2, yPos);
+    doc.text(
+      encodeText(t.forum?.todayTopics || "Discussion Topics"),
+      margin + 2,
+      yPos,
+    );
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
@@ -212,8 +252,8 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     if (topics.length > 0) {
       autoTable(doc, {
         startY: yPos,
-        head: [["#", t.forum?.topic || "Topic"]],
-        body: topics.map((topic, idx) => [`${idx + 1}`, topic]),
+        head: [["#", encodeText(t.forum?.topic || "Topic")]],
+        body: topics.map((topic, idx) => [`${idx + 1}`, encodeText(topic)]),
         margin: { left: margin, right: margin },
         theme: "striped",
         bodyStyles: { fontSize: 9 },
@@ -225,7 +265,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.text(
-      `${t.forum?.standingAgendas || "Standing Agendas:"}`,
+      encodeText(t.forum?.standingAgendas || "Standing Agendas:"),
       margin,
       yPos,
     );
@@ -241,7 +281,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
         agendaX = margin;
         yPos += 6;
       }
-      doc.text(`☐ ${agenda}`, agendaX, yPos);
+      doc.text(`☐ ${encodeText(agenda)}`, agendaX, yPos);
       agendaX += agendaWidth;
     });
     yPos += 12;
@@ -257,7 +297,11 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum?.explanation || "Explanation", margin + 2, yPos);
+    doc.text(
+      encodeText(t.forum?.explanation || "Explanation"),
+      margin + 2,
+      yPos,
+    );
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
@@ -265,7 +309,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "normal");
     const explanationText = formData?.explanation || "—";
     const splitExplanation = doc.splitTextToSize(
-      explanationText,
+      encodeText(explanationText),
       pageWidth - margin * 2,
     );
     doc.text(splitExplanation, margin, yPos);
@@ -282,7 +326,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum?.gaps || "Identified Gaps", margin + 2, yPos);
+    doc.text(encodeText(t.forum?.gaps || "Identified Gaps"), margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
@@ -290,8 +334,8 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     if (gaps.length > 0) {
       autoTable(doc, {
         startY: yPos,
-        head: [["#", "Gap Identified"]],
-        body: gaps.map((gap, idx) => [`${idx + 1}`, gap]),
+        head: [["#", encodeText("Gap Identified")]],
+        body: gaps.map((gap, idx) => [`${idx + 1}`, encodeText(gap)]),
         margin: { left: margin, right: margin },
         theme: "striped",
         headStyles: { fillColor: [194, 90, 0], textColor: [255, 255, 255] },
@@ -315,7 +359,11 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(t.forum?.agreements || "Agreed Points", margin + 2, yPos);
+    doc.text(
+      encodeText(t.forum?.agreements || "Agreed Points"),
+      margin + 2,
+      yPos,
+    );
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
@@ -324,8 +372,11 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     if (agreements.length > 0) {
       autoTable(doc, {
         startY: yPos,
-        head: [["#", "Agreed Point"]],
-        body: agreements.map((agreement, idx) => [`${idx + 1}`, agreement]),
+        head: [["#", encodeText("Agreed Point")]],
+        body: agreements.map((agreement, idx) => [
+          `${idx + 1}`,
+          encodeText(agreement),
+        ]),
         margin: { left: margin, right: margin },
         theme: "striped",
         headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
@@ -346,7 +397,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
 
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text(t.forum?.signatures || "Signatures", margin, yPos);
+    doc.text(encodeText(t.forum?.signatures || "Signatures"), margin, yPos);
     yPos += 10;
 
     const signatureCount = 7;
@@ -364,7 +415,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
       doc.text(
-        `${i + 1}${t.forum?.signatureN || "th Signature"}`,
+        encodeText(`${i + 1}${t.forum?.signatureN || "th Signature"}`),
         sigX,
         yPos - 3,
       );
@@ -426,9 +477,14 @@ export const exportDailyReportToPDF = (rows, date, t) => {
 
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text(t.dailyReport?.title || "Daily Report", pageWidth / 2, yPos, {
-      align: "center",
-    });
+    doc.text(
+      encodeText(t.dailyReport?.title || "Daily Report"),
+      pageWidth / 2,
+      yPos,
+      {
+        align: "center",
+      },
+    );
     yPos += 8;
 
     doc.setFontSize(10);
@@ -447,18 +503,18 @@ export const exportDailyReportToPDF = (rows, date, t) => {
       startY: yPos,
       head: [
         [
-          t.dailyReport?.colNo || "#",
-          t.dailyReport?.colDept || "Department",
-          t.dailyReport?.colService || "Service",
-          t.dailyReport?.colMale || "Male",
-          t.dailyReport?.colFemale || "Female",
-          t.dailyReport?.colTotal || "Total",
+          encodeText(t.dailyReport?.colNo || "#"),
+          encodeText(t.dailyReport?.colDept || "Department"),
+          encodeText(t.dailyReport?.colService || "Service"),
+          encodeText(t.dailyReport?.colMale || "Male"),
+          encodeText(t.dailyReport?.colFemale || "Female"),
+          encodeText(t.dailyReport?.colTotal || "Total"),
         ],
       ],
       body: rows.map((row, idx) => [
         idx + 1,
-        row.dept || "—",
-        row.service || "—",
+        encodeText(row.dept || "—"),
+        encodeText(row.service || "—"),
         row.male || 0,
         row.female || 0,
         row.total || 0,
@@ -467,7 +523,7 @@ export const exportDailyReportToPDF = (rows, date, t) => {
         [
           "",
           "",
-          t.dailyReport?.grandTotal || "Grand Total",
+          encodeText(t.dailyReport?.grandTotal || "Grand Total"),
           grandMale,
           grandFemale,
           grandTotal,
@@ -526,14 +582,19 @@ export const exportEvaluationReportToPDF = (
     // Header
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
-    doc.text(t.evaluation?.title || "Evaluation Report", pageWidth / 2, yPos, {
-      align: "center",
-    });
+    doc.text(
+      encodeText(t.evaluation?.title || "Evaluation Report"),
+      pageWidth / 2,
+      yPos,
+      {
+        align: "center",
+      },
+    );
     yPos += 8;
 
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.text(t.evaluation?.subtitle || "", pageWidth / 2, yPos, {
+    doc.text(encodeText(t.evaluation?.subtitle || ""), pageWidth / 2, yPos, {
       align: "center",
     });
     yPos += 10;
@@ -568,10 +629,17 @@ export const exportEvaluationReportToPDF = (
 
     autoTable(doc, {
       startY: yPos,
-      head: [["#", "Member Name", "Total Score (0-100)", "Rank"]],
+      head: [
+        [
+          encodeText("#"),
+          encodeText("Member Name"),
+          encodeText("Total Score (0-100)"),
+          encodeText("Rank"),
+        ],
+      ],
       body: sortedMembers.map((m, idx) => [
         idx + 1,
-        m.name,
+        encodeText(m.name),
         m.total,
         idx === 0
           ? "🥇 1st"
@@ -594,14 +662,13 @@ export const exportEvaluationReportToPDF = (
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(26, 107, 74);
-      doc.text(`🏆 Best Performer: ${bestPerformer}`, margin, yPos);
+      doc.text(`🏆 Best Performer: ${encodeText(bestPerformer)}`, margin, yPos);
       doc.setTextColor(0, 0, 0);
       yPos += 10;
     }
 
-    // ✅ Comments Section
+    // ✅ Comments Section with Unicode support
     if (comments && Object.keys(comments).length > 0) {
-      // Check if there are any non-empty comments
       const hasComments = Object.values(comments).some(
         (c) => c && c.trim() !== "",
       );
@@ -616,7 +683,6 @@ export const exportEvaluationReportToPDF = (
         memberList.forEach((member, idx) => {
           const comment = comments[idx] || "No comment provided";
 
-          // Check if we need a new page
           if (yPos > 240) {
             doc.addPage();
             yPos = margin;
@@ -625,20 +691,19 @@ export const exportEvaluationReportToPDF = (
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(26, 107, 74);
-          doc.text(`${member}:`, margin, yPos);
+          doc.text(`${encodeText(member)}:`, margin, yPos);
           yPos += 6;
 
           doc.setFontSize(10);
           doc.setFont("helvetica", "normal");
           doc.setTextColor(50, 50, 50);
           const splitComment = doc.splitTextToSize(
-            comment,
+            encodeText(comment),
             pageWidth - margin * 2 - 5,
           );
           doc.text(splitComment, margin + 3, yPos);
           yPos += splitComment.length * 5 + 8;
 
-          // Add a light separator line
           if (idx < memberList.length - 1) {
             doc.setDrawColor(200, 200, 200);
             doc.setLineWidth(0.3);
