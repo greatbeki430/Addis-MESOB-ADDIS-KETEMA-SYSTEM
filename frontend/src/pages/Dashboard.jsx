@@ -21,7 +21,7 @@ export default function Dashboard({ t }) {
     female: 0,
   });
 
-  // Animation helper - MOVED BEFORE useEffect
+  // Animation helper
   const animateNumber = (start, end, setter, key) => {
     const duration = 1000;
     const steps = 30;
@@ -54,7 +54,6 @@ export default function Dashboard({ t }) {
         const male = data.reduce((sum, r) => sum + (r.male || 0), 0);
         const female = data.reduce((sum, r) => sum + (r.female || 0), 0);
 
-        // Group by department
         const deptMap = {};
         data.forEach((r) => {
           if (r.dept) {
@@ -68,8 +67,6 @@ export default function Dashboard({ t }) {
         }));
 
         setStats({ total, male, female, departments });
-
-        // Animate numbers
         animateNumber(0, total, setAnimatedStats, "total");
         animateNumber(0, male, setAnimatedStats, "male");
         animateNumber(0, female, setAnimatedStats, "female");
@@ -83,7 +80,6 @@ export default function Dashboard({ t }) {
     loadDashboardData();
   }, []);
 
-  // Get time-based greeting
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return "🌅 Good morning";
@@ -91,32 +87,21 @@ export default function Dashboard({ t }) {
     return "🌙 Good evening";
   };
 
-  // Get role badge styling
   const getRoleBadge = (role) => {
     switch (role) {
       case "superadmin":
-        return {
-          bg: "#8B1A1A",
-          color: "#fff",
-          label: "Super Admin",
-          icon: "👑",
-        };
+        return { bg: C.dark, color: C.gold, label: "Super Admin", icon: "👑" };
       case "admin":
-        return { bg: "#1A6B4A", color: "#fff", label: "Admin", icon: "⚙️" };
+        return { bg: C.primary, color: "#fff", label: "Admin", icon: "⚙️" };
       case "leader":
         return {
-          bg: "#C25A00",
+          bg: C.orange,
           color: "#fff",
           label: "Team Leader",
           icon: "⭐",
         };
       default:
-        return {
-          bg: "#e8f5ee",
-          color: "#1a6b4a",
-          label: "Employee",
-          icon: "👤",
-        };
+        return { bg: C.border, color: C.dark, label: "Employee", icon: "👤" };
     }
   };
 
@@ -141,7 +126,7 @@ export default function Dashboard({ t }) {
 
   return (
     <div style={{ width: "100%", padding: "20px" }}>
-      {/* Welcome Section - Personalized */}
+      {/* Welcome Section */}
       <div
         style={{
           background: `linear-gradient(135deg, ${C.primary}08, ${C.light}08)`,
@@ -254,7 +239,7 @@ export default function Dashboard({ t }) {
         </div>
       </div>
 
-      {/* Stat Cards - Animated */}
+      {/* Stat Cards — all colors now use valid C.* values */}
       <div
         style={{
           display: "grid",
@@ -268,28 +253,28 @@ export default function Dashboard({ t }) {
           label={td.todayServices}
           value={animatedStats.total}
           icon="◈"
-          color={C.primary}
+          color={C.primary} // Deep Royal Blue
           loading={loading}
         />
         <StatCard
           label={td.male}
           value={animatedStats.male}
           icon="◉"
-          color={C.blue}
+          color={C.light} // Royal Blue (was C.blue — doesn't exist)
           loading={loading}
         />
         <StatCard
           label={td.female}
           value={animatedStats.female}
           icon="◉"
-          color={C.purple}
+          color={C.gold} // Gold (was C.purple — doesn't exist)
           loading={loading}
         />
         <StatCard
           label={td.departments}
           value={stats.departments.length}
           icon="⬢"
-          color={C.orange}
+          color={C.orange} // Orange (unchanged — exists in theme)
           loading={loading}
         />
       </div>
@@ -372,7 +357,7 @@ export default function Dashboard({ t }) {
                       width: `${(value / maxDeptValue) * 100}%`,
                       height: "100%",
                       borderRadius: 4,
-                      background: `linear-gradient(90deg, ${C.primary}, ${C.light})`,
+                      background: `linear-gradient(90deg, ${C.primary}, ${C.gold})`,
                       transition: "width 1s ease",
                     }}
                   />
