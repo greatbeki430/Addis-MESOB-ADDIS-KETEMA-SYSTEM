@@ -28,10 +28,18 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Response interceptor to handle 401 errors
+// ✅ Response interceptor to handle 401 errors - FIXED
 api.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error),
+  (error) => {
+    // Handle 401 Unauthorized - token expired
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+      // Optionally redirect to login
+      // window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  },
 );
 
 // Auth API
@@ -39,7 +47,7 @@ export const authAPI = {
   register: (userData) => api.post("/auth/register", userData),
   login: (credentials) => api.post("/auth/login", credentials),
   getMe: () => api.get("/auth/me"),
-  // NEW: User management endpoints
+  // User management endpoints
   getUsers: () => api.get("/auth/users"),
   getUser: (id) => api.get(`/auth/users/${id}`),
   updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
@@ -55,11 +63,14 @@ export const meetingAPI = {
   delete: (id) => api.delete(`/meetings/${id}`),
 };
 
-// Evaluations API
+// ✅ Evaluations API - COMPLETE
 export const evaluationAPI = {
   create: (data) => api.post("/evaluations", data),
   getAll: () => api.get("/evaluations"),
+  getById: (id) => api.get(`/evaluations/${id}`),
   getByTeam: (teamId) => api.get(`/evaluations/team/${teamId}`),
+  update: (id, data) => api.put(`/evaluations/${id}`, data),
+  delete: (id) => api.delete(`/evaluations/${id}`),
 };
 
 // Daily Reports API
@@ -69,18 +80,21 @@ export const dailyReportAPI = {
   getByDate: (date) => api.get(`/daily-reports/date/${date}`),
 };
 
-// Teams API
+// ✅ Teams API - COMPLETE
 export const teamAPI = {
   getAll: () => api.get("/teams"),
   getById: (id) => api.get(`/teams/${id}`),
   create: (data) => api.post("/teams", data),
   update: (id, data) => api.put(`/teams/${id}`, data),
+  delete: (id) => api.delete(`/teams/${id}`),
 };
 
 // Services API
 export const serviceAPI = {
   getAll: () => api.get("/services"),
 };
+
+// Reports API
 export const reportAPI = {
   create: (data) => api.post("/reports", data),
   getAll: (params) => api.get("/reports", { params }),

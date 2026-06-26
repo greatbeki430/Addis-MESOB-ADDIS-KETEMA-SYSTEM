@@ -1,33 +1,96 @@
 // ════════════════════════════════════════════════════════════
-// pages/Evaluation - Dynamic with Collapsible Rankings
+// pages/Evaluation - With Dynamic Comments & Database Storage
 // ════════════════════════════════════════════════════════════
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { btn, card, C, F, inp } from "../styles/theme";
 import { CRITERIA } from "../constants/criteria";
 import { exportEvaluationReportToPDF } from "../utils/pdfExport";
 import { useAuth } from "../hooks/useAuth";
+import { evaluationAPI } from "../services/api";
+import { useToast } from "../hooks/useToast";
 import { ArrowDown01Icon } from "hugeicons-react";
 
-export default function Evaluation({ t }) {
-  // ✅ FIX: Safe access to translations with fallback
+export default function Evaluation({ t, lang }) {
+  // ✅ Safe access to translations
   const safeT = t || {};
   const te = safeT.evaluation || {};
   const safeCriteria = safeT.criteria || {};
 
-  // eslint-disable-next-line no-unused-vars
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [scores, setScores] = useState({});
+  const [comments, setComments] = useState({});
   const [members, setMembers] = useState(["", "", ""]);
   const [teamName, setTeamName] = useState("");
-  const [showRankings, setShowRankings] = useState(false);
+  const [showRankings, setShowRankings] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [evaluationId, setEvaluationId] = useState(null);
 
-  // ✅ Create refs for all input fields for keyboard navigation
+  // ✅ Create refs for all input fields
   const inputRefs = useRef({});
+
+  // ✅ Load existing evaluation if editing - FIXED: wrap in a function with cleanup
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadSavedEvaluation = () => {
+      const savedEvaluation = localStorage.getItem("currentEvaluation");
+      if (savedEvaluation) {
+        try {
+          const data = JSON.parse(savedEvaluation);
+          // Only update state if component is still mounted
+          if (isMounted) {
+            if (data.members) setMembers(data.members);
+            if (data.scores) setScores(data.scores);
+            if (data.comments) setComments(data.comments);
+            if (data.teamName) setTeamName(data.teamName);
+            if (data.evaluationId) setEvaluationId(data.evaluationId);
+          }
+        } catch (e) {
+          console.error("Failed to load saved evaluation:", e);
+        }
+      }
+    };
+
+    loadSavedEvaluation();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []); // ✅ Empty dependency array - runs once on mount
+
+  // ✅ Auto-save to localStorage - FIXED: use a debounced approach
+  useEffect(() => {
+    const hasData =
+      members.some((m) => m.trim() !== "") || Object.keys(scores).length > 0;
+
+    if (!hasData) return;
+
+    const data = {
+      members,
+      scores,
+      comments,
+      teamName,
+      evaluationId,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    // Use a timeout to debounce saves
+    const timer = setTimeout(() => {
+      localStorage.setItem("currentEvaluation", JSON.stringify(data));
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [members, scores, comments, teamName, evaluationId]);
 
   // Add new member (max 7)
   const addMember = () => {
     if (members.length < 7) {
       setMembers([...members, ""]);
+      // Initialize comment for new member
+      const newComments = { ...comments };
+      newComments[members.length] = "";
+      setComments(newComments);
     }
   };
 
@@ -43,6 +106,10 @@ export default function Evaluation({ t }) {
         }
       });
       setScores(newScores);
+      // Remove comment
+      const newComments = { ...comments };
+      delete newComments[index];
+      setComments(newComments);
     }
   };
 
@@ -51,6 +118,13 @@ export default function Evaluation({ t }) {
     const newMembers = [...members];
     newMembers[index] = name;
     setMembers(newMembers);
+  };
+
+  // Update comment for a member
+  const updateComment = (index, comment) => {
+    const newComments = { ...comments };
+    newComments[index] = comment;
+    setComments(newComments);
   };
 
   const setScore = (cId, iIdx, m, v) => {
@@ -66,11 +140,20 @@ export default function Evaluation({ t }) {
 
   const totals = members
     .filter((m) => m.trim() !== "")
-    .map((m) => ({ name: m, total: total(m) }));
+    .map((m, idx) => ({
+      name: m,
+      index: idx,
+      total: total(m),
+      comment: comments[idx] || "",
+    }));
 
-  const sortedMembers = [...totals].sort((a, b) => b.total - a.total);
+  // ✅ Sort by score descending, then by name for equal scores
+  const sortedMembers = [...totals].sort((a, b) => {
+    if (b.total !== a.total) return b.total - a.total;
+    return a.name.localeCompare(b.name);
+  });
 
-  // Calculate summary stats for collapsed view
+  // Calculate summary stats
   const totalMembers = sortedMembers.length;
   const averageScore =
     totalMembers > 0
@@ -82,30 +165,108 @@ export default function Evaluation({ t }) {
   const lowestScore = sortedMembers[sortedMembers.length - 1]?.total || 0;
   const bestPerformer = sortedMembers[0]?.name || "—";
 
-  // ✅ Keyboard navigation: Visual order (top-to-bottom, left-to-right) with wrapping
+  // ✅ Save evaluation to database
+  const saveEvaluation = async () => {
+    const validMembers = members.filter((m) => m.trim() !== "");
+    if (validMembers.length === 0) {
+      showToast("Please add at least one team member", "warning");
+      return;
+    }
+
+    try {
+      setSaving(true);
+
+      // Calculate total scores for each member
+      const totalScoresData = validMembers.map((m) => ({
+        name: m,
+        total: total(m),
+      }));
+
+      // Find best performer
+      const bestPerformerName =
+        totalScoresData.length > 0
+          ? totalScoresData.reduce((a, b) => (a.total > b.total ? a : b)).name
+          : null;
+
+      // Prepare data for backend
+      const evaluationData = {
+        teamName: teamName || "Untitled Team",
+        members: validMembers,
+        scores: scores,
+        comments: comments,
+        totalScores: totalScoresData,
+        evaluatedBy: user?.name || user?.email || "Unknown",
+        evaluatedAt: new Date().toISOString(),
+        language: lang || "en",
+        status: "submitted",
+        bestPerformer: bestPerformerName,
+      };
+
+      let response;
+      if (evaluationId) {
+        // Update existing
+        response = await evaluationAPI.update(evaluationId, evaluationData);
+        showToast("✅ Evaluation updated successfully!", "success");
+      } else {
+        // Create new
+        response = await evaluationAPI.create(evaluationData);
+        setEvaluationId(response.data._id);
+        showToast("✅ Evaluation saved successfully!", "success");
+      }
+
+      // Clear localStorage after successful save
+      localStorage.removeItem("currentEvaluation");
+    } catch (error) {
+      console.error("Failed to save evaluation:", error);
+      showToast(
+        error.response?.data?.message ||
+          "Failed to save evaluation. Please try again.",
+        "error",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ✅ Get rank badge
+  const getRankBadge = (index, total) => {
+    if (total <= 1) return "🥇";
+    if (index === 0) return "🥇";
+    if (index === 1) return "🥈";
+    if (index === 2) return "🥉";
+    return `#${index + 1}`;
+  };
+
+  // ✅ Get performance level
+  const getPerformanceLevel = (score) => {
+    if (score >= 90)
+      return { label: "Outstanding", color: "#10b981", icon: "🌟" };
+    if (score >= 80)
+      return { label: "Excellent", color: "#3b82f6", icon: "⭐" };
+    if (score >= 70) return { label: "Good", color: "#8b5cf6", icon: "👍" };
+    if (score >= 60) return { label: "Average", color: "#f59e0b", icon: "📊" };
+    if (score >= 50)
+      return { label: "Needs Improvement", color: "#f97316", icon: "📈" };
+    return { label: "Needs Attention", color: "#ef4444", icon: "⚠️" };
+  };
+
+  // Keyboard navigation
   const handleKeyDown = (e, cId, itemIdx, member) => {
     const allMembers = members.filter((m) => m.trim() !== "");
     const currentMemberIndex = allMembers.indexOf(member);
 
-    // Next: Enter or ArrowDown
     if (e.key === "Enter" || e.key === "ArrowDown") {
       e.preventDefault();
-
       let nextCriterionId = cId;
       let nextItemIdx = itemIdx;
       let nextMemberIndex = currentMemberIndex + 1;
 
-      // If last member, move to next item (row) in same criterion
       if (nextMemberIndex >= allMembers.length) {
         nextMemberIndex = 0;
         nextItemIdx = itemIdx + 1;
-
-        // If last item, move to first item of next criterion
         if (nextItemIdx >= CRITERIA[cId - 1].items.length) {
           nextItemIdx = 0;
           nextCriterionId = cId + 1;
-
-          // If last criterion, wrap to first criterion
           if (nextCriterionId > CRITERIA.length) {
             nextCriterionId = 1;
           }
@@ -123,27 +284,21 @@ export default function Evaluation({ t }) {
       }
     }
 
-    // Previous: ArrowUp
     if (e.key === "ArrowUp") {
       e.preventDefault();
-
       let prevCriterionId = cId;
       let prevItemIdx = itemIdx;
       let prevMemberIndex = currentMemberIndex - 1;
 
-      // If first member, move to previous item (row) in same criterion
       if (prevMemberIndex < 0) {
         prevMemberIndex = allMembers.length - 1;
         prevItemIdx = itemIdx - 1;
-
-        // If first item, move to last item of previous criterion
         if (prevItemIdx < 0) {
           const prevCriterion = CRITERIA[cId - 2];
           if (prevCriterion) {
             prevItemIdx = prevCriterion.items.length - 1;
             prevCriterionId = cId - 1;
           } else {
-            // If first criterion, wrap to last criterion
             const lastCriterion = CRITERIA[CRITERIA.length - 1];
             prevItemIdx = lastCriterion.items.length - 1;
             prevCriterionId = CRITERIA.length;
@@ -163,57 +318,8 @@ export default function Evaluation({ t }) {
     }
   };
 
-  // Generate input ID for each score field
   const getInputId = (cId, iIdx, m) =>
     `score-${cId}-${iIdx}-${m.replace(/\s/g, "")}`;
-
-  const getRankInfo = (index, total, totalMembers) => {
-    const percentage = totalMembers > 0 ? (index + 1) / totalMembers : 0;
-
-    if (index === 0 && total > 0) {
-      return {
-        rank: "🥇 1st Place",
-        level: "🏆 Excellent",
-        color: "#fbbf24",
-        bg: "#fffbeb",
-      };
-    } else if (index === 1 && total > 0) {
-      return {
-        rank: "🥈 2nd Place",
-        level: "⭐ Very Good",
-        color: "#9ca3af",
-        bg: "#f3f4f6",
-      };
-    } else if (index === 2 && total > 0) {
-      return {
-        rank: "🥉 3rd Place",
-        level: "👍 Good",
-        color: "#cd7a32",
-        bg: "#fff7ed",
-      };
-    } else if (percentage <= 0.5) {
-      return {
-        rank: `#${index + 1}`,
-        level: "📈 Above Average",
-        color: "#3b82f6",
-        bg: "#eff6ff",
-      };
-    } else if (total >= 50) {
-      return {
-        rank: `#${index + 1}`,
-        level: "📊 Average",
-        color: "#8b5cf6",
-        bg: "#f5f3ff",
-      };
-    } else {
-      return {
-        rank: `#${index + 1}`,
-        level: "📉 Needs Improvement",
-        color: "#ef4444",
-        bg: "#fef2f2",
-      };
-    }
-  };
 
   const thS = {
     background: C.dark,
@@ -263,19 +369,35 @@ export default function Evaluation({ t }) {
         >
           {te.title || "Peer Forum Evaluation"}
         </h1>
-        <span
-          style={{
-            background: C.primary,
-            color: "#fff",
-            padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 3vw, 12px)",
-            borderRadius: 20,
-            fontSize: "clamp(10px, 3vw, 11px)",
-            fontWeight: 700,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {te.outOf || "Out of 100 pts"}
-        </span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span
+            style={{
+              background: C.primary,
+              color: "#fff",
+              padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 3vw, 12px)",
+              borderRadius: 20,
+              fontSize: "clamp(10px, 3vw, 11px)",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {te.outOf || "Out of 100 pts"}
+          </span>
+          {evaluationId && (
+            <span
+              style={{
+                background: "#10b981",
+                color: "#fff",
+                padding: "2px 10px",
+                borderRadius: 20,
+                fontSize: "10px",
+                fontWeight: 600,
+              }}
+            >
+              💾 Saved
+            </span>
+          )}
+        </div>
       </div>
 
       <p
@@ -517,9 +639,8 @@ export default function Evaluation({ t }) {
         </div>
       ))}
 
-      {/* ✅ COLLAPSIBLE RANKINGS SECTION with Hugeicons Icon */}
+      {/* ✅ RANKINGS WITH DYNAMIC COMMENTS */}
       <div style={card}>
-        {/* Clickable header with Hugeicons Arrow Down */}
         <div
           onClick={() => setShowRankings(!showRankings)}
           style={{
@@ -537,7 +658,6 @@ export default function Evaluation({ t }) {
           }
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {/* ✅ Hugeicons ArrowDown01Icon instead of text arrow */}
             <ArrowDown01Icon
               size={20}
               style={{
@@ -555,7 +675,7 @@ export default function Evaluation({ t }) {
                 fontFamily: F.sans,
               }}
             >
-              📊 ጠቅላላ & Rankings
+              📊 Performance Rankings & Feedback
             </h3>
             {!showRankings && sortedMembers.length > 0 && (
               <span
@@ -584,7 +704,7 @@ export default function Evaluation({ t }) {
               <span
                 style={{ fontSize: "clamp(11px, 3vw, 13px)", color: C.muted }}
               >
-                ⭐ Best: {bestPerformer}
+                🏆 Best: {bestPerformer}
               </span>
               <span
                 style={{ fontSize: "clamp(11px, 3vw, 13px)", color: C.muted }}
@@ -595,219 +715,323 @@ export default function Evaluation({ t }) {
           )}
         </div>
 
-        {/* Expanded content - only shown when showRankings is true */}
-        {showRankings && (
+        {showRankings && sortedMembers.length > 0 && (
           <div style={{ marginTop: 20 }}>
             {/* Summary Stats */}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-                gap: 12,
-                marginBottom: 24,
+                gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                gap: 10,
+                marginBottom: 20,
               }}
             >
               <div
                 style={{
                   background: C.bg,
-                  borderRadius: 10,
-                  padding: 12,
+                  borderRadius: 8,
+                  padding: "10px 12px",
                   textAlign: "center",
                 }}
               >
                 <div
                   style={{
-                    fontSize: "clamp(24px, 5vw, 28px)",
+                    fontSize: "clamp(20px, 4vw, 24px)",
                     fontWeight: 900,
                     color: C.primary,
                   }}
                 >
                   {totalMembers}
                 </div>
-                <div style={{ fontSize: "11px", color: C.muted }}>
+                <div style={{ fontSize: "10px", color: C.muted }}>
                   Total Members
                 </div>
               </div>
               <div
                 style={{
                   background: C.bg,
-                  borderRadius: 10,
-                  padding: 12,
+                  borderRadius: 8,
+                  padding: "10px 12px",
                   textAlign: "center",
                 }}
               >
                 <div
                   style={{
-                    fontSize: "clamp(24px, 5vw, 28px)",
+                    fontSize: "clamp(20px, 4vw, 24px)",
                     fontWeight: 900,
                     color: C.primary,
                   }}
                 >
                   {averageScore}
                 </div>
-                <div style={{ fontSize: "11px", color: C.muted }}>
+                <div style={{ fontSize: "10px", color: C.muted }}>
                   Average Score
                 </div>
               </div>
               <div
                 style={{
                   background: C.bg,
-                  borderRadius: 10,
-                  padding: 12,
+                  borderRadius: 8,
+                  padding: "10px 12px",
                   textAlign: "center",
                 }}
               >
                 <div
                   style={{
-                    fontSize: "clamp(24px, 5vw, 28px)",
+                    fontSize: "clamp(20px, 4vw, 24px)",
                     fontWeight: 900,
                     color: C.primary,
                   }}
                 >
                   {highestScore}
                 </div>
-                <div style={{ fontSize: "11px", color: C.muted }}>
+                <div style={{ fontSize: "10px", color: C.muted }}>
                   Highest Score
                 </div>
               </div>
               <div
                 style={{
                   background: C.bg,
-                  borderRadius: 10,
-                  padding: 12,
+                  borderRadius: 8,
+                  padding: "10px 12px",
                   textAlign: "center",
                 }}
               >
                 <div
                   style={{
-                    fontSize: "clamp(24px, 5vw, 28px)",
+                    fontSize: "clamp(20px, 4vw, 24px)",
                     fontWeight: 900,
                     color: C.primary,
                   }}
                 >
                   {lowestScore}
                 </div>
-                <div style={{ fontSize: "11px", color: C.muted }}>
+                <div style={{ fontSize: "10px", color: C.muted }}>
                   Lowest Score
                 </div>
               </div>
             </div>
 
-            {/* Detailed Rankings Cards */}
+            {/* ✅ Compact Cards with Comments */}
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns:
-                  "repeat(auto-fit, minmax(min(100%, 250px), 1fr))",
-                gap: 14,
+                  "repeat(auto-fill, minmax(min(100%, 300px), 1fr))",
+                gap: 12,
               }}
             >
-              {sortedMembers.map(({ name, total: memberTotal }, idx) => {
-                const rankInfo = getRankInfo(
-                  idx,
-                  memberTotal,
-                  sortedMembers.length,
-                );
-                return (
-                  <div
-                    key={name}
-                    style={{
-                      background: rankInfo.bg,
-                      borderRadius: 12,
-                      padding: 16,
-                      border: `2px solid ${rankInfo.color}20`,
-                    }}
-                  >
+              {sortedMembers.map(
+                ({ name, index, total: memberTotal, comment }, idx) => {
+                  const level = getPerformanceLevel(memberTotal);
+                  const rankBadge = getRankBadge(idx, sortedMembers.length);
+                  const isTopThree = idx < 3;
+
+                  return (
                     <div
+                      key={name}
                       style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: 12,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "clamp(14px, 4vw, 16px)",
-                          fontWeight: 800,
-                          color: C.dark,
-                        }}
-                      >
-                        {name}
-                      </span>
-                      <span
-                        style={{
-                          background: rankInfo.color,
-                          color: "#fff",
-                          padding: "2px 10px",
-                          borderRadius: 20,
-                          fontSize: "clamp(10px, 2.5vw, 11px)",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {rankInfo.rank}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "baseline",
-                        gap: 8,
-                        marginBottom: 8,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: "clamp(28px, 8vw, 36px)",
-                          fontWeight: 900,
-                          color: C.primary,
-                        }}
-                      >
-                        {memberTotal}
-                      </span>
-                      <span
-                        style={{
-                          fontSize: "clamp(12px, 3vw, 14px)",
-                          color: "#999",
-                        }}
-                      >
-                        / 100
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        marginTop: 8,
-                      }}
-                    >
-                      <span style={{ fontSize: "clamp(12px, 3vw, 14px)" }}>
-                        {rankInfo.level}
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        marginTop: 10,
-                        background: `${rankInfo.color}20`,
-                        borderRadius: 8,
-                        height: 6,
+                        background: C.white,
+                        borderRadius: 10,
+                        padding: "14px 16px",
+                        border: `2px solid ${isTopThree ? level.color : C.border}`,
+                        boxShadow: isTopThree
+                          ? `0 4px 16px ${level.color}33`
+                          : "0 2px 8px rgba(0,0,0,0.04)",
+                        transition: "all 0.3s ease",
+                        position: "relative",
                         overflow: "hidden",
                       }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = "translateY(-2px)";
+                        e.currentTarget.style.boxShadow = `0 6px 24px ${level.color}44`;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = isTopThree
+                          ? `0 4px 16px ${level.color}33`
+                          : "0 2px 8px rgba(0,0,0,0.04)";
+                      }}
                     >
+                      {/* Top performer badge */}
+                      {isTopThree && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            right: 0,
+                            background: level.color,
+                            color: "#fff",
+                            padding: "2px 12px",
+                            fontSize: "9px",
+                            fontWeight: 700,
+                            borderRadius: "0 10px 0 10px",
+                          }}
+                        >
+                          {idx === 0
+                            ? "🏆 TOP"
+                            : idx === 1
+                              ? "🥈 2ND"
+                              : "🥉 3RD"}
+                        </div>
+                      )}
+
                       <div
                         style={{
-                          width: `${memberTotal}%`,
-                          height: "100%",
-                          background: rankInfo.color,
-                          borderRadius: 8,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          marginBottom: 4,
                         }}
-                      />
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: "clamp(15px, 3vw, 17px)",
+                              fontWeight: 800,
+                              color: C.dark,
+                            }}
+                          >
+                            {name}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: "clamp(11px, 2.5vw, 13px)",
+                              fontWeight: 700,
+                            }}
+                          >
+                            {rankBadge}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: "clamp(18px, 4vw, 22px)",
+                            fontWeight: 900,
+                            color: level.color,
+                          }}
+                        >
+                          {memberTotal}
+                        </span>
+                      </div>
+
+                      {/* Progress bar */}
+                      <div
+                        style={{
+                          background: C.bg,
+                          borderRadius: 4,
+                          height: 4,
+                          overflow: "hidden",
+                          marginBottom: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${memberTotal}%`,
+                            height: "100%",
+                            background: `linear-gradient(90deg, ${level.color}, ${level.color}dd)`,
+                            borderRadius: 4,
+                            transition: "width 0.5s ease",
+                          }}
+                        />
+                      </div>
+
+                      {/* Performance level */}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span>{level.icon}</span>
+                        <span
+                          style={{
+                            fontSize: "clamp(10px, 2.5vw, 11px)",
+                            fontWeight: 600,
+                            color: level.color,
+                          }}
+                        >
+                          {level.label}
+                        </span>
+                      </div>
+
+                      {/* ✅ DYNAMIC COMMENT INPUT */}
+                      <div style={{ marginTop: 4 }}>
+                        <label
+                          style={{
+                            fontSize: "clamp(9px, 2vw, 10px)",
+                            fontWeight: 600,
+                            color: C.muted,
+                            display: "block",
+                            marginBottom: 2,
+                          }}
+                        >
+                          📝 Feedback / Comments
+                        </label>
+                        <textarea
+                          value={comment || ""}
+                          onChange={(e) => updateComment(index, e.target.value)}
+                          placeholder="Add your feedback, strengths, or areas for improvement..."
+                          style={{
+                            width: "100%",
+                            border: `1px solid ${C.border}`,
+                            borderRadius: 6,
+                            padding: "6px 8px",
+                            fontSize: "clamp(10px, 2.5vw, 11px)",
+                            fontFamily: F.sans,
+                            resize: "vertical",
+                            minHeight: "50px",
+                            outline: "none",
+                            transition: "border-color 0.2s",
+                            background: "#fafbfc",
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.borderColor = C.primary;
+                            e.currentTarget.boxShadow = `0 0 0 2px ${C.primary}22`;
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.borderColor = C.border;
+                            e.currentTarget.boxShadow = "none";
+                          }}
+                        />
+                        {comment && comment.length > 0 && (
+                          <div
+                            style={{
+                              fontSize: "9px",
+                              color: C.muted,
+                              marginTop: 2,
+                              textAlign: "right",
+                            }}
+                          >
+                            {comment.length} characters
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                },
+              )}
             </div>
+          </div>
+        )}
+
+        {showRankings && sortedMembers.length === 0 && (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "30px 20px",
+              color: C.muted,
+            }}
+          >
+            <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+            <p>Add team members and scores to see rankings</p>
           </div>
         )}
       </div>
@@ -824,6 +1048,23 @@ export default function Evaluation({ t }) {
       >
         <button
           style={{
+            background: "#10b981",
+            color: "#fff",
+            border: "none",
+            padding: "clamp(8px, 2.5vw, 11px) clamp(16px, 5vw, 26px)",
+            borderRadius: 8,
+            fontSize: "clamp(12px, 3.5vw, 14px)",
+            fontWeight: 700,
+            cursor: "pointer",
+            opacity: saving ? 0.7 : 1,
+          }}
+          onClick={saveEvaluation}
+          disabled={saving}
+        >
+          {saving ? "💾 Saving..." : "💾 Save Evaluation"}
+        </button>
+        <button
+          style={{
             background: "#dc2626",
             color: "#fff",
             border: "none",
@@ -834,26 +1075,29 @@ export default function Evaluation({ t }) {
             cursor: "pointer",
           }}
           onClick={() => {
-            const bestPerformer =
+            const bestPerformerName =
               sortedMembers.length > 0 ? sortedMembers[0].name : null;
             exportEvaluationReportToPDF(
               scores,
               members.filter((m) => m.trim() !== ""),
               (m) => total(m),
-              bestPerformer,
+              bestPerformerName,
               t,
+              comments,
             );
           }}
         >
           📄 Export PDF
         </button>
-        <button style={btn.primary}>💾 {te.save || "Save Evaluation"}</button>
         <button
           style={btn.secondary}
           onClick={() => {
             setScores({});
+            setComments({});
             setMembers(["", "", ""]);
             setTeamName("");
+            setEvaluationId(null);
+            localStorage.removeItem("currentEvaluation");
           }}
         >
           ↺ {te.reset || "Reset"}

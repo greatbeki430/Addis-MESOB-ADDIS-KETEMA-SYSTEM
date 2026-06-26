@@ -395,13 +395,10 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.save(`forum_report_${displayDate.replace(/\//g, "-")}.pdf`);
     console.log("✅ Forum Report PDF generated successfully!");
 
-    // ✅ Use professional toast
     showSuccessToast("📄 Forum Report PDF generated successfully!");
     return true;
   } catch (error) {
     console.error("❌ Forum Report PDF Error:", error);
-
-    // ✅ Use professional toast
     showErrorToast(`❌ Failed to generate PDF: ${error.message}`);
     return false;
   }
@@ -490,25 +487,23 @@ export const exportDailyReportToPDF = (rows, date, t) => {
     doc.save(`daily_report_${reportDate.replace(/\//g, "-")}.pdf`);
     console.log("✅ Daily Report PDF generated successfully!");
 
-    // ✅ Use professional toast
     showSuccessToast("📄 Daily Report PDF generated successfully!");
     return true;
   } catch (error) {
     console.error("❌ Daily Report PDF Error:", error);
-
-    // ✅ Use professional toast
     showErrorToast(`❌ Failed to generate PDF: ${error.message}`);
     return false;
   }
 };
 
-// ✅ Export Evaluation Report to PDF
+// ✅ Export Evaluation Report to PDF (with Comments Support)
 export const exportEvaluationReportToPDF = (
   scores,
   members,
   totalScores,
   bestPerformer,
   t,
+  comments = {},
 ) => {
   try {
     console.log("📄 Generating Evaluation Report PDF...");
@@ -528,6 +523,7 @@ export const exportEvaluationReportToPDF = (
     const margin = 15;
     let yPos = margin;
 
+    // Header
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
     doc.text(t.evaluation?.title || "Evaluation Report", pageWidth / 2, yPos, {
@@ -543,15 +539,17 @@ export const exportEvaluationReportToPDF = (
     yPos += 10;
 
     doc.setDrawColor(26, 107, 74);
+    doc.setLineWidth(0.5);
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 8;
 
+    // Evaluation Date
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text(`Evaluation Date: ${getEthiopianDate()}`, margin, yPos);
     yPos += 12;
 
-    // Team members summary
+    // Team Members Summary Table
     doc.setFillColor(26, 107, 74);
     doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
@@ -565,10 +563,24 @@ export const exportEvaluationReportToPDF = (
       total: totalScores(m),
     }));
 
+    // Sort by score descending
+    const sortedMembers = [...memberTotals].sort((a, b) => b.total - a.total);
+
     autoTable(doc, {
       startY: yPos,
-      head: [["#", "Member Name", "Total Score (0-100)"]],
-      body: memberTotals.map((m, idx) => [idx + 1, m.name, m.total]),
+      head: [["#", "Member Name", "Total Score (0-100)", "Rank"]],
+      body: sortedMembers.map((m, idx) => [
+        idx + 1,
+        m.name,
+        m.total,
+        idx === 0
+          ? "🥇 1st"
+          : idx === 1
+            ? "🥈 2nd"
+            : idx === 2
+              ? "🥉 3rd"
+              : `#${idx + 1}`,
+      ]),
       margin: { left: margin, right: margin },
       theme: "striped",
       headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
@@ -577,13 +589,64 @@ export const exportEvaluationReportToPDF = (
 
     yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
 
-    // Best performer
+    // Best Performer
     if (bestPerformer) {
       doc.setFontSize(12);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(26, 107, 74);
       doc.text(`🏆 Best Performer: ${bestPerformer}`, margin, yPos);
       doc.setTextColor(0, 0, 0);
+      yPos += 10;
+    }
+
+    // ✅ Comments Section
+    if (comments && Object.keys(comments).length > 0) {
+      // Check if there are any non-empty comments
+      const hasComments = Object.values(comments).some(
+        (c) => c && c.trim() !== "",
+      );
+
+      if (hasComments) {
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("📝 Individual Feedback & Comments", margin, yPos);
+        yPos += 10;
+
+        const memberList = members.filter((m) => m.trim() !== "");
+        memberList.forEach((member, idx) => {
+          const comment = comments[idx] || "No comment provided";
+
+          // Check if we need a new page
+          if (yPos > 240) {
+            doc.addPage();
+            yPos = margin;
+          }
+
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(26, 107, 74);
+          doc.text(`${member}:`, margin, yPos);
+          yPos += 6;
+
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(50, 50, 50);
+          const splitComment = doc.splitTextToSize(
+            comment,
+            pageWidth - margin * 2 - 5,
+          );
+          doc.text(splitComment, margin + 3, yPos);
+          yPos += splitComment.length * 5 + 8;
+
+          // Add a light separator line
+          if (idx < memberList.length - 1) {
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.3);
+            doc.line(margin, yPos - 4, pageWidth - margin, yPos - 4);
+            yPos += 4;
+          }
+        });
+      }
     }
 
     // Footer
@@ -600,13 +663,10 @@ export const exportEvaluationReportToPDF = (
     doc.save(`evaluation_report_${getEthiopianDate().replace(/\//g, "-")}.pdf`);
     console.log("✅ Evaluation Report PDF generated successfully!");
 
-    // ✅ Use professional toast
     showSuccessToast("📄 Evaluation Report PDF generated successfully!");
     return true;
   } catch (error) {
     console.error("❌ Evaluation Report PDF Error:", error);
-
-    // ✅ Use professional toast
     showErrorToast(`❌ Failed to generate PDF: ${error.message}`);
     return false;
   }
