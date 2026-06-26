@@ -5,7 +5,12 @@ import { dailyReportAPI } from "../services/api";
 import { exportDailyReportToPDF } from "../utils/pdfExport";
 
 export default function DailyReport({ t, lang }) {
-  const td = t.dailyReport;
+  // ✅ FIX: Safe access to translations with fallback
+  const safeT = t || {};
+  const td = safeT.dailyReport || {};
+  const safeCommon = safeT.common || {};
+  const safeYear = safeT.year || "2018 E.C.";
+
   const [rows, setRows] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(true);
@@ -161,7 +166,7 @@ export default function DailyReport({ t, lang }) {
                 backgroundClip: "text",
               }}
             >
-              {td.title}
+              {td.title || "Daily Report"}
             </h1>
             <p
               style={{
@@ -194,7 +199,7 @@ export default function DailyReport({ t, lang }) {
             boxShadow: `0 4px 15px ${C.primary}44`,
           }}
         >
-          {t.year}
+          {safeYear}
         </span>
       </div>
 
@@ -207,7 +212,7 @@ export default function DailyReport({ t, lang }) {
         }}
       >
         <Field
-          label={td.reportDate}
+          label={td.reportDate || "📅 Report Date"}
           value={date}
           onChange={setDate}
           type="date"
@@ -235,7 +240,7 @@ export default function DailyReport({ t, lang }) {
               margin: 0,
             }}
           >
-            {td.serviceList}
+            {td.serviceList || "📋 Service List"}
             <span
               style={{
                 fontSize: "clamp(11px, 3vw, 12px)",
@@ -244,7 +249,7 @@ export default function DailyReport({ t, lang }) {
                 marginLeft: 8,
               }}
             >
-              ({rows.length} {t.common?.records || "records"})
+              ({rows.length} {safeCommon.records || "records"})
             </span>
           </h3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -256,14 +261,14 @@ export default function DailyReport({ t, lang }) {
                 fontSize: "clamp(12px, 3vw, 13px)",
               }}
             >
-              ➕ {td.addRow}
+              ➕ {td.addRow || "+ Add Row"}
             </button>
           </div>
         </div>
 
         {loading ? (
           <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
-            ⏳ {t.common?.loading || "Loading..."}
+            ⏳ {safeCommon.loading || "Loading..."}
           </div>
         ) : (
           <>
@@ -286,14 +291,16 @@ export default function DailyReport({ t, lang }) {
                 <thead>
                   <tr>
                     <th style={th}>#</th>
-                    <th style={th}>{td.colDept}</th>
-                    <th style={th}>{td.colService}</th>
-                    <th style={{ ...th, textAlign: "center" }}>{td.colMale}</th>
+                    <th style={th}>{td.colDept || "Department"}</th>
+                    <th style={th}>{td.colService || "Service"}</th>
                     <th style={{ ...th, textAlign: "center" }}>
-                      {td.colFemale}
+                      {td.colMale || "M"}
                     </th>
                     <th style={{ ...th, textAlign: "center" }}>
-                      {td.colTotal}
+                      {td.colFemale || "F"}
+                    </th>
+                    <th style={{ ...th, textAlign: "center" }}>
+                      {td.colTotal || "Total"}
                     </th>
                     <th style={{ ...th, textAlign: "center", width: 40 }}>✕</th>
                   </tr>
@@ -439,7 +446,7 @@ export default function DailyReport({ t, lang }) {
                         color: C.dark,
                       }}
                     >
-                      {td.grandTotal}
+                      {td.grandTotal || "Grand Total"}
                     </td>
                     <td
                       style={{
@@ -530,7 +537,7 @@ export default function DailyReport({ t, lang }) {
                 onClick={saveReport}
                 disabled={saving}
               >
-                {saving ? "⏳ Saving..." : "💾 " + td.save}
+                {saving ? "⏳ Saving..." : "💾 " + (td.save || "Save Report")}
               </button>
             </div>
           </>
