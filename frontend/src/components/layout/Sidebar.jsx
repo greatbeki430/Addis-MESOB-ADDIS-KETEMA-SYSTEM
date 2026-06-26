@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { ArrowDown01Icon } from "hugeicons-react";
@@ -7,9 +8,183 @@ import { teamAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
 import { getFilteredNavItems } from "../../utils/roles";
 
+// =============================================
+// ANIMATED LOGO COMPONENT - Alternating "A" ↔ "አ"
+// =============================================
+const AnimatedLogo = ({ collapsed }) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [scale, setScale] = useState(1);
+  const [showAmharic, setShowAmharic] = useState(false);
+  const [isFlipping, setIsFlipping] = useState(false);
+
+  // ✅ Continuous rotation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRotation((prev) => (prev + 0.5) % 360);
+    }, 50);
+    return () => clearInterval(interval);
+  }, []);
+
+  // ✅ Pulse animation
+  useEffect(() => {
+    const pulseInterval = setInterval(() => {
+      setScale((prev) => (prev === 1 ? 1.05 : 1));
+    }, 2000);
+    return () => clearInterval(pulseInterval);
+  }, []);
+
+  // ✅ Alternating between "A" and "አ" with flip effect
+  useEffect(() => {
+    const flipInterval = setInterval(() => {
+      setIsFlipping(true);
+      setTimeout(() => {
+        setShowAmharic((prev) => !prev);
+        setIsFlipping(false);
+      }, 300);
+    }, 2000);
+
+    return () => clearInterval(flipInterval);
+  }, []);
+
+  // ✅ Colors defined inside component to avoid ESLint errors
+  const goldColor = "#f5c518";
+  const primaryColor = "#1a3aad";
+  const mutedTextColor = "#7a8fc8";
+
+  if (collapsed) {
+    return (
+      <div
+        style={{
+          width: 38,
+          height: 38,
+          minWidth: 38,
+          background: `linear-gradient(135deg, ${primaryColor}, ${goldColor})`,
+          borderRadius: 10,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 20,
+          fontWeight: 900,
+          color: "#fff",
+          fontFamily: F.serif,
+          animation: "pulseGlow 2s ease-in-out infinite",
+          transform: `scale(${scale})`,
+          transition: "transform 0.5s ease",
+          perspective: "1000px",
+        }}
+      >
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            transform: isFlipping ? "rotateY(180deg)" : "rotateY(0deg)",
+            transition: "transform 0.3s ease",
+            transformStyle: "preserve-3d",
+          }}
+        >
+          {showAmharic ? "አ" : "A"}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        cursor: "pointer",
+      }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+    >
+      <div
+        style={{
+          width: 42,
+          height: 42,
+          minWidth: 42,
+          background: `linear-gradient(135deg, ${primaryColor}, ${goldColor})`,
+          borderRadius: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 22,
+          fontWeight: 900,
+          color: "#fff",
+          fontFamily: F.serif,
+          transform: isHovered
+            ? `rotate(${rotation}deg) scale(1.15)`
+            : `rotate(0deg) scale(${scale})`,
+          transition: "transform 0.3s ease, box-shadow 0.3s ease",
+          boxShadow: isHovered
+            ? `0 0 40px ${goldColor}66`
+            : `0 4px 15px ${primaryColor}44`,
+          animation: "pulseGlow 3s ease-in-out infinite",
+          perspective: "1000px",
+        }}
+      >
+        <span
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            transform: isFlipping ? "rotateY(180deg)" : "rotateY(0deg)",
+            transition: "transform 0.3s ease",
+            transformStyle: "preserve-3d",
+            fontSize: "clamp(18px, 4vw, 24px)",
+            fontWeight: 900,
+            fontFamily: "'Noto Serif Ethiopic', serif",
+          }}
+        >
+          {showAmharic ? "አ" : "A"}
+        </span>
+      </div>
+      <div>
+        <div
+          style={{
+            fontSize: 18,
+            fontWeight: 800,
+            fontFamily: F.serif,
+            background: `linear-gradient(90deg, ${goldColor}, ${C.light}, ${primaryColor})`,
+            backgroundSize: isHovered ? "200% 100%" : "100% 100%",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+            transition: "all 0.5s ease",
+            letterSpacing: isHovered ? "3px" : "0px",
+            animation: isHovered ? "shimmer 2s linear infinite" : "none",
+          }}
+        >
+          A-MESOB
+        </div>
+        <div
+          style={{
+            fontSize: 9,
+            color: mutedTextColor,
+            letterSpacing: 1.5,
+            textTransform: "uppercase",
+            opacity: isHovered ? 1 : 0.7,
+            transition: "opacity 0.3s ease",
+          }}
+        >
+          One-Stop · አዲስ መሶብ
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =============================================
+// SIDEBAR COMPONENT
+// =============================================
 export default function Sidebar({
-  tab,
-  setTab,
   lang,
   setLang,
   t,
@@ -18,6 +193,9 @@ export default function Sidebar({
   selectedTeam,
   setSelectedTeam,
 }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [forumExpanded, setForumExpanded] = useState(false);
   const [teams, setTeams] = useState([]);
   const [showAddTeamModal, setShowAddTeamModal] = useState(false);
@@ -37,6 +215,7 @@ export default function Sidebar({
     }
   };
 
+  // ✅ Define colors here
   const DARK_BG = "#0d1a5e";
   const BORDER_COLOR = "#1a3aad";
   const ACTIVE_BG = "#1a3aad33";
@@ -106,9 +285,19 @@ export default function Sidebar({
     loadTeams();
   }, [loadTeams]);
 
+  // ✅ Handle team click - navigate to forum with team context
   const handleTeamClick = (team) => {
     setSelectedTeam(team);
-    setTab("forum");
+    // setTab("forum");
+    navigate("/forum");
+  };
+
+  // ✅ Handle navigation - uses React Router
+  const handleNavClick = (tabId) => {
+    // setTab(tabId);
+    setSelectedTeam(null);
+    setForumExpanded(false);
+    navigate(`/${tabId}`);
   };
 
   const handleAddTeam = async () => {
@@ -166,6 +355,22 @@ export default function Sidebar({
         zIndex: 50,
       }}
     >
+      <style>{`
+        @keyframes pulseGlow {
+          0%, 100% { box-shadow: 0 0 20px rgba(26,58,173,0.3); }
+          50% { box-shadow: 0 0 40px rgba(245,197,24,0.3); }
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes flip {
+          0% { transform: rotateY(0deg); }
+          50% { transform: rotateY(90deg); }
+          100% { transform: rotateY(180deg); }
+        }
+      `}</style>
+
       {/* Collapse Toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
@@ -189,58 +394,17 @@ export default function Sidebar({
         {collapsed ? "▶" : "◀"}
       </button>
 
-      {/* Logo */}
+      {/* Animated Logo */}
       <div
         style={{
           padding: collapsed ? "18px 0" : "16px",
           display: "flex",
           alignItems: "center",
           justifyContent: collapsed ? "center" : "flex-start",
-          gap: 12,
           borderBottom: `1px solid ${BORDER_COLOR}33`,
         }}
       >
-        <div
-          style={{
-            width: 38,
-            height: 38,
-            minWidth: 38,
-            background: "linear-gradient(135deg, #1a3aad, #f5c518)",
-            borderRadius: 10,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 20,
-            fontWeight: 900,
-            color: "#fff",
-            fontFamily: F.serif,
-            boxShadow: "0 4px 12px rgba(26,58,173,0.4)",
-          }}
-        >
-          አ
-        </div>
-        {!collapsed && (
-          <div>
-            <div
-              style={{
-                fontSize: isMobile ? 14 : 16,
-                fontWeight: 800,
-                background: "linear-gradient(90deg, #f5c518, #fff)",
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-                fontFamily: F.serif,
-              }}
-            >
-              {safeT("appName", "A-MESOB")}
-            </div>
-            <div
-              style={{ fontSize: 10, color: MUTED_TEXT, letterSpacing: 0.5 }}
-            >
-              {safeT("appSub", "One-Stop")}
-            </div>
-          </div>
-        )}
+        <AnimatedLogo collapsed={collapsed} />
       </div>
 
       {/* Nav Label */}
@@ -262,7 +426,8 @@ export default function Sidebar({
       {/* Nav Items */}
       <nav style={{ flex: 1, padding: "6px 0" }}>
         {filteredNavItems.map((n) => {
-          const active = tab === n.id && !(n.id === "forum" && selectedTeam);
+          // ✅ Use location.pathname for active state (URL-based)
+          const isActive = location.pathname === `/${n.id}`;
           const isForum = n.id === "forum";
           const navLabel = safeT(`nav.${n.id}`, n.id);
 
@@ -273,11 +438,10 @@ export default function Sidebar({
                   if (isForum) {
                     setForumExpanded(!forumExpanded);
                     setSelectedTeam(null);
-                    setTab("forum");
+                    // setTab("forum");
+                    navigate("/forum");
                   } else {
-                    setTab(n.id);
-                    setSelectedTeam(null);
-                    setForumExpanded(false);
+                    handleNavClick(n.id);
                   }
                 }}
                 title={navLabel}
@@ -292,24 +456,24 @@ export default function Sidebar({
                     : isMobile
                       ? "10px 16px"
                       : "11px 16px",
-                  background: active ? ACTIVE_BG : "none",
+                  background: isActive ? ACTIVE_BG : "none",
                   border: "none",
-                  borderLeft: active
+                  borderLeft: isActive
                     ? `4px solid ${ACTIVE_TEXT}`
                     : "4px solid transparent",
-                  color: active ? ACTIVE_TEXT : MUTED_TEXT,
+                  color: isActive ? ACTIVE_TEXT : MUTED_TEXT,
                   cursor: "pointer",
                   fontSize: isMobile ? 13 : 14,
-                  fontWeight: active ? 700 : 500,
+                  fontWeight: isActive ? 700 : 500,
                   fontFamily: F.sans,
                   transition: "all .18s",
                   marginBottom: 2,
                 }}
                 onMouseEnter={(e) => {
-                  if (!active) e.currentTarget.style.background = HOVER_BG;
+                  if (!isActive) e.currentTarget.style.background = HOVER_BG;
                 }}
                 onMouseLeave={(e) => {
-                  if (!active) e.currentTarget.style.background = "none";
+                  if (!isActive) e.currentTarget.style.background = "none";
                 }}
               >
                 <div

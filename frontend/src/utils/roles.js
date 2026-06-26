@@ -85,6 +85,12 @@ export const NAV_ITEMS = [
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
+    id: "admin/services",
+    icon: "🔧",
+    label: "Service Manager", // ✅ This will be translated via t('nav.admin/services')
+    roles: [ROLES.SUPER_ADMIN],
+  },
+  {
     id: "users",
     icon: "👥",
     label: "User Management",

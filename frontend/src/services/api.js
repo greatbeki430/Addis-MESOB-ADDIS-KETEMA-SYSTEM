@@ -90,8 +90,17 @@ export const teamAPI = {
 };
 
 // Services API
+// export const serviceAPI = {
+//   getAll: () => api.get("/services"),
+// };
+
 export const serviceAPI = {
   getAll: () => api.get("/services"),
+  // ✅ New methods
+  seed: () => api.post("/services/seed"),
+  create: (data) => api.post("/services", data),
+  update: (id, data) => api.put(`/services/${id}`, data),
+  delete: (id) => api.delete(`/services/${id}`),
 };
 
 // Reports API

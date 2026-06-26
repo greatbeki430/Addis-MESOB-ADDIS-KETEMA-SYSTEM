@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom"; // ✅ ADD THIS
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
 import mesobLogo from "../../assets/mesoblogo.png";
@@ -75,17 +76,18 @@ const generateParticles = () => {
 
 const STATIC_PARTICLES = generateParticles();
 
-// Addis MESOB Brand Colors (from logo: deep blue + golden yellow)
+// Addis MESOB Brand Colors
 const COLORS = {
-  primary: "#1a3aad", // Deep Blue - main backgrounds, buttons
-  secondary: "#2952cc", // Royal Blue - hover states, accents
-  gold: "#f5c518", // Golden Yellow - highlights, gradients
-  white: "#ffffff", // White - text on dark backgrounds
-  dark: "#0d1a5e", // Darker Blue - shadows, overlays
-  goldLight: "#fde98a", // Light Gold - subtle accents
+  primary: "#1a3aad",
+  secondary: "#2952cc",
+  gold: "#f5c518",
+  white: "#ffffff",
+  dark: "#0d1a5e",
+  goldLight: "#fde98a",
 };
 
 export default function Login({ onSwitchToRegister }) {
+  const navigate = useNavigate(); // ✅ ADD THIS
   const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -95,18 +97,31 @@ export default function Login({ onSwitchToRegister }) {
   const [isFocused, setIsFocused] = useState({ email: false, password: false });
   const [isHovered, setIsHovered] = useState(false);
   const [titleRotation, setTitleRotation] = useState(0);
+  const [showAmharic, setShowAmharic] = useState(false);
+  const [isFlipping, setIsFlipping] = useState(false);
   const { login } = useAuth();
 
   useEffect(() => {
     removeBodyMargins();
 
+    // Animated logo rotation
     const interval = setInterval(() => {
       setTitleRotation((prev) => (prev + 0.3) % 360);
     }, 50);
 
+    // ✅ Alternating between "A" and "አ" with flip effect
+    const flipInterval = setInterval(() => {
+      setIsFlipping(true);
+      setTimeout(() => {
+        setShowAmharic((prev) => !prev);
+        setIsFlipping(false);
+      }, 300);
+    }, 2000);
+
     return () => {
       restoreBodyMargins();
       clearInterval(interval);
+      clearInterval(flipInterval);
     };
   }, []);
 
@@ -117,7 +132,10 @@ export default function Login({ onSwitchToRegister }) {
 
     try {
       const result = await login({ email, password });
-      if (!result.success) {
+      if (result.success) {
+        // ✅ Redirect to dashboard after successful login
+        navigate("/dashboard");
+      } else {
         setError(result.error || t?.auth?.loginFailed || "Login failed");
       }
     } catch {
@@ -127,7 +145,6 @@ export default function Login({ onSwitchToRegister }) {
     }
   };
 
-  // Named function preserved from original
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
@@ -154,47 +171,57 @@ export default function Login({ onSwitchToRegister }) {
       </div>
 
       <div style={loginStyles.card}>
-        {/* Animated Logo Section */}
+        {/* ✅ Animated Logo Section with Alternating "A" ↔ "አ" */}
         <div style={loginStyles.logoContainer}>
           <div
             style={{
               ...loginStyles.logoIcon,
               transform: `rotate(${titleRotation}deg)`,
               background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
-              boxShadow: `0 8px 30px ${COLORS.primary}66`,
+              boxShadow: isHovered
+                ? `0 8px 40px ${COLORS.gold}66`
+                : `0 8px 30px ${COLORS.primary}66`,
+              transition: "transform 0.3s ease, box-shadow 0.3s ease",
+              perspective: "1000px",
             }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
           >
-            አ
+            <span
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: "100%",
+                height: "100%",
+                transform: isFlipping ? "rotateY(180deg)" : "rotateY(0deg)",
+                transition: "transform 0.3s ease",
+                transformStyle: "preserve-3d",
+                fontSize: "clamp(28px, 7vw, 38px)",
+                fontWeight: 900,
+                fontFamily: "'Noto Serif Ethiopic', serif",
+              }}
+            >
+              {showAmharic ? "አ" : "A"}
+            </span>
           </div>
           <div style={loginStyles.logoTextContainer}>
-            {/* Logo text with shimmer on hover — preserved from original */}
             <div
               style={{
                 ...loginStyles.logoText,
-                background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
+                background: isHovered
+                  ? `linear-gradient(90deg, ${COLORS.gold}, ${COLORS.primary}, ${COLORS.gold})`
+                  : `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
+                backgroundSize: isHovered ? "200% 100%" : "100% 100%",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
                 backgroundClip: "text",
                 fontSize: "clamp(32px, 8vw, 42px)",
                 fontWeight: 900,
                 fontFamily: "'Noto Serif Ethiopic', serif",
-                letterSpacing: "-0.5px",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = `linear-gradient(90deg, ${COLORS.gold}, ${COLORS.primary}, ${COLORS.gold})`;
-                e.currentTarget.style.backgroundSize = "200% 100%";
-                e.currentTarget.style.WebkitBackgroundClip = "text";
-                e.currentTarget.style.WebkitTextFillColor = "transparent";
-                e.currentTarget.style.backgroundClip = "text";
-                e.currentTarget.style.animation = "shimmer 2s linear infinite";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`;
-                e.currentTarget.style.backgroundSize = "100% 100%";
-                e.currentTarget.style.WebkitBackgroundClip = "text";
-                e.currentTarget.style.WebkitTextFillColor = "transparent";
-                e.currentTarget.style.backgroundClip = "text";
-                e.currentTarget.style.animation = "none";
+                letterSpacing: isHovered ? "3px" : "-0.5px",
+                transition: "all 0.5s ease",
+                animation: isHovered ? "shimmer 2s linear infinite" : "none",
               }}
             >
               A-MESOB
@@ -219,6 +246,10 @@ export default function Login({ onSwitchToRegister }) {
                 One
               </span>
               -Stop
+              <span style={loginStyles.logoSubDot}> · </span>
+              <span style={{ color: COLORS.gold, fontWeight: 700 }}>
+                አዲስ መሶብ
+              </span>
             </div>
           </div>
         </div>
@@ -382,9 +413,10 @@ export default function Login({ onSwitchToRegister }) {
           from { opacity: 0; transform: translateY(30px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        @keyframes goldPulse {
-          0%, 100% { border-color: rgba(245,197,24,0.3); }
-          50% { border-color: rgba(245,197,24,0.8); }
+        @keyframes flip {
+          0% { transform: rotateY(0deg); }
+          50% { transform: rotateY(90deg); }
+          100% { transform: rotateY(180deg); }
         }
       `}</style>
     </div>
@@ -404,7 +436,6 @@ const loginStyles = {
     alignItems: "center",
     justifyContent: "center",
     padding: "20px",
-    // ✅ Background image preserved from original
     backgroundImage: `url(${mesobLogo})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
@@ -418,7 +449,6 @@ const loginStyles = {
     left: 0,
     right: 0,
     bottom: 0,
-    // Updated to brand blue gradient overlay
     background:
       "linear-gradient(135deg, rgba(13,26,94,0.88) 0%, rgba(26,58,173,0.75) 50%, rgba(13,26,94,0.88) 100%)",
     backdropFilter: "blur(3px)",
@@ -435,7 +465,6 @@ const loginStyles = {
   particle: {
     position: "absolute",
     bottom: "-10px",
-    // Gold particles to match brand
     background: "rgba(245,197,24,0.15)",
     borderRadius: "50%",
     animation: "particleFloat linear infinite",
@@ -476,8 +505,9 @@ const loginStyles = {
     color: "#fff",
     fontFamily: "'Noto Serif Ethiopic', serif",
     boxShadow: "0 8px 30px rgba(26,58,173,0.4)",
-    transition: "transform 0.3s ease",
+    transition: "transform 0.3s ease, box-shadow 0.3s ease",
     animation: "pulseGlow 3s ease-in-out infinite",
+    perspective: "1000px",
   },
   logoTextContainer: {
     display: "flex",

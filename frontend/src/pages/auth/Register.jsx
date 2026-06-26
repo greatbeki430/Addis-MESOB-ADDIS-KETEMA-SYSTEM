@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom"; // ✅ ADD THIS
 import { useAuth } from "../../hooks/useAuth";
 
 const registerStyles = {
@@ -123,6 +124,7 @@ const registerStyles = {
 };
 
 export default function Register({ onClose, t }) {
+  const navigate = useNavigate(); // ✅ ADD THIS
   const tu = t?.userManagement || {};
   const [formData, setFormData] = useState({
     name: "",
@@ -168,8 +170,13 @@ export default function Register({ onClose, t }) {
         role: "employee",
         phone: "",
       });
+
+      // ✅ Navigate to dashboard after successful registration
       setTimeout(() => {
-        if (onClose) onClose();
+        if (onClose) {
+          onClose();
+        }
+        navigate("/dashboard");
       }, 1500);
     } else {
       setError(result.error);

@@ -1,5 +1,6 @@
 // src/App.jsx
 import { useState, useEffect } from "react";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { C, F } from "./styles/theme";
 import Sidebar from "./components/layout/Sidebar";
 import Header from "./components/layout/Header";
@@ -20,6 +21,7 @@ import { ToastContainer } from "./components/ui/Modal";
 import { useToast } from "./hooks/useToast";
 import { LanguageProvider } from "./context/LanguageProvider";
 import { useLanguage } from "./hooks/useLanguage";
+import AdminServiceManager from "./pages/admin/AdminServiceManager";
 
 // =============================================
 // ANIMATED A-MESOB TITLE COMPONENT
@@ -128,6 +130,8 @@ export const AnimatedTitle = ({ t, collapsed }) => {
 function AuthenticatedApp() {
   const { language, t, changeLanguage } = useLanguage();
   const { showToast, toasts, removeToast } = useToast();
+  // ✅ Removed unused navigate
+  const location = useLocation();
   const {
     user,
     isAdmin,
@@ -138,7 +142,8 @@ function AuthenticatedApp() {
     isLeaderOrAbove,
   } = useAuth();
 
-  const [tab, setTab] = useState("dashboard");
+  // ✅ Get current tab from URL path
+  const currentTab = location.pathname.replace("/", "") || "dashboard";
   const [collapsed, setCollapsed] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [showRegister, setShowRegister] = useState(false);
@@ -146,14 +151,6 @@ function AuthenticatedApp() {
   useEffect(() => {
     setToastFunction(showToast);
   }, [showToast]);
-
-  // ✅ FIX: t is a FUNCTION from LanguageProvider — no readiness gate needed.
-  // It is always available synchronously. Remove the broken typeof check entirely.
-
-  const handleSetTab = (newTab) => {
-    setTab(newTab);
-    if (newTab !== "forum") setSelectedTeam(null);
-  };
 
   const getRoleDisplay = () => {
     if (isSuperAdmin) return "Super Admin 👑";
@@ -179,6 +176,26 @@ function AuthenticatedApp() {
     if (isEmployee) return "Employee";
     return "User";
   };
+
+  // ✅ Check if translations are ready
+  if (!t || typeof t !== "function") {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          background: C.gray,
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>⏳</div>
+          <p style={{ color: C.muted }}>Loading translations...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -255,8 +272,7 @@ function AuthenticatedApp() {
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
       <Sidebar
-        tab={tab}
-        setTab={handleSetTab}
+        tab={currentTab}
         lang={language}
         setLang={changeLanguage}
         t={t}
@@ -275,7 +291,12 @@ function AuthenticatedApp() {
           overflow: "hidden",
         }}
       >
-        <Header tab={tab} t={t} lang={language} setLang={changeLanguage} />
+        <Header
+          tab={currentTab}
+          t={t}
+          lang={language}
+          setLang={changeLanguage}
+        />
 
         <main
           style={{
@@ -286,42 +307,121 @@ function AuthenticatedApp() {
           }}
         >
           <div className="page-enter">
-            {tab === "dashboard" && <Dashboard t={t} lang={language} />}
-            {tab === "forum" && (
-              <ForumReport
-                t={t}
-                lang={language}
-                selectedTeam={selectedTeam}
-                onReportSaved={(teamId, data) =>
-                  console.log("Report saved:", teamId, data)
+            <Routes>
+              {/* ✅ Redirect root to dashboard */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+              {/* ✅ Dashboard */}
+              <Route
+                path="/dashboard"
+                element={<Dashboard t={t} lang={language} />}
+              />
+
+              {/* ✅ Forum Report */}
+              <Route
+                path="/forum"
+                element={
+                  <ForumReport
+                    t={t}
+                    lang={language}
+                    selectedTeam={selectedTeam}
+                    onReportSaved={(teamId, data) =>
+                      console.log("Report saved:", teamId, data)
+                    }
+                  />
                 }
               />
-            )}
-            {tab === "evaluation" && <Evaluation t={t} lang={language} />}
-            {tab === "report" && isLeaderOrAbove && (
-              <DailyReport t={t} lang={language} />
-            )}
-            {tab === "services" && isAdminOrSuperAdmin && (
-              <Services t={t} lang={language} />
-            )}
-            {tab === "users" && isAdminOrSuperAdmin && (
-              <UserManagement
-                t={t}
-                isSuperAdmin={isSuperAdmin}
-                isAdmin={isAdmin}
-                lang={language}
+
+              {/* ✅ Evaluation */}
+              <Route
+                path="/evaluation"
+                element={<Evaluation t={t} lang={language} />}
               />
-            )}
-            {tab === "teams" && isSuperAdmin && (
-              <TeamManagement
-                t={t}
-                isSuperAdmin={isSuperAdmin}
-                lang={language}
+
+              {/* ✅ Daily Report - Only Team Leaders and above */}
+              <Route
+                path="/report"
+                element={
+                  isLeaderOrAbove ? (
+                    <DailyReport t={t} lang={language} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
               />
-            )}
-            {tab === "analytics" && isLeaderOrAbove && (
-              <Report t={t} lang={language} />
-            )}
+
+              {/* ✅ Services - Only Admins and Super Admins */}
+              <Route
+                path="/services"
+                element={
+                  isAdminOrSuperAdmin ? (
+                    <Services t={t} lang={language} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+
+              {/* ✅ Admin Service Manager - Only Super Admins */}
+              <Route
+                path="/admin/services"
+                element={
+                  isSuperAdmin ? (
+                    <AdminServiceManager t={t} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+
+              {/* ✅ User Management - Only Admins and Super Admins */}
+              <Route
+                path="/users"
+                element={
+                  isAdminOrSuperAdmin ? (
+                    <UserManagement
+                      t={t}
+                      isSuperAdmin={isSuperAdmin}
+                      isAdmin={isAdmin}
+                      lang={language}
+                    />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+
+              {/* ✅ Team Management - Only Super Admins */}
+              <Route
+                path="/teams"
+                element={
+                  isSuperAdmin ? (
+                    <TeamManagement
+                      t={t}
+                      isSuperAdmin={isSuperAdmin}
+                      lang={language}
+                    />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+
+              {/* ✅ Analytics - Only Team Leaders and above */}
+              <Route
+                path="/analytics"
+                element={
+                  isLeaderOrAbove ? (
+                    <Report t={t} lang={language} />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+
+              {/* ✅ Catch all - redirect to dashboard */}
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            </Routes>
           </div>
         </main>
       </div>
@@ -449,7 +549,15 @@ function AppRouter() {
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 32, marginBottom: 10 }}>⏳</div>
+          <div
+            style={{
+              fontSize: 32,
+              marginBottom: 10,
+              animation: "pulseGlow 1.5s ease-in-out infinite",
+            }}
+          >
+            ⏳
+          </div>
           <p style={{ color: C.muted }}>Loading...</p>
         </div>
       </div>
