@@ -126,7 +126,7 @@ export const AnimatedTitle = ({ t, collapsed }) => {
 // AUTHENTICATED APP
 // =============================================
 function AuthenticatedApp() {
-  // ✅ ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
+  // ✅ ALL HOOKS CALLED UNCONDITIONALLY AT THE TOP
   const { language, t, changeLanguage } = useLanguage();
   const { showToast, toasts, removeToast } = useToast();
   const {
@@ -148,9 +148,9 @@ function AuthenticatedApp() {
     setToastFunction(showToast);
   }, [showToast]);
 
-  // ✅ FIXED: Check if t is a function (which means translations are ready)
-  // t is a function that returns translation values
-  const isTranslationReady = typeof t === "function";
+  // ✅ FIX: t is a plain translations OBJECT, not a function.
+  // Check that it exists and has at least one expected key.
+  const isTranslationReady = t && typeof t === "object" && !!t.appName;
 
   if (!isTranslationReady) {
     return (
@@ -165,15 +165,7 @@ function AuthenticatedApp() {
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              fontSize: 32,
-              marginBottom: 10,
-              animation: "pulseGlow 1.5s ease-in-out infinite",
-            }}
-          >
-            ⏳
-          </div>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>⏳</div>
           <p style={{ color: C.muted }}>Loading translations...</p>
         </div>
       </div>
@@ -182,9 +174,7 @@ function AuthenticatedApp() {
 
   const handleSetTab = (newTab) => {
     setTab(newTab);
-    if (newTab !== "forum") {
-      setSelectedTeam(null);
-    }
+    if (newTab !== "forum") setSelectedTeam(null);
   };
 
   const getRoleDisplay = () => {
@@ -224,54 +214,43 @@ function AuthenticatedApp() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700;800&family=Noto+Serif+Ethiopic:wght@700;900&display=swap');
         * { box-sizing: border-box; margin: 0; }
-        
+
         @keyframes pulseGlow {
           0%, 100% { box-shadow: 0 0 20px ${C.primary}44; }
-          50% { box-shadow: 0 0 40px ${C.primary}88; }
+          50%       { box-shadow: 0 0 40px ${C.primary}88; }
         }
-        
         @keyframes slideIn {
           from { opacity: 0; transform: translateY(-20px); }
-          to { opacity: 1; transform: translateY(0); }
+          to   { opacity: 1; transform: translateY(0); }
         }
-        
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(30px); }
-          to { opacity: 1; transform: translateY(0); }
+          to   { opacity: 1; transform: translateY(0); }
         }
-        
         @keyframes fadeIn {
           from { opacity: 0; }
-          to { opacity: 1; }
+          to   { opacity: 1; }
         }
-        
         @keyframes shimmer {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+          0%   { background-position: -200% center; }
+          100% { background-position:  200% center; }
         }
-        
-        .page-enter {
-          animation: fadeInUp 0.4s ease forwards;
-        }
-        
+
+        .page-enter { animation: fadeInUp 0.4s ease forwards; }
+
         input:focus, textarea:focus, select:focus {
-          border-color: #1a6b4a !important;
+          border-color: ${C.primary} !important;
           outline: none;
-          box-shadow: 0 0 0 3px #1a6b4a22;
+          box-shadow: 0 0 0 3px ${C.primary}22;
         }
-        
-        button {
-          transition: opacity 0.15s, transform 0.15s;
-        }
-        button:hover {
-          opacity: 0.88;
-          transform: translateY(-1px);
-        }
-        
+
+        button { transition: opacity 0.15s, transform 0.15s; }
+        button:hover { opacity: 0.88; transform: translateY(-1px); }
+
         ::-webkit-scrollbar { width: 5px; height: 5px; }
         ::-webkit-scrollbar-track { background: #f0f7f4; }
         ::-webkit-scrollbar-thumb { background: #a0d4b8; border-radius: 3px; }
-        
+
         .daily-report-table-wrapper {
           overflow-x: auto;
           -webkit-overflow-scrolling: touch;
@@ -279,29 +258,23 @@ function AuthenticatedApp() {
           margin: 0 -8px;
           padding: 0 8px;
         }
-        
+
         @media (max-width: 768px) {
           .services-search, .services-filter { min-height: 44px; }
           .service-card:active { transform: scale(0.98); }
         }
-        
         @media (max-width: 480px) {
           select { font-size: 16px !important; }
           input[type="number"] { min-height: 32px; }
         }
-        
-        @media (max-width: 600px) {
-          .header-date { display: none !important; }
-        }
-        @media (max-width: 480px) {
-          .header-appname { display: none !important; }
-        }
+        @media (max-width: 600px) { .header-date   { display: none !important; } }
+        @media (max-width: 480px) { .header-appname { display: none !important; } }
         @media (max-width: 400px) {
           .header-lang-btn { padding: 2px 5px !important; font-size: 9px !important; }
         }
         @media (max-width: 550px) {
-          header { gap: 6px !important; }
-          header > div { gap: 6px !important; }
+          header         { gap: 6px !important; }
+          header > div   { gap: 6px !important; }
         }
       `}</style>
 
@@ -335,11 +308,11 @@ function AuthenticatedApp() {
             flex: 1,
             overflowY: "auto",
             overflowX: "hidden",
-            padding: "0",
+            padding: 0,
           }}
         >
           <div className="page-enter">
-            {tab === "dashboard" && <Dashboard t={t} />}
+            {tab === "dashboard" && <Dashboard t={t} lang={language} />}
             {tab === "forum" && (
               <ForumReport
                 t={t}
@@ -429,10 +402,7 @@ function AuthenticatedApp() {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            inset: 0,
             background: "rgba(0,0,0,0.5)",
             display: "flex",
             alignItems: "center",
@@ -448,7 +418,7 @@ function AuthenticatedApp() {
         </div>
       )}
 
-      {/* Add User Button */}
+      {/* Add User FAB */}
       {isAdminOrSuperAdmin && (
         <button
           onClick={() => setShowRegister(true)}
@@ -473,7 +443,7 @@ function AuthenticatedApp() {
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = "scale(1.1)";
-            e.currentTarget.style.boxShadow = "0 6px 20px rgba(26,107,74,0.4)";
+            e.currentTarget.style.boxShadow = `0 6px 20px ${C.primary}66`;
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = "scale(1)";
@@ -491,7 +461,6 @@ function AuthenticatedApp() {
 // APP ROUTER
 // =============================================
 function AppRouter() {
-  // ✅ ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
@@ -506,25 +475,14 @@ function AppRouter() {
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              fontSize: 32,
-              marginBottom: 10,
-              animation: "pulseGlow 1.5s ease-in-out infinite",
-            }}
-          >
-            ⏳
-          </div>
+          <div style={{ fontSize: 32, marginBottom: 10 }}>⏳</div>
           <p style={{ color: C.muted }}>Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (!isAuthenticated) {
-    return <Login />;
-  }
-
+  if (!isAuthenticated) return <Login />;
   return <AuthenticatedApp />;
 }
 

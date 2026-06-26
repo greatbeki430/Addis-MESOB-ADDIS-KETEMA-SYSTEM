@@ -6,14 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { dailyReportAPI } from "../services/api";
 
 export default function Dashboard({ t }) {
-  // ✅ FALLBACK: Safe access to translations
-  const safeT = t || {};
-  const td = safeT.dashboard || {};
-  const safeCriteria = safeT.criteria || {};
-  const safeCommon = safeT.common || {};
-  const safeAgendas = safeT.agendas || [];
-  const safeYear = safeT.year || "2018 E.C.";
-
+  const td = t.dashboard;
   const { user } = useAuth();
   const [stats, setStats] = useState({
     total: 0,
@@ -241,7 +234,7 @@ export default function Dashboard({ t }) {
               whiteSpace: "nowrap",
             }}
           >
-            {safeYear}
+            {t.year}
           </span>
         </div>
       </div>
@@ -257,31 +250,31 @@ export default function Dashboard({ t }) {
         }}
       >
         <StatCard
-          label={td.todayServices || "Today's Services"}
+          label={td.todayServices}
           value={animatedStats.total}
           icon="◈"
-          color={C.primary}
+          color={C.primary} // Deep Royal Blue
           loading={loading}
         />
         <StatCard
-          label={td.male || "Male"}
+          label={td.male}
           value={animatedStats.male}
           icon="◉"
-          color={C.light}
+          color={C.light} // Royal Blue (was C.blue — doesn't exist)
           loading={loading}
         />
         <StatCard
-          label={td.female || "Female"}
+          label={td.female}
           value={animatedStats.female}
           icon="◉"
-          color={C.gold}
+          color={C.gold} // Gold (was C.purple — doesn't exist)
           loading={loading}
         />
         <StatCard
-          label={td.departments || "Departments"}
+          label={td.departments}
           value={stats.departments.length}
           icon="⬢"
-          color={C.orange}
+          color={C.orange} // Orange (unchanged — exists in theme)
           loading={loading}
         />
       </div>
@@ -307,7 +300,7 @@ export default function Dashboard({ t }) {
               fontFamily: F.sans,
             }}
           >
-            {td.deptReport || "Daily Department Report"}
+            {td.deptReport}
           </h3>
           {stats.departments.length === 0 ? (
             <p
@@ -318,7 +311,7 @@ export default function Dashboard({ t }) {
                 padding: 20,
               }}
             >
-              {safeCommon.noData || "No data available"}
+              {t.common?.noData || "No data available"}
             </p>
           ) : (
             stats.departments.map(({ name, value }) => (
@@ -385,9 +378,9 @@ export default function Dashboard({ t }) {
               fontFamily: F.sans,
             }}
           >
-            {td.forumAgendas || "Standing Forum Agendas"}
+            {td.forumAgendas}
           </h3>
-          {safeAgendas.map((a, i) => (
+          {t.agendas?.map((a, i) => (
             <div
               key={i}
               style={{
@@ -443,7 +436,7 @@ export default function Dashboard({ t }) {
             fontFamily: F.sans,
           }}
         >
-          {td.criteriaOverview || "Evaluation Criteria Overview"}
+          {td.criteriaOverview}
         </h3>
         <div
           style={{
@@ -494,7 +487,7 @@ export default function Dashboard({ t }) {
                   lineHeight: 1.3,
                 }}
               >
-                {safeCriteria[c.key] || c.key}
+                {t.criteria[c.key]}
               </div>
               <div style={{ fontSize: "9px", color: "#999", marginBottom: 8 }}>
                 {c.titleEn}
@@ -509,7 +502,7 @@ export default function Dashboard({ t }) {
                   display: "inline-block",
                 }}
               >
-                {c.items.length} {td.subCriteria || "sub-criteria"}
+                {c.items.length} {td.subCriteria}
               </div>
             </div>
           ))}

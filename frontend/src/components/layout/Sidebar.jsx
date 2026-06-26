@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react"; // ✅ useCallback imported here
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { ArrowDown01Icon } from "hugeicons-react";
@@ -28,20 +28,33 @@ export default function Sidebar({
   const { user, isAdminOrSuperAdmin, isLeader, isEmployee } = useAuth();
   const filteredNavItems = getFilteredNavItems(user?.role || "employee");
 
+  // ✅ Safe translation access with fallbacks
+  const safeT = t || {};
+  const safeSidebar = safeT.sidebar || {};
+  const safeNav = safeT.nav || {};
+  const safeAppName = safeT.appName || "A-MESOB";
+  const safeAppSub = safeT.appSub || "One-Stop";
+
+  // Addis MESOB Brand Colors
+  const DARK_BG = "#0d1a5e";
+  const BORDER_COLOR = "#1a3aad";
+  const ACTIVE_BG = "#1a3aad33";
+  const ACTIVE_TEXT = "#f5c518";
+  const MUTED_TEXT = "#7a8fc8";
+  const SECTION_BG = "#0f2070";
+  const HOVER_BG = "#1a3aad22";
+
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Load teams from Backend API
-  const loadTeams = async () => {
+  // ✅ FIX: useCallback with stable deps so it doesn't re-create on every render
+  const loadTeams = useCallback(async () => {
     try {
       setLoading(true);
-      console.log("🔄 Loading teams from backend...");
       const response = await teamAPI.getAll();
-
-      console.log("📦 API Response:", response.data);
 
       if (response.data && Array.isArray(response.data)) {
         let formattedTeams = response.data.map((team) => ({
@@ -57,7 +70,7 @@ export default function Sidebar({
           department: team.department,
         }));
 
-        // If Employee or Team Leader, only show their team
+        // Employees and Leaders only see their own team
         if ((isEmployee || isLeader) && user) {
           const userTeam = formattedTeams.find(
             (team) =>
@@ -66,17 +79,10 @@ export default function Sidebar({
               team.leader === user.name ||
               team.leader === user._id,
           );
-          if (userTeam) {
-            formattedTeams = [userTeam];
-          } else {
-            formattedTeams = [];
-          }
+          formattedTeams = userTeam ? [userTeam] : [];
         }
 
-        console.log("✅ Formatted teams:", formattedTeams);
         setTeams(formattedTeams);
-      } else {
-        console.warn("⚠️ Response data is not an array:", response.data);
       }
     } catch (error) {
       console.error("❌ Failed to load teams:", error);
@@ -91,46 +97,35 @@ export default function Sidebar({
               team.leader === user.name ||
               team.leader === user._id,
           );
-          if (userTeam) {
-            parsedTeams = [userTeam];
-          } else {
-            parsedTeams = [];
-          }
+          parsedTeams = userTeam ? [userTeam] : [];
         }
         setTeams(parsedTeams);
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [isEmployee, isLeader, user]); // ✅ stable deps — only recreate when role/user changes
 
-  // Load teams on component mount
   useEffect(() => {
     loadTeams();
-  }, [isEmployee, isLeader, user]);
+  }, [loadTeams]);
 
-  // Handle team selection
   const handleTeamClick = (team) => {
     setSelectedTeam(team);
     setTab("forum");
   };
 
-  // Add new team to backend
   const handleAddTeam = async () => {
     if (!newTeamName.trim()) {
       alert("Please enter a team name");
       return;
     }
-
     try {
       setLoading(true);
-      console.log("➕ Creating new team:", newTeamName);
       const response = await teamAPI.create({
         name: newTeamName,
         department: newTeamDepartment,
       });
-
-      console.log("✅ Team created response:", response.data);
 
       const newTeam = {
         id: response.data._id,
@@ -143,14 +138,12 @@ export default function Sidebar({
         department: response.data.department,
       };
 
-      setTeams([...teams, newTeam]);
+      setTeams((prev) => [...prev, newTeam]);
       setNewTeamName("");
       setNewTeamDepartment("");
       setShowAddTeamModal(false);
       setForumExpanded(true);
-      console.log("🔄 Refreshing teams list...");
       await loadTeams();
-      console.log("✅ Teams refresh complete");
     } catch (error) {
       console.error("❌ Failed to create team:", error);
       alert(
@@ -163,22 +156,6 @@ export default function Sidebar({
   };
 
   const sidebarWidth = collapsed ? 64 : isMobile ? 200 : 260;
-
-  // Addis MESOB Brand Colors
-  const DARK_BG = "#0d1a5e";
-  const BORDER_COLOR = "#1a3aad";
-  const ACTIVE_BG = "#1a3aad33";
-  const ACTIVE_TEXT = "#f5c518";
-  const MUTED_TEXT = "#7a8fc8";
-  const SECTION_BG = "#0f2070";
-  const HOVER_BG = "#1a3aad22";
-
-  // ✅ FALLBACK: If t is undefined or doesn't have sidebar, use empty object
-  const safeT = t || {};
-  const safeSidebar = safeT.sidebar || {};
-  const safeNav = safeT.nav || {};
-  const safeAppName = safeT.appName || "A-MESOB";
-  const safeAppSub = safeT.appSub || "One-Stop";
 
   return (
     <aside
@@ -271,7 +248,7 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Nav label */}
+      {/* Nav Section Label */}
       {!collapsed && (
         <div
           style={{
@@ -287,7 +264,7 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* Nav items */}
+      {/* Nav Items */}
       <nav style={{ flex: 1, padding: "6px 0" }}>
         {filteredNavItems.map((n) => {
           const active = tab === n.id && !(n.id === "forum" && selectedTeam);
@@ -387,7 +364,6 @@ export default function Sidebar({
                       Loading...
                     </div>
                   )}
-
                   {!loading && teams.length === 0 && (
                     <div
                       style={{
@@ -402,7 +378,6 @@ export default function Sidebar({
                         : "No teams yet"}
                     </div>
                   )}
-
                   {teams.map((team) => (
                     <button
                       key={team.id}
@@ -458,13 +433,12 @@ export default function Sidebar({
                               fontWeight: 700,
                             }}
                           >
-                            {isLeader ? "Your Team" : "Your Team"}
+                            Your Team
                           </span>
                         )}
                     </button>
                   ))}
 
-                  {/* Add Team button */}
                   {isAdminOrSuperAdmin && (
                     <button
                       onClick={() => setShowAddTeamModal(true)}
@@ -515,7 +489,7 @@ export default function Sidebar({
         })}
       </nav>
 
-      {/* Language switcher */}
+      {/* Language Switcher */}
       <div
         style={{
           borderTop: `1px solid ${BORDER_COLOR}33`,
@@ -575,10 +549,7 @@ export default function Sidebar({
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
+            inset: 0,
             background: "rgba(13,26,94,0.7)",
             display: "flex",
             alignItems: "center",
