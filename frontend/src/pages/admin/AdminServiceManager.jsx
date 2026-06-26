@@ -1,12 +1,12 @@
 // frontend/src/pages/admin/AdminServiceManager.jsx
 import { useState, useEffect } from "react";
-// eslint-disable-next-line no-unused-vars
-import { btn, C, F, inp } from "../../styles/theme";
+import { btn, C, inp } from "../../styles/theme";
 import { serviceAPI } from "../../services/api";
 import { useToast } from "../../hooks/useToast";
 
 export default function AdminServiceManager({ t }) {
-  const { showToast, ToastContainer } = useToast();
+  // ✅ Only get showToast from useToast (ToastContainer is in App.jsx)
+  const { showToast } = useToast();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -115,7 +115,7 @@ export default function AdminServiceManager({ t }) {
 
   return (
     <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
-      <ToastContainer />
+      {/* ✅ REMOVED ToastContainer - it's already in App.jsx */}
 
       <div
         style={{
