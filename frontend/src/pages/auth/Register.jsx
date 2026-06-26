@@ -8,7 +8,7 @@ const registerStyles = {
     padding: "clamp(20px, 5vw, 40px)",
     width: "100%",
     maxWidth: 480,
-    boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+    boxShadow: "0 20px 40px rgba(26,58,173,0.15)",
     margin: "0 auto",
     boxSizing: "border-box",
     animation: "fadeInUp 0.4s ease",
@@ -16,13 +16,16 @@ const registerStyles = {
   title: {
     fontSize: "clamp(22px, 6vw, 28px)",
     fontWeight: 900,
-    color: "#1a6b4a",
+    background: "linear-gradient(135deg, #0d1a5e, #1a3aad)",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
     marginBottom: 8,
     textAlign: "center",
   },
   subtitle: {
     fontSize: "clamp(12px, 3.5vw, 13px)",
-    color: "#666",
+    color: "#5a6a99",
     textAlign: "center",
     marginBottom: "clamp(16px, 4vw, 24px)",
   },
@@ -37,32 +40,36 @@ const registerStyles = {
     display: "block",
     fontSize: "clamp(11px, 3vw, 12px)",
     fontWeight: 600,
-    color: "#333",
+    color: "#0d1a5e",
     marginBottom: 6,
   },
   input: {
     width: "100%",
     padding: "clamp(8px, 2.5vw, 10px) clamp(10px, 3vw, 12px)",
-    border: "1.5px solid #d0ddd6",
+    border: "1.5px solid #c8d0ef",
     borderRadius: 8,
     fontSize: "clamp(13px, 3.5vw, 14px)",
     outline: "none",
     boxSizing: "border-box",
     transition: "border-color 0.2s, box-shadow 0.2s",
+    background: "#fafffe",
   },
   select: {
     width: "100%",
     padding: "clamp(8px, 2.5vw, 10px) clamp(10px, 3vw, 12px)",
-    border: "1.5px solid #d0ddd6",
+    border: "1.5px solid #c8d0ef",
     borderRadius: 8,
     fontSize: "clamp(13px, 3.5vw, 14px)",
     background: "#fff",
     boxSizing: "border-box",
+    color: "#0d1a5e",
+    outline: "none",
+    cursor: "pointer",
   },
   button: {
     flex: 1,
     padding: "clamp(10px, 3vw, 12px)",
-    background: "linear-gradient(135deg, #1a6b4a, #2aaa78)",
+    background: "linear-gradient(135deg, #1a3aad, #2952cc)",
     color: "#fff",
     border: "none",
     borderRadius: 8,
@@ -71,6 +78,7 @@ const registerStyles = {
     cursor: "pointer",
     minHeight: 44,
     transition: "transform 0.2s, box-shadow 0.2s",
+    boxShadow: "0 4px 14px rgba(26,58,173,0.3)",
   },
   error: {
     background: "#fee2e2",
@@ -81,27 +89,36 @@ const registerStyles = {
     marginBottom: 16,
   },
   success: {
-    background: "#e8f5ee",
-    color: "#1a6b4a",
+    background: "#eef1fc",
+    color: "#1a3aad",
     padding: "10px",
     borderRadius: 8,
     fontSize: "clamp(11px, 3vw, 12px)",
     marginBottom: 16,
     animation: "fadeInUp 0.3s ease",
+    border: "1px solid #c8d0ef",
   },
   buttonRow: { display: "flex", gap: 12, marginTop: 16 },
   cancelButton: {
     flex: 1,
     padding: "clamp(10px, 3vw, 12px)",
-    background: "#f0f7f4",
-    color: "#666",
-    border: "1px solid #d0ddd6",
+    background: "#eef1fc",
+    color: "#5a6a99",
+    border: "1px solid #c8d0ef",
     borderRadius: 8,
     fontSize: "clamp(13px, 3.5vw, 14px)",
     fontWeight: 600,
     cursor: "pointer",
     minHeight: 44,
-    transition: "background 0.2s",
+    transition: "background 0.2s, color 0.2s",
+  },
+  // Gold accent divider between sections
+  divider: {
+    height: 2,
+    background: "linear-gradient(90deg, transparent, #f5c518, transparent)",
+    margin: "16px 0",
+    borderRadius: 2,
+    opacity: 0.6,
   },
 };
 
@@ -135,7 +152,6 @@ export default function Register({ onClose, t }) {
     }
 
     setLoading(true);
-    // Destructure confirmPassword but don't use it directly (it's omitted from registerData)
     // eslint-disable-next-line no-unused-vars
     const { confirmPassword: _confirmPassword, ...registerData } = formData;
     const result = await register(registerData);
@@ -169,6 +185,9 @@ export default function Register({ onClose, t }) {
           "Create a new user account with specific role permissions"}
       </p>
 
+      {/* Gold accent divider */}
+      <div style={registerStyles.divider} />
+
       {error && <div style={registerStyles.error}>❌ {error}</div>}
       {success && <div style={registerStyles.success}>✅ {success}</div>}
 
@@ -186,8 +205,15 @@ export default function Register({ onClose, t }) {
             onChange={handleChange}
             required
             placeholder="e.g., John Doe"
-            onFocus={(e) => (e.currentTarget.style.borderColor = "#1a6b4a")}
-            onBlur={(e) => (e.currentTarget.style.borderColor = "#d0ddd6")}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "#1a3aad";
+              e.currentTarget.style.boxShadow =
+                "0 0 0 3px rgba(26,58,173,0.13)";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "#c8d0ef";
+              e.currentTarget.style.boxShadow = "none";
+            }}
           />
         </div>
 
@@ -203,8 +229,15 @@ export default function Register({ onClose, t }) {
             onChange={handleChange}
             required
             placeholder="user@example.com"
-            onFocus={(e) => (e.currentTarget.style.borderColor = "#1a6b4a")}
-            onBlur={(e) => (e.currentTarget.style.borderColor = "#d0ddd6")}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = "#1a3aad";
+              e.currentTarget.style.boxShadow =
+                "0 0 0 3px rgba(26,58,173,0.13)";
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = "#c8d0ef";
+              e.currentTarget.style.boxShadow = "none";
+            }}
           />
         </div>
 
@@ -222,8 +255,15 @@ export default function Register({ onClose, t }) {
               onChange={handleChange}
               required
               placeholder="Min 6 characters"
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#1a6b4a")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#d0ddd6")}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#1a3aad";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(26,58,173,0.13)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#c8d0ef";
+                e.currentTarget.style.boxShadow = "none";
+              }}
             />
           </div>
           <div>
@@ -239,8 +279,15 @@ export default function Register({ onClose, t }) {
               onChange={handleChange}
               required
               placeholder="Confirm password"
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#1a6b4a")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#d0ddd6")}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#1a3aad";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(26,58,173,0.13)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#c8d0ef";
+                e.currentTarget.style.boxShadow = "none";
+              }}
             />
           </div>
         </div>
@@ -273,8 +320,15 @@ export default function Register({ onClose, t }) {
               value={formData.phone}
               onChange={handleChange}
               placeholder="+251 9XX XXX XXX"
-              onFocus={(e) => (e.currentTarget.style.borderColor = "#1a6b4a")}
-              onBlur={(e) => (e.currentTarget.style.borderColor = "#d0ddd6")}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#1a3aad";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(26,58,173,0.13)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#c8d0ef";
+                e.currentTarget.style.boxShadow = "none";
+              }}
             />
           </div>
         </div>
@@ -284,8 +338,14 @@ export default function Register({ onClose, t }) {
             type="button"
             style={registerStyles.cancelButton}
             onClick={onClose}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#e5e7eb")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "#f0f7f4")}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#c8d0ef";
+              e.currentTarget.style.color = "#1a3aad";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#eef1fc";
+              e.currentTarget.style.color = "#5a6a99";
+            }}
           >
             {tu.cancel || "Cancel"}
           </button>
@@ -297,12 +357,13 @@ export default function Register({ onClose, t }) {
               if (!loading) {
                 e.currentTarget.style.transform = "translateY(-2px)";
                 e.currentTarget.style.boxShadow =
-                  "0 4px 12px rgba(26,107,74,0.3)";
+                  "0 6px 20px rgba(26,58,173,0.4)";
               }
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
+              e.currentTarget.style.boxShadow =
+                "0 4px 14px rgba(26,58,173,0.3)";
             }}
           >
             {loading ? "⏳ Creating..." : "✅ Create User"}

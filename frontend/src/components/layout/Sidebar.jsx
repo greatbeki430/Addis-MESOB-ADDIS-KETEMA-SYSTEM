@@ -34,10 +34,15 @@ export default function Sidebar({
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Load teams from Backend API
   const loadTeams = async () => {
     try {
       setLoading(true);
+      console.log("🔄 Loading teams from backend...");
       const response = await teamAPI.getAll();
+
+      console.log("📦 API Response:", response.data);
+
       if (response.data && Array.isArray(response.data)) {
         let formattedTeams = response.data.map((team) => ({
           id: team._id,
@@ -51,6 +56,8 @@ export default function Sidebar({
           reports: [],
           department: team.department,
         }));
+
+        // If Employee or Team Leader, only show their team
         if ((isEmployee || isLeader) && user) {
           const userTeam = formattedTeams.find(
             (team) =>
@@ -59,15 +66,24 @@ export default function Sidebar({
               team.leader === user.name ||
               team.leader === user._id,
           );
-          formattedTeams = userTeam ? [userTeam] : [];
+          if (userTeam) {
+            formattedTeams = [userTeam];
+          } else {
+            formattedTeams = [];
+          }
         }
+
+        console.log("✅ Formatted teams:", formattedTeams);
         setTeams(formattedTeams);
+      } else {
+        console.warn("⚠️ Response data is not an array:", response.data);
       }
     } catch (error) {
       console.error("❌ Failed to load teams:", error);
       const savedTeams = localStorage.getItem("forumTeams");
       if (savedTeams) {
         let parsedTeams = JSON.parse(savedTeams);
+        // If Employee or Team Leader, only show their team
         if ((isEmployee || isLeader) && user) {
           const userTeam = parsedTeams.find(
             (team) =>
@@ -76,7 +92,11 @@ export default function Sidebar({
               team.leader === user.name ||
               team.leader === user._id,
           );
-          parsedTeams = userTeam ? [userTeam] : [];
+          if (userTeam) {
+            parsedTeams = [userTeam];
+          } else {
+            parsedTeams = [];
+          }
         }
         setTeams(parsedTeams);
       }
@@ -85,26 +105,34 @@ export default function Sidebar({
     }
   };
 
+  // Load teams on component mount
   useEffect(() => {
     loadTeams();
   }, [isEmployee, isLeader, user]);
 
+  // Handle team selection
   const handleTeamClick = (team) => {
     setSelectedTeam(team);
     setTab("forum");
   };
 
+  // Add new team to backend
   const handleAddTeam = async () => {
     if (!newTeamName.trim()) {
       alert("Please enter a team name");
       return;
     }
+
     try {
       setLoading(true);
+      console.log("➕ Creating new team:", newTeamName);
       const response = await teamAPI.create({
         name: newTeamName,
         department: newTeamDepartment,
       });
+
+      console.log("✅ Team created response:", response.data);
+
       const newTeam = {
         id: response.data._id,
         name: response.data.name,
@@ -115,12 +143,15 @@ export default function Sidebar({
         reports: [],
         department: response.data.department,
       };
+
       setTeams([...teams, newTeam]);
       setNewTeamName("");
       setNewTeamDepartment("");
       setShowAddTeamModal(false);
       setForumExpanded(true);
+      console.log("🔄 Refreshing teams list...");
       await loadTeams();
+      console.log("✅ Teams refresh complete");
     } catch (error) {
       console.error("❌ Failed to create team:", error);
       alert(
@@ -134,13 +165,13 @@ export default function Sidebar({
 
   const sidebarWidth = collapsed ? 64 : isMobile ? 200 : 260;
 
-  // Brand colors
+  // Addis MESOB Brand Colors
   const DARK_BG = "#0d1a5e"; // Dark navy sidebar bg
   const BORDER_COLOR = "#1a3aad"; // Blue border
   const ACTIVE_BG = "#1a3aad33"; // Active item tint
   const ACTIVE_TEXT = "#f5c518"; // Gold for active items
   const MUTED_TEXT = "#7a8fc8"; // Muted blue text
-  const SECTION_BG = "#0f2070"; // Slightly lighter than dark
+  const SECTION_BG = "#0f2070"; // Slightly lighter than dark bg
   const HOVER_BG = "#1a3aad22";
 
   return (
@@ -285,7 +316,7 @@ export default function Sidebar({
                   background: active ? ACTIVE_BG : "none",
                   border: "none",
                   borderLeft: active
-                    ? `4px solid ${C.gold}`
+                    ? `4px solid ${ACTIVE_TEXT}`
                     : "4px solid transparent",
                   color: active ? ACTIVE_TEXT : MUTED_TEXT,
                   cursor: "pointer",
@@ -326,7 +357,7 @@ export default function Sidebar({
                 )}
               </button>
 
-              {/* Team list */}
+              {/* Team list under Forum */}
               {isForum && forumExpanded && !collapsed && (
                 <div
                   style={{
@@ -350,6 +381,7 @@ export default function Sidebar({
                       Loading...
                     </div>
                   )}
+
                   {!loading && teams.length === 0 && (
                     <div
                       style={{
@@ -364,6 +396,7 @@ export default function Sidebar({
                         : "No teams yet"}
                     </div>
                   )}
+
                   {teams.map((team) => (
                     <button
                       key={team.id}
@@ -379,7 +412,7 @@ export default function Sidebar({
                         borderRadius: 6,
                         borderLeft:
                           selectedTeam?.id === team.id
-                            ? `3px solid ${C.gold}`
+                            ? `3px solid ${ACTIVE_TEXT}`
                             : "3px solid transparent",
                         color:
                           selectedTeam?.id === team.id
@@ -406,25 +439,27 @@ export default function Sidebar({
                       {team.name.length > 18
                         ? team.name.substring(0, 16) + "…"
                         : team.name}
+                      {/* Show role badge for the user's team */}
                       {(isEmployee || isLeader) &&
                         team.members?.includes(user?.name) && (
                           <span
                             style={{
                               marginLeft: 6,
                               fontSize: 8,
-                              background: C.gold,
-                              color: C.dark,
+                              background: "#f5c518",
+                              color: "#0d1a5e",
                               padding: "1px 6px",
                               borderRadius: 10,
                               fontWeight: 700,
                             }}
                           >
-                            Your Team
+                            {isLeader ? "Your Team" : "Your Team"}
                           </span>
                         )}
                     </button>
                   ))}
 
+                  {/* Add Team button - Only Admins and Super Admins */}
                   {isAdminOrSuperAdmin && (
                     <button
                       onClick={() => setShowAddTeamModal(true)}
@@ -447,8 +482,8 @@ export default function Sidebar({
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = HOVER_BG;
-                        e.currentTarget.style.color = C.gold;
-                        e.currentTarget.style.borderColor = C.gold;
+                        e.currentTarget.style.color = "#f5c518";
+                        e.currentTarget.style.borderColor = "#f5c518";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "none";
@@ -512,9 +547,9 @@ export default function Sidebar({
               onClick={() => setLang(l.code)}
               title={l.label}
               style={{
-                background: lang === l.code ? C.gold : "transparent",
-                color: lang === l.code ? C.dark : MUTED_TEXT,
-                border: `1px solid ${lang === l.code ? C.gold : BORDER_COLOR + "55"}`,
+                background: lang === l.code ? "#f5c518" : "transparent",
+                color: lang === l.code ? "#0d1a5e" : MUTED_TEXT,
+                border: `1px solid ${lang === l.code ? "#f5c518" : `${BORDER_COLOR}55`}`,
                 borderRadius: 5,
                 padding: collapsed ? "5px 7px" : "4px 10px",
                 fontSize: 11,
@@ -556,7 +591,7 @@ export default function Sidebar({
               width: "100%",
               maxWidth: 340,
               boxSizing: "border-box",
-              border: `2px solid ${C.gold}`,
+              border: "2px solid #f5c518",
               boxShadow: "0 20px 60px rgba(13,26,94,0.4)",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -564,7 +599,7 @@ export default function Sidebar({
             <h3
               style={{
                 marginBottom: 16,
-                color: C.dark,
+                color: "#0d1a5e",
                 fontSize: 18,
                 fontFamily: F.sans,
               }}

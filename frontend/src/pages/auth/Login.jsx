@@ -14,6 +14,7 @@ const removeBodyMargins = () => {
   document.body.style.bottom = "0";
   document.body.style.width = "100%";
   document.body.style.height = "100%";
+
   const root = document.getElementById("root");
   if (root) {
     root.style.minHeight = "100vh";
@@ -39,6 +40,7 @@ const restoreBodyMargins = () => {
   document.body.style.bottom = "";
   document.body.style.width = "";
   document.body.style.height = "";
+
   const root = document.getElementById("root");
   if (root) {
     root.style.minHeight = "";
@@ -53,12 +55,14 @@ const restoreBodyMargins = () => {
   }
 };
 
+// Generate particles with deterministic values
 const generateParticles = () => {
   const seed = 12345;
   const pseudoRandom = (index) => {
     const x = Math.sin(index * 9301 + seed * 49297) * 49297;
     return x - Math.floor(x);
   };
+
   return Array.from({ length: 20 }, (_, i) => ({
     id: i,
     left: 5 + pseudoRandom(i) * 90,
@@ -71,19 +75,18 @@ const generateParticles = () => {
 
 const STATIC_PARTICLES = generateParticles();
 
-// ✅ Brand colors from logo
+// Addis MESOB Brand Colors (from logo: deep blue + golden yellow)
 const COLORS = {
-  primary: "#1a3aad",
-  secondary: "#2952cc",
-  gold: "#f5c518",
-  goldLight: "#fde98a",
-  dark: "#0d1a5e",
-  white: "#ffffff",
+  primary: "#1a3aad", // Deep Blue - main backgrounds, buttons
+  secondary: "#2952cc", // Royal Blue - hover states, accents
+  gold: "#f5c518", // Golden Yellow - highlights, gradients
+  white: "#ffffff", // White - text on dark backgrounds
+  dark: "#0d1a5e", // Darker Blue - shadows, overlays
+  goldLight: "#fde98a", // Light Gold - subtle accents
 };
 
 export default function Login({ onSwitchToRegister }) {
   const { t } = useLanguage();
-  const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -92,12 +95,15 @@ export default function Login({ onSwitchToRegister }) {
   const [isFocused, setIsFocused] = useState({ email: false, password: false });
   const [isHovered, setIsHovered] = useState(false);
   const [titleRotation, setTitleRotation] = useState(0);
+  const { login } = useAuth();
 
   useEffect(() => {
     removeBodyMargins();
+
     const interval = setInterval(() => {
       setTitleRotation((prev) => (prev + 0.3) % 360);
     }, 50);
+
     return () => {
       restoreBodyMargins();
       clearInterval(interval);
@@ -108,6 +114,7 @@ export default function Login({ onSwitchToRegister }) {
     e.preventDefault();
     setError("");
     setLoading(true);
+
     try {
       const result = await login({ email, password });
       if (!result.success) {
@@ -120,71 +127,124 @@ export default function Login({ onSwitchToRegister }) {
     }
   };
 
-  return (
-    <div style={S.container}>
-      <div style={S.overlay} />
+  // Named function preserved from original
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
 
-      {/* Particles */}
-      <div style={S.particlesContainer}>
-        {STATIC_PARTICLES.map((p) => (
+  return (
+    <div style={loginStyles.container}>
+      <div style={loginStyles.overlay}></div>
+
+      {/* Animated Background Particles */}
+      <div style={loginStyles.particlesContainer}>
+        {STATIC_PARTICLES.map((particle) => (
           <div
-            key={p.id}
+            key={particle.id}
             style={{
-              ...S.particle,
-              left: `${p.left}%`,
-              animationDuration: `${p.duration}s`,
-              animationDelay: `${p.delay}s`,
-              width: `${p.width}px`,
-              height: `${p.height}px`,
+              ...loginStyles.particle,
+              left: `${particle.left}%`,
+              animationDuration: `${particle.duration}s`,
+              animationDelay: `${particle.delay}s`,
+              width: `${particle.width}px`,
+              height: `${particle.height}px`,
             }}
           />
         ))}
       </div>
 
-      <div style={S.card}>
-        {/* Logo */}
-        <div style={S.logoContainer}>
+      <div style={loginStyles.card}>
+        {/* Animated Logo Section */}
+        <div style={loginStyles.logoContainer}>
           <div
             style={{
-              ...S.logoIcon,
+              ...loginStyles.logoIcon,
               transform: `rotate(${titleRotation}deg)`,
+              background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
+              boxShadow: `0 8px 30px ${COLORS.primary}66`,
             }}
           >
             አ
           </div>
-          <div style={S.logoTextContainer}>
-            <div style={S.logoText}>A-MESOB</div>
-            <div style={S.logoSub}>
-              <span style={S.logoSubHighlight}>Addis</span> MESOB
-              <span style={S.logoSubDot}> · </span>
-              <span style={S.logoSubHighlight}>One</span>-Stop
+          <div style={loginStyles.logoTextContainer}>
+            {/* Logo text with shimmer on hover — preserved from original */}
+            <div
+              style={{
+                ...loginStyles.logoText,
+                background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                fontSize: "clamp(32px, 8vw, 42px)",
+                fontWeight: 900,
+                fontFamily: "'Noto Serif Ethiopic', serif",
+                letterSpacing: "-0.5px",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = `linear-gradient(90deg, ${COLORS.gold}, ${COLORS.primary}, ${COLORS.gold})`;
+                e.currentTarget.style.backgroundSize = "200% 100%";
+                e.currentTarget.style.WebkitBackgroundClip = "text";
+                e.currentTarget.style.WebkitTextFillColor = "transparent";
+                e.currentTarget.style.backgroundClip = "text";
+                e.currentTarget.style.animation = "shimmer 2s linear infinite";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`;
+                e.currentTarget.style.backgroundSize = "100% 100%";
+                e.currentTarget.style.WebkitBackgroundClip = "text";
+                e.currentTarget.style.WebkitTextFillColor = "transparent";
+                e.currentTarget.style.backgroundClip = "text";
+                e.currentTarget.style.animation = "none";
+              }}
+            >
+              A-MESOB
+            </div>
+            <div style={loginStyles.logoSub}>
+              <span
+                style={{
+                  ...loginStyles.logoSubHighlight,
+                  color: COLORS.primary,
+                }}
+              >
+                Addis
+              </span>{" "}
+              MESOB
+              <span style={loginStyles.logoSubDot}> · </span>
+              <span
+                style={{
+                  ...loginStyles.logoSubHighlight,
+                  color: COLORS.primary,
+                }}
+              >
+                One
+              </span>
+              -Stop
             </div>
           </div>
         </div>
 
-        <p style={S.subtitle}>
+        <p style={loginStyles.subtitle}>
           {t?.auth?.login || "Login"}{" "}
           {t?.auth?.toYourAccount || "to your account"}
         </p>
 
         {error && (
-          <div style={S.error}>
+          <div style={loginStyles.error}>
             <span style={{ marginRight: 8 }}>⚠️</span>
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit}>
-          {/* Email */}
-          <div style={S.inputGroup}>
-            <label style={S.label}>{t?.auth?.email || "Email"}</label>
-            <div style={S.inputWrapper}>
-              <span style={S.inputIcon}>📧</span>
+          <div style={loginStyles.inputGroup}>
+            <label style={loginStyles.label}>{t?.auth?.email || "Email"}</label>
+            <div style={loginStyles.inputWrapper}>
+              <span style={loginStyles.inputIcon}>📧</span>
               <input
                 type="email"
                 style={{
-                  ...S.input,
-                  ...(isFocused.email ? S.inputFocused : {}),
+                  ...loginStyles.input,
+                  ...(isFocused.email ? loginStyles.inputFocused : {}),
                 }}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -196,16 +256,17 @@ export default function Login({ onSwitchToRegister }) {
             </div>
           </div>
 
-          {/* Password */}
-          <div style={S.inputGroup}>
-            <label style={S.label}>{t?.auth?.password || "Password"}</label>
-            <div style={S.inputWrapper}>
-              <span style={S.inputIcon}>🔒</span>
+          <div style={loginStyles.inputGroup}>
+            <label style={loginStyles.label}>
+              {t?.auth?.password || "Password"}
+            </label>
+            <div style={loginStyles.inputWrapper}>
+              <span style={loginStyles.inputIcon}>🔒</span>
               <input
                 type={showPassword ? "text" : "password"}
                 style={{
-                  ...S.input,
-                  ...(isFocused.password ? S.inputFocused : {}),
+                  ...loginStyles.input,
+                  ...(isFocused.password ? loginStyles.inputFocused : {}),
                 }}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -216,15 +277,16 @@ export default function Login({ onSwitchToRegister }) {
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                style={S.eyeButton}
+                onClick={togglePasswordVisibility}
+                style={loginStyles.eyeButton}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = COLORS.gold;
-                  e.currentTarget.style.transform = "scale(1.1)";
+                  e.currentTarget.style.transform =
+                    "translateY(-50%) scale(1.1)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color = "#999";
-                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.transform = "translateY(-50%) scale(1)";
                 }}
               >
                 {showPassword ? "👁️" : "👁️‍🗨️"}
@@ -232,12 +294,13 @@ export default function Login({ onSwitchToRegister }) {
             </div>
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
             style={{
-              ...S.button,
-              ...(isHovered ? S.buttonHover : {}),
+              ...loginStyles.button,
+              ...(isHovered ? loginStyles.buttonHover : {}),
+              background: `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.secondary} 50%, ${COLORS.gold} 100%)`,
+              backgroundSize: "200% 100%",
             }}
             disabled={loading}
             onMouseEnter={() => setIsHovered(true)}
@@ -245,7 +308,7 @@ export default function Login({ onSwitchToRegister }) {
           >
             {loading ? (
               <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={S.spinner} />
+                <span style={loginStyles.spinner}></span>
                 {t?.auth?.loggingIn || "Logging in..."}
               </span>
             ) : (
@@ -257,11 +320,14 @@ export default function Login({ onSwitchToRegister }) {
           </button>
         </form>
 
-        <div style={S.link}>
+        <div style={loginStyles.link}>
           {t?.auth?.noAccount || "Don't have an account?"}{" "}
           <button
             onClick={onSwitchToRegister}
-            style={S.linkButton}
+            style={{
+              ...loginStyles.linkButton,
+              color: COLORS.primary,
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateX(4px)";
               e.currentTarget.style.color = COLORS.gold;
@@ -275,12 +341,12 @@ export default function Login({ onSwitchToRegister }) {
           </button>
         </div>
 
-        <div style={S.footer}>
-          <span style={S.footerText}>
+        <div style={loginStyles.footer}>
+          <span style={loginStyles.footerText}>
             {t?.appSub || "Addis Ketema · One-Stop Service"}
           </span>
-          <span style={S.footerDot}>•</span>
-          <span style={S.footerText}>{t?.year || "2018 E.C."}</span>
+          <span style={loginStyles.footerDot}>•</span>
+          <span style={loginStyles.footerText}>{t?.year || "2018 E.C."}</span>
         </div>
       </div>
 
@@ -288,6 +354,10 @@ export default function Login({ onSwitchToRegister }) {
         @keyframes shimmer {
           0% { background-position: -200% center; }
           100% { background-position: 200% center; }
+        }
+        @keyframes float {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-10px) rotate(5deg); }
         }
         @keyframes pulseGlow {
           0%, 100% { box-shadow: 0 0 20px rgba(26,58,173,0.4); }
@@ -321,7 +391,7 @@ export default function Login({ onSwitchToRegister }) {
   );
 }
 
-const S = {
+const loginStyles = {
   container: {
     position: "fixed",
     top: 0,
@@ -334,6 +404,7 @@ const S = {
     alignItems: "center",
     justifyContent: "center",
     padding: "20px",
+    // ✅ Background image preserved from original
     backgroundImage: `url(${mesobLogo})`,
     backgroundSize: "cover",
     backgroundPosition: "center",
@@ -347,6 +418,7 @@ const S = {
     left: 0,
     right: 0,
     bottom: 0,
+    // Updated to brand blue gradient overlay
     background:
       "linear-gradient(135deg, rgba(13,26,94,0.88) 0%, rgba(26,58,173,0.75) 50%, rgba(13,26,94,0.88) 100%)",
     backdropFilter: "blur(3px)",
@@ -363,12 +435,13 @@ const S = {
   particle: {
     position: "absolute",
     bottom: "-10px",
+    // Gold particles to match brand
     background: "rgba(245,197,24,0.15)",
     borderRadius: "50%",
     animation: "particleFloat linear infinite",
   },
   card: {
-    background: "rgba(255,255,255,0.97)",
+    background: "rgba(255, 255, 255, 0.97)",
     backdropFilter: "blur(20px)",
     borderRadius: "clamp(20px, 5vw, 30px)",
     padding: "clamp(30px, 6vw, 50px)",
@@ -421,6 +494,7 @@ const S = {
     fontFamily: "'Noto Serif Ethiopic', serif",
     letterSpacing: "-0.5px",
     lineHeight: 1.1,
+    transition: "all 0.3s ease",
   },
   logoSub: {
     fontSize: "clamp(10px, 2.5vw, 12px)",
@@ -445,7 +519,9 @@ const S = {
     marginBottom: "clamp(24px, 5vw, 32px)",
     fontFamily: "'Noto Sans Ethiopic', sans-serif",
   },
-  inputGroup: { marginBottom: "clamp(16px, 4vw, 20px)" },
+  inputGroup: {
+    marginBottom: "clamp(16px, 4vw, 20px)",
+  },
   label: {
     display: "block",
     fontSize: "clamp(11px, 3vw, 12px)",
@@ -454,7 +530,10 @@ const S = {
     marginBottom: 6,
     fontFamily: "'Noto Sans Ethiopic', sans-serif",
   },
-  inputWrapper: { position: "relative", width: "100%" },
+  inputWrapper: {
+    position: "relative",
+    width: "100%",
+  },
   inputIcon: {
     position: "absolute",
     left: "12px",
@@ -578,5 +657,9 @@ const S = {
     color: "#8899bb",
     fontFamily: "'Noto Sans Ethiopic', sans-serif",
   },
-  footerDot: { color: "#f5c518", fontSize: "10px", fontWeight: 900 },
+  footerDot: {
+    color: "#f5c518",
+    fontSize: "10px",
+    fontWeight: 900,
+  },
 };
