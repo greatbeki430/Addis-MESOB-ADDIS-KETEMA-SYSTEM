@@ -2,12 +2,15 @@ import { useState, useEffect, useCallback } from "react";
 import { C, btn, card } from "../../styles/theme";
 import { teamAPI, authAPI } from "../../services/api";
 import { getRoleDisplayName } from "../../utils/roles";
-// import { Modal, useToast } from "../../components/ui/Modal";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../hooks/useToast";
 
-// eslint-disable-next-line no-unused-vars
 export default function TeamManagement({ t, isSuperAdmin }) {
+  // ✅ FIX: Safe access to translations with fallback
+  const safeT = t || {};
+  const tt = safeT.teamManagement || {};
+  const safeCommon = safeT.common || {};
+
   const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,13 +53,13 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     setLoading(true);
     try {
       await fetchData();
-      showToast("Data refreshed successfully", "success");
+      showToast(tt.refreshSuccess || "Data refreshed successfully", "success");
     } catch {
-      showToast("Failed to refresh data", "error");
+      showToast(tt.refreshError || "Failed to refresh data", "error");
     } finally {
       setLoading(false);
     }
-  }, [fetchData, showToast]);
+  }, [fetchData, showToast, tt]);
 
   useEffect(() => {
     let isMounted = true;
@@ -80,10 +83,10 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     try {
       if (editingTeam) {
         await teamAPI.update(editingTeam._id, formData);
-        showToast("Team updated successfully!", "success");
+        showToast(tt.updateSuccess || "Team updated successfully!", "success");
       } else {
         await teamAPI.create(formData);
-        showToast("Team created successfully!", "success");
+        showToast(tt.createSuccess || "Team created successfully!", "success");
       }
       setShowModal(false);
       setEditingTeam(null);
@@ -93,9 +96,10 @@ export default function TeamManagement({ t, isSuperAdmin }) {
       console.error("Failed to save team:", error);
       setAlertModal({
         isOpen: true,
-        title: "Error",
+        title: tt.title || "Error",
         message:
           error.response?.data?.message ||
+          tt.saveError ||
           "Operation failed. Please try again.",
         type: "error",
       });
@@ -106,16 +110,18 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     try {
       await teamAPI.delete(confirmModal.teamId);
       setConfirmModal({ isOpen: false, teamId: null, teamName: "" });
-      showToast("Team deleted successfully!", "success");
+      showToast(tt.deleteSuccess || "Team deleted successfully!", "success");
       await refreshData();
     } catch (error) {
       console.error("Failed to delete team:", error);
       setConfirmModal({ isOpen: false, teamId: null, teamName: "" });
       setAlertModal({
         isOpen: true,
-        title: "Error",
+        title: tt.title || "Error",
         message:
-          error.response?.data?.message || "Delete failed. Please try again.",
+          error.response?.data?.message ||
+          tt.deleteError ||
+          "Delete failed. Please try again.",
         type: "error",
       });
     }
@@ -151,11 +157,11 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         onClose={() =>
           setConfirmModal({ isOpen: false, teamId: null, teamName: "" })
         }
-        title="Confirm Delete"
-        message={`Are you sure you want to delete "${confirmModal.teamName}"? This action cannot be undone.`}
+        title={tt.confirmDeleteTitle || "Confirm Delete"}
+        message={`${tt.confirmDeleteMessage || "Are you sure you want to delete"}"${confirmModal.teamName}"? ${tt.deleteWarning || "This action cannot be undone."}`}
         type="confirm"
-        confirmText="Delete"
-        cancelText="Cancel"
+        confirmText={tt.delete || "Delete"}
+        cancelText={tt.cancel || "Cancel"}
         onConfirm={handleDelete}
         onCancel={() =>
           setConfirmModal({ isOpen: false, teamId: null, teamName: "" })
@@ -179,7 +185,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
             color: C.dark,
           }}
         >
-          👥 Team Management
+          👥 {tt.title || "Team Management"}
         </h1>
         {isSuperAdmin && (
           <button
@@ -190,18 +196,20 @@ export default function TeamManagement({ t, isSuperAdmin }) {
             }}
             style={btn.primary}
           >
-            + Add New Team
+            + {tt.addTeam || "Add New Team"}
           </button>
         )}
       </div>
 
       {loading ? (
-        <div style={{ textAlign: "center", padding: 40 }}>Loading...</div>
+        <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
+          {safeCommon.loading || "Loading..."}
+        </div>
       ) : (
         <div style={{ display: "grid", gap: 16 }}>
           {teams.length === 0 ? (
             <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
-              No teams created yet.
+              {tt.noTeams || "No teams created yet."}
             </div>
           ) : (
             teams.map((team) => (
@@ -222,17 +230,18 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                       {team.name}
                     </h3>
                     <p style={{ fontSize: 12, color: C.muted }}>
-                      {team.department || "No department"}
+                      {team.department || tt.noDepartment || "No department"}
                     </p>
                     <p style={{ fontSize: 12, marginTop: 8 }}>
-                      <strong>Leader:</strong>{" "}
-                      {team.leader?.name || "Not assigned"}
+                      <strong>{tt.leader || "Leader"}:</strong>{" "}
+                      {team.leader?.name || tt.notAssigned || "Not assigned"}
                     </p>
                     <p style={{ fontSize: 12 }}>
-                      <strong>Members:</strong> {team.members?.length || 0}
+                      <strong>{tt.members || "Members"}:</strong>{" "}
+                      {team.members?.length || 0}
                     </p>
                     <p style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-                      Created:{" "}
+                      {tt.created || "Created"}:{" "}
                       {team.createdAt
                         ? new Date(team.createdAt).toLocaleDateString()
                         : "N/A"}
@@ -257,7 +266,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                           fontSize: 18,
                           marginRight: 8,
                         }}
-                        title="Edit"
+                        title={tt.edit || "Edit"}
                       >
                         ✏️
                       </button>
@@ -270,7 +279,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                           fontSize: 18,
                           color: "#dc2626",
                         }}
-                        title="Delete"
+                        title={tt.delete || "Delete"}
                       >
                         🗑️
                       </button>
@@ -314,14 +323,16 @@ export default function TeamManagement({ t, isSuperAdmin }) {
             onClick={(e) => e.stopPropagation()}
           >
             <h2 style={{ marginBottom: 20 }}>
-              {editingTeam ? "✏️ Edit Team" : "➕ Add New Team"}
+              {editingTeam
+                ? `✏️ ${tt.editTeam || "Edit Team"}`
+                : `➕ ${tt.addNewTeam || "Add New Team"}`}
             </h2>
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 12 }}>
                 <label
                   style={{ display: "block", marginBottom: 4, fontWeight: 600 }}
                 >
-                  Team Name
+                  {tt.teamName || "Team Name"}
                 </label>
                 <input
                   type="text"
@@ -342,7 +353,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                 <label
                   style={{ display: "block", marginBottom: 4, fontWeight: 600 }}
                 >
-                  Department
+                  {tt.department || "Department"}
                 </label>
                 <input
                   type="text"
@@ -356,14 +367,16 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                     border: `1px solid #d0ddd6`,
                     borderRadius: 6,
                   }}
-                  placeholder="e.g., Customer Service"
+                  placeholder={
+                    tt.departmentPlaceholder || "e.g., Customer Service"
+                  }
                 />
               </div>
               <div style={{ marginBottom: 20 }}>
                 <label
                   style={{ display: "block", marginBottom: 4, fontWeight: 600 }}
                 >
-                  Team Leader
+                  {tt.teamLeader || "Team Leader"}
                 </label>
                 <select
                   value={formData.leader}
@@ -377,7 +390,9 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                     borderRadius: 6,
                   }}
                 >
-                  <option value="">Select Team Leader</option>
+                  <option value="">
+                    {tt.selectLeader || "Select Team Leader"}
+                  </option>
                   {users
                     .filter(
                       (u) =>
@@ -400,10 +415,10 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                   onClick={() => setShowModal(false)}
                   style={btn.secondary}
                 >
-                  Cancel
+                  {tt.cancel || "Cancel"}
                 </button>
                 <button type="submit" style={btn.primary}>
-                  {editingTeam ? "Update" : "Create"}
+                  {editingTeam ? tt.update || "Update" : tt.create || "Create"}
                 </button>
               </div>
             </form>

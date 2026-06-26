@@ -33,10 +33,10 @@ export const getRoleDisplayName = (role) => {
 // Get role badge color
 export const getRoleBadgeColor = (role) => {
   const colors = {
-    superadmin: "#8B1A1A", // Dark Red
-    admin: "#1A6B4A", // Green
-    leader: "#C25A00", // Orange
-    employee: "#1E4D8C", // Blue
+    superadmin: "#8B1A1A",
+    admin: "#1A6B4A",
+    leader: "#C25A00",
+    employee: "#1E4D8C",
   };
   return colors[role] || "#666";
 };
@@ -52,7 +52,7 @@ export const getRoleIcon = (role) => {
   return icons[role] || "👥";
 };
 
-// ✅ CORRECTED: Navigation items with proper role requirements
+// ✅ Navigation items with proper role requirements
 export const NAV_ITEMS = [
   {
     id: "dashboard",
@@ -76,31 +76,30 @@ export const NAV_ITEMS = [
     id: "report",
     icon: "📄",
     label: "Daily Report",
-    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN], // ✅ Team Leader+ only
+    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     id: "services",
     icon: "🔧",
     label: "Services",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN], // ✅ Admin+ only
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     id: "users",
     icon: "👥",
     label: "User Management",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN], // ✅ Admin+ only
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     id: "teams",
     icon: "👥",
     label: "Team Management",
-    roles: [ROLES.SUPER_ADMIN], // ✅ Super Admin only
+    roles: [ROLES.SUPER_ADMIN],
   },
   {
     id: "analytics",
     icon: "📊",
     label: "Analytics",
-    // roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN], // ✅ Admin+ only
     roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
 ];

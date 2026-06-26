@@ -9,7 +9,6 @@ import {
   getRoleIcon,
   ROLES,
 } from "../../utils/roles";
-// import { Modal, useToast } from "../../components/ui/Modal";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../hooks/useToast";
 
@@ -71,6 +70,11 @@ const RoleDescription = ({ role }) => {
 };
 
 export default function UserManagement({ t }) {
+  // ✅ FIX: Safe access to translations with fallback
+  const safeT = t || {};
+  const tu = safeT.userManagement || {};
+  const safeCommon = safeT.common || {};
+
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -118,8 +122,9 @@ export default function UserManagement({ t }) {
       console.error("Failed to load users:", error);
       setAlertModal({
         isOpen: true,
-        title: "Error",
-        message: "Failed to load users. Please refresh the page.",
+        title: tu.title || "Error",
+        message:
+          tu.loadError || "Failed to load users. Please refresh the page.",
         type: "error",
       });
     } finally {
@@ -137,10 +142,10 @@ export default function UserManagement({ t }) {
           role: formData.role,
           phone: formData.phone,
         });
-        showToast("User updated successfully!", "success");
+        showToast(tu.updateSuccess || "User updated successfully!", "success");
       } else {
         await authAPI.register(formData);
-        showToast("User created successfully!", "success");
+        showToast(tu.createSuccess || "User created successfully!", "success");
       }
       setShowModal(false);
       setEditingUser(null);
@@ -156,9 +161,10 @@ export default function UserManagement({ t }) {
       console.error("Failed to save user:", error);
       setAlertModal({
         isOpen: true,
-        title: "Error",
+        title: tu.title || "Error",
         message:
           error.response?.data?.message ||
+          tu.saveError ||
           "Operation failed. Please try again.",
         type: "error",
       });
@@ -169,16 +175,18 @@ export default function UserManagement({ t }) {
     try {
       await authAPI.deleteUser(confirmModal.userId);
       setConfirmModal({ isOpen: false, userId: null, userName: "" });
-      showToast("User deleted successfully!", "success");
+      showToast(tu.deleteSuccess || "User deleted successfully!", "success");
       loadUsers();
     } catch (error) {
       console.error("Failed to delete user:", error);
       setConfirmModal({ isOpen: false, userId: null, userName: "" });
       setAlertModal({
         isOpen: true,
-        title: "Error",
+        title: tu.title || "Error",
         message:
-          error.response?.data?.message || "Delete failed. Please try again.",
+          error.response?.data?.message ||
+          tu.deleteError ||
+          "Delete failed. Please try again.",
         type: "error",
       });
     }
@@ -211,16 +219,16 @@ export default function UserManagement({ t }) {
   const getAvailableRoles = () => {
     if (isSuperAdmin) {
       return [
-        { value: ROLES.EMPLOYEE, label: "Employee" },
-        { value: ROLES.TEAM_LEADER, label: "Team Leader" },
-        { value: ROLES.ADMIN, label: "Admin" },
-        { value: ROLES.SUPER_ADMIN, label: "Super Admin" },
+        { value: ROLES.EMPLOYEE, label: tu.roleEmployee || "Employee" },
+        { value: ROLES.TEAM_LEADER, label: tu.roleTeamLeader || "Team Leader" },
+        { value: ROLES.ADMIN, label: tu.roleAdmin || "Admin" },
+        { value: ROLES.SUPER_ADMIN, label: tu.roleSuperAdmin || "Super Admin" },
       ];
     }
     if (isAdmin) {
       return [
-        { value: ROLES.EMPLOYEE, label: "Employee" },
-        { value: ROLES.TEAM_LEADER, label: "Team Leader" },
+        { value: ROLES.EMPLOYEE, label: tu.roleEmployee || "Employee" },
+        { value: ROLES.TEAM_LEADER, label: tu.roleTeamLeader || "Team Leader" },
       ];
     }
     return [];
@@ -246,8 +254,8 @@ export default function UserManagement({ t }) {
   const roleStats = getRoleStats();
 
   const getTranslation = (key) => {
-    if (t && t.userManagement) {
-      return t.userManagement[key] || key;
+    if (tu && tu[key]) {
+      return tu[key];
     }
     const fallback = {
       title: "User Management",
@@ -305,11 +313,11 @@ export default function UserManagement({ t }) {
         onClose={() =>
           setConfirmModal({ isOpen: false, userId: null, userName: "" })
         }
-        title="Confirm Delete"
-        message={`Are you sure you want to delete "${confirmModal.userName}"? This action cannot be undone.`}
+        title={tu.confirmDeleteTitle || "Confirm Delete"}
+        message={`${tu.confirmDeleteMessage || "Are you sure you want to delete"}"${confirmModal.userName}"? ${tu.deleteWarning || "This action cannot be undone."}`}
         type="confirm"
-        confirmText="Delete"
-        cancelText="Cancel"
+        confirmText={tu.delete || "Delete"}
+        cancelText={tu.cancel || "Cancel"}
         onConfirm={handleDelete}
         onCancel={() =>
           setConfirmModal({ isOpen: false, userId: null, userName: "" })
@@ -320,7 +328,7 @@ export default function UserManagement({ t }) {
       <Modal
         isOpen={viewModal.isOpen}
         onClose={() => setViewModal({ isOpen: false, user: null })}
-        title={`👤 User Details - ${viewModal.user?.name || ""}`}
+        title={`👤 ${tu.userDetails || "User Details"} - ${viewModal.user?.name || ""}`}
         type="info"
         size="md"
       >
@@ -335,7 +343,7 @@ export default function UserManagement({ t }) {
                   paddingBottom: 8,
                 }}
               >
-                <span style={{ color: C.muted }}>Name</span>
+                <span style={{ color: C.muted }}>{tu.fullName || "Name"}</span>
                 <span style={{ fontWeight: 600, color: C.dark }}>
                   {viewModal.user.name}
                 </span>
@@ -348,7 +356,7 @@ export default function UserManagement({ t }) {
                   paddingBottom: 8,
                 }}
               >
-                <span style={{ color: C.muted }}>Email</span>
+                <span style={{ color: C.muted }}>{tu.email || "Email"}</span>
                 <span style={{ fontWeight: 600, color: C.dark }}>
                   {viewModal.user.email}
                 </span>
@@ -361,7 +369,7 @@ export default function UserManagement({ t }) {
                   paddingBottom: 8,
                 }}
               >
-                <span style={{ color: C.muted }}>Role</span>
+                <span style={{ color: C.muted }}>{tu.role || "Role"}</span>
                 <span style={{ fontWeight: 600, color: C.dark }}>
                   {getRoleIcon(viewModal.user.role)}{" "}
                   {getRoleDisplayName(viewModal.user.role)}
@@ -375,7 +383,7 @@ export default function UserManagement({ t }) {
                   paddingBottom: 8,
                 }}
               >
-                <span style={{ color: C.muted }}>Phone</span>
+                <span style={{ color: C.muted }}>{tu.phone || "Phone"}</span>
                 <span style={{ fontWeight: 600, color: C.dark }}>
                   {viewModal.user.phone || "N/A"}
                 </span>
@@ -388,7 +396,7 @@ export default function UserManagement({ t }) {
                   paddingBottom: 8,
                 }}
               >
-                <span style={{ color: C.muted }}>User ID</span>
+                <span style={{ color: C.muted }}>{tu.userId || "User ID"}</span>
                 <span style={{ fontWeight: 400, color: "#999", fontSize: 12 }}>
                   {viewModal.user._id}
                 </span>
@@ -401,14 +409,18 @@ export default function UserManagement({ t }) {
                   paddingBottom: 8,
                 }}
               >
-                <span style={{ color: C.muted }}>Created</span>
+                <span style={{ color: C.muted }}>
+                  {tu.created || "Created"}
+                </span>
                 <span style={{ fontWeight: 600, color: C.dark }}>
                   {new Date(viewModal.user.createdAt).toLocaleDateString()} at{" "}
                   {new Date(viewModal.user.createdAt).toLocaleTimeString()}
                 </span>
               </div>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: C.muted }}>Last Updated</span>
+                <span style={{ color: C.muted }}>
+                  {tu.lastUpdated || "Last Updated"}
+                </span>
                 <span style={{ fontWeight: 600, color: C.dark }}>
                   {new Date(viewModal.user.updatedAt).toLocaleDateString()} at{" "}
                   {new Date(viewModal.user.updatedAt).toLocaleTimeString()}
@@ -500,7 +512,9 @@ export default function UserManagement({ t }) {
           <div style={{ fontSize: 24, fontWeight: 900, color: C.dark }}>
             {roleStats.total}
           </div>
-          <div style={{ fontSize: 11, color: C.muted }}>Total</div>
+          <div style={{ fontSize: 11, color: C.muted }}>
+            {tu.total || "Total"}
+          </div>
         </div>
         <div
           style={{
@@ -514,7 +528,9 @@ export default function UserManagement({ t }) {
           <div style={{ fontSize: 24, fontWeight: 900, color: "#8B1A1A" }}>
             {roleStats.superadmin}
           </div>
-          <div style={{ fontSize: 11, color: C.muted }}>👑 Super Admin</div>
+          <div style={{ fontSize: 11, color: C.muted }}>
+            👑 {tu.superAdmin || "Super Admin"}
+          </div>
         </div>
         <div
           style={{
@@ -528,7 +544,9 @@ export default function UserManagement({ t }) {
           <div style={{ fontSize: 24, fontWeight: 900, color: "#1A6B4A" }}>
             {roleStats.admin}
           </div>
-          <div style={{ fontSize: 11, color: C.muted }}>⚙️ Admin</div>
+          <div style={{ fontSize: 11, color: C.muted }}>
+            ⚙️ {tu.admin || "Admin"}
+          </div>
         </div>
         <div
           style={{
@@ -542,7 +560,9 @@ export default function UserManagement({ t }) {
           <div style={{ fontSize: 24, fontWeight: 900, color: "#C25A00" }}>
             {roleStats.leader}
           </div>
-          <div style={{ fontSize: 11, color: C.muted }}>⭐ Team Leader</div>
+          <div style={{ fontSize: 11, color: C.muted }}>
+            ⭐ {tu.teamLeader || "Team Leader"}
+          </div>
         </div>
         <div
           style={{
@@ -556,7 +576,9 @@ export default function UserManagement({ t }) {
           <div style={{ fontSize: 24, fontWeight: 900, color: "#1E4D8C" }}>
             {roleStats.employee}
           </div>
-          <div style={{ fontSize: 11, color: C.muted }}>👤 Employee</div>
+          <div style={{ fontSize: 11, color: C.muted }}>
+            👤 {tu.employee || "Employee"}
+          </div>
         </div>
       </div>
 
@@ -606,10 +628,14 @@ export default function UserManagement({ t }) {
           }}
         >
           <option value="all">{getTranslation("allRoles")}</option>
-          <option value={ROLES.EMPLOYEE}>Employee</option>
-          <option value={ROLES.TEAM_LEADER}>Team Leader</option>
-          <option value={ROLES.ADMIN}>Admin</option>
-          <option value={ROLES.SUPER_ADMIN}>Super Admin</option>
+          <option value={ROLES.EMPLOYEE}>{tu.employee || "Employee"}</option>
+          <option value={ROLES.TEAM_LEADER}>
+            {tu.teamLeader || "Team Leader"}
+          </option>
+          <option value={ROLES.ADMIN}>{tu.admin || "Admin"}</option>
+          <option value={ROLES.SUPER_ADMIN}>
+            {tu.superAdmin || "Super Admin"}
+          </option>
         </select>
       </div>
 
@@ -624,7 +650,7 @@ export default function UserManagement({ t }) {
           }}
         >
           <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
-          <p>Loading users...</p>
+          <p>{safeCommon.loading || "Loading..."}</p>
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
@@ -647,7 +673,7 @@ export default function UserManagement({ t }) {
                     fontSize: 13,
                   }}
                 >
-                  Name
+                  {getTranslation("fullName")}
                 </th>
                 <th
                   style={{
@@ -656,7 +682,7 @@ export default function UserManagement({ t }) {
                     fontSize: 13,
                   }}
                 >
-                  Email
+                  {getTranslation("email")}
                 </th>
                 <th
                   style={{
@@ -665,7 +691,7 @@ export default function UserManagement({ t }) {
                     fontSize: 13,
                   }}
                 >
-                  Role
+                  {getTranslation("role")}
                 </th>
                 <th
                   style={{
@@ -674,7 +700,7 @@ export default function UserManagement({ t }) {
                     fontSize: 13,
                   }}
                 >
-                  Phone
+                  {getTranslation("phone")}
                 </th>
                 <th
                   style={{
@@ -683,7 +709,7 @@ export default function UserManagement({ t }) {
                     fontSize: 13,
                   }}
                 >
-                  Actions
+                  {getTranslation("actions") || "Actions"}
                 </th>
               </tr>
             </thead>
@@ -783,7 +809,7 @@ export default function UserManagement({ t }) {
                       title={getTranslation("edit")}
                     />
 
-                    {/* 👁️ View Button - Now opens professional modal */}
+                    {/* 👁️ View Button */}
                     <ActionButton
                       onClick={() => openViewModal(user)}
                       icon="👁️"
@@ -792,13 +818,13 @@ export default function UserManagement({ t }) {
                       title={getTranslation("viewDetails")}
                     />
 
-                    {/* 🔄 Role Change Button (Super Admin only) */}
+                    {/* 🔄 Role Change Button */}
                     {isSuperAdmin && user.role !== ROLES.SUPER_ADMIN && (
                       <ActionButton
                         onClick={() => {
                           const newRole = prompt(
-                            `Change role for ${user.name}:\n\n` +
-                              "Enter one of: employee, leader, admin",
+                            `${tu.changeRolePrompt || "Change role for"} ${user.name}:\n\n` +
+                              `${tu.roleOptions || "Enter one of: employee, leader, admin"}`,
                             user.role,
                           );
                           if (newRole && newRole !== user.role) {
@@ -825,8 +851,9 @@ export default function UserManagement({ t }) {
                             } else {
                               setAlertModal({
                                 isOpen: true,
-                                title: "Invalid Role",
+                                title: tu.invalidRoleTitle || "Invalid Role",
                                 message:
+                                  tu.invalidRoleMessage ||
                                   "Please use: employee, leader, or admin",
                                 type: "warning",
                               });
@@ -834,7 +861,7 @@ export default function UserManagement({ t }) {
                           }
                         }}
                         icon="🔄"
-                        label="Role"
+                        label={tu.changeRole || "Role"}
                         color="#f59e0b"
                         title={getTranslation("changeRole")}
                       />
@@ -1036,7 +1063,7 @@ export default function UserManagement({ t }) {
                   <input
                     type="password"
                     required
-                    placeholder="Min 6 characters"
+                    placeholder={tu.minPassword || "Min 6 characters"}
                     value={formData.password}
                     onChange={(e) =>
                       setFormData({ ...formData, password: e.target.value })
