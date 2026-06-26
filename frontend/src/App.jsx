@@ -103,7 +103,7 @@ export const AnimatedTitle = ({ t, collapsed }) => {
             letterSpacing: isHovered ? "2px" : "0px",
           }}
         >
-          {t.appName}
+          {t?.appName || "A-MESOB"}
         </div>
         <div
           style={{
@@ -115,7 +115,7 @@ export const AnimatedTitle = ({ t, collapsed }) => {
             transition: "opacity 0.3s ease",
           }}
         >
-          {t.appSub}
+          {t?.appSub || "One-Stop"}
         </div>
       </div>
     </div>
@@ -126,10 +126,8 @@ export const AnimatedTitle = ({ t, collapsed }) => {
 // AUTHENTICATED APP
 // =============================================
 function AuthenticatedApp() {
+  // ✅ ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const { language, t, changeLanguage } = useLanguage();
-  const [tab, setTab] = useState("dashboard");
-  const [collapsed, setCollapsed] = useState(false);
-  const [selectedTeam, setSelectedTeam] = useState(null);
   const { showToast, toasts, removeToast } = useToast();
   const {
     user,
@@ -140,11 +138,44 @@ function AuthenticatedApp() {
     isAdminOrSuperAdmin,
     isLeaderOrAbove,
   } = useAuth();
+
+  const [tab, setTab] = useState("dashboard");
+  const [collapsed, setCollapsed] = useState(false);
+  const [selectedTeam, setSelectedTeam] = useState(null);
   const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
     setToastFunction(showToast);
   }, [showToast]);
+
+  // ✅ FALLBACK: Check if translations are loaded (after all hooks)
+  if (!t || typeof t !== "object") {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "100vh",
+          background: C.gray,
+          fontFamily: F.sans,
+        }}
+      >
+        <div style={{ textAlign: "center" }}>
+          <div
+            style={{
+              fontSize: 32,
+              marginBottom: 10,
+              animation: "pulseGlow 1.5s ease-in-out infinite",
+            }}
+          >
+            ⏳
+          </div>
+          <p style={{ color: C.muted }}>Loading translations...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSetTab = (newTab) => {
     setTab(newTab);
@@ -305,7 +336,7 @@ function AuthenticatedApp() {
           }}
         >
           <div className="page-enter">
-            {tab === "dashboard" && <Dashboard t={t} lang={language} />}
+            {tab === "dashboard" && <Dashboard t={t} />}
             {tab === "forum" && (
               <ForumReport
                 t={t}
@@ -457,6 +488,7 @@ function AuthenticatedApp() {
 // APP ROUTER
 // =============================================
 function AppRouter() {
+  // ✅ ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
