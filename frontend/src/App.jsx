@@ -19,7 +19,6 @@ import { setToastFunction } from "./utils/toastHelper";
 import { ToastContainer } from "./components/ui/Modal";
 import { useToast } from "./hooks/useToast";
 import { LanguageProvider } from "./context/LanguageProvider";
-// // import { useAuth } from "./hooks/useAuth";
 import { useLanguage } from "./hooks/useLanguage";
 
 // =============================================
