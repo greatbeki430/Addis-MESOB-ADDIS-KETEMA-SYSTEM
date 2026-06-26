@@ -110,7 +110,11 @@ function DynamicFieldGroup({
 }
 
 export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
-  const tf = t.forum;
+  // ✅ FIX: Safe access to translations with fallback
+  const safeT = t || {};
+  const tf = safeT.forum || {};
+  const safeYear = safeT.year || "2018 E.C.";
+
   const [form, setForm] = useState({
     date: new Date().toISOString().split("T")[0],
     timeStart: "",
@@ -227,7 +231,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               marginBottom: 8,
             }}
           >
-            {tf.saved}
+            {tf.saved || "Report Saved!"}
           </h2>
           <p
             style={{
@@ -237,7 +241,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               fontSize: "clamp(13px, 3.5vw, 15px)",
             }}
           >
-            {tf.savedSub}
+            {tf.savedSub || "Peer Forum report completed successfully."}
           </p>
           <button
             style={btn.primary}
@@ -252,7 +256,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               e.currentTarget.style.boxShadow = "none";
             }}
           >
-            {tf.newReport}
+            {tf.newReport || "New Report ➤"}
           </button>
         </div>
       </div>
@@ -334,7 +338,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
                 backgroundClip: "text",
               }}
             >
-              {tf.title} - {selectedTeam.name}
+              {tf.title || "Peer Forum Report Form"} - {selectedTeam.name}
             </h1>
             <p
               style={{
@@ -343,7 +347,8 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
                 margin: "2px 0 0",
               }}
             >
-              {tf.subtitle}
+              {tf.subtitle ||
+                "Addis Ababa City Admin · Addis Messob · Addis Ketema Center"}
             </p>
           </div>
         </div>
@@ -359,7 +364,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             boxShadow: `0 4px 15px ${C.primary}44`,
           }}
         >
-          {t.year}
+          {safeYear}
         </span>
       </div>
 
@@ -371,22 +376,22 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           boxShadow: "0 2px 16px #0003",
         }}
       >
-        <Section title={tf.meetingTime} icon="📅">
+        <Section title={tf.meetingTime || "📅 Meeting Time"} icon="📅">
           <div style={g3Responsive}>
             <Field
-              label={tf.date}
+              label={tf.date || "Date"}
               value={form.date}
               onChange={(v) => upd("date", v)}
               type="date"
             />
             <Field
-              label={tf.startTime}
+              label={tf.startTime || "Start Time"}
               value={form.timeStart}
               onChange={(v) => upd("timeStart", v)}
               type="time"
             />
             <Field
-              label={tf.endTime}
+              label={tf.endTime || "End Time"}
               value={form.timeEnd}
               onChange={(v) => upd("timeEnd", v)}
               type="time"
@@ -395,7 +400,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         </Section>
 
         <DynamicFieldGroup
-          title={tf.presentMembers}
+          title={tf.presentMembers || "👥 Present Members"}
           icon="👥"
           values={form.present}
           onAdd={() => addItem("present", "")}
@@ -407,7 +412,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           }}
           renderField={(value, idx) => (
             <Field
-              label={`${idx + 1}${tf.memberN}`}
+              label={`${idx + 1}${tf.memberN || " Member"}`}
               value={value}
               onChange={(v) => {
                 const updated = [...form.present];
@@ -419,7 +424,10 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           )}
         />
 
-        <Section title={tf.absentMembers} icon="🚫">
+        <Section
+          title={tf.absentMembers || "🚫 Absent Members & Reasons"}
+          icon="🚫"
+        >
           {form.absent.map((item, idx) => (
             <div
               key={idx}
@@ -454,7 +462,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               >
                 <div style={{ flex: "2", minWidth: "120px" }}>
                   <Field
-                    label={`${idx + 1} ${tf.name}`}
+                    label={`${idx + 1} ${tf.name || "Name"}`}
                     value={item.name}
                     onChange={(v) => updateAbsent(idx, "name", v)}
                     placeholder="Name"
@@ -462,7 +470,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
                 </div>
                 <div style={{ flex: "3", minWidth: "120px" }}>
                   <Field
-                    label={tf.reason}
+                    label={tf.reason || "Reason"}
                     value={item.reason}
                     onChange={(v) => updateAbsent(idx, "reason", v)}
                     placeholder="Reason for absence"
@@ -530,7 +538,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         </Section>
 
         <DynamicFieldGroup
-          title={tf.prevResults}
+          title={tf.prevResults || "📋 Results from Previous Meeting"}
           icon="📋"
           values={form.prevResults}
           onAdd={() => addItem("prevResults", "")}
@@ -545,7 +553,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         />
 
         <DynamicFieldGroup
-          title={tf.todayTopics}
+          title={tf.todayTopics || "💬 Today's Discussion Topics"}
           icon="💬"
           values={form.topics}
           onAdd={() => addItem("topics", "")}
@@ -555,11 +563,14 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             updated[idx] = val;
             setForm((prev) => ({ ...prev, topics: updated }));
           }}
-          labelPrefix={tf.topic}
+          labelPrefix={tf.topic || "Topic"}
           placeholderPrefix="Topic"
         />
 
-        <Section title={tf.explanation} icon="📝">
+        <Section
+          title={tf.explanation || "📝 Explanation Given (Brief)"}
+          icon="📝"
+        >
           <textarea
             style={{
               ...inp,
@@ -571,7 +582,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             rows={3}
             value={form.explanation}
             onChange={(e) => upd("explanation", e.target.value)}
-            placeholder={tf.explanationPlaceholder}
+            placeholder={tf.explanationPlaceholder || "Write explanation..."}
             onFocus={(e) => {
               e.currentTarget.borderColor = C.primary;
               e.currentTarget.boxShadow = `0 0 0 3px ${C.primary}22`;
@@ -584,7 +595,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         </Section>
 
         <DynamicFieldGroup
-          title={tf.gaps}
+          title={tf.gaps || "⚠️ Identified Gaps"}
           icon="⚠️"
           values={form.gaps}
           onAdd={() => addItem("gaps", "")}
@@ -599,7 +610,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         />
 
         <DynamicFieldGroup
-          title={tf.agreements}
+          title={tf.agreements || "✅ Agreed Points"}
           icon="✅"
           values={form.agreements}
           onAdd={() => addItem("agreements", "")}
@@ -613,7 +624,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           placeholderPrefix="Agreement"
         />
 
-        <Section title={tf.signatures} icon="✍️">
+        <Section title={tf.signatures || "✍️ Signatures"} icon="✍️">
           {form.signatures.map((sig, idx) => (
             <div
               key={idx}
@@ -628,7 +639,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             >
               <div style={{ flex: 1 }}>
                 <Field
-                  label={`${idx + 1}${tf.signatureN}`}
+                  label={`${idx + 1}${tf.signatureN || " Signature"}`}
                   value={sig}
                   onChange={(v) => {
                     const updated = [...form.signatures];
@@ -743,7 +754,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             onClick={handleSaveReport}
             disabled={saving}
           >
-            {saving ? "⏳ Saving..." : tf.save}
+            {saving ? "⏳ Saving..." : tf.save || "Save Report ✓"}
           </button>
         </div>
       </div>
