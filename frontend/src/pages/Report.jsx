@@ -10,6 +10,11 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 
 export default function Report({ t }) {
+  // ✅ FIX: Safe access to translations with fallback
+  const safeT = t || {};
+  const safeReport = safeT.report || {};
+  const safePeriod = safeT.period || {};
+
   const { user, isLeader, isAdmin, isSuperAdmin } = useAuth();
 
   const [reportType, setReportType] = useState("daily");
@@ -31,22 +36,22 @@ export default function Report({ t }) {
   const [selectedSavedReport, setSelectedSavedReport] = useState(null);
 
   const reportTypes = [
-    { value: "daily", label: t?.report?.daily || "Daily Report" },
-    { value: "weekly", label: t?.report?.weekly || "Weekly Report" },
-    { value: "monthly", label: t?.report?.monthly || "Monthly Report" },
-    { value: "quarterly", label: t?.report?.quarterly || "Quarterly Report" },
-    { value: "half-year", label: t?.report?.halfYear || "Half-Year Report" },
-    { value: "yearly", label: t?.report?.yearly || "Yearly Report" },
-    { value: "custom", label: t?.report?.custom || "Custom Range" },
+    { value: "daily", label: safeReport.daily || "Daily Report" },
+    { value: "weekly", label: safeReport.weekly || "Weekly Report" },
+    { value: "monthly", label: safeReport.monthly || "Monthly Report" },
+    { value: "quarterly", label: safeReport.quarterly || "Quarterly Report" },
+    { value: "half-year", label: safeReport.halfYear || "Half-Year Report" },
+    { value: "yearly", label: safeReport.yearly || "Yearly Report" },
+    { value: "custom", label: safeReport.custom || "Custom Range" },
   ];
 
   const periods = [
-    { value: "daily", label: t?.period?.daily || "Daily" },
-    { value: "weekly", label: t?.period?.weekly || "Weekly" },
-    { value: "monthly", label: t?.period?.monthly || "Monthly" },
-    { value: "quarterly", label: t?.period?.quarterly || "Quarterly" },
-    { value: "half-year", label: t?.period?.halfYear || "Half Year" },
-    { value: "yearly", label: t?.period?.yearly || "Yearly" },
+    { value: "daily", label: safePeriod.daily || "Daily" },
+    { value: "weekly", label: safePeriod.weekly || "Weekly" },
+    { value: "monthly", label: safePeriod.monthly || "Monthly" },
+    { value: "quarterly", label: safePeriod.quarterly || "Quarterly" },
+    { value: "half-year", label: safePeriod.halfYear || "Half Year" },
+    { value: "yearly", label: safePeriod.yearly || "Yearly" },
   ];
 
   // ✅ Load teams and determine user's team
@@ -246,7 +251,7 @@ export default function Report({ t }) {
     } catch (error) {
       console.error("Failed to generate report:", error);
       setError(
-        t?.report?.generateError ||
+        safeReport.generateError ||
           "Failed to generate report. Please try again.",
       );
     } finally {
@@ -544,12 +549,12 @@ export default function Report({ t }) {
             margin: 0,
           }}
         >
-          📊 {t?.report?.title || "Report Generator"}
+          📊 {safeReport.title || "Report Generator"}
           {getTeamDisplayName()}
           {isLeader && userTeam && (
             <span style={{ fontSize: 16, color: C.primary, fontWeight: 600 }}>
               {" "}
-              - {t?.report?.myTeam || "My Team"}
+              - {safeReport.myTeam || "My Team"}
             </span>
           )}
         </h1>
@@ -565,7 +570,7 @@ export default function Report({ t }) {
               whiteSpace: "nowrap",
             }}
           >
-            {t?.report?.analytics || "Analytics"}
+            {safeReport.analytics || "Analytics"}
           </span>
           <button
             onClick={() => setShowHistory(!showHistory)}
@@ -596,7 +601,7 @@ export default function Report({ t }) {
             fontFamily: F.sans,
           }}
         >
-          {t?.report?.description ||
+          {safeReport.description ||
             "Generate comprehensive reports by merging data from all modules"}
         </p>
       )}
@@ -618,13 +623,13 @@ export default function Report({ t }) {
           <span style={{ fontSize: 20 }}>👑</span>
           <div>
             <span style={{ fontWeight: 600, color: C.dark }}>
-              {t?.report?.leadingTeam || "Leading Team"}:
+              {safeReport.leadingTeam || "Leading Team"}:
             </span>
             <span style={{ color: C.primary, fontWeight: 700, marginLeft: 6 }}>
               {userTeam.name}
             </span>
             <span style={{ fontSize: 12, color: C.muted, marginLeft: 12 }}>
-              {t?.report?.teamLeaderAccess ||
+              {safeReport.teamLeaderAccess ||
                 "You have access to your team's analytics only"}
             </span>
           </div>
@@ -758,7 +763,7 @@ export default function Report({ t }) {
                 color: C.dark,
               }}
             >
-              {t?.report?.typeLabel || "Report Type"}
+              {safeReport.typeLabel || "Report Type"}
             </label>
             <select
               value={reportType}
@@ -783,7 +788,7 @@ export default function Report({ t }) {
                 color: C.dark,
               }}
             >
-              {t?.report?.periodLabel || "Period"}
+              {safeReport.periodLabel || "Period"}
             </label>
             <select
               value={period}
@@ -809,14 +814,14 @@ export default function Report({ t }) {
                   color: C.dark,
                 }}
               >
-                {t?.report?.teamLabel || "Team (Optional)"}
+                {safeReport.teamLabel || "Team (Optional)"}
               </label>
               <select
                 value={selectedTeam}
                 onChange={(e) => setSelectedTeam(e.target.value)}
                 style={inp}
               >
-                <option value="">{t?.report?.allTeams || "All Teams"}</option>
+                <option value="">{safeReport.allTeams || "All Teams"}</option>
                 {teams.map((team) => (
                   <option key={team.id || team._id} value={team.id || team._id}>
                     {team.name}
@@ -837,7 +842,7 @@ export default function Report({ t }) {
                   color: C.dark,
                 }}
               >
-                {t?.report?.teamLabel || "Team"}
+                {safeReport.teamLabel || "Team"}
               </label>
               <input
                 type="text"
@@ -863,7 +868,7 @@ export default function Report({ t }) {
                 color: C.dark,
               }}
             >
-              {t?.report?.startDate || "Start Date"}
+              {safeReport.startDate || "Start Date"}
             </label>
             <input
               type="date"
@@ -883,7 +888,7 @@ export default function Report({ t }) {
                 color: C.dark,
               }}
             >
-              {t?.report?.endDate || "End Date"}
+              {safeReport.endDate || "End Date"}
             </label>
             <input
               type="date"
@@ -914,7 +919,7 @@ export default function Report({ t }) {
             }}
           >
             {loading
-              ? t?.report?.generating || "⏳ Generating..."
+              ? safeReport.generating || "⏳ Generating..."
               : "🔍 Generate & Save Report"}
           </button>
 
@@ -936,7 +941,7 @@ export default function Report({ t }) {
                   gap: 8,
                 }}
               >
-                {t?.report?.exportBtn || "Export Report"} ▼
+                {safeReport.exportBtn || "Export Report"} ▼
               </button>
 
               {showExportOptions && (
@@ -1059,7 +1064,7 @@ export default function Report({ t }) {
                 color: C.dark,
               }}
             >
-              📋 {t?.report?.results || "Report Results"}
+              📋 {safeReport.results || "Report Results"}
               {selectedSavedReport && (
                 <span style={{ fontSize: 12, color: C.muted, fontWeight: 400 }}>
                   {" "}
@@ -1070,7 +1075,7 @@ export default function Report({ t }) {
             <span
               style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
             >
-              {t?.report?.generated || "Generated"}:{" "}
+              {safeReport.generated || "Generated"}:{" "}
               {new Date(reportData.generatedAt).toLocaleString()}
             </span>
           </div>
@@ -1084,7 +1089,6 @@ export default function Report({ t }) {
               marginBottom: 20,
             }}
           >
-            {/* Summary cards unchanged - keep your original code here */}
             <div
               style={{
                 background: C.bg,
@@ -1105,13 +1109,81 @@ export default function Report({ t }) {
               <div
                 style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
               >
-                {t?.report?.totalRecords || "Total Records"}
+                {safeReport.totalRecords || "Total Records"}
               </div>
             </div>
-            {/* ... other 3 summary cards (Completed, Pending, Average) - same as your original ... */}
+            <div
+              style={{
+                background: C.bg,
+                borderRadius: 8,
+                padding: 12,
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "clamp(20px, 5vw, 28px)",
+                  fontWeight: 900,
+                  color: "#10b981",
+                }}
+              >
+                {reportData.summary?.completed || 0}
+              </div>
+              <div
+                style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
+              >
+                {safeReport.completed || "Completed"}
+              </div>
+            </div>
+            <div
+              style={{
+                background: C.bg,
+                borderRadius: 8,
+                padding: 12,
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "clamp(20px, 5vw, 28px)",
+                  fontWeight: 900,
+                  color: "#f59e0b",
+                }}
+              >
+                {reportData.summary?.pending || 0}
+              </div>
+              <div
+                style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
+              >
+                {safeReport.pending || "Pending"}
+              </div>
+            </div>
+            <div
+              style={{
+                background: C.bg,
+                borderRadius: 8,
+                padding: 12,
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "clamp(20px, 5vw, 28px)",
+                  fontWeight: 900,
+                  color: C.primary,
+                }}
+              >
+                {reportData.summary?.average || 0}
+              </div>
+              <div
+                style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
+              >
+                {safeReport.average || "Average Value"}
+              </div>
+            </div>
           </div>
 
-          {/* Data Table - keep your original table code */}
+          {/* Data Table */}
           <div style={{ overflowX: "auto" }}>
             <table
               style={{
@@ -1120,7 +1192,107 @@ export default function Report({ t }) {
                 fontSize: "clamp(11px, 3vw, 13px)",
               }}
             >
-              {/* thead and tbody - keep exactly as in your original code */}
+              <thead>
+                <tr style={{ background: C.dark }}>
+                  <th
+                    style={{
+                      padding: "10px",
+                      color: C.light,
+                      textAlign: "left",
+                    }}
+                  >
+                    #
+                  </th>
+                  <th
+                    style={{
+                      padding: "10px",
+                      color: C.light,
+                      textAlign: "left",
+                    }}
+                  >
+                    {safeReport.date || "Date"}
+                  </th>
+                  <th
+                    style={{
+                      padding: "10px",
+                      color: C.light,
+                      textAlign: "left",
+                    }}
+                  >
+                    {safeReport.team || "Team"}
+                  </th>
+                  <th
+                    style={{
+                      padding: "10px",
+                      color: C.light,
+                      textAlign: "left",
+                    }}
+                  >
+                    {safeReport.typeCol || "Type"}
+                  </th>
+                  <th
+                    style={{
+                      padding: "10px",
+                      color: C.light,
+                      textAlign: "left",
+                    }}
+                  >
+                    {safeReport.descriptionCol || "Description"}
+                  </th>
+                  <th
+                    style={{
+                      padding: "10px",
+                      color: C.light,
+                      textAlign: "left",
+                    }}
+                  >
+                    {safeReport.value || "Value"}
+                  </th>
+                  <th
+                    style={{
+                      padding: "10px",
+                      color: C.light,
+                      textAlign: "left",
+                    }}
+                  >
+                    {safeReport.status || "Status"}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {reportData.data.map((item, idx) => (
+                  <tr
+                    key={idx}
+                    style={{
+                      borderBottom: `1px solid ${C.border}`,
+                      background: idx % 2 === 0 ? C.white : C.cardBg,
+                    }}
+                  >
+                    <td style={{ padding: "8px 10px" }}>{idx + 1}</td>
+                    <td style={{ padding: "8px 10px" }}>{item.date}</td>
+                    <td style={{ padding: "8px 10px" }}>{item.team}</td>
+                    <td style={{ padding: "8px 10px" }}>{item.type}</td>
+                    <td style={{ padding: "8px 10px" }}>{item.description}</td>
+                    <td style={{ padding: "8px 10px" }}>{item.value}</td>
+                    <td style={{ padding: "8px 10px" }}>
+                      <span
+                        style={{
+                          padding: "2px 10px",
+                          borderRadius: 12,
+                          fontSize: 11,
+                          fontWeight: 600,
+                          background:
+                            item.status === "Completed" ? "#d1fae5" : "#fef3c7",
+                          color:
+                            item.status === "Completed" ? "#065f46" : "#92400e",
+                        }}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
             </table>
           </div>
         </div>
@@ -1145,10 +1317,10 @@ export default function Report({ t }) {
               marginBottom: 8,
             }}
           >
-            {t?.report?.noReportGenerated || "No Report Generated Yet"}
+            {safeReport.noReportGenerated || "No Report Generated Yet"}
           </h3>
           <p style={{ fontSize: "clamp(12px, 3vw, 14px)", color: C.muted }}>
-            {t?.report?.selectParameters ||
+            {safeReport.selectParameters ||
               "Select your report parameters and click 'Generate Report' to view data"}
           </p>
         </div>
