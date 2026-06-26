@@ -55,12 +55,10 @@ const restoreBodyMargins = () => {
   }
 };
 
-// ✅ Generate particles with deterministic values (moved outside component)
+// ✅ Generate particles with deterministic values
 const generateParticles = () => {
-  // Use a seed-based approach to generate consistent values
   const seed = 12345;
   const pseudoRandom = (index) => {
-    // Simple pseudo-random number generator
     const x = Math.sin(index * 9301 + seed * 49297) * 49297;
     return x - Math.floor(x);
   };
@@ -75,8 +73,17 @@ const generateParticles = () => {
   }));
 };
 
-// Pre-generate particles once outside component
 const STATIC_PARTICLES = generateParticles();
+
+// Addis MESOB Brand Colors
+const COLORS = {
+  primary: "#1a6b4a", // Dark Green
+  light: "#2aaa78", // Bright Green
+  gold: "#c9a84c", // Gold from logo
+  goldLight: "#e8d5a3", // Light Gold
+  dark: "#0d1f14",
+  white: "#ffffff",
+};
 
 export default function Login({ onSwitchToRegister }) {
   const { t } = useLanguage();
@@ -93,7 +100,6 @@ export default function Login({ onSwitchToRegister }) {
   useEffect(() => {
     removeBodyMargins();
 
-    // Animated title rotation
     const interval = setInterval(() => {
       setTitleRotation((prev) => (prev + 0.3) % 360);
     }, 50);
@@ -115,7 +121,6 @@ export default function Login({ onSwitchToRegister }) {
         setError(result.error || t?.auth?.loginFailed || "Login failed");
       }
     } catch {
-      // Error is handled by showing the login failed message
       setError(t?.auth?.loginFailed || "Login failed");
     } finally {
       setLoading(false);
@@ -148,26 +153,38 @@ export default function Login({ onSwitchToRegister }) {
       </div>
 
       <div style={loginStyles.card}>
-        {/* Animated Logo Section */}
+        {/* Animated Logo Section - Updated with Addis MESOB Colors */}
         <div style={loginStyles.logoContainer}>
           <div
             style={{
               ...loginStyles.logoIcon,
               transform: `rotate(${titleRotation}deg)`,
+              background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
+              boxShadow: `0 8px 30px ${COLORS.primary}66`,
             }}
           >
             አ
           </div>
           <div style={loginStyles.logoTextContainer}>
             <div
-              style={loginStyles.logoText}
+              style={{
+                ...loginStyles.logoText,
+                background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                fontSize: "clamp(32px, 8vw, 42px)",
+                fontWeight: 900,
+                fontFamily: "'Noto Serif Ethiopic', serif",
+                letterSpacing: "-0.5px",
+              }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = `linear-gradient(90deg, #2aaa78, #1a6b4a, #2aaa78)`;
+                e.currentTarget.style.background = `linear-gradient(90deg, ${COLORS.gold}, ${COLORS.primary}, ${COLORS.gold})`;
                 e.currentTarget.style.backgroundSize = "200% 100%";
                 e.currentTarget.style.animation = "shimmer 2s linear infinite";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = `linear-gradient(135deg, #1a6b4a, #2aaa78)`;
+                e.currentTarget.style.background = `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`;
                 e.currentTarget.style.backgroundSize = "100% 100%";
                 e.currentTarget.style.animation = "none";
               }}
@@ -175,9 +192,25 @@ export default function Login({ onSwitchToRegister }) {
               A-MESOB
             </div>
             <div style={loginStyles.logoSub}>
-              <span style={loginStyles.logoSubHighlight}>Addis</span> MESOB
+              <span
+                style={{
+                  ...loginStyles.logoSubHighlight,
+                  color: COLORS.primary,
+                }}
+              >
+                Addis
+              </span>{" "}
+              MESOB
               <span style={loginStyles.logoSubDot}> · </span>
-              <span style={loginStyles.logoSubHighlight}>One</span>-Stop
+              <span
+                style={{
+                  ...loginStyles.logoSubHighlight,
+                  color: COLORS.primary,
+                }}
+              >
+                One
+              </span>
+              -Stop
             </div>
           </div>
         </div>
@@ -239,7 +272,7 @@ export default function Login({ onSwitchToRegister }) {
                 onClick={togglePasswordVisibility}
                 style={loginStyles.eyeButton}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.color = "#1a6b4a";
+                  e.currentTarget.style.color = COLORS.primary;
                   e.currentTarget.style.transform = "scale(1.1)";
                 }}
                 onMouseLeave={(e) => {
@@ -257,6 +290,7 @@ export default function Login({ onSwitchToRegister }) {
             style={{
               ...loginStyles.button,
               ...(isHovered ? loginStyles.buttonHover : {}),
+              background: `linear-gradient(135deg, ${COLORS.primary}, ${COLORS.gold})`,
             }}
             disabled={loading}
             onMouseEnter={() => setIsHovered(true)}
@@ -280,14 +314,17 @@ export default function Login({ onSwitchToRegister }) {
           {t?.auth?.noAccount || "Don't have an account?"}{" "}
           <button
             onClick={onSwitchToRegister}
-            style={loginStyles.linkButton}
+            style={{
+              ...loginStyles.linkButton,
+              color: COLORS.primary,
+            }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateX(4px)";
-              e.currentTarget.style.color = "#2aaa78";
+              e.currentTarget.style.color = COLORS.gold;
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "translateX(0)";
-              e.currentTarget.style.color = "#1a6b4a";
+              e.currentTarget.style.color = COLORS.primary;
             }}
           >
             {t?.auth?.register || "Register"}
@@ -409,7 +446,7 @@ const loginStyles = {
   logoIcon: {
     width: "clamp(50px, 12vw, 65px)",
     height: "clamp(50px, 12vw, 65px)",
-    background: "linear-gradient(135deg, #1a6b4a, #2aaa78)",
+    background: "linear-gradient(135deg, #1a6b4a, #c9a84c)",
     borderRadius: "clamp(14px, 3vw, 18px)",
     display: "flex",
     alignItems: "center",
@@ -430,7 +467,7 @@ const loginStyles = {
   logoText: {
     fontSize: "clamp(28px, 7vw, 36px)",
     fontWeight: 900,
-    background: "linear-gradient(135deg, #1a6b4a, #2aaa78)",
+    background: "linear-gradient(135deg, #1a6b4a, #c9a84c)",
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent",
     backgroundClip: "text",
@@ -521,7 +558,7 @@ const loginStyles = {
   button: {
     width: "100%",
     padding: "clamp(14px, 3.5vw, 16px)",
-    background: "linear-gradient(135deg, #1a6b4a, #2aaa78)",
+    background: "linear-gradient(135deg, #1a6b4a, #c9a84c)",
     color: "#fff",
     border: "none",
     borderRadius: "clamp(10px, 2.5vw, 12px)",
