@@ -1,9 +1,16 @@
+// ════════════════════════════════════════════════════════════
+// constants/criteria.js
+// Evaluation criteria from official document:
+// "የውጤታማ መመዘኛ መሰፈርት" (Peer Forum Effectiveness Criteria)
+// Colors updated to Addis MESOB brand palette
+// ════════════════════════════════════════════════════════════
+
 export const CRITERIA = [
   {
     id: 1,
     key: "c1",
     weight: 25,
-    color: "#1a6b4a",
+    color: "#1a3aad", // Brand Blue (was old green #1a6b4a)
     titleEn: "Effective Service Delivery",
     items: [
       {
@@ -47,7 +54,7 @@ export const CRITERIA = [
     id: 2,
     key: "c2",
     weight: 22,
-    color: "#1e4d8c",
+    color: "#2952cc", // Brand Royal Blue (was #1e4d8c)
     titleEn: "Strong Work Ethics",
     items: [
       {
@@ -71,7 +78,7 @@ export const CRITERIA = [
     id: 3,
     key: "c3",
     weight: 23,
-    color: "#7b2d8b",
+    color: "#7b2d8b", // Purple kept (document uses distinct color per criterion)
     titleEn: "Timely & Quality Execution",
     items: [
       {
@@ -86,8 +93,8 @@ export const CRITERIA = [
       },
       {
         text: "የፖሊሲዎች እምነት ያላቸዉ",
-        points: 4,
         textEn: "Have strong belief/conviction in the policies",
+        points: 4,
       },
       {
         text: "ግልፅና ተገቢ አቋም ያላቸው",
@@ -110,7 +117,7 @@ export const CRITERIA = [
     id: 4,
     key: "c4",
     weight: 15,
-    color: "#c25a00",
+    color: "#c25a00", // Orange kept
     titleEn: "Creating Exemplary Work",
     items: [
       {
@@ -134,7 +141,7 @@ export const CRITERIA = [
     id: 5,
     key: "c5",
     weight: 15,
-    color: "#8b1a1a",
+    color: "#0d1a5e", // Brand Dark Navy (was #8b1a1a)
     titleEn: "Principle-Based Cooperation",
     items: [
       {

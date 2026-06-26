@@ -1,4 +1,11 @@
+// ════════════════════════════════════════════════════════════
+// constants/services.js
+// Full service list from Addis MESOB Service Catalogue (221-page PDF)
+// All 12 agencies as registered in the official catalogue
+// ════════════════════════════════════════════════════════════
+
 export const SERVICES = [
+  // ─── 1. ገቢዎች / Revenue ───────────────────────────────────
   {
     dept: "ገቢዎች",
     deptEn: "Revenue",
@@ -9,8 +16,22 @@ export const SERVICES = [
   {
     dept: "ገቢዎች",
     deptEn: "Revenue",
-    name: "አዲስ የንግድ ፍቃድ",
+    name: "አዲስ ንግድ ምዝገባ",
+    nameEn: "New Trade Registration",
+    active: true,
+  },
+  {
+    dept: "ገቢዎች",
+    deptEn: "Revenue",
+    name: "አዲስ የንግድ ሥራ ፍቃድ",
     nameEn: "New Business License",
+    active: true,
+  },
+  {
+    dept: "ገቢዎች",
+    deptEn: "Revenue",
+    name: "የንግድ ስም ምዝገባ",
+    nameEn: "Trade Name Registration",
     active: true,
   },
   {
@@ -30,10 +51,40 @@ export const SERVICES = [
   {
     dept: "ገቢዎች",
     deptEn: "Revenue",
+    name: "ንግድ ፍቃድ ማሻሻያ",
+    nameEn: "Business License Amendment",
+    active: true,
+  },
+  {
+    dept: "ገቢዎች",
+    deptEn: "Revenue",
     name: "የንግድ ምዝገባ ምትክ",
     nameEn: "Trade Reg. Replacement",
     active: true,
   },
+  {
+    dept: "ገቢዎች",
+    deptEn: "Revenue",
+    name: "የንግድ ሥራ ፈቃድ ምትክ",
+    nameEn: "Business License Replacement",
+    active: true,
+  },
+  {
+    dept: "ገቢዎች",
+    deptEn: "Revenue",
+    name: "የንግድ ሥራ ፈቃድ ስረዛ",
+    nameEn: "Business License Cancellation",
+    active: true,
+  },
+  {
+    dept: "ገቢዎች",
+    deptEn: "Revenue",
+    name: "ኢ ፋይሊንግ እና ኢ ፔይመንት ፓስወርድ",
+    nameEn: "E-Filing & E-Payment Password",
+    active: true,
+  },
+
+  // ─── 2. አሽ/ተሽ / Driver & Vehicle Authority ───────────────
   {
     dept: "አሽ/ተሽ",
     deptEn: "Transport",
@@ -44,15 +95,89 @@ export const SERVICES = [
   {
     dept: "አሽ/ተሽ",
     deptEn: "Transport",
-    name: "ዓመታዊ ቴክ. ምርመራ",
+    name: "ዓመታዊ ቴክ. ምርመራ (ቦሎ)",
     nameEn: "Annual Vehicle Inspection",
     active: true,
   },
+  {
+    dept: "አሽ/ተሽ",
+    deptEn: "Transport",
+    name: "የውጭ መንጃ ፈቃድ ቅያሪ",
+    nameEn: "Foreign License Exchange",
+    active: false,
+  },
+  {
+    dept: "አሽ/ተሽ",
+    deptEn: "Transport",
+    name: "ዕዳ ዕገዳ አገልግሎት",
+    nameEn: "Debt Block Service",
+    active: true,
+  },
+  {
+    dept: "አሽ/ተሽ",
+    deptEn: "Transport",
+    name: "ዕግድ ማንሳት አገልግሎት",
+    nameEn: "Lift Block Service",
+    active: true,
+  },
+
+  // ─── 3. ትራፊክ ማኔጅምንት / Traffic Management ─────────────
+  {
+    dept: "ትራፊክ",
+    deptEn: "Traffic",
+    name: "ከአደጋ ነፃ መረጃ መስጠት",
+    nameEn: "Accident-Free Record",
+    active: true,
+  },
+  {
+    dept: "ትራፊክ",
+    deptEn: "Traffic",
+    name: "የደንብ ተላላፊ ሪከርድ ማጣራት",
+    nameEn: "Offender Record Inquiry",
+    active: true,
+  },
+  {
+    dept: "ትራፊክ",
+    deptEn: "Traffic",
+    name: "የተሃድሶ ስልጠና ማስተላለፍ",
+    nameEn: "Rehabilitation Training Referral",
+    active: true,
+  },
+  {
+    dept: "ትራፊክ",
+    deptEn: "Traffic",
+    name: "ለኤምባሲ የአደጋ ሪከርድ ማረጋገጫ",
+    nameEn: "Embassy Accident Record Confirmation",
+    active: false,
+  },
+
+  // ─── 4. ሲቪል ምዝገባ / Civil Registration ──────────────────
   {
     dept: "ሲቪል ምዝገባ",
     deptEn: "Civil Registry",
     name: "የልደት ምዝገባ",
     nameEn: "Birth Registration",
+    active: true,
+  },
+  {
+    dept: "ሲቪል ምዝገባ",
+    deptEn: "Civil Registry",
+    name: "የጋብቻ ምዝገባ",
+    nameEn: "Marriage Registration",
+    active: true,
+  },
+  {
+    dept: "ሲቪል ምዝገባ",
+    deptEn: "Civil Registry",
+    name: "የፍቺ ምዝገባ",
+    nameEn: "Divorce Registration",
+    active: true,
+  },
+  {
+    dept: "ሲቪል ምዝገባ",
+    deptEn: "Civil Registry",
+    name: "የሞት ምዝገባ",
+    nameEn: "Death Registration",
     active: true,
   },
   {
@@ -65,10 +190,26 @@ export const SERVICES = [
   {
     dept: "ሲቪል ምዝገባ",
     deptEn: "Civil Registry",
-    name: "የነዋሪነት መታወቂያ",
-    nameEn: "Resident ID",
+    name: "የነዋሪነት መታወቂያ እርማት/ዕድሳት",
+    nameEn: "Resident ID Correction/Renewal",
     active: true,
   },
+  {
+    dept: "ሲቪል ምዝገባ",
+    deptEn: "Civil Registry",
+    name: "ያላገባ ማስረጃ",
+    nameEn: "Single Status Certificate",
+    active: true,
+  },
+  {
+    dept: "ሲቪል ምዝገባ",
+    deptEn: "Civil Registry",
+    name: "የብሄራዊ መታወቂያ ምዝገባ",
+    nameEn: "National ID Registration",
+    active: true,
+  },
+
+  // ─── 5. ኢንቨስትመንት / Investment Commission ────────────────
   {
     dept: "ኢንቨስትመንት",
     deptEn: "Investment",
@@ -76,6 +217,29 @@ export const SERVICES = [
     nameEn: "New Investment License",
     active: true,
   },
+  {
+    dept: "ኢንቨስትመንት",
+    deptEn: "Investment",
+    name: "የኢንቨስትመንት ፍቃድ ዕድሳት",
+    nameEn: "Investment License Renewal",
+    active: true,
+  },
+  {
+    dept: "ኢንቨስትመንት",
+    deptEn: "Investment",
+    name: "የኢንቨስትመንት ፍቃድ ማሻሻያ",
+    nameEn: "Investment License Amendment",
+    active: true,
+  },
+  {
+    dept: "ኢንቨስትመንት",
+    deptEn: "Investment",
+    name: "የኢንቨስትመንት ማስፋፊያ ፈቃድ",
+    nameEn: "Investment Expansion License",
+    active: true,
+  },
+
+  // ─── 6. ስራና ክህሎት / Labor & Skills Bureau ───────────────
   {
     dept: "ስራና ክህሎት",
     deptEn: "Labor & Skills",
@@ -87,14 +251,85 @@ export const SERVICES = [
     dept: "ስራና ክህሎት",
     deptEn: "Labor & Skills",
     name: "መረጃ፣ ምክርና ግንዛቤ",
-    nameEn: "Info & Counseling",
+    nameEn: "Info, Counseling & Awareness",
+    active: true,
+  },
+  {
+    dept: "ስራና ክህሎት",
+    deptEn: "Labor & Skills",
+    name: "ኢንተርፕራይዝ ማደራጀትና ወደ ስራ ማስገባት",
+    nameEn: "Enterprise Organization & Employment",
+    active: false,
+  },
+
+  // ─── 7. ቤቶች / Housing Development & Administration ──────
+  {
+    dept: "ቤቶች",
+    deptEn: "Housing",
+    name: "የቤት ኪራይ ውል ማደስ/ማቋረጥ",
+    nameEn: "Rental Contract Renewal/Termination",
     active: true,
   },
   {
     dept: "ቤቶች",
     deptEn: "Housing",
-    name: "የቤት ኪራይ ውል ማደስ",
-    nameEn: "Rental Contract Renewal",
+    name: "አዲስ ውል የማዋዋል አገልግሎት",
+    nameEn: "New Rental Contract Service",
+    active: false,
+  },
+  {
+    dept: "ቤቶች",
+    deptEn: "Housing",
+    name: "የቤት ቅይይር ጥያቄ",
+    nameEn: "House Exchange Request",
+    active: false,
+  },
+  {
+    dept: "ቤቶች",
+    deptEn: "Housing",
+    name: "ተነሺዎች ምትክ ቤት",
+    nameEn: "Displaced Persons Replacement House",
+    active: false,
+  },
+
+  // ─── 8. ፕላንና ልማት / Planning & Development Bureau ───────
+  {
+    dept: "ፕላን",
+    deptEn: "Planning",
+    name: "የፕላን ስምምነት መረጃ",
+    nameEn: "Plan Agreement Information",
+    active: true,
+  },
+
+  // ─── 9. ግንባታ ፈቃድ / Construction Permit Authority ───────
+  {
+    dept: "ግንባታ",
+    deptEn: "Construction",
+    name: "አዲስ ግንባታ ፈቃድ",
+    nameEn: "New Construction Permit",
+    active: true,
+  },
+  {
+    dept: "ግንባታ",
+    deptEn: "Construction",
+    name: "የግንባታ ፈቃድ ዕድሳት",
+    nameEn: "Construction Permit Renewal",
+    active: true,
+  },
+
+  // ─── 10. መሬት ልማትና ማኔጅመንት / Land Development & Mgmt ──
+  {
+    dept: "መሬት",
+    deptEn: "Land",
+    name: "የመሬት ይዞታ ምዝገባ",
+    nameEn: "Land Holding Registration",
+    active: true,
+  },
+  {
+    dept: "መሬት",
+    deptEn: "Land",
+    name: "የካርታ አገልግሎት",
+    nameEn: "Land Map/Carta Service",
     active: true,
   },
 ];

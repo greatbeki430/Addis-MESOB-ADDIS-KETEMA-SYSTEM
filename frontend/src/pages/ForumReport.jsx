@@ -109,6 +109,128 @@ function DynamicFieldGroup({
   );
 }
 
+// ════════════════════════════════════════════════════════════
+// Standing Agendas Panel
+// Shows the 7 fixed forum agenda items from the physical form
+// "ቋሚ የአቻ ፎረም አጀንዳዎች" — present on every meeting report
+// ════════════════════════════════════════════════════════════
+const STANDING_AGENDAS_AM = [
+  "በተቋሙ መልካም አስተዳደር ማስፈን በተመለከተ",
+  "በተቋሙ ብልሹ አሰራር ከመታገል አንጻር",
+  "መደበኛ አገልግሎት አሰጣጥን ከማሳለጥ አንጻር",
+  "QMS ስታንዳርድ በመስራት",
+  "ሳምንታዊ አብነታዊ ስራዎች",
+  "ያጋጠሙ ችግሮች",
+  "የተፈታበት አግባብ",
+];
+
+function StandingAgendasPanel({ t }) {
+  const safeT = t || {};
+  const agendas = safeT.agendas || STANDING_AGENDAS_AM;
+  const tf = safeT.forum || {};
+  const [collapsed, setCollapsed] = useState(false);
+
+  return (
+    <div
+      style={{
+        background: "linear-gradient(135deg, #f0f3ff, #e8ecf8)",
+        border: "1.5px solid #c8d0ef",
+        borderLeft: "5px solid #1a3aad",
+        borderRadius: 12,
+        marginBottom: 20,
+        overflow: "hidden",
+      }}
+    >
+      <div
+        onClick={() => setCollapsed(!collapsed)}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "12px 16px",
+          cursor: "pointer",
+          userSelect: "none",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 18 }}>📋</span>
+          <span
+            style={{
+              fontWeight: 800,
+              fontSize: "clamp(12px, 3.5vw, 14px)",
+              color: "#0d1a5e",
+              fontFamily: "'Noto Sans Ethiopic', sans-serif",
+            }}
+          >
+            {tf.standingAgendas || "ቋሚ የአቻ ፎረም አጀንዳዎች"}
+          </span>
+          <span
+            style={{
+              background: "#1a3aad",
+              color: "#f5c518",
+              fontSize: 10,
+              fontWeight: 700,
+              padding: "2px 8px",
+              borderRadius: 20,
+            }}
+          >
+            {agendas.length}
+          </span>
+        </div>
+        <span style={{ color: "#1a3aad", fontSize: 14, fontWeight: 700 }}>
+          {collapsed ? "▶" : "▼"}
+        </span>
+      </div>
+      {!collapsed && (
+        <div style={{ padding: "0 16px 14px" }}>
+          {agendas.map((agenda, i) => (
+            <div
+              key={i}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 10,
+                padding: "7px 0",
+                borderBottom:
+                  i < agendas.length - 1 ? "1px solid #dde3f5" : "none",
+              }}
+            >
+              <span
+                style={{
+                  minWidth: 22,
+                  height: 22,
+                  background: "#1a3aad",
+                  color: "#f5c518",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 10,
+                  fontWeight: 800,
+                  flexShrink: 0,
+                }}
+              >
+                {i + 1}
+              </span>
+              <span
+                style={{
+                  fontSize: "clamp(11px, 3vw, 13px)",
+                  color: "#1a3060",
+                  fontFamily: "'Noto Sans Ethiopic', sans-serif",
+                  lineHeight: 1.5,
+                  flex: 1,
+                }}
+              >
+                {agenda}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
   // ✅ FIX: Safe access to translations with fallback
   const safeT = t || {};
@@ -367,6 +489,9 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           {safeYear}
         </span>
       </div>
+
+      {/* ✅ Standing Agendas — shown on every forum report per official form */}
+      <StandingAgendasPanel t={safeT} />
 
       <div
         style={{

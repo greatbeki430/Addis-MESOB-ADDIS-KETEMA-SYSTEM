@@ -1036,6 +1036,244 @@ export default function Evaluation({ t, lang }) {
         )}
       </div>
 
+      {/* ✅ BEST PERFORMER DECLARATION + SIGNATURES
+           Matches physical document: "የወሩ ምርጥ ፈፃሚ …ሆኖ ተመርጧል"
+           Team Leader + up to 5 member signatures as per official form */}
+      {sortedMembers.length > 0 && (
+        <div
+          style={{
+            ...card,
+            border: `2px solid ${C.gold}`,
+            background: "linear-gradient(135deg, #fff, #fffdf0)",
+          }}
+        >
+          {/* Best Performer Announcement */}
+          <div
+            style={{
+              textAlign: "center",
+              padding: "clamp(12px, 3vw, 20px)",
+              borderBottom: `1px solid ${C.border}`,
+              marginBottom: 20,
+            }}
+          >
+            <div
+              style={{ fontSize: "clamp(28px, 7vw, 40px)", marginBottom: 8 }}
+            >
+              🏆
+            </div>
+            <div
+              style={{
+                fontSize: "clamp(12px, 3vw, 14px)",
+                color: C.muted,
+                fontFamily: F.sans,
+                marginBottom: 8,
+              }}
+            >
+              {te.bestPerformerLabel ||
+                "የወሩ ምርጥ ፈፃሚ / Best Performer of the Month"}
+            </div>
+            <div
+              style={{
+                fontSize: "clamp(18px, 5vw, 26px)",
+                fontWeight: 900,
+                color: C.dark,
+                fontFamily: F.serif,
+                background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+                marginBottom: 4,
+              }}
+            >
+              {sortedMembers[0]?.name || "—"}
+            </div>
+            <div
+              style={{
+                fontSize: "clamp(11px, 3vw, 13px)",
+                color: C.muted,
+                fontFamily: F.sans,
+              }}
+            >
+              {te.bestPerformerSub || "ሆኖ ተመርጧል"} ·{" "}
+              {sortedMembers[0]?.total || 0} {te.points || "pts"}
+            </div>
+          </div>
+
+          {/* Signature Grid — Team Leader + up to 5 members */}
+          <div>
+            <div
+              style={{
+                fontSize: "clamp(12px, 3vw, 13px)",
+                fontWeight: 700,
+                color: C.dark,
+                fontFamily: F.sans,
+                marginBottom: 16,
+              }}
+            >
+              ✍️ {te.signaturesTitle || "ፊርማዎች / Signatures"}
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(min(100%, 160px), 1fr))",
+                gap: "clamp(12px, 3vw, 20px)",
+              }}
+            >
+              {/* Team Leader signature box */}
+              <div
+                style={{
+                  background: `linear-gradient(135deg, ${C.primary}10, ${C.gold}10)`,
+                  border: `1.5px solid ${C.primary}`,
+                  borderRadius: 10,
+                  padding: "clamp(10px, 3vw, 16px)",
+                  textAlign: "center",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "clamp(10px, 2.5vw, 11px)",
+                    fontWeight: 700,
+                    color: C.primary,
+                    fontFamily: F.sans,
+                    marginBottom: 8,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                  }}
+                >
+                  {te.teamLeaderLabel || "ቡድን መሪ / Team Leader"}
+                </div>
+                <input
+                  type="text"
+                  placeholder={te.namePlaceholder || "ስም / Name"}
+                  style={{
+                    width: "100%",
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 6,
+                    padding: "6px 8px",
+                    fontSize: "clamp(11px, 2.5vw, 12px)",
+                    fontFamily: F.sans,
+                    marginBottom: 8,
+                    textAlign: "center",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                />
+                <div
+                  style={{
+                    borderBottom: `1.5px solid ${C.dark}`,
+                    marginTop: 24,
+                    marginBottom: 4,
+                  }}
+                />
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: C.muted,
+                    fontFamily: F.sans,
+                  }}
+                >
+                  {te.signatureLine || "ፊርማ / Signature"}
+                </div>
+              </div>
+
+              {/* Member signature boxes — one per evaluated member, max 5 */}
+              {sortedMembers.slice(0, 5).map(({ name }, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    background: C.cardBg,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 10,
+                    padding: "clamp(10px, 3vw, 16px)",
+                    textAlign: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "clamp(10px, 2.5vw, 11px)",
+                      fontWeight: 600,
+                      color: C.muted,
+                      fontFamily: F.sans,
+                      marginBottom: 6,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {te.memberLabel || "ተመዛኝ ፈፃሚ"} {idx + 1}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "clamp(11px, 2.5vw, 13px)",
+                      fontWeight: 700,
+                      color: C.dark,
+                      fontFamily: F.sans,
+                      marginBottom: 4,
+                      minHeight: 20,
+                    }}
+                  >
+                    {name}
+                  </div>
+                  <div
+                    style={{
+                      borderBottom: `1.5px solid ${C.dark}`,
+                      marginTop: 24,
+                      marginBottom: 4,
+                    }}
+                  />
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: C.muted,
+                      fontFamily: F.sans,
+                    }}
+                  >
+                    {te.signatureLine || "ፊርማ / Signature"}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Date row */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                marginTop: 16,
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "clamp(11px, 3vw, 12px)",
+                  color: C.muted,
+                  fontFamily: F.sans,
+                  fontWeight: 600,
+                }}
+              >
+                {te.dateLabel || "ቀን / Date:"}
+              </span>
+              <span
+                style={{
+                  fontSize: "clamp(11px, 3vw, 12px)",
+                  color: C.dark,
+                  fontFamily: F.sans,
+                  fontWeight: 700,
+                  borderBottom: `1px solid ${C.border}`,
+                  minWidth: 120,
+                  paddingBottom: 2,
+                }}
+              >
+                {new Date().toLocaleDateString("en-GB")}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div
         style={{
