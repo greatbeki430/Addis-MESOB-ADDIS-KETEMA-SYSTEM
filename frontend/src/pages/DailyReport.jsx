@@ -49,44 +49,58 @@ export default function DailyReport({ t, lang }) {
         const response = await serviceAPI.getAll();
         console.log("🔍 Full API Response:", response);
 
-        // ✅ Handle different response formats
+        // ✅ Handle different response formats - FIXED
         let services = [];
-        if (response && response.data) {
-          // If response.data is an array, use it
-          if (Array.isArray(response.data)) {
-            services = response.data;
-          }
-          // If response.data has a data property that's an array
-          else if (response.data.data && Array.isArray(response.data.data)) {
-            services = response.data.data;
-          }
-          // If response.data has a services property that's an array
-          else if (
-            response.data.services &&
-            Array.isArray(response.data.services)
-          ) {
-            services = response.data.services;
-          }
-          // If response.data is an object with some array property
-          else if (typeof response.data === "object") {
-            for (const key in response.data) {
-              if (
-                Array.isArray(response.data[key]) &&
-                response.data[key].length > 0
-              ) {
-                const firstItem = response.data[key][0];
-                if (firstItem && (firstItem.name || firstItem.dept)) {
-                  services = response.data[key];
-                  break;
-                }
+
+        // Check if response is an array directly
+        if (Array.isArray(response)) {
+          services = response;
+        }
+        // Check if response.data is an array
+        else if (response && Array.isArray(response.data)) {
+          services = response.data;
+        }
+        // Check if response.data has a data property
+        else if (
+          response &&
+          response.data &&
+          Array.isArray(response.data.data)
+        ) {
+          services = response.data.data;
+        }
+        // Check if response has a services property
+        else if (
+          response &&
+          response.services &&
+          Array.isArray(response.services)
+        ) {
+          services = response.services;
+        }
+        // Check if response.data has a services property
+        else if (
+          response &&
+          response.data &&
+          response.data.services &&
+          Array.isArray(response.data.services)
+        ) {
+          services = response.data.services;
+        }
+        // Check if response is an object with an array property
+        else if (response && typeof response === "object") {
+          for (const key in response) {
+            if (Array.isArray(response[key]) && response[key].length > 0) {
+              const firstItem = response[key][0];
+              if (firstItem && (firstItem.dept || firstItem.name)) {
+                services = response[key];
+                break;
               }
             }
           }
-        } else if (Array.isArray(response)) {
-          services = response;
         }
 
         console.log("📦 Extracted services:", services.length);
+        console.log("📋 First service:", services[0]);
+
         setAllServices(services);
 
         // Extract unique departments
@@ -109,6 +123,8 @@ export default function DailyReport({ t, lang }) {
       try {
         setLoading(true);
         const response = await dailyReportAPI.getByDate(date);
+        console.log("📋 Daily report response:", response);
+
         if (response.data && response.data.length > 0) {
           setRows(response.data);
         } else {
