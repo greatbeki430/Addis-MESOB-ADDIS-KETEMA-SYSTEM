@@ -3,6 +3,14 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { btn, C, inp } from "../../styles/theme";
 import { serviceAPI } from "../../services/api";
 import { useToast } from "../../hooks/useToast";
+import {
+  FiEdit2,
+  FiTrash2,
+  FiPlus,
+  FiUpload,
+  FiX,
+  FiLoader,
+} from "react-icons/fi";
 
 export default function AdminServiceManager({ t }) {
   const { showToast } = useToast();
@@ -12,6 +20,8 @@ export default function AdminServiceManager({ t }) {
   const [editingService, setEditingService] = useState(null);
   const [expandedDepts, setExpandedDepts] = useState({});
   const [hoveredDept, setHoveredDept] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
     dept: "",
     deptEn: "",
@@ -19,6 +29,7 @@ export default function AdminServiceManager({ t }) {
     nameEn: "",
     active: true,
     stdTime: "",
+    image: "",
   });
 
   const isInitialLoadRef = useRef(true);
@@ -81,14 +92,51 @@ export default function AdminServiceManager({ t }) {
     }
   };
 
+  // Handle image upload - convert to Base64 for sending to backend
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        showToast("Please upload an image file", "error");
+        return;
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showToast("Image size should be less than 5MB", "error");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result);
+        setFormData((prev) => ({ ...prev, image: reader.result }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeImage = () => {
+    setImagePreview("");
+    setFormData((prev) => ({ ...prev, image: "" }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      setUploading(true);
+
+      const submitData = { ...formData };
+
+      // If image is empty string and editing, it means user wants to remove image
+      if (submitData.image === "" && editingService && editingService.image) {
+        submitData.image = "";
+      }
+
       if (editingService) {
-        await serviceAPI.update(editingService._id, formData);
+        await serviceAPI.update(editingService._id, submitData);
         showToast("Service updated successfully!", "success");
       } else {
-        await serviceAPI.create(formData);
+        await serviceAPI.create(submitData);
         showToast("Service added successfully!", "success");
       }
       setShowAddModal(false);
@@ -100,11 +148,15 @@ export default function AdminServiceManager({ t }) {
         nameEn: "",
         active: true,
         stdTime: "",
+        image: "",
       });
+      setImagePreview("");
       isExpandedInitializedRef.current = false;
       await loadServices();
     } catch (err) {
       showToast(err.response?.data?.message || "Operation failed", "error");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -130,7 +182,9 @@ export default function AdminServiceManager({ t }) {
       nameEn: service.nameEn || "",
       active: service.active,
       stdTime: service.stdTime || "",
+      image: service.image || "",
     });
+    setImagePreview(service.image || "");
     setShowAddModal(true);
   };
 
@@ -158,6 +212,10 @@ export default function AdminServiceManager({ t }) {
           0% { transform: rotate(180deg) scale(1); }
           50% { transform: rotate(0deg) scale(1.2); }
           100% { transform: rotate(0deg) scale(1); }
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
         .dept-header {
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -205,6 +263,40 @@ export default function AdminServiceManager({ t }) {
         .service-row-enter {
           animation: fadeSlideIn 0.3s ease forwards;
         }
+        .image-preview-container {
+          position: relative;
+          display: inline-block;
+          width: 80px;
+          height: 80px;
+          border-radius: 8px;
+          overflow: hidden;
+          border: 2px solid #e5e7eb;
+        }
+        .image-preview-container img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+        .image-preview-container .remove-btn {
+          position: absolute;
+          top: -6px;
+          right: -6px;
+          background: #ef4444;
+          color: white;
+          border: none;
+          border-radius: 50%;
+          width: 20px;
+          height: 20px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 12px;
+          transition: all 0.2s;
+        }
+        .image-preview-container .remove-btn:hover {
+          transform: scale(1.1);
+        }
         @keyframes fadeSlideIn {
           from {
             opacity: 0;
@@ -217,6 +309,7 @@ export default function AdminServiceManager({ t }) {
         }
       `}</style>
 
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -265,21 +358,30 @@ export default function AdminServiceManager({ t }) {
                 nameEn: "",
                 active: true,
                 stdTime: "",
+                image: "",
               });
+              setImagePreview("");
               setShowAddModal(true);
             }}
             style={btn.primary}
           >
-            ➕ {ts.addServiceBtn || "Add Service"}
+            <FiPlus size={16} style={{ marginRight: 6 }} />
+            {ts.addServiceBtn || "Add Service"}
           </button>
         </div>
       </div>
 
+      {/* Loading State */}
       {loading ? (
         <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
-          ⏳ Loading...
+          <FiLoader
+            size={24}
+            style={{ animation: "spin 1s linear infinite" }}
+          />
+          <div style={{ marginTop: 12 }}>Loading...</div>
         </div>
       ) : (
+        /* Services Table */
         <div style={{ overflowX: "auto" }}>
           <table
             style={{
@@ -306,7 +408,7 @@ export default function AdminServiceManager({ t }) {
                   style={{
                     padding: "12px 16px",
                     textAlign: "left",
-                    width: "250px",
+                    width: "200px",
                   }}
                 >
                   Department
@@ -316,6 +418,15 @@ export default function AdminServiceManager({ t }) {
                 </th>
                 <th style={{ padding: "12px 16px", textAlign: "left" }}>
                   English Name
+                </th>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "center",
+                    width: "100px",
+                  }}
+                >
+                  Image
                 </th>
                 <th
                   style={{
@@ -360,7 +471,7 @@ export default function AdminServiceManager({ t }) {
                       onMouseEnter={() => setHoveredDept(dept)}
                       onMouseLeave={() => setHoveredDept(null)}
                     >
-                      <td colSpan="6" style={{ padding: "12px 16px" }}>
+                      <td colSpan="7" style={{ padding: "12px 16px" }}>
                         <div
                           style={{
                             display: "flex",
@@ -490,7 +601,6 @@ export default function AdminServiceManager({ t }) {
                             >
                               {globalIndex}
                             </td>
-                            {/* EMPTY Department cell - no repeat */}
                             <td
                               style={{
                                 padding: "10px 16px",
@@ -499,7 +609,6 @@ export default function AdminServiceManager({ t }) {
                                 fontSize: 12,
                               }}
                             >
-                              {/* Intentionally empty to avoid repeating department name */}
                               <span
                                 style={{ opacity: 0.3, fontStyle: "italic" }}
                               >
@@ -522,6 +631,36 @@ export default function AdminServiceManager({ t }) {
                               style={{ padding: "10px 16px", color: C.muted }}
                             >
                               {s.nameEn}
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 16px",
+                                textAlign: "center",
+                              }}
+                            >
+                              {s.image ? (
+                                <img
+                                  src={s.image}
+                                  alt={s.name}
+                                  style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 6,
+                                    objectFit: "cover",
+                                    border: `1px solid ${C.border}`,
+                                  }}
+                                />
+                              ) : (
+                                <span
+                                  style={{
+                                    color: C.muted,
+                                    fontSize: 11,
+                                    fontStyle: "italic",
+                                  }}
+                                >
+                                  No image
+                                </span>
+                              )}
                             </td>
                             <td
                               style={{
@@ -575,7 +714,7 @@ export default function AdminServiceManager({ t }) {
                                 }}
                                 title="Edit"
                               >
-                                ✏️
+                                <FiEdit2 size={16} color="#3b82f6" />
                               </button>
                               <button
                                 onClick={() => handleDelete(s._id)}
@@ -601,7 +740,7 @@ export default function AdminServiceManager({ t }) {
                                 }}
                                 title="Delete"
                               >
-                                🗑️
+                                <FiTrash2 size={16} />
                               </button>
                             </td>
                           </tr>
@@ -615,7 +754,7 @@ export default function AdminServiceManager({ t }) {
         </div>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal with Image Upload */}
       {showAddModal && (
         <div
           style={{
@@ -628,7 +767,9 @@ export default function AdminServiceManager({ t }) {
             zIndex: 1000,
             padding: 16,
           }}
-          onClick={() => setShowAddModal(false)}
+          onClick={() => {
+            if (!uploading) setShowAddModal(false);
+          }}
         >
           <div
             style={{
@@ -636,7 +777,9 @@ export default function AdminServiceManager({ t }) {
               borderRadius: 16,
               padding: 28,
               width: "90%",
-              maxWidth: 500,
+              maxWidth: 550,
+              maxHeight: "90vh",
+              overflow: "auto",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -646,12 +789,26 @@ export default function AdminServiceManager({ t }) {
                 fontSize: "clamp(20px, 5vw, 24px)",
                 fontWeight: 800,
                 color: C.dark,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
               }}
             >
-              {editingService ? "✏️ Edit Service" : "➕ Add New Service"}
+              {editingService ? (
+                <>
+                  <FiEdit2 size={22} color="#3b82f6" />
+                  Edit Service
+                </>
+              ) : (
+                <>
+                  <FiPlus size={22} color={C.primary} />
+                  Add New Service
+                </>
+              )}
             </h2>
             <form onSubmit={handleSubmit}>
               <div style={{ display: "grid", gap: 12 }}>
+                {/* Department (Amharic) */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -669,6 +826,8 @@ export default function AdminServiceManager({ t }) {
                     placeholder="e.g., ስርዓቶች"
                   />
                 </div>
+
+                {/* Department (English) */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -685,6 +844,8 @@ export default function AdminServiceManager({ t }) {
                     placeholder="e.g., Systems"
                   />
                 </div>
+
+                {/* Service Name (Amharic) */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -702,6 +863,8 @@ export default function AdminServiceManager({ t }) {
                     placeholder="e.g., ቲን ፈጅስትፈሸን"
                   />
                 </div>
+
+                {/* Service Name (English) */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -718,6 +881,8 @@ export default function AdminServiceManager({ t }) {
                     placeholder="e.g., TIN Registration"
                   />
                 </div>
+
+                {/* Standard Time */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -734,6 +899,78 @@ export default function AdminServiceManager({ t }) {
                     placeholder="e.g., 30 min"
                   />
                 </div>
+
+                {/* Image Upload */}
+                <div>
+                  <label
+                    style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
+                  >
+                    Service Image
+                  </label>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <label
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "8px 16px",
+                        background: "#f3f4f6",
+                        borderRadius: 8,
+                        cursor: "pointer",
+                        border: `1px dashed ${C.border}`,
+                        transition: "all 0.3s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#e5e7eb";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#f3f4f6";
+                      }}
+                    >
+                      <FiUpload size={16} />
+                      <span style={{ fontSize: 13 }}>Upload Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        style={{ display: "none" }}
+                      />
+                    </label>
+
+                    {/* Image Preview */}
+                    {imagePreview && (
+                      <div className="image-preview-container">
+                        <img src={imagePreview} alt="Preview" />
+                        <button
+                          type="button"
+                          className="remove-btn"
+                          onClick={removeImage}
+                        >
+                          <FiX size={12} />
+                        </button>
+                      </div>
+                    )}
+
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: C.muted,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      Max 5MB • JPG, PNG, GIF
+                    </span>
+                  </div>
+                </div>
+
+                {/* Status */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -755,6 +992,8 @@ export default function AdminServiceManager({ t }) {
                   </select>
                 </div>
               </div>
+
+              {/* Modal Actions */}
               <div
                 style={{
                   display: "flex",
@@ -767,11 +1006,35 @@ export default function AdminServiceManager({ t }) {
                   type="button"
                   onClick={() => setShowAddModal(false)}
                   style={btn.secondary}
+                  disabled={uploading}
                 >
                   Cancel
                 </button>
-                <button type="submit" style={btn.primary}>
-                  {editingService ? "💾 Update" : "✅ Create"}
+                <button
+                  type="submit"
+                  style={{
+                    ...btn.primary,
+                    opacity: uploading ? 0.7 : 1,
+                    cursor: uploading ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <FiLoader
+                        size={16}
+                        style={{ animation: "spin 0.8s linear infinite" }}
+                      />
+                      Saving...
+                    </>
+                  ) : editingService ? (
+                    "💾 Update"
+                  ) : (
+                    "✅ Create"
+                  )}
                 </button>
               </div>
             </form>

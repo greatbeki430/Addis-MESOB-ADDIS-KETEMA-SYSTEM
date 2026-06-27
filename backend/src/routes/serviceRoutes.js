@@ -1,3 +1,4 @@
+// backend/routes/serviceRoutes.js
 const express = require("express");
 const {
   getServices,
@@ -10,10 +11,7 @@ const { protect } = require("../middleware/auth");
 
 const router = express.Router();
 
-// Public routes
 router.get("/", getServices);
-
-// Admin only routes
 router.post("/seed", protect, seedServices);
 router.post("/", protect, addService);
 router.put("/:id", protect, updateService);

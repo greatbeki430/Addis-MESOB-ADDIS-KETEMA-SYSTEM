@@ -1,7 +1,8 @@
+// backend/controllers/serviceController.js
 const Service = require("../models/Service");
-const SERVICES = require("../constants/services"); // ✅ Import from shared constants
+const SERVICES = require("../constants/services");
+const cloudinary = require("../src/config/cloudinary");
 
-// ✅ Get all services
 const getServices = async (req, res) => {
   try {
     const services = await Service.find();
@@ -11,10 +12,8 @@ const getServices = async (req, res) => {
   }
 };
 
-// ✅ Seed services - Bulk import (clears existing and inserts new)
 const seedServices = async (req, res) => {
   try {
-    // Check if user is admin/superadmin
     if (
       !req.user ||
       (req.user.role !== "admin" && req.user.role !== "superadmin")
@@ -24,13 +23,10 @@ const seedServices = async (req, res) => {
         .json({ message: "Unauthorized: Admin access required" });
     }
 
-    // Clear existing services
     await Service.deleteMany({});
     console.log("🗑️ Cleared existing services");
 
-    // Insert all services from shared constants
     const result = await Service.insertMany(SERVICES);
-
     res.status(201).json({
       message: `✅ ${result.length} services seeded successfully!`,
       count: result.length,
@@ -42,10 +38,39 @@ const seedServices = async (req, res) => {
   }
 };
 
-// ✅ Add a single service (via UI)
+const uploadImage = async (base64Image) => {
+  try {
+    const result = await cloudinary.uploader.upload(base64Image, {
+      folder: "services",
+      transformation: [
+        { width: 200, height: 200, crop: "fill" },
+        { quality: "auto:good" },
+        { fetch_format: "auto" },
+      ],
+    });
+    return {
+      url: result.secure_url,
+      publicId: result.public_id,
+    };
+  } catch (error) {
+    console.error("Cloudinary upload error:", error);
+    throw new Error("Failed to upload image");
+  }
+};
+
+const deleteImage = async (publicId) => {
+  try {
+    if (publicId) {
+      await cloudinary.uploader.destroy(publicId);
+      console.log(`🗑️ Deleted image: ${publicId}`);
+    }
+  } catch (error) {
+    console.error("Cloudinary delete error:", error);
+  }
+};
+
 const addService = async (req, res) => {
   try {
-    // Check if user is admin/superadmin
     if (
       !req.user ||
       (req.user.role !== "admin" && req.user.role !== "superadmin")
@@ -55,21 +80,32 @@ const addService = async (req, res) => {
         .json({ message: "Unauthorized: Admin access required" });
     }
 
-    const { dept, deptEn, name, nameEn, active, stdTime } = req.body;
+    const { dept, deptEn, name, nameEn, active, stdTime, image } = req.body;
 
-    // Validate required fields
     if (!dept || !name) {
       return res
         .status(400)
         .json({ message: "Department and Name are required" });
     }
 
-    // Check if service already exists
     const existing = await Service.findOne({ name, dept });
     if (existing) {
       return res
         .status(400)
         .json({ message: "Service already exists in this department" });
+    }
+
+    let imageUrl = "";
+    let imagePublicId = "";
+
+    if (image && image.startsWith("data:image")) {
+      try {
+        const uploadResult = await uploadImage(image);
+        imageUrl = uploadResult.url;
+        imagePublicId = uploadResult.publicId;
+      } catch (error) {
+        return res.status(400).json({ message: "Failed to upload image" });
+      }
     }
 
     const service = new Service({
@@ -79,6 +115,8 @@ const addService = async (req, res) => {
       nameEn: nameEn || name,
       active: active !== undefined ? active : true,
       stdTime: stdTime || "",
+      image: imageUrl,
+      imagePublicId: imagePublicId,
     });
 
     await service.save();
@@ -92,7 +130,6 @@ const addService = async (req, res) => {
   }
 };
 
-// ✅ Update a service
 const updateService = async (req, res) => {
   try {
     if (
@@ -107,14 +144,35 @@ const updateService = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
+    const existingService = await Service.findById(id);
+    if (!existingService) {
+      return res.status(404).json({ message: "Service not found" });
+    }
+
+    if (updates.image) {
+      if (updates.image.startsWith("data:image")) {
+        if (existingService.imagePublicId) {
+          await deleteImage(existingService.imagePublicId);
+        }
+        try {
+          const uploadResult = await uploadImage(updates.image);
+          updates.image = uploadResult.url;
+          updates.imagePublicId = uploadResult.publicId;
+        } catch (error) {
+          return res.status(400).json({ message: "Failed to upload image" });
+        }
+      } else if (updates.image === "") {
+        if (existingService.imagePublicId) {
+          await deleteImage(existingService.imagePublicId);
+        }
+        updates.imagePublicId = "";
+      }
+    }
+
     const service = await Service.findByIdAndUpdate(id, updates, {
       new: true,
       runValidators: true,
     });
-
-    if (!service) {
-      return res.status(404).json({ message: "Service not found" });
-    }
 
     res.json({
       message: "✅ Service updated successfully!",
@@ -126,7 +184,6 @@ const updateService = async (req, res) => {
   }
 };
 
-// ✅ Delete a service
 const deleteService = async (req, res) => {
   try {
     if (
@@ -139,15 +196,20 @@ const deleteService = async (req, res) => {
     }
 
     const { id } = req.params;
-    const service = await Service.findByIdAndDelete(id);
 
+    const service = await Service.findById(id);
     if (!service) {
       return res.status(404).json({ message: "Service not found" });
     }
 
+    if (service.imagePublicId) {
+      await deleteImage(service.imagePublicId);
+    }
+
+    await Service.findByIdAndDelete(id);
+
     res.json({
       message: "✅ Service deleted successfully!",
-      service,
     });
   } catch (error) {
     console.error("Delete service error:", error);
