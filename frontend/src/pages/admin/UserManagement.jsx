@@ -12,7 +12,7 @@ import {
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../hooks/useToast";
 
-// ✅ Reusable Action Button Component with improved styling
+// ✅ Reusable Action Button Component
 const ActionButton = ({ onClick, icon, label, color = C.primary, title }) => (
   <button
     onClick={onClick}
@@ -46,7 +46,6 @@ const ActionButton = ({ onClick, icon, label, color = C.primary, title }) => (
   </button>
 );
 
-// ✅ Role Description Component
 const RoleDescription = ({ role }) => {
   const descriptions = {
     superadmin: "Full system control • Manage all users & teams",
@@ -70,18 +69,14 @@ const RoleDescription = ({ role }) => {
 };
 
 export default function UserManagement({ t }) {
-  // ✅ FIX: Safely access translations with multiple fallback layers
   const safeT = t || {};
   const tu = safeT.userManagement || {};
   const safeCommon = safeT.common || {};
 
-  // Fallback translations for all keys
   const getTranslation = (key) => {
-    // Try to get from userManagement object first
     if (tu && tu[key]) {
       return tu[key];
     }
-    // Fallback to hardcoded English
     const fallback = {
       title: "User Management",
       subtitle: "Manage all users in the system",
@@ -133,7 +128,6 @@ export default function UserManagement({ t }) {
       invalidRoleMessage: "Please use: employee, leader, or admin",
       changeRolePrompt: "Change role for",
       roleOptions: "Enter one of: employee, leader, admin",
-      // changeRole: "Role",
       minPassword: "Min 6 characters",
       updateSuccess: "User updated successfully!",
       createSuccess: "User created successfully!",
@@ -141,34 +135,6 @@ export default function UserManagement({ t }) {
       deleteError: "Delete failed. Please try again.",
       saveError: "Operation failed. Please try again.",
       loadError: "Failed to load users. Please refresh the page.",
-      noTeams: "No teams created yet.",
-      notAssigned: "Not assigned",
-      leader: "Leader",
-      members: "Members",
-      // created: "Created",
-      editTeam: "Edit Team",
-      addNewTeam: "Add New Team",
-      teamName: "Team Name",
-      department: "Department",
-      departmentPlaceholder: "e.g., Customer Service",
-      // teamLeader: "Team Leader",
-      selectLeader: "Select Team Leader",
-      update: "Update",
-      create: "Create",
-      refreshSuccess: "Data refreshed successfully",
-      refreshError: "Failed to refresh data",
-      // updateSuccess: "Team updated successfully!",
-      // createSuccess: "Team created successfully!",
-      // deleteSuccess: "Team deleted successfully!",
-      // deleteError: "Delete failed. Please try again.",
-      // saveError: "Operation failed. Please try again.",
-      // confirmDeleteTitle: "Confirm Delete",
-      // confirmDeleteMessage: "Are you sure you want to delete",
-      // deleteWarning: "This action cannot be undone.",
-      addTeam: "Add New Team",
-      // noTeams: "No teams created yet.",
-      noDepartment: "No department",
-      // notAssigned: "Not assigned",
     };
     return fallback[key] || key;
   };
@@ -188,7 +154,6 @@ export default function UserManagement({ t }) {
   });
   const { user: currentUser, isSuperAdmin, isAdmin } = useAuth();
 
-  // ✅ Modal states
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     userId: null,
@@ -204,9 +169,10 @@ export default function UserManagement({ t }) {
     message: "",
     type: "info",
   });
-  const { showToast, ToastContainer } = useToast();
 
-  // ✅ Load users on mount
+  // Use toast but DON'T render ToastContainer here (it's in App.jsx)
+  const { showToast } = useToast();
+
   useEffect(() => {
     loadUsers();
   }, []);
@@ -298,7 +264,6 @@ export default function UserManagement({ t }) {
     });
   };
 
-  // ✅ Filter users based on search and role
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -346,10 +311,9 @@ export default function UserManagement({ t }) {
 
   return (
     <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
-      {/* ✅ Toast Container */}
-      <ToastContainer />
+      {/* Modals - no ToastContainer here */}
 
-      {/* ✅ Alert Modal */}
+      {/* Alert Modal */}
       <Modal
         isOpen={alertModal.isOpen}
         onClose={() =>
@@ -360,7 +324,7 @@ export default function UserManagement({ t }) {
         type={alertModal.type}
       />
 
-      {/* ✅ Confirm Delete Modal */}
+      {/* Confirm Delete Modal */}
       <Modal
         isOpen={confirmModal.isOpen}
         onClose={() =>
@@ -377,7 +341,7 @@ export default function UserManagement({ t }) {
         }
       />
 
-      {/* ✅ View User Modal */}
+      {/* View User Modal */}
       <Modal
         isOpen={viewModal.isOpen}
         onClose={() => setViewModal({ isOpen: false, user: null })}
@@ -851,7 +815,6 @@ export default function UserManagement({ t }) {
                       gap: 4,
                     }}
                   >
-                    {/* ✏️ Edit Button */}
                     <ActionButton
                       onClick={() => {
                         setEditingUser(user);
@@ -870,7 +833,6 @@ export default function UserManagement({ t }) {
                       title={getTranslation("edit")}
                     />
 
-                    {/* 👁️ View Button */}
                     <ActionButton
                       onClick={() => openViewModal(user)}
                       icon="👁️"
@@ -879,7 +841,6 @@ export default function UserManagement({ t }) {
                       title={getTranslation("viewDetails")}
                     />
 
-                    {/* 🔄 Role Change Button */}
                     {isSuperAdmin && user.role !== ROLES.SUPER_ADMIN && (
                       <ActionButton
                         onClick={() => {
@@ -926,7 +887,6 @@ export default function UserManagement({ t }) {
                       />
                     )}
 
-                    {/* 🗑️ Delete Button */}
                     {canDeleteUser(user) && (
                       <ActionButton
                         onClick={() => openDeleteConfirm(user._id, user.name)}
@@ -942,7 +902,6 @@ export default function UserManagement({ t }) {
             </tbody>
           </table>
 
-          {/* Empty State */}
           {filteredUsers.length === 0 && (
             <div
               style={{

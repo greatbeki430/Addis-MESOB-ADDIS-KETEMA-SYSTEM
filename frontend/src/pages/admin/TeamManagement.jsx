@@ -6,12 +6,10 @@ import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../hooks/useToast";
 
 export default function TeamManagement({ t, isSuperAdmin }) {
-  // ✅ FIX: Safely access translations with fallback
   const safeT = t || {};
   const tt = safeT.teamManagement || {};
   const safeCommon = safeT.common || {};
 
-  // ✅ Fallback function for translations
   const getTranslation = (key) => {
     if (tt && tt[key]) {
       return tt[key];
@@ -62,7 +60,6 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     leader: "",
   });
 
-  // ✅ Modal states
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     teamId: null,
@@ -74,7 +71,9 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     message: "",
     type: "info",
   });
-  const { showToast, ToastContainer } = useToast();
+
+  // Use toast but DON'T render ToastContainer here (it's in App.jsx)
+  const { showToast } = useToast();
 
   const fetchData = useCallback(async () => {
     try {
@@ -171,10 +170,8 @@ export default function TeamManagement({ t, isSuperAdmin }) {
 
   return (
     <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
-      {/* ✅ Toast Container */}
-      <ToastContainer />
+      {/* Modals - no ToastContainer here */}
 
-      {/* ✅ Alert Modal */}
       <Modal
         isOpen={alertModal.isOpen}
         onClose={() =>
@@ -185,7 +182,6 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         type={alertModal.type}
       />
 
-      {/* ✅ Confirm Delete Modal */}
       <Modal
         isOpen={confirmModal.isOpen}
         onClose={() =>
