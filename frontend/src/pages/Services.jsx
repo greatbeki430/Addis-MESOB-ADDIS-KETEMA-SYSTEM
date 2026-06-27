@@ -10,8 +10,6 @@ import {
   FiBox,
   FiCheck,
   FiX,
-  // FiPlus,
-  // FiMinus,
   FiSettings,
   FiStar,
   FiAward,
@@ -24,22 +22,10 @@ import {
   FiPhone,
   FiMail,
   FiGlobe,
-  // FiInfo,
-  // FiAlertCircle,
-  // FiCheckCircle,
-  // FiXCircle,
-  // FiTrendingUp,
-  // FiTrendingDown,
-  // FiBarChart2,
-  // FiPieChart,
-  // FiLayers,
-  // FiFilter,
-  // FiRefreshCw,
   // FiLoader,
 } from "react-icons/fi";
 
 export default function Services({ t, lang }) {
-  // ✅ FIX: Safe access to translations with fallback
   const safeT = t || {};
   const ts = safeT.services || {};
   const safeCommon = safeT.common || {};
@@ -50,16 +36,76 @@ export default function Services({ t, lang }) {
   const [filter, setFilter] = useState("all");
   const [hoveredCard, setHoveredCard] = useState(null);
   const [searchFocused, setSearchFocused] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Load services from API
   useEffect(() => {
     const loadServices = async () => {
       try {
         setLoading(true);
+        setError(null);
         const response = await serviceAPI.getAll();
-        setServices(response.data || SERVICES);
+
+        console.log("✅ API Response:", response);
+
+        // ✅ Handle different response formats
+        let serviceData = [];
+
+        if (response) {
+          // If response is already an array
+          if (Array.isArray(response)) {
+            serviceData = response;
+          }
+          // If response has a data property that's an array
+          else if (response.data && Array.isArray(response.data)) {
+            serviceData = response.data;
+          }
+          // If response has a data property that has a data property
+          else if (
+            response.data &&
+            response.data.data &&
+            Array.isArray(response.data.data)
+          ) {
+            serviceData = response.data.data;
+          }
+          // If response has a services property
+          else if (response.services && Array.isArray(response.services)) {
+            serviceData = response.services;
+          }
+          // If response.data is an object with services
+          else if (
+            response.data &&
+            response.data.services &&
+            Array.isArray(response.data.services)
+          ) {
+            serviceData = response.data.services;
+          }
+          // If response is a plain object, try to extract any array
+          else if (typeof response === "object") {
+            // Look for any property that is an array
+            for (const key in response) {
+              if (Array.isArray(response[key]) && response[key].length > 0) {
+                // Check if the first item has service-like properties
+                const firstItem = response[key][0];
+                if (firstItem && (firstItem.name || firstItem.dept)) {
+                  serviceData = response[key];
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        console.log("📦 Extracted services:", serviceData.length);
+
+        if (serviceData.length > 0) {
+          setServices(serviceData);
+        } else {
+          console.warn("⚠️ No services found in response, using fallback");
+          setServices(SERVICES);
+        }
       } catch (error) {
-        console.error("Failed to load services:", error);
+        console.error("❌ Failed to load services:", error);
+        setError(error.message || "Failed to load services");
         setServices(SERVICES);
       } finally {
         setLoading(false);
@@ -71,27 +117,30 @@ export default function Services({ t, lang }) {
   // Map localized names
   const localizedServices = services.map((s) => ({
     ...s,
-    displayName: lang === "en" ? s.nameEn : s.name,
-    displayDept: lang === "en" ? s.deptEn : s.dept,
+    displayName:
+      lang === "en"
+        ? s.nameEn || s.name || "Unnamed Service"
+        : s.name || "Unnamed Service",
+    displayDept:
+      lang === "en"
+        ? s.deptEn || s.dept || "Uncategorized"
+        : s.dept || "Uncategorized",
   }));
 
-  // Get unique departments
   const depts = [
     ts.all || "All",
-    ...new Set(localizedServices.map((s) => s.displayDept)),
+    ...new Set(localizedServices.map((s) => s.displayDept).filter(Boolean)),
   ];
 
-  // Filter services
   const filtered = localizedServices.filter(
     (s) =>
       (filter === (ts.all || "All") || s.displayDept === filter) &&
-      (s.displayName.toLowerCase().includes(search.toLowerCase()) ||
-        s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.nameEn.toLowerCase().includes(search.toLowerCase()) ||
-        s.displayDept.toLowerCase().includes(search.toLowerCase())),
+      (s.displayName?.toLowerCase().includes(search.toLowerCase()) ||
+        s.name?.toLowerCase().includes(search.toLowerCase()) ||
+        s.nameEn?.toLowerCase().includes(search.toLowerCase()) ||
+        s.displayDept?.toLowerCase().includes(search.toLowerCase())),
   );
 
-  // Get icon for service
   const getServiceIcon = (index) => {
     const icons = [
       <FiTool size={24} />,
@@ -122,7 +171,7 @@ export default function Services({ t, lang }) {
         animation: "fadeInUp 0.5s ease",
       }}
     >
-      {/* Header */}
+      {/* Header - same as before */}
       <div
         style={{
           display: "flex",
@@ -228,7 +277,7 @@ export default function Services({ t, lang }) {
                 boxShadow: searchFocused ? `0 0 0 3px ${C.primary}22` : "none",
                 transition: "all 0.3s ease",
               }}
-              placeholder={ts.search || "➤ Search services..."}
+              placeholder={ts.search || "Search services..."}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onFocus={() => setSearchFocused(true)}
@@ -257,6 +306,26 @@ export default function Services({ t, lang }) {
           </select>
         </div>
       </div>
+
+      {/* Error State */}
+      {error && (
+        <div
+          style={{
+            background: "#fee2e2",
+            color: "#dc2626",
+            padding: "12px 16px",
+            borderRadius: 8,
+            marginBottom: 16,
+            border: "1px solid #fecaca",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span>⚠️</span>
+          {error}
+        </div>
+      )}
 
       {/* Loading State */}
       {loading && (
@@ -311,7 +380,7 @@ export default function Services({ t, lang }) {
       )}
 
       {/* Services Grid */}
-      {!loading && (
+      {!loading && !error && (
         <div
           style={{
             display: "grid",
@@ -320,150 +389,151 @@ export default function Services({ t, lang }) {
             gap: "clamp(12px, 3vw, 16px)",
           }}
         >
-          {filtered.map((s, i) => (
+          {filtered.length > 0 ? (
+            filtered.map((s, i) => (
+              <div
+                key={s._id || i}
+                style={{
+                  background: C.white,
+                  borderRadius: "clamp(10px, 2.5vw, 14px)",
+                  padding: "clamp(14px, 4vw, 20px)",
+                  boxShadow:
+                    hoveredCard === i
+                      ? "0 8px 30px rgba(0,0,0,0.12)"
+                      : "0 2px 10px rgba(0,0,0,0.06)",
+                  border: `1px solid ${hoveredCard === i ? C.primary : C.border}`,
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  cursor: "pointer",
+                  transform:
+                    hoveredCard === i ? "translateY(-4px)" : "translateY(0)",
+                  animation: `fadeInUp ${0.2 + i * 0.05}s ease`,
+                }}
+                onMouseEnter={() => setHoveredCard(i)}
+                onMouseLeave={() => setHoveredCard(null)}
+              >
+                <div
+                  style={{
+                    fontSize: "clamp(22px, 6vw, 28px)",
+                    color: C.primary,
+                    marginBottom: "clamp(8px, 2.5vw, 10px)",
+                    transition: "transform 0.3s ease",
+                    transform:
+                      hoveredCard === i
+                        ? "scale(1.2) rotate(10deg)"
+                        : "scale(1) rotate(0deg)",
+                  }}
+                >
+                  {getServiceIcon(i)}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "clamp(12px, 3.5vw, 14px)",
+                    fontWeight: 700,
+                    fontFamily: F.sans,
+                    marginBottom: 4,
+                    color: C.dark,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {s.displayName || s.name || "Unnamed Service"}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "clamp(9px, 2.5vw, 10px)",
+                    color: "#bbb",
+                    fontFamily: F.sans,
+                    marginBottom: 4,
+                    wordBreak: "break-word",
+                  }}
+                >
+                  {lang === "en" ? s.name || s.nameEn : s.nameEn || s.name}
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "clamp(10px, 2.5vw, 11px)",
+                    color: "#888",
+                    fontFamily: F.sans,
+                    marginBottom: "clamp(8px, 2.5vw, 12px)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <FiBriefcase size={12} />
+                  {s.displayDept || s.dept || "Uncategorized"}
+                </div>
+
+                <span
+                  style={{
+                    background: s.active ? C.bg : "#ffeee8",
+                    color: s.active ? C.primary : C.orange,
+                    borderRadius: 12,
+                    padding: "clamp(3px, 1.5vw, 5px) clamp(10px, 2.5vw, 14px)",
+                    fontSize: "clamp(9px, 2.5vw, 10px)",
+                    fontWeight: 700,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    transition: "all 0.3s ease",
+                    transform: hoveredCard === i ? "scale(1.05)" : "scale(1)",
+                  }}
+                >
+                  {s.active ? (
+                    <>
+                      <FiCheck size={10} />
+                      {ts.active || "Active"}
+                    </>
+                  ) : (
+                    <>
+                      <FiX size={10} />
+                      {ts.inactive || "Inactive"}
+                    </>
+                  )}
+                </span>
+              </div>
+            ))
+          ) : (
             <div
-              key={i}
               style={{
-                background: C.white,
-                borderRadius: "clamp(10px, 2.5vw, 14px)",
-                padding: "clamp(14px, 4vw, 20px)",
-                boxShadow:
-                  hoveredCard === i
-                    ? "0 8px 30px rgba(0,0,0,0.12)"
-                    : "0 2px 10px rgba(0,0,0,0.06)",
-                border: `1px solid ${hoveredCard === i ? C.primary : C.border}`,
-                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                cursor: "pointer",
-                transform:
-                  hoveredCard === i ? "translateY(-4px)" : "translateY(0)",
-                animation: `fadeInUp ${0.2 + i * 0.05}s ease`,
+                gridColumn: "1 / -1",
+                textAlign: "center",
+                padding: "clamp(40px, 10vw, 60px) clamp(20px, 5vw, 40px)",
+                color: "#999",
+                fontFamily: F.sans,
+                animation: "fadeInUp 0.4s ease",
               }}
-              onMouseEnter={() => setHoveredCard(i)}
-              onMouseLeave={() => setHoveredCard(null)}
             >
               <div
                 style={{
-                  fontSize: "clamp(22px, 6vw, 28px)",
-                  color: C.primary,
-                  marginBottom: "clamp(8px, 2.5vw, 10px)",
-                  transition: "transform 0.3s ease",
-                  transform:
-                    hoveredCard === i
-                      ? "scale(1.2) rotate(10deg)"
-                      : "scale(1) rotate(0deg)",
+                  fontSize: "clamp(40px, 10vw, 56px)",
+                  marginBottom: "clamp(12px, 3vw, 16px)",
+                  opacity: 0.5,
                 }}
               >
-                {getServiceIcon(i)}
+                <FiPackage
+                  size={56}
+                  color={C.muted}
+                  style={{ display: "block", margin: "0 auto" }}
+                />
               </div>
-
-              <div
+              <p style={{ fontSize: "clamp(14px, 3.5vw, 16px)" }}>
+                {ts.noneFound || "No services found"}
+              </p>
+              <p
                 style={{
-                  fontSize: "clamp(12px, 3.5vw, 14px)",
-                  fontWeight: 700,
-                  fontFamily: F.sans,
-                  marginBottom: 4,
-                  color: C.dark,
-                  lineHeight: 1.3,
-                }}
-              >
-                {s.displayName}
-              </div>
-
-              <div
-                style={{
-                  fontSize: "clamp(9px, 2.5vw, 10px)",
+                  fontSize: "clamp(12px, 3vw, 13px)",
                   color: "#bbb",
-                  fontFamily: F.sans,
-                  marginBottom: 4,
-                  wordBreak: "break-word",
+                  marginTop: 8,
                 }}
               >
-                {lang === "en" ? s.name : s.nameEn}
-              </div>
-
-              <div
-                style={{
-                  fontSize: "clamp(10px, 2.5vw, 11px)",
-                  color: "#888",
-                  fontFamily: F.sans,
-                  marginBottom: "clamp(8px, 2.5vw, 12px)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <FiBriefcase size={12} />
-                {s.displayDept}
-              </div>
-
-              <span
-                style={{
-                  background: s.active ? C.bg : "#ffeee8",
-                  color: s.active ? C.primary : C.orange,
-                  borderRadius: 12,
-                  padding: "clamp(3px, 1.5vw, 5px) clamp(10px, 2.5vw, 14px)",
-                  fontSize: "clamp(9px, 2.5vw, 10px)",
-                  fontWeight: 700,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                  transition: "all 0.3s ease",
-                  transform: hoveredCard === i ? "scale(1.05)" : "scale(1)",
-                }}
-              >
-                {s.active ? (
-                  <>
-                    <FiCheck size={10} />
-                    {ts.active || "Active"}
-                  </>
-                ) : (
-                  <>
-                    <FiX size={10} />
-                    {ts.inactive || "Inactive"}
-                  </>
-                )}
-              </span>
+                {safeCommon.tryAdjusting ||
+                  "Try adjusting your search or filter"}
+              </p>
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!loading && filtered.length === 0 && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "clamp(40px, 10vw, 60px) clamp(20px, 5vw, 40px)",
-            color: "#999",
-            fontFamily: F.sans,
-            animation: "fadeInUp 0.4s ease",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "clamp(40px, 10vw, 56px)",
-              marginBottom: "clamp(12px, 3vw, 16px)",
-              opacity: 0.5,
-            }}
-          >
-            <FiPackage
-              size={56}
-              color={C.muted}
-              style={{ display: "block", margin: "0 auto" }}
-            />
-          </div>
-          <p style={{ fontSize: "clamp(14px, 3.5vw, 16px)" }}>
-            {ts.noneFound || "No services found"}
-          </p>
-          <p
-            style={{
-              fontSize: "clamp(12px, 3vw, 13px)",
-              color: "#bbb",
-              marginTop: 8,
-            }}
-          >
-            {safeCommon.tryAdjusting || "Try adjusting your search or filter"}
-          </p>
+          )}
         </div>
       )}
 
