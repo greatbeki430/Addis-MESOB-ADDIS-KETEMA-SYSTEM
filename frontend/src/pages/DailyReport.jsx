@@ -22,7 +22,6 @@ export default function DailyReport({ t, lang }) {
   const { showToast } = useToast();
   const { user } = useAuth();
 
-  // ✅ FIX 1: t is a FUNCTION — call it with dot-path strings
   const td = (key, fb = "") => t?.(`dailyReport.${key}`) || fb;
   const tcm = (key, fb = "") => t?.(`common.${key}`) || fb;
 
@@ -32,7 +31,7 @@ export default function DailyReport({ t, lang }) {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [hoveredRow, setHoveredRow] = useState(null);
-  const [departments, setDepartments] = useState([]);
+  const [departments, setDepartments] = useState([]); // [ [rawKey, label], ... ]
   const [allServices, setAllServices] = useState([]);
   const [animatedTotals, setAnimatedTotals] = useState({
     total: 0,
@@ -42,27 +41,30 @@ export default function DailyReport({ t, lang }) {
 
   const prevRowsRef = useRef(rows);
 
-  // Fetch departments and services from database
+  // ─── Fetch departments and services ──────────────────────────────────────────
   useEffect(() => {
     const fetchData = async () => {
       try {
         const response = await serviceAPI.getAll();
         console.log("🔍 Full API Response:", response);
 
+        // Backend returns res.json(services) — a plain array.
+        // Axios wraps it in response.data, so response.data IS the array.
         let services = [];
-        if (Array.isArray(response)) services = response;
-        else if (response && Array.isArray(response.data))
+        if (Array.isArray(response)) {
+          services = response;
+        } else if (response?.data && Array.isArray(response.data)) {
           services = response.data;
-        else if (response?.data && Array.isArray(response.data.data))
+        } else if (response?.data?.data && Array.isArray(response.data.data)) {
           services = response.data.data;
-        else if (response?.services && Array.isArray(response.services))
+        } else if (response?.services && Array.isArray(response.services)) {
           services = response.services;
-        else if (
+        } else if (
           response?.data?.services &&
           Array.isArray(response.data.services)
-        )
+        ) {
           services = response.data.services;
-        else if (response && typeof response === "object") {
+        } else if (response && typeof response === "object") {
           for (const key in response) {
             if (Array.isArray(response[key]) && response[key].length > 0) {
               const firstItem = response[key][0];
@@ -83,24 +85,30 @@ export default function DailyReport({ t, lang }) {
 
         setAllServices(services);
 
-        const deptSet = new Set();
+        // ✅ KEY FIX: Build a Map where key = raw s.dept (used for filtering)
+        // and value = the localized display label shown in the dropdown.
+        // This means option.value is always the raw DB key, so getServicesByDept
+        // can reliably do s.dept === deptKey regardless of display language.
+        const deptMap = new Map();
         services.forEach((s) => {
-          if (s.dept) deptSet.add(s.dept);
-          if (s.deptEn && s.deptEn !== s.dept) deptSet.add(s.deptEn);
+          if (s.dept && !deptMap.has(s.dept)) {
+            const label = lang === "en" ? s.deptEn || s.dept : s.dept;
+            deptMap.set(s.dept, label);
+          }
         });
-        const uniqueDepts = Array.from(deptSet).filter(Boolean);
-        console.log("🏢 Unique departments:", uniqueDepts);
-        setDepartments(uniqueDepts);
+
+        const deptEntries = Array.from(deptMap.entries()); // [[rawKey, label], ...]
+        console.log("🏢 Departments:", deptEntries);
+        setDepartments(deptEntries);
       } catch (error) {
         console.error("❌ Failed to fetch services:", error);
         showToast("Failed to load services", "error");
       }
     };
     fetchData();
-  }, []); // ✅ showToast omitted from deps — not needed, prevents infinite loop
+  }, [lang]); // Re-run when lang changes so localized labels update
 
-  // ✅ FIX 3: Load daily report data — showToast removed from deps,
-  // replaced with showToast so this only re-runs when `date` changes.
+  // ─── Load daily report for selected date ────────────────────────────────────
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -113,7 +121,6 @@ export default function DailyReport({ t, lang }) {
         }
       } catch (error) {
         if (error.response?.status === 404) {
-          // 404 just means no report for this date — not an error
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
         } else {
           console.error("Failed to load daily report:", error);
@@ -121,11 +128,11 @@ export default function DailyReport({ t, lang }) {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
         }
       } finally {
-        setLoading(false); // ✅ Always runs now — no infinite re-trigger
+        setLoading(false);
       }
     };
     loadData();
-  }, [date]); // ✅ Only re-runs when date changes
+  }, [date]);
 
   const calculateTotals = (rowsData) => {
     const total = rowsData.reduce((a, r) => a + (r.total || 0), 0);
@@ -157,6 +164,13 @@ export default function DailyReport({ t, lang }) {
 
   const removeRow = (index) => {
     if (rows.length > 1) setRows(rows.filter((_, i) => i !== index));
+  };
+
+  // ✅ FIX: Filter services by the raw dept key (s.dept), which is what
+  // the dropdown stores as option.value. This now always matches correctly.
+  const getServicesByDept = (deptKey) => {
+    if (!deptKey) return [];
+    return allServices.filter((s) => s.dept === deptKey);
   };
 
   const saveReport = async () => {
@@ -210,11 +224,6 @@ export default function DailyReport({ t, lang }) {
     } finally {
       setExporting(false);
     }
-  };
-
-  const getServicesByDept = (dept) => {
-    if (!dept) return allServices;
-    return allServices.filter((s) => s.dept === dept);
   };
 
   // ─── Style helpers ───────────────────────────────────────────────────────────
@@ -449,6 +458,9 @@ export default function DailyReport({ t, lang }) {
                 </thead>
                 <tbody>
                   {rows.map((r, i) => {
+                    // ✅ FIX: r.dept is the raw DB key (e.g. "ምዝገባ").
+                    // getServicesByDept filters allServices by s.dept === deptKey,
+                    // so this always returns the correct services for the row.
                     const availableServices = getServicesByDept(r.dept);
                     return (
                       <tr
@@ -471,6 +483,7 @@ export default function DailyReport({ t, lang }) {
                           {i + 1}
                         </td>
 
+                        {/* ── Department dropdown ──────────────────────────── */}
                         <td style={tdCell}>
                           <select
                             style={{
@@ -482,6 +495,7 @@ export default function DailyReport({ t, lang }) {
                             }}
                             value={r.dept || ""}
                             onChange={(e) => {
+                              // Store the raw dept key in state so filtering works
                               upd(i, "dept", e.target.value);
                               upd(i, "service", "");
                             }}
@@ -490,9 +504,10 @@ export default function DailyReport({ t, lang }) {
                               {td("selectDept", "Select Dept")}
                             </option>
                             {departments.length > 0 ? (
-                              departments.map((dept) => (
-                                <option key={dept} value={dept}>
-                                  {dept}
+                              departments.map(([rawKey, label]) => (
+                                // value = raw DB key; display text = localized label
+                                <option key={rawKey} value={rawKey}>
+                                  {label}
                                 </option>
                               ))
                             ) : (
@@ -503,6 +518,7 @@ export default function DailyReport({ t, lang }) {
                           </select>
                         </td>
 
+                        {/* ── Service dropdown ─────────────────────────────── */}
                         <td style={tdCell}>
                           <select
                             style={{
@@ -521,12 +537,17 @@ export default function DailyReport({ t, lang }) {
                             {availableServices.length > 0 ? (
                               availableServices.map((s) => (
                                 <option key={s._id} value={s.name}>
-                                  {s.name}
+                                  {/* Show localized name; fallback to raw name */}
+                                  {lang === "en" ? s.nameEn || s.name : s.name}
                                 </option>
                               ))
+                            ) : r.dept ? (
+                              <option value="" disabled>
+                                No services for this dept
+                              </option>
                             ) : (
                               <option value="" disabled>
-                                No services available
+                                Select a department first
                               </option>
                             )}
                           </select>
