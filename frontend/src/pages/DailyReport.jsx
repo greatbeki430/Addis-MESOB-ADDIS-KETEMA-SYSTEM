@@ -15,35 +15,7 @@ import {
   FiSave,
   FiLoader,
   FiFileText,
-  // FiUsers,
-  // FiUser,
-  // FiUserCheck,
   FiBarChart2,
-  // FiTrendingUp,
-  // FiTrendingDown,
-  // FiClock,
-  // FiCheck,
-  // FiAlertCircle,
-  // FiInfo,
-  // FiEdit2,
-  // FiTrash2,
-  // FiPrinter,
-  // FiFile,
-  // FiFolder,
-  // FiGrid,
-  // FiLayout,
-  // FiMenu,
-  // FiMoreHorizontal,
-  // FiPaperclip,
-  // FiSearch,
-  // FiSend,
-  // FiShare2,
-  // FiSliders,
-  // FiTarget,
-  // FiThumbsUp,
-  // FiUserPlus,
-  // FiUserMinus,
-  // FiUsers as FiUsersIcon,
 } from "react-icons/fi";
 
 export default function DailyReport({ t, lang }) {
@@ -491,9 +463,11 @@ export default function DailyReport({ t, lang }) {
                               hoveredRow === i ? C.primary : C.border,
                             cursor: "pointer",
                           }}
-                          value={r.dept}
+                          value={r.dept || ""}
                           onChange={(e) => {
-                            upd(i, "dept", e.target.value);
+                            const selectedDept = e.target.value;
+                            upd(i, "dept", selectedDept);
+                            // Reset service when department changes
                             upd(i, "service", "");
                           }}
                         >
@@ -516,12 +490,13 @@ export default function DailyReport({ t, lang }) {
                               hoveredRow === i ? C.primary : C.border,
                             cursor: "pointer",
                           }}
-                          value={r.service}
+                          value={r.service || ""}
                           onChange={(e) => upd(i, "service", e.target.value)}
                         >
                           <option value="">
                             {td.selectService || "Select Service"}
                           </option>
+                          {/* Use getServicesByDept function here */}
                           {getServicesByDept(r.dept).map((s) => (
                             <option key={s._id} value={s.name}>
                               {s.name}
