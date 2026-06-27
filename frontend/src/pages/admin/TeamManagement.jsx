@@ -4,7 +4,26 @@ import { teamAPI, authAPI } from "../../services/api";
 import { getRoleDisplayName } from "../../utils/roles";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../hooks/useToast";
-import { FiEdit2, FiTrash2 } from "react-icons/fi";
+import {
+  FiEdit2,
+  FiTrash2,
+  FiUsers,
+  FiUserPlus,
+  FiUser,
+  FiUserCheck,
+  FiStar,
+  // eslint-disable-next-line no-unused-vars
+  FiAward,
+  FiX,
+  FiCheck,
+  // eslint-disable-next-line no-unused-vars
+  FiPlus,
+  FiCalendar,
+  FiBriefcase,
+  // eslint-disable-next-line no-unused-vars
+  FiUserMinus,
+} from "react-icons/fi";
+
 export default function TeamManagement({ t, isSuperAdmin }) {
   const safeT = t || {};
   const tt = safeT.teamManagement || {};
@@ -198,6 +217,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         }
       />
 
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -213,9 +233,13 @@ export default function TeamManagement({ t, isSuperAdmin }) {
             fontSize: "clamp(18px, 5vw, 24px)",
             fontWeight: 900,
             color: C.dark,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
           }}
         >
-          👥 {getTranslation("title")}
+          <FiUsers size={24} color={C.primary} />
+          {getTranslation("title")}
         </h1>
         {isSuperAdmin && (
           <button
@@ -224,13 +248,20 @@ export default function TeamManagement({ t, isSuperAdmin }) {
               setFormData({ name: "", department: "", leader: "" });
               setShowModal(true);
             }}
-            style={btn.primary}
+            style={{
+              ...btn.primary,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
           >
-            + {getTranslation("addTeam")}
+            <FiUserPlus size={16} />
+            {getTranslation("addTeam")}
           </button>
         )}
       </div>
 
+      {/* Teams List */}
       {loading ? (
         <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
           {safeCommon.loading || "Loading..."}
@@ -239,11 +270,36 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         <div style={{ display: "grid", gap: 16 }}>
           {teams.length === 0 ? (
             <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
+              <FiUsers
+                size={48}
+                style={{
+                  display: "block",
+                  margin: "0 auto 16px",
+                  opacity: 0.3,
+                }}
+              />
               {getTranslation("noTeams")}
             </div>
           ) : (
             teams.map((team) => (
-              <div key={team._id} style={{ ...card, padding: 16 }}>
+              <div
+                key={team._id}
+                style={{
+                  ...card,
+                  padding: 16,
+                  transition: "all 0.3s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 20px rgba(0,0,0,0.08)";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow =
+                    "0 2px 12px rgba(0,0,0,0.06)";
+                  e.currentTarget.style.transform = "translateY(0)";
+                }}
+              >
                 <div
                   style={{
                     display: "flex",
@@ -253,24 +309,46 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                     gap: 12,
                   }}
                 >
-                  <div>
+                  <div style={{ flex: 1 }}>
                     <h3
-                      style={{ fontSize: 16, fontWeight: 800, marginBottom: 4 }}
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 800,
+                        marginBottom: 4,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
                     >
+                      <FiUser size={16} color={C.primary} />
                       {team.name}
                     </h3>
                     <p style={{ fontSize: 12, color: C.muted }}>
+                      <FiBriefcase size={12} style={{ marginRight: 4 }} />
                       {team.department || getTranslation("noDepartment")}
                     </p>
                     <p style={{ fontSize: 12, marginTop: 8 }}>
-                      <strong>{getTranslation("leader")}:</strong>{" "}
+                      <strong>
+                        <FiStar
+                          size={12}
+                          style={{ marginRight: 4, color: "#f59e0b" }}
+                        />
+                        {getTranslation("leader")}:
+                      </strong>{" "}
                       {team.leader?.name || getTranslation("notAssigned")}
                     </p>
                     <p style={{ fontSize: 12 }}>
-                      <strong>{getTranslation("members")}:</strong>{" "}
+                      <strong>
+                        <FiUserCheck
+                          size={12}
+                          style={{ marginRight: 4, color: C.primary }}
+                        />
+                        {getTranslation("members")}:
+                      </strong>{" "}
                       {team.members?.length || 0}
                     </p>
                     <p style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                      <FiCalendar size={11} style={{ marginRight: 4 }} />
                       {getTranslation("created")}:{" "}
                       {team.createdAt
                         ? new Date(team.createdAt).toLocaleDateString()
@@ -386,6 +464,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
             justifyContent: "center",
             zIndex: 1000,
             padding: 16,
+            backdropFilter: "blur(4px)",
           }}
           onClick={() => setShowModal(false)}
         >
@@ -398,18 +477,43 @@ export default function TeamManagement({ t, isSuperAdmin }) {
               maxWidth: 500,
               maxHeight: "90vh",
               overflow: "auto",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 style={{ marginBottom: 20 }}>
-              {editingTeam
-                ? `✏️ ${getTranslation("editTeam")}`
-                : `➕ ${getTranslation("addNewTeam")}`}
+            <h2
+              style={{
+                marginBottom: 20,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                fontSize: "clamp(18px, 4vw, 22px)",
+                fontWeight: 800,
+                color: C.dark,
+              }}
+            >
+              {editingTeam ? (
+                <>
+                  <FiEdit2 size={20} color="#3b82f6" />
+                  {getTranslation("editTeam")}
+                </>
+              ) : (
+                <>
+                  <FiUserPlus size={20} color={C.primary} />
+                  {getTranslation("addNewTeam")}
+                </>
+              )}
             </h2>
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 12 }}>
                 <label
-                  style={{ display: "block", marginBottom: 4, fontWeight: 600 }}
+                  style={{
+                    display: "block",
+                    marginBottom: 4,
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: C.dark,
+                  }}
                 >
                   {getTranslation("teamName")}
                 </label>
@@ -425,12 +529,27 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                     padding: 10,
                     border: `1px solid #d0ddd6`,
                     borderRadius: 6,
+                    fontSize: 14,
+                    outline: "none",
+                    transition: "border-color 0.2s",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = C.primary;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "#d0ddd6";
                   }}
                 />
               </div>
               <div style={{ marginBottom: 12 }}>
                 <label
-                  style={{ display: "block", marginBottom: 4, fontWeight: 600 }}
+                  style={{
+                    display: "block",
+                    marginBottom: 4,
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: C.dark,
+                  }}
                 >
                   {getTranslation("department")}
                 </label>
@@ -445,13 +564,28 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                     padding: 10,
                     border: `1px solid #d0ddd6`,
                     borderRadius: 6,
+                    fontSize: 14,
+                    outline: "none",
+                    transition: "border-color 0.2s",
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = C.primary;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "#d0ddd6";
                   }}
                   placeholder={getTranslation("departmentPlaceholder")}
                 />
               </div>
               <div style={{ marginBottom: 20 }}>
                 <label
-                  style={{ display: "block", marginBottom: 4, fontWeight: 600 }}
+                  style={{
+                    display: "block",
+                    marginBottom: 4,
+                    fontWeight: 600,
+                    fontSize: 13,
+                    color: C.dark,
+                  }}
                 >
                   {getTranslation("teamLeader")}
                 </label>
@@ -465,6 +599,9 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                     padding: 10,
                     border: `1px solid #d0ddd6`,
                     borderRadius: 6,
+                    fontSize: 14,
+                    outline: "none",
+                    background: C.white,
                   }}
                 >
                   <option value="">{getTranslation("selectLeader")}</option>
@@ -483,19 +620,47 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                 </select>
               </div>
               <div
-                style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  justifyContent: "flex-end",
+                  borderTop: `1px solid ${C.border}`,
+                  paddingTop: 16,
+                }}
               >
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  style={btn.secondary}
+                  style={{
+                    ...btn.secondary,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
                 >
+                  <FiX size={16} />
                   {getTranslation("cancel")}
                 </button>
-                <button type="submit" style={btn.primary}>
-                  {editingTeam
-                    ? getTranslation("update")
-                    : getTranslation("create")}
+                <button
+                  type="submit"
+                  style={{
+                    ...btn.primary,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  {editingTeam ? (
+                    <>
+                      <FiCheck size={16} />
+                      {getTranslation("update")}
+                    </>
+                  ) : (
+                    <>
+                      <FiUserPlus size={16} />
+                      {getTranslation("create")}
+                    </>
+                  )}
                 </button>
               </div>
             </form>

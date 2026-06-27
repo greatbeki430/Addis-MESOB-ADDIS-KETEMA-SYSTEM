@@ -11,7 +11,29 @@ import {
 } from "../../utils/roles";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../hooks/useToast";
-import { FiEdit2, FiEye, FiTrash2, FiRefreshCw } from "react-icons/fi";
+import {
+  FiEdit2,
+  FiEye,
+  FiTrash2,
+  FiRefreshCw,
+  FiUserPlus,
+  FiSearch,
+  FiUsers,
+  FiUser,
+  FiUserCheck,
+  // eslint-disable-next-line no-unused-vars
+  FiUserX,
+  FiShield,
+  // eslint-disable-next-line no-unused-vars
+  FiShieldOff,
+  FiStar,
+  // eslint-disable-next-line no-unused-vars
+  FiAward,
+  FiX,
+  FiCheck,
+  // eslint-disable-next-line no-unused-vars
+  FiAlertCircle,
+} from "react-icons/fi";
 
 // ✅ Reusable Action Button Component with beautiful icons
 const ActionButton = ({ onClick, Icon, label, color = C.primary, title }) => (
@@ -51,6 +73,35 @@ const ActionButton = ({ onClick, Icon, label, color = C.primary, title }) => (
     {Icon && <Icon size={18} />}
     {label && <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>}
   </button>
+);
+
+// ✅ Stat Card Component with react-icons
+// eslint-disable-next-line no-unused-vars
+const StatCard = ({ icon: Icon, value, label, color, bgColor }) => (
+  <div
+    style={{
+      background: C.white,
+      padding: "14px 18px",
+      borderRadius: 10,
+      textAlign: "center",
+      border: `1px solid ${C.border}`,
+      transition: "all 0.3s ease",
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.transform = "translateY(-4px)";
+      e.currentTarget.style.boxShadow = `0 8px 24px ${color}22`;
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.transform = "translateY(0)";
+      e.currentTarget.style.boxShadow = "none";
+    }}
+  >
+    <div style={{ fontSize: 28, fontWeight: 900, color: color }}>{value}</div>
+    <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+      <Icon size={14} style={{ marginRight: 4, color: color }} />
+      {label}
+    </div>
+  </div>
 );
 
 const RoleDescription = ({ role }) => {
@@ -106,8 +157,8 @@ export default function UserManagement({ t }) {
       phone: "Phone",
       phoneOptional: "Phone (Optional)",
       cancel: "Cancel",
-      updateUser: "💾 Update User",
-      createUser: "✅ Create User",
+      updateUser: "Update User",
+      createUser: "Create User",
       viewDetails: "View user details",
       edit: "Edit",
       delete: "Delete",
@@ -175,6 +226,11 @@ export default function UserManagement({ t }) {
     title: "",
     message: "",
     type: "info",
+  });
+  const [roleModal, setRoleModal] = useState({
+    isOpen: false,
+    user: null,
+    selectedRole: "employee",
   });
 
   // Use toast but DON'T render ToastContainer here (it's in App.jsx)
@@ -463,6 +519,96 @@ export default function UserManagement({ t }) {
         )}
       </Modal>
 
+      {/* Role Change Modal */}
+      <Modal
+        isOpen={roleModal.isOpen}
+        onClose={() =>
+          setRoleModal({ isOpen: false, user: null, selectedRole: "employee" })
+        }
+        title={`🔄 ${getTranslation("changeRole")}`}
+        type="confirm"
+        confirmText={getTranslation("update")}
+        cancelText={getTranslation("cancel")}
+        onConfirm={() => {
+          if (roleModal.user) {
+            const newRole = roleModal.selectedRole;
+            const updateData = {
+              name: roleModal.user.name,
+              email: roleModal.user.email,
+              role: newRole,
+              phone: roleModal.user.phone || "",
+            };
+            authAPI
+              .updateUser(roleModal.user._id, updateData)
+              .then(() => {
+                showToast(getTranslation("updateSuccess"), "success");
+                loadUsers();
+                setRoleModal({
+                  isOpen: false,
+                  user: null,
+                  selectedRole: "employee",
+                });
+              })
+              .catch((error) => {
+                console.error("Failed to update role:", error);
+                setAlertModal({
+                  isOpen: true,
+                  title: getTranslation("title"),
+                  message:
+                    error.response?.data?.message ||
+                    getTranslation("saveError"),
+                  type: "error",
+                });
+              });
+          }
+        }}
+        onCancel={() =>
+          setRoleModal({ isOpen: false, user: null, selectedRole: "employee" })
+        }
+      >
+        <div style={{ padding: "4px 0" }}>
+          <p style={{ marginBottom: 16, color: "#555" }}>
+            {getTranslation("changeRolePrompt")}{" "}
+            <strong>{roleModal.user?.name}</strong>
+          </p>
+          <div>
+            <label
+              style={{
+                display: "block",
+                marginBottom: 6,
+                fontWeight: 600,
+                fontSize: 13,
+              }}
+            >
+              {getTranslation("role")}
+            </label>
+            <select
+              value={roleModal.selectedRole}
+              onChange={(e) =>
+                setRoleModal({ ...roleModal, selectedRole: e.target.value })
+              }
+              style={{
+                width: "100%",
+                padding: "10px 14px",
+                border: `1.5px solid ${C.border}`,
+                borderRadius: 8,
+                fontSize: 14,
+                background: C.white,
+                outline: "none",
+              }}
+            >
+              <option value={ROLES.EMPLOYEE}>
+                {getTranslation("roleEmployee")}
+              </option>
+              <option value={ROLES.TEAM_LEADER}>
+                {getTranslation("roleTeamLeader")}
+              </option>
+              <option value={ROLES.ADMIN}>{getTranslation("roleAdmin")}</option>
+            </select>
+          </div>
+        </div>
+      </Modal>
+
       {/* Header with Stats */}
       <div
         style={{
@@ -484,7 +630,8 @@ export default function UserManagement({ t }) {
               margin: 0,
             }}
           >
-            👥 {getTranslation("title")}
+            <FiUsers size={24} style={{ marginRight: 8, color: C.primary }} />
+            {getTranslation("title")}
           </h1>
           <p
             style={{
@@ -519,11 +666,12 @@ export default function UserManagement({ t }) {
             gap: 8,
           }}
         >
-          <span style={{ fontSize: 18 }}>➕</span> {getTranslation("addUser")}
+          <FiUserPlus size={18} />
+          {getTranslation("addUser")}
         </button>
       </div>
 
-      {/* Statistics Cards */}
+      {/* Statistics Cards with react-icons */}
       <div
         style={{
           display: "grid",
@@ -532,86 +680,36 @@ export default function UserManagement({ t }) {
           marginBottom: 20,
         }}
       >
-        <div
-          style={{
-            background: C.white,
-            padding: "12px 16px",
-            borderRadius: 10,
-            textAlign: "center",
-            border: `1px solid ${C.border}`,
-          }}
-        >
-          <div style={{ fontSize: 24, fontWeight: 900, color: C.dark }}>
-            {roleStats.total}
-          </div>
-          <div style={{ fontSize: 11, color: C.muted }}>
-            {getTranslation("total")}
-          </div>
-        </div>
-        <div
-          style={{
-            background: C.white,
-            padding: "12px 16px",
-            borderRadius: 10,
-            textAlign: "center",
-            border: `1px solid ${C.border}`,
-          }}
-        >
-          <div style={{ fontSize: 24, fontWeight: 900, color: "#8B1A1A" }}>
-            {roleStats.superadmin}
-          </div>
-          <div style={{ fontSize: 11, color: C.muted }}>
-            👑 {getTranslation("superAdmin")}
-          </div>
-        </div>
-        <div
-          style={{
-            background: C.white,
-            padding: "12px 16px",
-            borderRadius: 10,
-            textAlign: "center",
-            border: `1px solid ${C.border}`,
-          }}
-        >
-          <div style={{ fontSize: 24, fontWeight: 900, color: "#1A6B4A" }}>
-            {roleStats.admin}
-          </div>
-          <div style={{ fontSize: 11, color: C.muted }}>
-            ⚙️ {getTranslation("admin")}
-          </div>
-        </div>
-        <div
-          style={{
-            background: C.white,
-            padding: "12px 16px",
-            borderRadius: 10,
-            textAlign: "center",
-            border: `1px solid ${C.border}`,
-          }}
-        >
-          <div style={{ fontSize: 24, fontWeight: 900, color: "#C25A00" }}>
-            {roleStats.leader}
-          </div>
-          <div style={{ fontSize: 11, color: C.muted }}>
-            ⭐ {getTranslation("teamLeader")}
-          </div>
-        </div>
-        <div
-          style={{
-            background: C.white,
-            padding: "12px 16px",
-            borderRadius: 10,
-            textAlign: "center",
-            border: `1px solid ${C.border}`,
-          }}
-        >
-          <div style={{ fontSize: 24, fontWeight: 900, color: "#1E4D8C" }}>
-            {roleStats.employee}
-          </div>
-          <div style={{ fontSize: 11, color: C.muted }}>
-            👤 {getTranslation("employee")}
-          </div>
-        </div>
+        <StatCard
+          icon={FiUsers}
+          value={roleStats.total}
+          label={getTranslation("total")}
+          color="#1a3aad"
+        />
+        <StatCard
+          icon={FiShield}
+          value={roleStats.superadmin}
+          label={getTranslation("superAdmin")}
+          color="#8B1A1A"
+        />
+        <StatCard
+          icon={FiUserCheck}
+          value={roleStats.admin}
+          label={getTranslation("admin")}
+          color="#1A6B4A"
+        />
+        <StatCard
+          icon={FiStar}
+          value={roleStats.leader}
+          label={getTranslation("teamLeader")}
+          color="#C25A00"
+        />
+        <StatCard
+          icon={FiUser}
+          value={roleStats.employee}
+          label={getTranslation("employee")}
+          color="#1E4D8C"
+        />
       </div>
 
       {/* Search and Filter */}
@@ -624,28 +722,39 @@ export default function UserManagement({ t }) {
           marginBottom: 16,
         }}
       >
-        <input
-          type="text"
-          placeholder={getTranslation("searchPlaceholder")}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          style={{
-            flex: 1,
-            minWidth: 200,
-            padding: "10px 14px",
-            border: `1.5px solid ${C.border}`,
-            borderRadius: 8,
-            fontSize: 14,
-            outline: "none",
-            transition: "border-color 0.2s",
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = C.primary;
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = C.border;
-          }}
-        />
+        <div style={{ flex: 1, minWidth: 200, position: "relative" }}>
+          <FiSearch
+            size={18}
+            style={{
+              position: "absolute",
+              left: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#999",
+            }}
+          />
+          <input
+            type="text"
+            placeholder={getTranslation("searchPlaceholder")}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px 14px 10px 40px",
+              border: `1.5px solid ${C.border}`,
+              borderRadius: 8,
+              fontSize: 14,
+              outline: "none",
+              transition: "border-color 0.2s",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = C.primary;
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+            }}
+          />
+        </div>
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
@@ -705,6 +814,7 @@ export default function UserManagement({ t }) {
                     fontSize: 13,
                   }}
                 >
+                  <FiUser size={14} style={{ marginRight: 6 }} />
                   {getTranslation("fullName")}
                 </th>
                 <th
@@ -769,6 +879,10 @@ export default function UserManagement({ t }) {
                       color: C.dark,
                     }}
                   >
+                    <FiUser
+                      size={14}
+                      style={{ marginRight: 8, color: C.primary, opacity: 0.6 }}
+                    />
                     {user.name}
                     {user._id === currentUser._id && (
                       <span
@@ -854,41 +968,11 @@ export default function UserManagement({ t }) {
                     {isSuperAdmin && user.role !== ROLES.SUPER_ADMIN && (
                       <ActionButton
                         onClick={() => {
-                          const newRole = prompt(
-                            `${getTranslation("changeRolePrompt")} ${user.name}:\n\n` +
-                              getTranslation("roleOptions"),
-                            user.role,
-                          );
-                          if (newRole && newRole !== user.role) {
-                            const validRoles = [
-                              ROLES.EMPLOYEE,
-                              ROLES.TEAM_LEADER,
-                              ROLES.ADMIN,
-                            ];
-                            if (validRoles.includes(newRole)) {
-                              setEditingUser(user);
-                              setFormData({
-                                name: user.name,
-                                email: user.email,
-                                password: "",
-                                role: newRole,
-                                phone: user.phone || "",
-                              });
-                              const submitEvent = new Event("submit", {
-                                bubbles: true,
-                              });
-                              document
-                                .querySelector("#user-form")
-                                ?.dispatchEvent(submitEvent);
-                            } else {
-                              setAlertModal({
-                                isOpen: true,
-                                title: getTranslation("invalidRoleTitle"),
-                                message: getTranslation("invalidRoleMessage"),
-                                type: "warning",
-                              });
-                            }
-                          }
+                          setRoleModal({
+                            isOpen: true,
+                            user: user,
+                            selectedRole: user.role,
+                          });
                         }}
                         Icon={FiRefreshCw}
                         label=""
@@ -976,11 +1060,22 @@ export default function UserManagement({ t }) {
                 color: C.dark,
                 fontFamily: F.serif,
                 marginBottom: 4,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
               }}
             >
-              {editingUser
-                ? "✏️ " + getTranslation("editUser")
-                : "➕ " + getTranslation("addNewUser")}
+              {editingUser ? (
+                <>
+                  <FiEdit2 size={22} color="#3b82f6" />
+                  {getTranslation("editUser")}
+                </>
+              ) : (
+                <>
+                  <FiUserPlus size={22} color={C.primary} />
+                  {getTranslation("addNewUser")}
+                </>
+              )}
             </h2>
             <p
               style={{
@@ -1205,8 +1300,12 @@ export default function UserManagement({ t }) {
                     ...btn.secondary,
                     padding: "10px 24px",
                     fontSize: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
                   }}
                 >
+                  <FiX size={16} />
                   {getTranslation("cancel")}
                 </button>
                 <button
@@ -1220,9 +1319,17 @@ export default function UserManagement({ t }) {
                     gap: 8,
                   }}
                 >
-                  {editingUser
-                    ? getTranslation("updateUser")
-                    : getTranslation("createUser")}
+                  {editingUser ? (
+                    <>
+                      <FiCheck size={16} />
+                      {getTranslation("updateUser")}
+                    </>
+                  ) : (
+                    <>
+                      <FiUserPlus size={16} />
+                      {getTranslation("createUser")}
+                    </>
+                  )}
                 </button>
               </div>
             </form>

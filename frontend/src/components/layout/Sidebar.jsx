@@ -3,10 +3,36 @@ import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
-import { ArrowDown01Icon } from "hugeicons-react";
 import { teamAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
 import { getFilteredNavItems } from "../../utils/roles";
+import {
+  FiChevronLeft,
+  FiChevronRight,
+  FiChevronDown,
+  // eslint-disable-next-line no-unused-vars
+  FiChevronUp,
+  FiPlus,
+  FiX,
+  FiUsers,
+  // eslint-disable-next-line no-unused-vars
+  FiUser,
+  FiUserPlus,
+  FiHome,
+  FiMessageSquare,
+  FiStar,
+  FiFileText,
+  FiGrid,
+  FiSettings,
+  FiUsers as FiUsersIcon,
+  FiBarChart2,
+  FiGlobe,
+  // eslint-disable-next-line no-unused-vars
+  FiFlag,
+  FiCheck,
+  FiLoader,
+  FiMenu,
+} from "react-icons/fi";
 
 // =============================================
 // ANIMATED LOGO COMPONENT - Alternating "A" ↔ "አ"
@@ -288,13 +314,11 @@ export default function Sidebar({
   // ✅ Handle team click - navigate to forum with team context
   const handleTeamClick = (team) => {
     setSelectedTeam(team);
-    // setTab("forum");
     navigate("/forum");
   };
 
   // ✅ Handle navigation - uses React Router
   const handleNavClick = (tabId) => {
-    // setTab(tabId);
     setSelectedTeam(null);
     setForumExpanded(false);
     navigate(`/${tabId}`);
@@ -337,6 +361,22 @@ export default function Sidebar({
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ Nav item icon mapping
+  const getNavIcon = (id) => {
+    const icons = {
+      dashboard: <FiHome size={20} />,
+      forum: <FiMessageSquare size={20} />,
+      evaluation: <FiStar size={20} />,
+      report: <FiFileText size={20} />,
+      services: <FiGrid size={20} />,
+      "admin/services": <FiSettings size={20} />,
+      users: <FiUsersIcon size={20} />,
+      teams: <FiUsers size={20} />,
+      analytics: <FiBarChart2 size={20} />,
+    };
+    return icons[id] || <FiMenu size={20} />;
   };
 
   const sidebarWidth = collapsed ? 64 : isMobile ? 200 : 260;
@@ -391,7 +431,7 @@ export default function Sidebar({
         onMouseEnter={(e) => (e.currentTarget.style.background = "#1a3aad44")}
         onMouseLeave={(e) => (e.currentTarget.style.background = SECTION_BG)}
       >
-        {collapsed ? "▶" : "◀"}
+        {collapsed ? <FiChevronRight size={18} /> : <FiChevronLeft size={18} />}
       </button>
 
       {/* Animated Logo */}
@@ -426,7 +466,6 @@ export default function Sidebar({
       {/* Nav Items */}
       <nav style={{ flex: 1, padding: "6px 0" }}>
         {filteredNavItems.map((n) => {
-          // ✅ Use location.pathname for active state (URL-based)
           const isActive = location.pathname === `/${n.id}`;
           const isForum = n.id === "forum";
           const navLabel = safeT(`nav.${n.id}`, n.id);
@@ -438,7 +477,6 @@ export default function Sidebar({
                   if (isForum) {
                     setForumExpanded(!forumExpanded);
                     setSelectedTeam(null);
-                    // setTab("forum");
                     navigate("/forum");
                   } else {
                     handleNavClick(n.id);
@@ -483,11 +521,13 @@ export default function Sidebar({
                     gap: collapsed ? 0 : 12,
                   }}
                 >
-                  <span style={{ fontSize: isMobile ? 18 : 20 }}>{n.icon}</span>
+                  <span style={{ fontSize: isMobile ? 18 : 20 }}>
+                    {getNavIcon(n.id)}
+                  </span>
                   {!collapsed && <span>{navLabel}</span>}
                 </div>
                 {isForum && !collapsed && (
-                  <ArrowDown01Icon
+                  <FiChevronDown
                     size={14}
                     style={{
                       transform: forumExpanded
@@ -519,8 +559,16 @@ export default function Sidebar({
                         color: MUTED_TEXT,
                         fontSize: 12,
                         textAlign: "center",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
                       }}
                     >
+                      <FiLoader
+                        size={14}
+                        style={{ animation: "spin 1s linear infinite" }}
+                      />
                       Loading...
                     </div>
                   )}
@@ -565,6 +613,9 @@ export default function Sidebar({
                         fontWeight: selectedTeam?.id === team.id ? 600 : 400,
                         transition: "all 0.15s",
                         lineHeight: 1.4,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = HOVER_BG;
@@ -577,6 +628,7 @@ export default function Sidebar({
                         }
                       }}
                     >
+                      <FiUsers size={12} />
                       {team.name.length > 18
                         ? team.name.substring(0, 16) + "…"
                         : team.name}
@@ -584,7 +636,7 @@ export default function Sidebar({
                         team.members?.includes(user?.name) && (
                           <span
                             style={{
-                              marginLeft: 6,
+                              marginLeft: "auto",
                               fontSize: 8,
                               background: "#f5c518",
                               color: "#0d1a5e",
@@ -629,15 +681,7 @@ export default function Sidebar({
                         e.currentTarget.style.borderColor = `${BORDER_COLOR}66`;
                       }}
                     >
-                      <span
-                        style={{
-                          fontSize: 16,
-                          fontWeight: "bold",
-                          lineHeight: 1,
-                        }}
-                      >
-                        +
-                      </span>{" "}
+                      <FiPlus size={14} style={{ fontWeight: "bold" }} />
                       Add Team
                     </button>
                   )}
@@ -664,8 +708,12 @@ export default function Sidebar({
               letterSpacing: 1,
               marginBottom: 10,
               textTransform: "uppercase",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
+            <FiGlobe size={12} />
             {safeT("sidebar.language", "Language")}
           </div>
         )}
@@ -695,9 +743,13 @@ export default function Sidebar({
                 cursor: "pointer",
                 fontFamily: F.sans,
                 transition: "all 0.15s",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
               }}
             >
               {l.flag}
+              {!collapsed && l.code.toUpperCase()}
             </button>
           ))}
         </div>
@@ -715,6 +767,7 @@ export default function Sidebar({
             justifyContent: "center",
             zIndex: 1000,
             padding: 16,
+            backdropFilter: "blur(4px)",
           }}
           onClick={() => setShowAddTeamModal(false)}
         >
@@ -726,7 +779,7 @@ export default function Sidebar({
               width: "100%",
               maxWidth: 340,
               boxSizing: "border-box",
-              border: "2px solid #f5c518",
+              border: `2px solid #f5c518`,
               boxShadow: "0 20px 60px rgba(13,26,94,0.4)",
             }}
             onClick={(e) => e.stopPropagation()}
@@ -737,9 +790,13 @@ export default function Sidebar({
                 color: "#0d1a5e",
                 fontSize: 18,
                 fontFamily: F.sans,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
               }}
             >
-              ➕ Add New Team
+              <FiUserPlus size={20} color={C.primary} />
+              Add New Team
             </h3>
             <input
               type="text"
@@ -755,6 +812,14 @@ export default function Sidebar({
                 fontSize: 14,
                 boxSizing: "border-box",
                 fontFamily: F.sans,
+                outline: "none",
+                transition: "border-color 0.2s",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = C.primary;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = C.border;
               }}
               onKeyPress={(e) => e.key === "Enter" && handleAddTeam()}
             />
@@ -772,6 +837,14 @@ export default function Sidebar({
                 fontSize: 14,
                 boxSizing: "border-box",
                 fontFamily: F.sans,
+                outline: "none",
+                transition: "border-color 0.2s",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = C.primary;
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = C.border;
               }}
               onKeyPress={(e) => e.key === "Enter" && handleAddTeam()}
             />
@@ -788,8 +861,19 @@ export default function Sidebar({
                   cursor: "pointer",
                   fontSize: 14,
                   fontFamily: F.sans,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#d1d5db";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "#e5e7eb";
                 }}
               >
+                <FiX size={16} />
                 Cancel
               </button>
               <button
@@ -797,7 +881,7 @@ export default function Sidebar({
                 disabled={loading}
                 style={{
                   padding: "8px 16px",
-                  background: "linear-gradient(135deg, #1a3aad, #f5c518)",
+                  background: `linear-gradient(135deg, ${C.primary}, #f5c518)`,
                   color: "#fff",
                   border: "none",
                   borderRadius: 6,
@@ -806,14 +890,49 @@ export default function Sidebar({
                   fontWeight: 600,
                   opacity: loading ? 0.7 : 1,
                   fontFamily: F.sans,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  transition: "all 0.2s",
+                }}
+                onMouseEnter={(e) => {
+                  if (!loading) {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow =
+                      "0 4px 12px rgba(26,58,173,0.3)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
                 }}
               >
-                {loading ? "Adding..." : "Add Team"}
+                {loading ? (
+                  <>
+                    <FiLoader
+                      size={16}
+                      style={{ animation: "spin 1s linear infinite" }}
+                    />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <FiCheck size={16} />
+                    Add Team
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </aside>
   );
 }
