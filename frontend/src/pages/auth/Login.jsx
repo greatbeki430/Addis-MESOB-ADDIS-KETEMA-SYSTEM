@@ -99,6 +99,7 @@ export default function Login({ onSwitchToRegister }) {
   const [titleRotation, setTitleRotation] = useState(0);
   const [showAmharic, setShowAmharic] = useState(false);
   const [isFlipping, setIsFlipping] = useState(false);
+  const [isButtonHovered, setIsButtonHovered] = useState(false);
   const { login } = useAuth();
 
   useEffect(() => {
@@ -329,13 +330,13 @@ export default function Login({ onSwitchToRegister }) {
             type="submit"
             style={{
               ...loginStyles.button,
-              ...(isHovered ? loginStyles.buttonHover : {}),
+              ...(isButtonHovered ? loginStyles.buttonHover : {}),
               background: `linear-gradient(135deg, ${COLORS.primary} 0%, ${COLORS.secondary} 50%, ${COLORS.gold} 100%)`,
               backgroundSize: "200% 100%",
             }}
             disabled={loading}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
+            onMouseEnter={() => setIsButtonHovered(true)}
+            onMouseLeave={() => setIsButtonHovered(false)}
           >
             {loading ? (
               <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
