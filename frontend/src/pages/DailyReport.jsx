@@ -47,20 +47,61 @@ export default function DailyReport({ t, lang }) {
     const fetchData = async () => {
       try {
         const response = await serviceAPI.getAll();
-        const services = response.data || [];
+        console.log("🔍 Full API Response:", response);
+
+        // ✅ Handle different response formats
+        let services = [];
+        if (response && response.data) {
+          // If response.data is an array, use it
+          if (Array.isArray(response.data)) {
+            services = response.data;
+          }
+          // If response.data has a data property that's an array
+          else if (response.data.data && Array.isArray(response.data.data)) {
+            services = response.data.data;
+          }
+          // If response.data has a services property that's an array
+          else if (
+            response.data.services &&
+            Array.isArray(response.data.services)
+          ) {
+            services = response.data.services;
+          }
+          // If response.data is an object with some array property
+          else if (typeof response.data === "object") {
+            for (const key in response.data) {
+              if (
+                Array.isArray(response.data[key]) &&
+                response.data[key].length > 0
+              ) {
+                const firstItem = response.data[key][0];
+                if (firstItem && (firstItem.name || firstItem.dept)) {
+                  services = response.data[key];
+                  break;
+                }
+              }
+            }
+          }
+        } else if (Array.isArray(response)) {
+          services = response;
+        }
+
+        console.log("📦 Extracted services:", services.length);
         setAllServices(services);
 
         // Extract unique departments
         const uniqueDepts = [
           ...new Set(services.map((s) => s.dept).filter(Boolean)),
         ];
+        console.log("🏢 Unique departments:", uniqueDepts);
         setDepartments(uniqueDepts);
       } catch (error) {
-        console.error("Failed to fetch services:", error);
+        console.error("❌ Failed to fetch services:", error);
+        showToast("Failed to load services", "error");
       }
     };
     fetchData();
-  }, []);
+  }, [showToast]);
 
   // Load daily report data
   useEffect(() => {
@@ -434,155 +475,163 @@ export default function DailyReport({ t, lang }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((r, i) => (
-                    <tr
-                      key={i}
-                      style={{
-                        ...(i % 2 === 0 ? { background: C.cardBg } : {}),
-                        transition: "background 0.3s ease",
-                      }}
-                      onMouseEnter={() => setHoveredRow(i)}
-                      onMouseLeave={() => setHoveredRow(null)}
-                    >
-                      <td
+                  {rows.map((r, i) => {
+                    // Get services for this row's department
+                    const availableServices = getServicesByDept(r.dept);
+
+                    return (
+                      <tr
+                        key={i}
                         style={{
-                          ...td2,
-                          textAlign: "center",
-                          color: "#aaa",
-                          fontWeight: 600,
+                          ...(i % 2 === 0 ? { background: C.cardBg } : {}),
+                          transition: "background 0.3s ease",
                         }}
+                        onMouseEnter={() => setHoveredRow(i)}
+                        onMouseLeave={() => setHoveredRow(null)}
                       >
-                        {i + 1}
-                      </td>
-                      <td style={td2}>
-                        <select
+                        <td
                           style={{
-                            ...ti,
-                            width: "clamp(120px, 15vw, 150px)",
-                            borderColor:
-                              hoveredRow === i ? C.primary : C.border,
-                            cursor: "pointer",
-                          }}
-                          value={r.dept || ""}
-                          onChange={(e) => {
-                            const selectedDept = e.target.value;
-                            upd(i, "dept", selectedDept);
-                            // Reset service when department changes
-                            upd(i, "service", "");
+                            ...td2,
+                            textAlign: "center",
+                            color: "#aaa",
+                            fontWeight: 600,
                           }}
                         >
-                          <option value="">
-                            {td.selectDept || "Select Dept"}
-                          </option>
-                          {departments.map((dept) => (
-                            <option key={dept} value={dept}>
-                              {dept}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td style={td2}>
-                        <select
-                          style={{
-                            ...ti,
-                            width: "clamp(130px, 20vw, 180px)",
-                            borderColor:
-                              hoveredRow === i ? C.primary : C.border,
-                            cursor: "pointer",
-                          }}
-                          value={r.service || ""}
-                          onChange={(e) => upd(i, "service", e.target.value)}
-                        >
-                          <option value="">
-                            {td.selectService || "Select Service"}
-                          </option>
-                          {/* Use getServicesByDept function here */}
-                          {getServicesByDept(r.dept).map((s) => (
-                            <option key={s._id} value={s.name}>
-                              {s.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td style={td2}>
-                        <input
-                          type="number"
-                          style={{
-                            ...ti,
-                            width: "clamp(50px, 10vw, 60px)",
-                            textAlign: "center",
-                            minHeight: "32px",
-                            borderColor:
-                              hoveredRow === i ? C.primary : C.border,
-                          }}
-                          value={r.male || 0}
-                          onChange={(e) =>
-                            upd(i, "male", Number(e.target.value) || 0)
-                          }
-                          inputMode="numeric"
-                          min="0"
-                        />
-                      </td>
-                      <td style={td2}>
-                        <input
-                          type="number"
-                          style={{
-                            ...ti,
-                            width: "clamp(50px, 10vw, 60px)",
-                            textAlign: "center",
-                            minHeight: "32px",
-                            borderColor:
-                              hoveredRow === i ? C.primary : C.border,
-                          }}
-                          value={r.female || 0}
-                          onChange={(e) =>
-                            upd(i, "female", Number(e.target.value) || 0)
-                          }
-                          inputMode="numeric"
-                          min="0"
-                        />
-                      </td>
-                      <td
-                        style={{
-                          ...td2,
-                          textAlign: "center",
-                          fontWeight: 700,
-                          color: C.primary,
-                          fontSize: "clamp(13px, 3.5vw, 15px)",
-                        }}
-                      >
-                        {r.total || 0}
-                      </td>
-                      <td style={{ ...td2, textAlign: "center" }}>
-                        {rows.length > 1 && (
-                          <button
-                            onClick={() => removeRow(i)}
+                          {i + 1}
+                        </td>
+                        <td style={td2}>
+                          <select
                             style={{
-                              background: "none",
-                              border: "none",
+                              ...ti,
+                              width: "clamp(120px, 15vw, 150px)",
+                              borderColor:
+                                hoveredRow === i ? C.primary : C.border,
                               cursor: "pointer",
-                              fontSize: 16,
-                              color: "#999",
-                              transition: "all 0.3s ease",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
                             }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color = "#dc2626";
-                              e.currentTarget.style.transform = "scale(1.2)";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color = "#999";
-                              e.currentTarget.style.transform = "scale(1)";
+                            value={r.dept || ""}
+                            onChange={(e) => {
+                              const selectedDept = e.target.value;
+                              // Update department
+                              upd(i, "dept", selectedDept);
+                              // Reset service when department changes
+                              upd(i, "service", "");
                             }}
                           >
-                            <FiX size={16} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                            <option value="">
+                              {td.selectDept || "Select Dept"}
+                            </option>
+                            {departments.map((dept) => (
+                              <option key={dept} value={dept}>
+                                {dept}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={td2}>
+                          <select
+                            style={{
+                              ...ti,
+                              width: "clamp(130px, 20vw, 180px)",
+                              borderColor:
+                                hoveredRow === i ? C.primary : C.border,
+                              cursor: "pointer",
+                            }}
+                            value={r.service || ""}
+                            onChange={(e) => {
+                              const selectedService = e.target.value;
+                              upd(i, "service", selectedService);
+                            }}
+                          >
+                            <option value="">
+                              {td.selectService || "Select Service"}
+                            </option>
+                            {availableServices.map((s) => (
+                              <option key={s._id} value={s.name}>
+                                {s.name}
+                              </option>
+                            ))}
+                          </select>
+                        </td>
+                        <td style={td2}>
+                          <input
+                            type="number"
+                            style={{
+                              ...ti,
+                              width: "clamp(50px, 10vw, 60px)",
+                              textAlign: "center",
+                              minHeight: "32px",
+                              borderColor:
+                                hoveredRow === i ? C.primary : C.border,
+                            }}
+                            value={r.male || 0}
+                            onChange={(e) =>
+                              upd(i, "male", Number(e.target.value) || 0)
+                            }
+                            inputMode="numeric"
+                            min="0"
+                          />
+                        </td>
+                        <td style={td2}>
+                          <input
+                            type="number"
+                            style={{
+                              ...ti,
+                              width: "clamp(50px, 10vw, 60px)",
+                              textAlign: "center",
+                              minHeight: "32px",
+                              borderColor:
+                                hoveredRow === i ? C.primary : C.border,
+                            }}
+                            value={r.female || 0}
+                            onChange={(e) =>
+                              upd(i, "female", Number(e.target.value) || 0)
+                            }
+                            inputMode="numeric"
+                            min="0"
+                          />
+                        </td>
+                        <td
+                          style={{
+                            ...td2,
+                            textAlign: "center",
+                            fontWeight: 700,
+                            color: C.primary,
+                            fontSize: "clamp(13px, 3.5vw, 15px)",
+                          }}
+                        >
+                          {r.total || 0}
+                        </td>
+                        <td style={{ ...td2, textAlign: "center" }}>
+                          {rows.length > 1 && (
+                            <button
+                              onClick={() => removeRow(i)}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontSize: 16,
+                                color: "#999",
+                                transition: "all 0.3s ease",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.color = "#dc2626";
+                                e.currentTarget.style.transform = "scale(1.2)";
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.color = "#999";
+                                e.currentTarget.style.transform = "scale(1)";
+                              }}
+                            >
+                              <FiX size={16} />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
 
                   {/* Grand Total Row */}
                   <tr
