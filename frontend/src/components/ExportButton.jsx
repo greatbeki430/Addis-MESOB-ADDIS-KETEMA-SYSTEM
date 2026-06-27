@@ -1,5 +1,5 @@
-// import React from 'react';
 import { exportForumReportToPDF } from "../utils/pdfExport";
+import { FiDownload } from "react-icons/fi";
 
 // Simple export button component
 const ExportButton = ({ formData, t, meetingNumber }) => {
@@ -21,7 +21,8 @@ const ExportButton = ({ formData, t, meetingNumber }) => {
         marginRight: 12,
       }}
     >
-      📄 {t.forum?.exportPDF || "Export PDF"}
+      <FiDownload size={16} />
+      {t.forum?.exportPDF || "Export PDF"}
     </button>
   );
 };

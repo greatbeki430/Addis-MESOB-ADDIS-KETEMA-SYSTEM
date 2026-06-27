@@ -36,6 +36,9 @@ export default function StatCard({
           transform: isHovered
             ? "scale(1.2) rotate(5deg)"
             : "scale(1) rotate(0deg)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         {icon}

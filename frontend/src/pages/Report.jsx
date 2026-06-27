@@ -9,6 +9,56 @@ import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 
+// ✅ Import react-icons
+import {
+  FiBarChart2,
+  FiCheck,
+  FiChevronDown,
+  FiClock,
+  FiFile,
+  FiFileText,
+  FiList,
+  FiPrinter,
+  FiRefreshCw,
+  FiTrash2,
+  FiX,
+  FiDownload,
+  FiFilePlus,
+  FiTrendingUp,
+  FiAward,
+  FiAlertCircle,
+  FiClock as FiClockIcon,
+  FiDatabase,
+  FiFolder,
+} from "react-icons/fi";
+
+// ✅ Also import specific icons we actually need
+// import {
+//   FiBarChart2 as FiBarChart2Icon,
+//   FiCalendar as FiCalendarIcon,
+//   FiCheck as FiCheckIcon,
+//   FiChevronDown as FiChevronDownIcon,
+//   FiClock as FiClockIcon2,
+//   FiDownload as FiDownloadIcon,
+//   FiFile as FiFileIcon,
+//   FiFileText as FiFileTextIcon,
+//   FiFolder as FiFolderIcon,
+//   FiGrid as FiGridIcon,
+//   FiHome as FiHomeIcon,
+//   FiList as FiListIcon,
+//   FiPlus as FiPlusIcon,
+//   FiPrinter as FiPrinterIcon,
+//   FiRefreshCw as FiRefreshCwIcon,
+//   FiSave as FiSaveIcon,
+//   FiSearch as FiSearchIcon2,
+//   FiSettings as FiSettingsIcon,
+//   FiStar as FiStarIcon2,
+//   FiTrash2 as FiTrash2Icon,
+//   FiUser as FiUserIcon2,
+//   FiUsers as FiUsersIcon3,
+//   FiX as FiXIcon2,
+// } from "react-icons/fi";
+
 export default function Report({ t }) {
   // ✅ FIX: Safe access to translations with fallback
   const safeT = t || {};
@@ -547,9 +597,13 @@ export default function Report({ t }) {
             color: C.dark,
             fontFamily: F.serif,
             margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
           }}
         >
-          📊 {safeReport.title || "Report Generator"}
+          <FiBarChart2 size={24} color={C.primary} />
+          {safeReport.title || "Report Generator"}
           {getTeamDisplayName()}
           {isLeader && userTeam && (
             <span style={{ fontSize: 16, color: C.primary, fontWeight: 600 }}>
@@ -568,8 +622,12 @@ export default function Report({ t }) {
               fontSize: "clamp(10px, 3vw, 11px)",
               fontWeight: 700,
               whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
             }}
           >
+            <FiTrendingUp size={12} />
             {safeReport.analytics || "Analytics"}
           </span>
           <button
@@ -584,9 +642,13 @@ export default function Report({ t }) {
               fontWeight: 700,
               cursor: "pointer",
               whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
             }}
           >
-            📜 History
+            <FiFolder size={12} />
+            History
           </button>
         </div>
       </div>
@@ -620,7 +682,7 @@ export default function Report({ t }) {
             gap: 12,
           }}
         >
-          <span style={{ fontSize: 20 }}>👑</span>
+          <FiAward size={20} color={C.gold} />
           <div>
             <span style={{ fontWeight: 600, color: C.dark }}>
               {safeReport.leadingTeam || "Leading Team"}:
@@ -654,7 +716,18 @@ export default function Report({ t }) {
               marginBottom: 12,
             }}
           >
-            <h4 style={{ margin: 0, color: C.dark }}>📜 Saved Reports</h4>
+            <h4
+              style={{
+                margin: 0,
+                color: C.dark,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              <FiFolder size={16} />
+              Saved Reports
+            </h4>
             <button
               onClick={() => setShowHistory(false)}
               style={{
@@ -663,9 +736,11 @@ export default function Report({ t }) {
                 fontSize: 18,
                 cursor: "pointer",
                 color: "#999",
+                display: "flex",
+                alignItems: "center",
               }}
             >
-              ✕
+              <FiX size={18} />
             </button>
           </div>
           {loadingHistory ? (
@@ -716,10 +791,12 @@ export default function Report({ t }) {
                     fontSize: 16,
                     color: "#dc2626",
                     padding: "4px 8px",
+                    display: "flex",
+                    alignItems: "center",
                   }}
                   title="Delete report"
                 >
-                  🗑️
+                  <FiTrash2 size={16} />
                 </button>
               </div>
             ))
@@ -737,9 +814,13 @@ export default function Report({ t }) {
             borderRadius: 8,
             marginBottom: 16,
             border: "1px solid #fecaca",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
           }}
         >
-          ⚠️ {error}
+          <FiAlertCircle size={16} />
+          {error}
         </div>
       )}
 
@@ -916,11 +997,25 @@ export default function Report({ t }) {
               padding: "clamp(8px, 2.5vw, 11px) clamp(20px, 5vw, 32px)",
               fontSize: "clamp(12px, 3.5vw, 14px)",
               opacity: loading ? 0.7 : 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
-            {loading
-              ? safeReport.generating || "⏳ Generating..."
-              : "🔍 Generate & Save Report"}
+            {loading ? (
+              <>
+                <FiRefreshCw
+                  size={16}
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                {safeReport.generating || "Generating..."}
+              </>
+            ) : (
+              <>
+                <FiFilePlus size={16} />
+                Generate & Save Report
+              </>
+            )}
           </button>
 
           {reportData && (
@@ -941,7 +1036,9 @@ export default function Report({ t }) {
                   gap: 8,
                 }}
               >
-                {safeReport.exportBtn || "Export Report"} ▼
+                <FiDownload size={16} />
+                {safeReport.exportBtn || "Export Report"}
+                <FiChevronDown size={14} />
               </button>
 
               {showExportOptions && (
@@ -982,7 +1079,7 @@ export default function Report({ t }) {
                       (e.currentTarget.style.background = "none")
                     }
                   >
-                    <span style={{ fontSize: 20 }}>📊</span>
+                    <FiFile size={18} color="#217346" />
                     Export as Excel
                   </button>
                   <button
@@ -1008,7 +1105,7 @@ export default function Report({ t }) {
                       (e.currentTarget.style.background = "none")
                     }
                   >
-                    <span style={{ fontSize: 20 }}>📄</span>
+                    <FiFileText size={18} color="#2b579a" />
                     Export as Word
                   </button>
                   <button
@@ -1034,7 +1131,7 @@ export default function Report({ t }) {
                       (e.currentTarget.style.background = "none")
                     }
                   >
-                    <span style={{ fontSize: 20 }}>📕</span>
+                    <FiPrinter size={18} color="#dc2626" />
                     Export as PDF
                   </button>
                 </div>
@@ -1062,9 +1159,13 @@ export default function Report({ t }) {
                 fontSize: "clamp(14px, 4vw, 16px)",
                 fontWeight: 800,
                 color: C.dark,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
               }}
             >
-              📋 {safeReport.results || "Report Results"}
+              <FiList size={18} />
+              {safeReport.results || "Report Results"}
               {selectedSavedReport && (
                 <span style={{ fontSize: 12, color: C.muted, fontWeight: 400 }}>
                   {" "}
@@ -1073,8 +1174,15 @@ export default function Report({ t }) {
               )}
             </h3>
             <span
-              style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
+              style={{
+                fontSize: "clamp(10px, 3vw, 11px)",
+                color: C.muted,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
             >
+              <FiClock size={12} />
               {safeReport.generated || "Generated"}:{" "}
               {new Date(reportData.generatedAt).toLocaleString()}
             </span>
@@ -1107,8 +1215,16 @@ export default function Report({ t }) {
                 {reportData.summary?.total || 0}
               </div>
               <div
-                style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
+                style={{
+                  fontSize: "clamp(10px, 3vw, 11px)",
+                  color: C.muted,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                }}
               >
+                <FiDatabase size={12} />
                 {safeReport.totalRecords || "Total Records"}
               </div>
             </div>
@@ -1130,8 +1246,16 @@ export default function Report({ t }) {
                 {reportData.summary?.completed || 0}
               </div>
               <div
-                style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
+                style={{
+                  fontSize: "clamp(10px, 3vw, 11px)",
+                  color: C.muted,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                }}
               >
+                <FiCheck size={12} />
                 {safeReport.completed || "Completed"}
               </div>
             </div>
@@ -1153,8 +1277,16 @@ export default function Report({ t }) {
                 {reportData.summary?.pending || 0}
               </div>
               <div
-                style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
+                style={{
+                  fontSize: "clamp(10px, 3vw, 11px)",
+                  color: C.muted,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                }}
               >
+                <FiClockIcon size={12} />
                 {safeReport.pending || "Pending"}
               </div>
             </div>
@@ -1176,8 +1308,16 @@ export default function Report({ t }) {
                 {reportData.summary?.average || 0}
               </div>
               <div
-                style={{ fontSize: "clamp(10px, 3vw, 11px)", color: C.muted }}
+                style={{
+                  fontSize: "clamp(10px, 3vw, 11px)",
+                  color: C.muted,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 4,
+                }}
               >
+                <FiTrendingUp size={12} />
                 {safeReport.average || "Average Value"}
               </div>
             </div>
@@ -1285,8 +1425,16 @@ export default function Report({ t }) {
                             item.status === "Completed" ? "#d1fae5" : "#fef3c7",
                           color:
                             item.status === "Completed" ? "#065f46" : "#92400e",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
                         }}
                       >
+                        {item.status === "Completed" ? (
+                          <FiCheck size={10} />
+                        ) : (
+                          <FiClockIcon size={10} />
+                        )}
                         {item.status}
                       </span>
                     </td>
@@ -1308,7 +1456,13 @@ export default function Report({ t }) {
             padding: "40px 20px",
           }}
         >
-          <div style={{ fontSize: 48, marginBottom: 16 }}>📊</div>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>
+            <FiBarChart2
+              size={48}
+              color={C.muted}
+              style={{ display: "block", margin: "0 auto" }}
+            />
+          </div>
           <h3
             style={{
               fontSize: "clamp(16px, 4vw, 20px)",
@@ -1325,6 +1479,13 @@ export default function Report({ t }) {
           </p>
         </div>
       )}
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

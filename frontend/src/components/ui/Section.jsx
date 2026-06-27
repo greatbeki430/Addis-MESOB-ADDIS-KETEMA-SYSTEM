@@ -23,7 +23,15 @@ export default function Section({ title, children, icon }) {
         }}
       >
         {icon && (
-          <span style={{ fontSize: "clamp(18px, 4.5vw, 22px)" }}>{icon}</span>
+          <span
+            style={{
+              fontSize: "clamp(18px, 4.5vw, 22px)",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            {icon}
+          </span>
         )}
         {title}
       </h3>

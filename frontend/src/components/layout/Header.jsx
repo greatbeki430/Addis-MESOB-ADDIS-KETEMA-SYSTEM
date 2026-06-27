@@ -2,17 +2,32 @@ import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { useAuth } from "../../hooks/useAuth";
 import { useState } from "react";
+import {
+  FiHome,
+  FiMessageSquare,
+  FiStar,
+  FiFileText,
+  FiGrid,
+  FiUsers,
+  FiBarChart2,
+  FiLogOut,
+  FiCalendar,
+  FiChevronRight,
+  FiUser,
+  // FiFlag,
+  FiGlobe,
+} from "react-icons/fi";
 
 export default function Header({ tab, t, lang, setLang }) {
   const icons = {
-    dashboard: "⬢",
-    forum: "◈",
-    evaluation: "◉",
-    report: "◫",
-    services: "◧",
-    users: "👥",
-    teams: "👥",
-    analytics: "📊",
+    dashboard: <FiHome size={18} />,
+    forum: <FiMessageSquare size={18} />,
+    evaluation: <FiStar size={18} />,
+    report: <FiFileText size={18} />,
+    services: <FiGrid size={18} />,
+    users: <FiUsers size={18} />,
+    teams: <FiUsers size={18} />,
+    analytics: <FiBarChart2 size={18} />,
   };
   const { logout, user } = useAuth();
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
@@ -25,6 +40,7 @@ export default function Header({ tab, t, lang, setLang }) {
     day: "numeric",
   });
 
+  // eslint-disable-next-line no-unused-vars
   const getUserInitial = () => {
     if (!user?.name) return "U";
     return user.name.charAt(0).toUpperCase();
@@ -75,9 +91,11 @@ export default function Header({ tab, t, lang, setLang }) {
             color: C.primary,
             flexShrink: 0,
             animation: "pulseGlow 3s ease-in-out infinite",
+            display: "flex",
+            alignItems: "center",
           }}
         >
-          {icons[tab] || "◈"}
+          {icons[tab] || <FiGrid size={18} />}
         </span>
 
         <span
@@ -99,9 +117,11 @@ export default function Header({ tab, t, lang, setLang }) {
             color: C.gold,
             fontSize: "clamp(10px, 3vw, 14px)",
             fontWeight: 900,
+            display: "flex",
+            alignItems: "center",
           }}
         >
-          ›
+          <FiChevronRight size={14} />
         </span>
 
         <span
@@ -146,7 +166,8 @@ export default function Header({ tab, t, lang, setLang }) {
             gap: 4,
           }}
         >
-          📅 {dateStr}
+          <FiCalendar size={12} />
+          {dateStr}
         </span>
 
         {/* Language Buttons — desktop */}
@@ -178,6 +199,9 @@ export default function Header({ tab, t, lang, setLang }) {
                   whiteSpace: "nowrap",
                   minWidth: "clamp(24px, 6vw, 32px)",
                   transform: lang === l.code ? "scale(1.05)" : "scale(1)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2,
                 }}
                 onMouseEnter={(e) => {
                   if (lang !== l.code) {
@@ -192,6 +216,7 @@ export default function Header({ tab, t, lang, setLang }) {
                   }
                 }}
               >
+                <FiGlobe size={10} />
                 {l.flag}
               </button>
             ))}
@@ -244,7 +269,7 @@ export default function Header({ tab, t, lang, setLang }) {
           onMouseEnter={() => setIsLogoutHovered(true)}
           onMouseLeave={() => setIsLogoutHovered(false)}
         >
-          <span style={{ fontSize: "clamp(12px, 3vw, 14px)" }}>🚪</span>
+          <FiLogOut size={14} />
           <span style={{ display: "inline-block" }}>
             {safeAuth.logout || "Logout"}
           </span>
@@ -280,7 +305,7 @@ export default function Header({ tab, t, lang, setLang }) {
             e.currentTarget.style.boxShadow = "0 2px 8px rgba(26,58,173,0.35)";
           }}
         >
-          {getUserInitial()}
+          <FiUser size={16} />
         </div>
       </div>
 

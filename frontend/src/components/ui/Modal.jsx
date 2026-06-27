@@ -1,5 +1,51 @@
 import { useState, useEffect, useRef } from "react";
 import { C, F } from "../../styles/theme";
+import {
+  FiCheckCircle,
+  // FiAlertCircle,
+  FiXCircle,
+  FiInfo,
+  FiHelpCircle,
+  FiX,
+  FiCheck,
+  FiAlertTriangle,
+  // FiBell,
+  // FiMessageSquare,
+  // FiThumbsUp,
+  // FiThumbsDown,
+  // FiStar,
+  // FiAward,
+  // FiClock,
+  // FiCalendar,
+  // FiEdit2,
+  // FiTrash2,
+  // FiPlus,
+  // FiMinus,
+  // FiSave,
+  // FiDownload,
+  // FiPrinter,
+  // FiFile,
+  // FiFolder,
+  // FiSearch,
+  // FiSettings,
+  // FiUser,
+  // FiUsers,
+  // FiMail,
+  // FiPhone,
+  // FiMapPin,
+  // FiGlobe,
+  // FiLink,
+  // FiLock,
+  // FiUnlock,
+  // FiEye,
+  // FiEyeOff,
+  // FiHeart,
+  // FiFlag,
+  // FiGift,
+  // FiTrophy,
+  // FiMedal,
+  // FiAward as FiAwardIcon,
+} from "react-icons/fi";
 
 export const Modal = ({
   isOpen,
@@ -58,15 +104,30 @@ export const Modal = ({
   const getIcon = () => {
     switch (type) {
       case "success":
-        return "✅";
+        return <FiCheckCircle size={24} />;
       case "warning":
-        return "⚠️";
+        return <FiAlertTriangle size={24} />;
       case "error":
-        return "❌";
+        return <FiXCircle size={24} />;
       case "confirm":
-        return "❓";
+        return <FiHelpCircle size={24} />;
       default:
-        return "ℹ️";
+        return <FiInfo size={24} />;
+    }
+  };
+
+  const getIconColor = () => {
+    switch (type) {
+      case "success":
+        return "#10b981";
+      case "warning":
+        return "#f59e0b";
+      case "error":
+        return "#ef4444";
+      case "confirm":
+        return "#3b82f6";
+      default:
+        return C.primary;
     }
   };
 
@@ -131,6 +192,8 @@ export const Modal = ({
     handleClose();
   };
 
+  const iconColor = getIconColor();
+
   return (
     <div
       style={{
@@ -169,7 +232,7 @@ export const Modal = ({
         }
         @keyframes pulse {
           0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.02); }
+          50% { transform: scale(1.1); }
         }
       `}</style>
       <div
@@ -202,7 +265,10 @@ export const Modal = ({
             <span
               style={{
                 fontSize: 22,
+                color: iconColor,
                 animation: "pulse 2s ease-in-out infinite",
+                display: "flex",
+                alignItems: "center",
               }}
             >
               {getIcon()}
@@ -231,6 +297,9 @@ export const Modal = ({
                 padding: "4px 8px",
                 borderRadius: 6,
                 transition: "all 0.2s",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "#f3f4f6";
@@ -243,7 +312,7 @@ export const Modal = ({
                 e.currentTarget.style.transform = "rotate(0deg)";
               }}
             >
-              ✕
+              <FiX size={20} />
             </button>
           )}
         </div>
@@ -294,6 +363,9 @@ export const Modal = ({
                 cursor: "pointer",
                 transition: "all 0.2s",
                 fontFamily: F.sans,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = "#f3f4f6";
@@ -304,6 +376,7 @@ export const Modal = ({
                 e.currentTarget.style.transform = "translateY(0)";
               }}
             >
+              <FiX size={14} />
               {cancelText}
             </button>
           )}
@@ -320,6 +393,9 @@ export const Modal = ({
                 cursor: "pointer",
                 transition: "all 0.2s",
                 fontFamily: F.sans,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.opacity = "0.85";
@@ -332,6 +408,7 @@ export const Modal = ({
                 e.currentTarget.style.boxShadow = "none";
               }}
             >
+              <FiCheck size={14} />
               {confirmText}
             </button>
           )}
@@ -348,6 +425,9 @@ export const Modal = ({
                 cursor: "pointer",
                 transition: "all 0.2s",
                 fontFamily: F.sans,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.opacity = "0.85";
@@ -358,6 +438,7 @@ export const Modal = ({
                 e.currentTarget.style.transform = "translateY(0)";
               }}
             >
+              <FiCheck size={14} />
               OK
             </button>
           )}
@@ -391,13 +472,13 @@ export const Toast = ({
   const getColors = () => {
     switch (type) {
       case "success":
-        return { bg: "#10b981", icon: "✅" };
+        return { bg: "#10b981", icon: <FiCheckCircle size={20} /> };
       case "error":
-        return { bg: "#ef4444", icon: "❌" };
+        return { bg: "#ef4444", icon: <FiXCircle size={20} /> };
       case "warning":
-        return { bg: "#f59e0b", icon: "⚠️" };
+        return { bg: "#f59e0b", icon: <FiAlertTriangle size={20} /> };
       default:
-        return { bg: C.primary, icon: "ℹ️" };
+        return { bg: C.primary, icon: <FiInfo size={20} /> };
     }
   };
 
@@ -430,7 +511,9 @@ export const Toast = ({
           fontFamily: F.sans,
         }}
       >
-        <span style={{ fontSize: 20 }}>{colors.icon}</span>
+        <span style={{ fontSize: 20, display: "flex", alignItems: "center" }}>
+          {colors.icon}
+        </span>
         <span style={{ fontSize: 13, flex: 1 }}>{message}</span>
         <button
           onClick={() => {
@@ -448,6 +531,8 @@ export const Toast = ({
             opacity: 0.7,
             padding: "4px",
             transition: "opacity 0.2s",
+            display: "flex",
+            alignItems: "center",
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.opacity = "1";
@@ -456,7 +541,7 @@ export const Toast = ({
             e.currentTarget.style.opacity = "0.7";
           }}
         >
-          ✕
+          <FiX size={16} />
         </button>
       </div>
     </div>

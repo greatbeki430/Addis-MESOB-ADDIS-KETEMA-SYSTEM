@@ -6,6 +6,7 @@ import {
   exportRecognitionCertificateToPDF,
   exportBiWeeklyAggregateReportToPDF,
 } from "../utils/pdfExport";
+import { FiDownload, FiChevronDown, FiFileText } from "react-icons/fi";
 
 const ExportMenu = ({
   type, // 'forum', 'evaluation', 'daily', 'certificate', 'biweekly'
@@ -98,7 +99,9 @@ const ExportMenu = ({
         onClick={() => setIsOpen(!isOpen)}
         onMouseEnter={() => setIsOpen(true)}
       >
-        📄 Export Report ▼
+        <FiDownload size={14} />
+        Export Report
+        <FiChevronDown size={12} />
       </button>
       {isOpen && (
         <div style={menuStyle} onMouseLeave={() => setIsOpen(false)}>
@@ -108,7 +111,8 @@ const ExportMenu = ({
             onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f5")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
           >
-            📑 PDF Format
+            <FiFileText size={14} />
+            PDF Format
           </div>
         </div>
       )}

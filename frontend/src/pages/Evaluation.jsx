@@ -8,7 +8,65 @@ import { exportEvaluationReportToPDF } from "../utils/pdfExport";
 import { useAuth } from "../hooks/useAuth";
 import { evaluationAPI } from "../services/api";
 import { useToast } from "../hooks/useToast";
-import { ArrowDown01Icon } from "hugeicons-react";
+import {
+  FiChevronDown,
+  // FiChevronRight,
+  FiUser,
+  // FiUserPlus,
+  // FiUserX,
+  FiUsers,
+  FiStar,
+  FiAward,
+  FiTrophy,
+  FiBarChart2,
+  FiTrendingUp,
+  FiTrendingDown,
+  FiCheck,
+  FiX,
+  FiPlus,
+  // FiMinus,
+  FiSave,
+  FiDownload,
+  FiRefreshCw,
+  FiLoader,
+  // FiClock,
+  FiCalendar,
+  // FiEdit2,
+  FiMessageSquare,
+  FiThumbsUp,
+  // FiAward as FiAwardIcon,
+  FiTarget,
+  // FiZap,
+  // FiFileText,
+  FiClipboard,
+  // FiList,
+  // FiGrid,
+  // FiLayout,
+  // FiMenu,
+  // FiMoreHorizontal,
+  // FiPaperclip,
+  // FiPrinter,
+  // FiSearch,
+  // FiSend,
+  // FiShare2,
+  // FiSliders,
+  // FiTool,
+  // FiUserCheck,
+  // FiUserMinus,
+  // FiUserPlus as FiUserPlusIcon,
+  // FiUsers as FiUsersIcon,
+  FiPenTool,
+  // FiFile,
+  // FiFolder,
+  // FiBookmark,
+  // FiFlag,
+  // FiGift,
+  // FiHeart,
+  // FiSmile,
+  // FiMeh,
+  // FiFrown,
+  FiAlertCircle,
+} from "react-icons/fi";
 
 export default function Evaluation({ t, lang }) {
   // ✅ Safe access to translations
@@ -240,14 +298,40 @@ export default function Evaluation({ t, lang }) {
   // ✅ Get performance level
   const getPerformanceLevel = (score) => {
     if (score >= 90)
-      return { label: "Outstanding", color: "#10b981", icon: "🌟" };
+      return {
+        label: "Outstanding",
+        color: "#10b981",
+        icon: <FiStar size={14} />,
+      };
     if (score >= 80)
-      return { label: "Excellent", color: "#3b82f6", icon: "⭐" };
-    if (score >= 70) return { label: "Good", color: "#8b5cf6", icon: "👍" };
-    if (score >= 60) return { label: "Average", color: "#f59e0b", icon: "📊" };
+      return {
+        label: "Excellent",
+        color: "#3b82f6",
+        icon: <FiAward size={14} />,
+      };
+    if (score >= 70)
+      return {
+        label: "Good",
+        color: "#8b5cf6",
+        icon: <FiThumbsUp size={14} />,
+      };
+    if (score >= 60)
+      return {
+        label: "Average",
+        color: "#f59e0b",
+        icon: <FiBarChart2 size={14} />,
+      };
     if (score >= 50)
-      return { label: "Needs Improvement", color: "#f97316", icon: "📈" };
-    return { label: "Needs Attention", color: "#ef4444", icon: "⚠️" };
+      return {
+        label: "Needs Improvement",
+        color: "#f97316",
+        icon: <FiTrendingUp size={14} />,
+      };
+    return {
+      label: "Needs Attention",
+      color: "#ef4444",
+      icon: <FiAlertCircle size={14} />,
+    };
   };
 
   // Keyboard navigation
@@ -365,8 +449,12 @@ export default function Evaluation({ t, lang }) {
             color: C.dark,
             fontFamily: F.serif,
             margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
           }}
         >
+          <FiClipboard size={24} color={C.primary} />
           {te.title || "Peer Forum Evaluation"}
         </h1>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -379,8 +467,12 @@ export default function Evaluation({ t, lang }) {
               fontSize: "clamp(10px, 3vw, 11px)",
               fontWeight: 700,
               whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
             }}
           >
+            <FiTarget size={12} />
             {te.outOf || "Out of 100 pts"}
           </span>
           {evaluationId && (
@@ -392,9 +484,13 @@ export default function Evaluation({ t, lang }) {
                 borderRadius: 20,
                 fontSize: "10px",
                 fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
               }}
             >
-              💾 Saved
+              <FiCheck size={12} />
+              Saved
             </span>
           )}
         </div>
@@ -422,6 +518,7 @@ export default function Evaluation({ t, lang }) {
             color: C.dark,
           }}
         >
+          <FiUsers size={14} style={{ marginRight: 6 }} />
           Team Name / Department
         </label>
         <input
@@ -451,9 +548,13 @@ export default function Evaluation({ t, lang }) {
               color: C.dark,
               fontFamily: F.sans,
               margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
-            👥 {te.teamMembers || "Team Members"} (Max 7)
+            <FiUsers size={18} color={C.primary} />
+            {te.teamMembers || "Team Members"} (Max 7)
           </h3>
           {members.length < 7 && (
             <button
@@ -472,7 +573,8 @@ export default function Evaluation({ t, lang }) {
                 gap: 4,
               }}
             >
-              + Add Member
+              <FiPlus size={14} />
+              Add Member
             </button>
           )}
         </div>
@@ -508,9 +610,12 @@ export default function Evaluation({ t, lang }) {
                     height: 32,
                     cursor: "pointer",
                     fontSize: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  ✕
+                  <FiX size={16} />
                 </button>
               )}
             </div>
@@ -542,6 +647,7 @@ export default function Evaluation({ t, lang }) {
               gap: 6,
             }}
           >
+            <FiTarget size={16} />
             {safeCriteria[c.key] || c.key}
             <span
               style={{
@@ -658,7 +764,7 @@ export default function Evaluation({ t, lang }) {
           }
         >
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <ArrowDown01Icon
+            <FiChevronDown
               size={20}
               style={{
                 transform: showRankings ? "rotate(0deg)" : "rotate(-90deg)",
@@ -673,9 +779,13 @@ export default function Evaluation({ t, lang }) {
                 fontWeight: 800,
                 color: C.dark,
                 fontFamily: F.sans,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
               }}
             >
-              📊 Performance Rankings & Feedback
+              <FiBarChart2 size={18} color={C.primary} />
+              Performance Rankings & Feedback
             </h3>
             {!showRankings && sortedMembers.length > 0 && (
               <span
@@ -702,14 +812,28 @@ export default function Evaluation({ t, lang }) {
               }}
             >
               <span
-                style={{ fontSize: "clamp(11px, 3vw, 13px)", color: C.muted }}
+                style={{
+                  fontSize: "clamp(11px, 3vw, 13px)",
+                  color: C.muted,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
               >
-                🏆 Best: {bestPerformer}
+                <FiTrophy size={14} color={C.gold} />
+                Best: {bestPerformer}
               </span>
               <span
-                style={{ fontSize: "clamp(11px, 3vw, 13px)", color: C.muted }}
+                style={{
+                  fontSize: "clamp(11px, 3vw, 13px)",
+                  color: C.muted,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
               >
-                📊 Avg: {averageScore}
+                <FiTrendingUp size={14} color={C.primary} />
+                Avg: {averageScore}
               </span>
             </div>
           )}
@@ -743,7 +867,17 @@ export default function Evaluation({ t, lang }) {
                 >
                   {totalMembers}
                 </div>
-                <div style={{ fontSize: "10px", color: C.muted }}>
+                <div
+                  style={{
+                    fontSize: "10px",
+                    color: C.muted,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 4,
+                  }}
+                >
+                  <FiUsers size={12} />
                   Total Members
                 </div>
               </div>
@@ -764,7 +898,17 @@ export default function Evaluation({ t, lang }) {
                 >
                   {averageScore}
                 </div>
-                <div style={{ fontSize: "10px", color: C.muted }}>
+                <div
+                  style={{
+                    fontSize: "10px",
+                    color: C.muted,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 4,
+                  }}
+                >
+                  <FiTrendingUp size={12} />
                   Average Score
                 </div>
               </div>
@@ -785,7 +929,17 @@ export default function Evaluation({ t, lang }) {
                 >
                   {highestScore}
                 </div>
-                <div style={{ fontSize: "10px", color: C.muted }}>
+                <div
+                  style={{
+                    fontSize: "10px",
+                    color: C.muted,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 4,
+                  }}
+                >
+                  <FiAward size={12} />
                   Highest Score
                 </div>
               </div>
@@ -806,7 +960,17 @@ export default function Evaluation({ t, lang }) {
                 >
                   {lowestScore}
                 </div>
-                <div style={{ fontSize: "10px", color: C.muted }}>
+                <div
+                  style={{
+                    fontSize: "10px",
+                    color: C.muted,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 4,
+                  }}
+                >
+                  <FiTrendingDown size={12} />
                   Lowest Score
                 </div>
               </div>
@@ -866,13 +1030,27 @@ export default function Evaluation({ t, lang }) {
                             fontSize: "9px",
                             fontWeight: 700,
                             borderRadius: "0 10px 0 10px",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
                           }}
                         >
-                          {idx === 0
-                            ? "🏆 TOP"
-                            : idx === 1
-                              ? "🥈 2ND"
-                              : "🥉 3RD"}
+                          {idx === 0 ? (
+                            <>
+                              <FiTrophy size={10} />
+                              TOP
+                            </>
+                          ) : idx === 1 ? (
+                            <>
+                              <FiAward size={10} />
+                              2ND
+                            </>
+                          ) : (
+                            <>
+                              <FiStar size={10} />
+                              3RD
+                            </>
+                          )}
                         </div>
                       )}
 
@@ -896,8 +1074,12 @@ export default function Evaluation({ t, lang }) {
                               fontSize: "clamp(15px, 3vw, 17px)",
                               fontWeight: 800,
                               color: C.dark,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
                             }}
                           >
+                            <FiUser size={14} color={C.primary} />
                             {name}
                           </span>
                           <span
@@ -950,7 +1132,7 @@ export default function Evaluation({ t, lang }) {
                           marginBottom: 6,
                         }}
                       >
-                        <span>{level.icon}</span>
+                        {level.icon}
                         <span
                           style={{
                             fontSize: "clamp(10px, 2.5vw, 11px)",
@@ -973,7 +1155,11 @@ export default function Evaluation({ t, lang }) {
                             marginBottom: 2,
                           }}
                         >
-                          📝 Feedback / Comments
+                          <FiMessageSquare
+                            size={10}
+                            style={{ marginRight: 4 }}
+                          />
+                          Feedback / Comments
                         </label>
                         <textarea
                           value={comment || ""}
@@ -1030,7 +1216,9 @@ export default function Evaluation({ t, lang }) {
               color: C.muted,
             }}
           >
-            <div style={{ fontSize: 32, marginBottom: 8 }}>📋</div>
+            <div style={{ fontSize: 32, marginBottom: 8 }}>
+              <FiClipboard size={32} color={C.muted} />
+            </div>
             <p>Add team members and scores to see rankings</p>
           </div>
         )}
@@ -1059,7 +1247,11 @@ export default function Evaluation({ t, lang }) {
             <div
               style={{ fontSize: "clamp(28px, 7vw, 40px)", marginBottom: 8 }}
             >
-              🏆
+              <FiTrophy
+                size={40}
+                color={C.gold}
+                style={{ display: "block", margin: "0 auto" }}
+              />
             </div>
             <div
               style={{
@@ -1108,9 +1300,13 @@ export default function Evaluation({ t, lang }) {
                 color: C.dark,
                 fontFamily: F.sans,
                 marginBottom: 16,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              ✍️ {te.signaturesTitle || "ፊርማዎች / Signatures"}
+              <FiPenTool size={14} />
+              {te.signaturesTitle || "ፊርማዎች / Signatures"}
             </div>
             <div
               style={{
@@ -1139,8 +1335,13 @@ export default function Evaluation({ t, lang }) {
                     marginBottom: 8,
                     textTransform: "uppercase",
                     letterSpacing: 0.5,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 4,
                   }}
                 >
+                  <FiStar size={12} />
                   {te.teamLeaderLabel || "ቡድን መሪ / Team Leader"}
                 </div>
                 <input
@@ -1212,8 +1413,13 @@ export default function Evaluation({ t, lang }) {
                       fontFamily: F.sans,
                       marginBottom: 4,
                       minHeight: 20,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 4,
                     }}
                   >
+                    <FiUser size={12} color={C.primary} />
                     {name}
                   </div>
                   <div
@@ -1252,8 +1458,12 @@ export default function Evaluation({ t, lang }) {
                   color: C.muted,
                   fontFamily: F.sans,
                   fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
                 }}
               >
+                <FiCalendar size={12} />
                 {te.dateLabel || "ቀን / Date:"}
               </span>
               <span
@@ -1295,11 +1505,27 @@ export default function Evaluation({ t, lang }) {
             fontWeight: 700,
             cursor: "pointer",
             opacity: saving ? 0.7 : 1,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
           }}
           onClick={saveEvaluation}
           disabled={saving}
         >
-          {saving ? "💾 Saving..." : "💾 Save Evaluation"}
+          {saving ? (
+            <>
+              <FiLoader
+                size={16}
+                style={{ animation: "spin 1s linear infinite" }}
+              />
+              Saving...
+            </>
+          ) : (
+            <>
+              <FiSave size={16} />
+              Save Evaluation
+            </>
+          )}
         </button>
         <button
           style={{
@@ -1311,6 +1537,9 @@ export default function Evaluation({ t, lang }) {
             fontSize: "clamp(12px, 3.5vw, 14px)",
             fontWeight: 700,
             cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
           }}
           onClick={() => {
             const bestPerformerName =
@@ -1325,10 +1554,16 @@ export default function Evaluation({ t, lang }) {
             );
           }}
         >
-          📄 Export PDF
+          <FiDownload size={16} />
+          Export PDF
         </button>
         <button
-          style={btn.secondary}
+          style={{
+            ...btn.secondary,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
           onClick={() => {
             setScores({});
             setComments({});
@@ -1338,9 +1573,17 @@ export default function Evaluation({ t, lang }) {
             localStorage.removeItem("currentEvaluation");
           }}
         >
-          ↺ {te.reset || "Reset"}
+          <FiRefreshCw size={16} />
+          {te.reset || "Reset"}
         </button>
       </div>
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

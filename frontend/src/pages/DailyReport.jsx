@@ -6,6 +6,45 @@ import { dailyReportAPI, serviceAPI } from "../services/api";
 import { exportDailyReportToPDF } from "../utils/pdfExport";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
+import {
+  FiCalendar,
+  FiList,
+  FiPlus,
+  FiX,
+  FiDownload,
+  FiSave,
+  FiLoader,
+  FiFileText,
+  // FiUsers,
+  // FiUser,
+  // FiUserCheck,
+  FiBarChart2,
+  // FiTrendingUp,
+  // FiTrendingDown,
+  // FiClock,
+  // FiCheck,
+  // FiAlertCircle,
+  // FiInfo,
+  // FiEdit2,
+  // FiTrash2,
+  // FiPrinter,
+  // FiFile,
+  // FiFolder,
+  // FiGrid,
+  // FiLayout,
+  // FiMenu,
+  // FiMoreHorizontal,
+  // FiPaperclip,
+  // FiSearch,
+  // FiSend,
+  // FiShare2,
+  // FiSliders,
+  // FiTarget,
+  // FiThumbsUp,
+  // FiUserPlus,
+  // FiUserMinus,
+  // FiUsers as FiUsersIcon,
+} from "react-icons/fi";
 
 export default function DailyReport({ t, lang }) {
   const { showToast } = useToast();
@@ -243,7 +282,7 @@ export default function DailyReport({ t, lang }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: "clamp(28px, 7vw, 36px)" }}>📋</span>
+          <FiFileText size={36} color={C.primary} />
           <div>
             <h1
               style={{
@@ -265,8 +304,12 @@ export default function DailyReport({ t, lang }) {
                 fontSize: "clamp(12px, 3vw, 13px)",
                 color: C.muted,
                 margin: "2px 0 0",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
+              <FiCalendar size={14} />
               {new Date(date).toLocaleDateString(
                 lang === "en" ? "en-US" : lang === "am" ? "am-ET" : "om-ET",
                 {
@@ -304,7 +347,12 @@ export default function DailyReport({ t, lang }) {
         }}
       >
         <Field
-          label={td.reportDate || "📅 Report Date"}
+          label={
+            <>
+              <FiCalendar size={14} style={{ marginRight: 6 }} />
+              {td.reportDate || "Report Date"}
+            </>
+          }
           value={date}
           onChange={setDate}
           type="date"
@@ -330,9 +378,13 @@ export default function DailyReport({ t, lang }) {
               color: C.dark,
               fontFamily: F.sans,
               margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
-            {td.serviceList || "📋 Service List"}
+            <FiList size={18} color={C.primary} />
+            {td.serviceList || "Service List"}
             <span
               style={{
                 fontSize: "clamp(11px, 3vw, 12px)",
@@ -351,16 +403,28 @@ export default function DailyReport({ t, lang }) {
                 ...btn.secondary,
                 padding: "clamp(6px, 1.5vw, 8px) clamp(12px, 3vw, 18px)",
                 fontSize: "clamp(12px, 3vw, 13px)",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              ➕ {td.addRow || "+ Add Row"}
+              <FiPlus size={14} />
+              {td.addRow || "+ Add Row"}
             </button>
           </div>
         </div>
 
         {loading ? (
           <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
-            ⏳ {safeCommon.loading || "Loading..."}
+            <FiLoader
+              size={24}
+              style={{
+                animation: "spin 1s linear infinite",
+                display: "block",
+                margin: "0 auto 12px",
+              }}
+            />
+            {safeCommon.loading || "Loading..."}
           </div>
         ) : (
           <>
@@ -525,6 +589,9 @@ export default function DailyReport({ t, lang }) {
                               fontSize: 16,
                               color: "#999",
                               transition: "all 0.3s ease",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.color = "#dc2626";
@@ -535,7 +602,7 @@ export default function DailyReport({ t, lang }) {
                               e.currentTarget.style.transform = "scale(1)";
                             }}
                           >
-                            ✕
+                            <FiX size={16} />
                           </button>
                         )}
                       </td>
@@ -559,6 +626,7 @@ export default function DailyReport({ t, lang }) {
                         color: C.dark,
                       }}
                     >
+                      <FiBarChart2 size={14} style={{ marginRight: 6 }} />
                       {td.grandTotal || "Grand Total"}
                     </td>
                     <td
@@ -640,7 +708,20 @@ export default function DailyReport({ t, lang }) {
                   e.currentTarget.style.boxShadow = "none";
                 }}
               >
-                {exporting ? "⏳ Exporting..." : "📄 Export PDF"}
+                {exporting ? (
+                  <>
+                    <FiLoader
+                      size={16}
+                      style={{ animation: "spin 1s linear infinite" }}
+                    />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <FiDownload size={16} />
+                    Export PDF
+                  </>
+                )}
               </button>
               <button
                 style={{
@@ -656,12 +737,36 @@ export default function DailyReport({ t, lang }) {
                 onClick={saveReport}
                 disabled={saving}
               >
-                {saving ? "⏳ Saving..." : "💾 " + (td.save || "Save Report")}
+                {saving ? (
+                  <>
+                    <FiLoader
+                      size={16}
+                      style={{ animation: "spin 1s linear infinite" }}
+                    />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <FiSave size={16} />
+                    {td.save || "Save Report"}
+                  </>
+                )}
               </button>
             </div>
           </>
         )}
       </div>
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

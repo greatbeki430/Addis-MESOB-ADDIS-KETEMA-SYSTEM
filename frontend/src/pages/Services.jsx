@@ -2,6 +2,41 @@ import { useState, useEffect } from "react";
 import { card, C, F, inp } from "../styles/theme";
 import { SERVICES } from "../constants/services";
 import { serviceAPI } from "../services/api";
+import {
+  FiSearch,
+  FiGrid,
+  FiTool,
+  FiPackage,
+  FiBox,
+  FiCheck,
+  FiX,
+  // FiPlus,
+  // FiMinus,
+  FiSettings,
+  FiStar,
+  FiAward,
+  FiBriefcase,
+  FiUsers,
+  FiUser,
+  FiClock,
+  FiCalendar,
+  FiMapPin,
+  FiPhone,
+  FiMail,
+  FiGlobe,
+  // FiInfo,
+  // FiAlertCircle,
+  // FiCheckCircle,
+  // FiXCircle,
+  // FiTrendingUp,
+  // FiTrendingDown,
+  // FiBarChart2,
+  // FiPieChart,
+  // FiLayers,
+  // FiFilter,
+  // FiRefreshCw,
+  // FiLoader,
+} from "react-icons/fi";
 
 export default function Services({ t, lang }) {
   // ✅ FIX: Safe access to translations with fallback
@@ -56,6 +91,28 @@ export default function Services({ t, lang }) {
         s.displayDept.toLowerCase().includes(search.toLowerCase())),
   );
 
+  // Get icon for service
+  const getServiceIcon = (index) => {
+    const icons = [
+      <FiTool size={24} />,
+      <FiPackage size={24} />,
+      <FiBox size={24} />,
+      <FiSettings size={24} />,
+      <FiStar size={24} />,
+      <FiAward size={24} />,
+      <FiBriefcase size={24} />,
+      <FiUsers size={24} />,
+      <FiUser size={24} />,
+      <FiClock size={24} />,
+      <FiCalendar size={24} />,
+      <FiMapPin size={24} />,
+      <FiPhone size={24} />,
+      <FiMail size={24} />,
+      <FiGlobe size={24} />,
+    ];
+    return icons[index % icons.length];
+  };
+
   return (
     <div
       style={{
@@ -78,7 +135,9 @@ export default function Services({ t, lang }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: "clamp(28px, 7vw, 36px)" }}>🔧</span>
+          <span style={{ fontSize: "clamp(28px, 7vw, 36px)" }}>
+            <FiTool size={36} color={C.primary} />
+          </span>
           <div>
             <h1
               style={{
@@ -117,8 +176,12 @@ export default function Services({ t, lang }) {
             whiteSpace: "nowrap",
             boxShadow: `0 4px 15px ${C.primary}44`,
             animation: "pulseGlow 3s ease-in-out infinite",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
           }}
         >
+          <FiGrid size={14} />
           {ts.catalogue || "Service Catalogue"} • {services.length}
         </span>
       </div>
@@ -152,7 +215,7 @@ export default function Services({ t, lang }) {
                 transition: "opacity 0.3s ease",
               }}
             >
-              🔍
+              <FiSearch size={18} />
             </span>
             <input
               style={{
@@ -290,7 +353,7 @@ export default function Services({ t, lang }) {
                       : "scale(1) rotate(0deg)",
                 }}
               >
-                ◈
+                {getServiceIcon(i)}
               </div>
 
               <div
@@ -324,8 +387,12 @@ export default function Services({ t, lang }) {
                   color: "#888",
                   fontFamily: F.sans,
                   marginBottom: "clamp(8px, 2.5vw, 12px)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
                 }}
               >
+                <FiBriefcase size={12} />
                 {s.displayDept}
               </div>
 
@@ -337,14 +404,24 @@ export default function Services({ t, lang }) {
                   padding: "clamp(3px, 1.5vw, 5px) clamp(10px, 2.5vw, 14px)",
                   fontSize: "clamp(9px, 2.5vw, 10px)",
                   fontWeight: 700,
-                  display: "inline-block",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
                   transition: "all 0.3s ease",
                   transform: hoveredCard === i ? "scale(1.05)" : "scale(1)",
                 }}
               >
-                {s.active
-                  ? ts.active || "✓ Active"
-                  : ts.inactive || "✗ Inactive"}
+                {s.active ? (
+                  <>
+                    <FiCheck size={10} />
+                    {ts.active || "Active"}
+                  </>
+                ) : (
+                  <>
+                    <FiX size={10} />
+                    {ts.inactive || "Inactive"}
+                  </>
+                )}
               </span>
             </div>
           ))}
@@ -369,7 +446,11 @@ export default function Services({ t, lang }) {
               opacity: 0.5,
             }}
           >
-            ◎
+            <FiPackage
+              size={56}
+              color={C.muted}
+              style={{ display: "block", margin: "0 auto" }}
+            />
           </div>
           <p style={{ fontSize: "clamp(14px, 3.5vw, 16px)" }}>
             {ts.noneFound || "No services found"}
@@ -385,6 +466,21 @@ export default function Services({ t, lang }) {
           </p>
         </div>
       )}
+
+      <style>{`
+        @keyframes pulseGlow {
+          0%, 100% { box-shadow: 0 4px 15px ${C.primary}44; }
+          50% { box-shadow: 0 4px 30px ${C.primary}88; }
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

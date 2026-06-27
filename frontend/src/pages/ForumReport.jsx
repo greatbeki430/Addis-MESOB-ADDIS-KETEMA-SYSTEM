@@ -4,6 +4,61 @@ import Field from "../components/ui/Field";
 import Section from "../components/ui/Section";
 import { exportForumReportToPDF } from "../utils/pdfExport";
 import { meetingAPI } from "../services/api";
+import {
+  FiPlus,
+  FiX,
+  FiUsers,
+  // FiUser,
+  FiUserX,
+  FiCalendar,
+  // FiClock,
+  FiFileText,
+  FiMessageSquare,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiBookOpen,
+  // FiList,
+  FiEdit3,
+  FiPenTool,
+  FiDownload,
+  FiSave,
+  FiLoader,
+  FiChevronDown,
+  FiChevronRight,
+  FiCheck,
+  // FiCircle,
+  // FiStar,
+  // FiAward,
+  // FiInfo,
+  // FiHelpCircle,
+  // FiSettings,
+  // FiTool,
+  // FiBarChart2,
+  // FiPieChart,
+  // FiTrendingUp,
+  // FiTrendingDown,
+  // FiActivity,
+  // FiClipboard,
+  // FiFile,
+  // FiFolder,
+  // FiGrid,
+  // FiLayout,
+  // FiMenu,
+  // FiMoreHorizontal,
+  // FiPaperclip,
+  // FiPrinter,
+  // FiRefreshCw,
+  // FiSearch,
+  // FiSend,
+  // FiShare2,
+  // FiSliders,
+  // FiTarget,
+  // FiThumbsUp,
+  FiUserCheck,
+  // FiUserMinus,
+  // FiUserPlus,
+  // FiUsers as FiUsersIcon,
+} from "react-icons/fi";
 
 function DynamicFieldGroup({
   title,
@@ -14,7 +69,7 @@ function DynamicFieldGroup({
   renderField,
   labelPrefix = "",
   placeholderPrefix = "",
-  icon = "📝",
+  icon,
 }) {
   return (
     <Section title={title} icon={icon}>
@@ -69,7 +124,7 @@ function DynamicFieldGroup({
                 e.currentTarget.style.transform = "scale(1)";
               }}
             >
-              ✕
+              <FiX size={16} />
             </button>
           )}
         </div>
@@ -103,7 +158,8 @@ function DynamicFieldGroup({
           e.currentTarget.style.boxShadow = "none";
         }}
       >
-        <span style={{ fontSize: "16px", fontWeight: "bold" }}>+</span> Add
+        <FiPlus size={16} />
+        Add
       </button>
     </Section>
   );
@@ -153,7 +209,7 @@ function StandingAgendasPanel({ t }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 18 }}>📋</span>
+          <FiBookOpen size={18} color="#1a3aad" />
           <span
             style={{
               fontWeight: 800,
@@ -178,7 +234,11 @@ function StandingAgendasPanel({ t }) {
           </span>
         </div>
         <span style={{ color: "#1a3aad", fontSize: 14, fontWeight: 700 }}>
-          {collapsed ? "▶" : "▼"}
+          {collapsed ? (
+            <FiChevronRight size={16} />
+          ) : (
+            <FiChevronDown size={16} />
+          )}
         </span>
       </div>
       {!collapsed && (
@@ -342,7 +402,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               animation: "pulseGlow 2s ease-in-out infinite",
             }}
           >
-            ✓
+            <FiCheck size={40} />
           </div>
           <h2
             style={{
@@ -378,7 +438,8 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               e.currentTarget.style.boxShadow = "none";
             }}
           >
-            {tf.newReport || "New Report ➤"}
+            <FiPlus size={16} style={{ marginRight: 6 }} />
+            {tf.newReport || "New Report"}
           </button>
         </div>
       </div>
@@ -404,7 +465,11 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           <div
             style={{ fontSize: "clamp(48px, 12vw, 64px)", marginBottom: 16 }}
           >
-            📋
+            <FiMessageSquare
+              size={64}
+              color={C.muted}
+              style={{ display: "block", margin: "0 auto" }}
+            />
           </div>
           <p
             style={{
@@ -417,7 +482,8 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               "Select a team from the sidebar to start a report"}
           </p>
           <p style={{ fontSize: "clamp(13px, 3vw, 15px)" }}>
-            👈 Click on "Peer Forum" in the sidebar, then choose a team
+            <FiUsers size={16} style={{ marginRight: 8 }} />
+            Click on "Peer Forum" in the sidebar, then choose a team
           </p>
         </div>
       </div>
@@ -445,7 +511,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: "clamp(28px, 7vw, 36px)" }}>💬</span>
+          <FiMessageSquare size={36} color={C.primary} />
           <div>
             <h1
               style={{
@@ -501,7 +567,10 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           boxShadow: "0 2px 16px #0003",
         }}
       >
-        <Section title={tf.meetingTime || "📅 Meeting Time"} icon="📅">
+        <Section
+          title={tf.meetingTime || "📅 Meeting Time"}
+          icon={<FiCalendar size={18} />}
+        >
           <div style={g3Responsive}>
             <Field
               label={tf.date || "Date"}
@@ -525,8 +594,8 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         </Section>
 
         <DynamicFieldGroup
-          title={tf.presentMembers || "👥 Present Members"}
-          icon="👥"
+          title={tf.presentMembers || "Present Members"}
+          icon={<FiUserCheck size={18} />}
           values={form.present}
           onAdd={() => addItem("present", "")}
           onRemove={(idx) => removeItem("present", idx)}
@@ -550,8 +619,8 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         />
 
         <Section
-          title={tf.absentMembers || "🚫 Absent Members & Reasons"}
-          icon="🚫"
+          title={tf.absentMembers || "Absent Members & Reasons"}
+          icon={<FiUserX size={18} />}
         >
           {form.absent.map((item, idx) => (
             <div
@@ -626,7 +695,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
                       e.currentTarget.style.transform = "scale(1)";
                     }}
                   >
-                    ✕
+                    <FiX size={16} />
                   </button>
                 )}
               </div>
@@ -658,13 +727,14 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               e.currentTarget.style.transform = "translateY(0)";
             }}
           >
-            <span>+</span> Add
+            <FiPlus size={16} />
+            Add
           </button>
         </Section>
 
         <DynamicFieldGroup
-          title={tf.prevResults || "📋 Results from Previous Meeting"}
-          icon="📋"
+          title={tf.prevResults || "Results from Previous Meeting"}
+          icon={<FiFileText size={18} />}
           values={form.prevResults}
           onAdd={() => addItem("prevResults", "")}
           onRemove={(idx) => removeItem("prevResults", idx)}
@@ -678,8 +748,8 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         />
 
         <DynamicFieldGroup
-          title={tf.todayTopics || "💬 Today's Discussion Topics"}
-          icon="💬"
+          title={tf.todayTopics || "Today's Discussion Topics"}
+          icon={<FiMessageSquare size={18} />}
           values={form.topics}
           onAdd={() => addItem("topics", "")}
           onRemove={(idx) => removeItem("topics", idx)}
@@ -693,8 +763,8 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         />
 
         <Section
-          title={tf.explanation || "📝 Explanation Given (Brief)"}
-          icon="📝"
+          title={tf.explanation || "Explanation Given (Brief)"}
+          icon={<FiEdit3 size={18} />}
         >
           <textarea
             style={{
@@ -720,8 +790,8 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         </Section>
 
         <DynamicFieldGroup
-          title={tf.gaps || "⚠️ Identified Gaps"}
-          icon="⚠️"
+          title={tf.gaps || "Identified Gaps"}
+          icon={<FiAlertCircle size={18} />}
           values={form.gaps}
           onAdd={() => addItem("gaps", "")}
           onRemove={(idx) => removeItem("gaps", idx)}
@@ -735,8 +805,8 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         />
 
         <DynamicFieldGroup
-          title={tf.agreements || "✅ Agreed Points"}
-          icon="✅"
+          title={tf.agreements || "Agreed Points"}
+          icon={<FiCheckCircle size={18} />}
           values={form.agreements}
           onAdd={() => addItem("agreements", "")}
           onRemove={(idx) => removeItem("agreements", idx)}
@@ -749,7 +819,10 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           placeholderPrefix="Agreement"
         />
 
-        <Section title={tf.signatures || "✍️ Signatures"} icon="✍️">
+        <Section
+          title={tf.signatures || "Signatures"}
+          icon={<FiPenTool size={18} />}
+        >
           {form.signatures.map((sig, idx) => (
             <div
               key={idx}
@@ -797,7 +870,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
                     e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
-                  ✕
+                  <FiX size={16} />
                 </button>
               )}
             </div>
@@ -828,7 +901,8 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               e.currentTarget.style.transform = "translateY(0)";
             }}
           >
-            <span>+</span> Add
+            <FiPlus size={16} />
+            Add
           </button>
         </Section>
 
@@ -854,6 +928,9 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               cursor: "pointer",
               fontFamily: F.sans,
               transition: "all 0.3s ease",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
             }}
             onClick={() =>
               exportForumReportToPDF(form, t, lang, selectedTeam?.name)
@@ -868,21 +945,45 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               e.currentTarget.style.boxShadow = "none";
             }}
           >
-            📄 Export PDF
+            <FiDownload size={16} />
+            Export PDF
           </button>
           <button
             style={{
               ...btn.primary,
               padding: "clamp(10px, 2.5vw, 14px) clamp(20px, 5vw, 32px)",
               fontSize: "clamp(13px, 3.5vw, 15px)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
             }}
             onClick={handleSaveReport}
             disabled={saving}
           >
-            {saving ? "⏳ Saving..." : tf.save || "Save Report ✓"}
+            {saving ? (
+              <>
+                <FiLoader
+                  size={16}
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                Saving...
+              </>
+            ) : (
+              <>
+                <FiSave size={16} />
+                {tf.save || "Save Report"}
+              </>
+            )}
           </button>
         </div>
       </div>
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
