@@ -1,11 +1,15 @@
+// frontend/src/pages/DailyReport.jsx
 import { useState, useEffect, useRef } from "react";
 import { btn, card, C, F } from "../styles/theme";
 import Field from "../components/ui/Field";
-import { dailyReportAPI } from "../services/api";
+import { dailyReportAPI, serviceAPI } from "../services/api";
 import { exportDailyReportToPDF } from "../utils/pdfExport";
+import { useToast } from "../hooks/useToast";
+import { useAuth } from "../hooks/useAuth";
 
 export default function DailyReport({ t, lang }) {
-  // ✅ FIX: Safe access to translations with fallback
+  const { showToast } = useToast();
+  const { user } = useAuth();
   const safeT = t || {};
   const td = safeT.dailyReport || {};
   const safeCommon = safeT.common || {};
@@ -15,15 +19,37 @@ export default function DailyReport({ t, lang }) {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [hoveredRow, setHoveredRow] = useState(null);
+  const [departments, setDepartments] = useState([]);
+  const [allServices, setAllServices] = useState([]);
   const [animatedTotals, setAnimatedTotals] = useState({
     total: 0,
     male: 0,
     female: 0,
   });
 
-  // Use ref to track if totals need updating
   const prevRowsRef = useRef(rows);
+
+  // Fetch departments and services from database
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const response = await serviceAPI.getAll();
+        const services = response.data || [];
+        setAllServices(services);
+
+        // Extract unique departments
+        const uniqueDepts = [
+          ...new Set(services.map((s) => s.dept).filter(Boolean)),
+        ];
+        setDepartments(uniqueDepts);
+      } catch (error) {
+        console.error("Failed to fetch services:", error);
+      }
+    };
+    fetchData();
+  }, []);
 
   // Load daily report data
   useEffect(() => {
@@ -34,21 +60,25 @@ export default function DailyReport({ t, lang }) {
         if (response.data && response.data.length > 0) {
           setRows(response.data);
         } else {
-          // Start with one empty row if no data
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
         }
       } catch (error) {
-        console.error("Failed to load daily report:", error);
-        setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
+        // If 404, no report exists for this date - that's fine
+        if (error.response?.status === 404) {
+          setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
+        } else {
+          console.error("Failed to load daily report:", error);
+          showToast("Failed to load daily report", "error");
+          setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
+        }
       } finally {
         setLoading(false);
       }
     };
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
-  // Update totals without causing cascading renders
-  // Use useMemo or calculate directly in render
   const calculateTotals = (rowsData) => {
     const total = rowsData.reduce((a, r) => a + (r.total || 0), 0);
     const male = rowsData.reduce((a, r) => a + (r.male || 0), 0);
@@ -56,9 +86,7 @@ export default function DailyReport({ t, lang }) {
     return { total, male, female };
   };
 
-  // Update totals when rows change - but only if they actually changed
   useEffect(() => {
-    // Check if rows actually changed to avoid unnecessary updates
     if (prevRowsRef.current !== rows) {
       const newTotals = calculateTotals(rows);
       setAnimatedTotals(newTotals);
@@ -90,14 +118,78 @@ export default function DailyReport({ t, lang }) {
   const saveReport = async () => {
     try {
       setSaving(true);
-      const data = rows.filter((r) => r.dept || r.service);
-      await dailyReportAPI.create({ date, data });
-      // Show success toast
+      // Filter out empty rows
+      const entries = rows.filter((r) => r.dept || r.service);
+
+      if (entries.length === 0) {
+        showToast("Please add at least one service entry", "warning");
+        setSaving(false);
+        return;
+      }
+
+      // Check if all rows have department and service
+      const invalidRows = entries.filter((r) => !r.dept || !r.service);
+      if (invalidRows.length > 0) {
+        showToast(
+          "Please fill in both Department and Service for all rows",
+          "warning",
+        );
+        setSaving(false);
+        return;
+      }
+
+      // Calculate grand total
+      const grandTotal = entries.reduce(
+        (sum, entry) => sum + (entry.total || 0),
+        0,
+      );
+
+      // Send data in the format backend expects
+      const payload = {
+        date: date,
+        entries: entries,
+        grandTotal: grandTotal,
+        team: user?.team || null,
+      };
+
+      await dailyReportAPI.create(payload);
+      showToast("✅ Report saved successfully!", "success");
     } catch (error) {
       console.error("Failed to save report:", error);
+      showToast(
+        error.response?.data?.message || "Failed to save report",
+        "error",
+      );
     } finally {
       setSaving(false);
     }
+  };
+
+  const exportPDF = async () => {
+    try {
+      setExporting(true);
+      const exportData = rows.filter((r) => r.dept || r.service);
+
+      if (exportData.length === 0) {
+        showToast("No data to export", "warning");
+        setExporting(false);
+        return;
+      }
+
+      await exportDailyReportToPDF(exportData, date, t);
+      showToast("✅ PDF exported successfully!", "success");
+    } catch (error) {
+      console.error("Failed to export PDF:", error);
+      showToast("Failed to export PDF", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  // Get services filtered by department
+  const getServicesByDept = (dept) => {
+    if (!dept) return allServices;
+    return allServices.filter((s) => s.dept === dept);
   };
 
   const th = {
@@ -327,30 +419,51 @@ export default function DailyReport({ t, lang }) {
                         {i + 1}
                       </td>
                       <td style={td2}>
-                        <input
+                        <select
                           style={{
                             ...ti,
-                            width: "clamp(70px, 15vw, 90px)",
+                            width: "clamp(120px, 15vw, 150px)",
                             borderColor:
                               hoveredRow === i ? C.primary : C.border,
+                            cursor: "pointer",
                           }}
                           value={r.dept}
-                          onChange={(e) => upd(i, "dept", e.target.value)}
-                          placeholder="Dept"
-                        />
+                          onChange={(e) => {
+                            upd(i, "dept", e.target.value);
+                            upd(i, "service", "");
+                          }}
+                        >
+                          <option value="">
+                            {td.selectDept || "Select Dept"}
+                          </option>
+                          {departments.map((dept) => (
+                            <option key={dept} value={dept}>
+                              {dept}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td style={td2}>
-                        <input
+                        <select
                           style={{
                             ...ti,
-                            width: "clamp(100px, 20vw, 130px)",
+                            width: "clamp(130px, 20vw, 180px)",
                             borderColor:
                               hoveredRow === i ? C.primary : C.border,
+                            cursor: "pointer",
                           }}
                           value={r.service}
                           onChange={(e) => upd(i, "service", e.target.value)}
-                          placeholder="Service"
-                        />
+                        >
+                          <option value="">
+                            {td.selectService || "Select Service"}
+                          </option>
+                          {getServicesByDept(r.dept).map((s) => (
+                            <option key={s._id} value={s.name}>
+                              {s.name}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td style={td2}>
                         <input
@@ -363,9 +476,9 @@ export default function DailyReport({ t, lang }) {
                             borderColor:
                               hoveredRow === i ? C.primary : C.border,
                           }}
-                          value={r.male}
+                          value={r.male || 0}
                           onChange={(e) =>
-                            upd(i, "male", Number(e.target.value))
+                            upd(i, "male", Number(e.target.value) || 0)
                           }
                           inputMode="numeric"
                           min="0"
@@ -382,9 +495,9 @@ export default function DailyReport({ t, lang }) {
                             borderColor:
                               hoveredRow === i ? C.primary : C.border,
                           }}
-                          value={r.female}
+                          value={r.female || 0}
                           onChange={(e) =>
-                            upd(i, "female", Number(e.target.value))
+                            upd(i, "female", Number(e.target.value) || 0)
                           }
                           inputMode="numeric"
                           min="0"
@@ -506,24 +619,28 @@ export default function DailyReport({ t, lang }) {
                   borderRadius: 10,
                   fontSize: "clamp(13px, 3.5vw, 15px)",
                   fontWeight: 700,
-                  cursor: "pointer",
+                  cursor: exporting ? "not-allowed" : "pointer",
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 8,
                   transition: "all 0.3s ease",
+                  opacity: exporting ? 0.7 : 1,
                 }}
-                onClick={() => exportDailyReportToPDF(rows, date, t)}
+                onClick={exportPDF}
+                disabled={exporting}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow =
-                    "0 6px 20px rgba(220,38,38,0.3)";
+                  if (!exporting) {
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow =
+                      "0 6px 20px rgba(220,38,38,0.3)";
+                  }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "translateY(0)";
                   e.currentTarget.style.boxShadow = "none";
                 }}
               >
-                📄 Export PDF
+                {exporting ? "⏳ Exporting..." : "📄 Export PDF"}
               </button>
               <button
                 style={{
@@ -533,6 +650,8 @@ export default function DailyReport({ t, lang }) {
                   display: "inline-flex",
                   alignItems: "center",
                   gap: 8,
+                  opacity: saving ? 0.7 : 1,
+                  cursor: saving ? "not-allowed" : "pointer",
                 }}
                 onClick={saveReport}
                 disabled={saving}

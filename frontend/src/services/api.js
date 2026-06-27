@@ -73,11 +73,14 @@ export const evaluationAPI = {
   delete: (id) => api.delete(`/evaluations/${id}`),
 };
 
+// frontend/src/services/api.js - Update dailyReportAPI
+
 // Daily Reports API
 export const dailyReportAPI = {
   create: (data) => api.post("/daily-reports", data),
-  getAll: () => api.get("/daily-reports"),
+  getAll: (params) => api.get("/daily-reports", { params }),
   getByDate: (date) => api.get(`/daily-reports/date/${date}`),
+  deleteByDate: (date) => api.delete(`/daily-reports/date/${date}`),
 };
 
 // ✅ Teams API - COMPLETE
