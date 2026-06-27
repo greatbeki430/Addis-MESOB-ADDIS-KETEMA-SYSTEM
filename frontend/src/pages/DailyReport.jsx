@@ -49,18 +49,18 @@ export default function DailyReport({ t, lang }) {
         const response = await serviceAPI.getAll();
         console.log("🔍 Full API Response:", response);
 
-        // ✅ Handle different response formats - FIXED
+        // ✅ Handle different response formats
         let services = [];
 
-        // Check if response is an array directly
+        // Direct array
         if (Array.isArray(response)) {
           services = response;
         }
-        // Check if response.data is an array
+        // response.data is array
         else if (response && Array.isArray(response.data)) {
           services = response.data;
         }
-        // Check if response.data has a data property
+        // response.data.data is array
         else if (
           response &&
           response.data &&
@@ -68,7 +68,7 @@ export default function DailyReport({ t, lang }) {
         ) {
           services = response.data.data;
         }
-        // Check if response has a services property
+        // response.services is array
         else if (
           response &&
           response.services &&
@@ -76,7 +76,7 @@ export default function DailyReport({ t, lang }) {
         ) {
           services = response.services;
         }
-        // Check if response.data has a services property
+        // response.data.services is array
         else if (
           response &&
           response.data &&
@@ -85,7 +85,7 @@ export default function DailyReport({ t, lang }) {
         ) {
           services = response.data.services;
         }
-        // Check if response is an object with an array property
+        // Search for any array property
         else if (response && typeof response === "object") {
           for (const key in response) {
             if (Array.isArray(response[key]) && response[key].length > 0) {
@@ -99,14 +99,25 @@ export default function DailyReport({ t, lang }) {
         }
 
         console.log("📦 Extracted services:", services.length);
-        console.log("📋 First service:", services[0]);
+
+        if (services.length > 0) {
+          console.log(
+            "📋 First service:",
+            JSON.stringify(services[0], null, 2),
+          );
+        }
 
         setAllServices(services);
 
-        // Extract unique departments
-        const uniqueDepts = [
-          ...new Set(services.map((s) => s.dept).filter(Boolean)),
-        ];
+        // ✅ Extract unique departments - handle both dept and deptEn
+        const deptSet = new Set();
+        services.forEach((s) => {
+          if (s.dept) deptSet.add(s.dept);
+          // Also add deptEn if available and different
+          if (s.deptEn && s.deptEn !== s.dept) deptSet.add(s.deptEn);
+        });
+
+        const uniqueDepts = Array.from(deptSet).filter(Boolean);
         console.log("🏢 Unique departments:", uniqueDepts);
         setDepartments(uniqueDepts);
       } catch (error) {
@@ -123,15 +134,12 @@ export default function DailyReport({ t, lang }) {
       try {
         setLoading(true);
         const response = await dailyReportAPI.getByDate(date);
-        console.log("📋 Daily report response:", response);
-
         if (response.data && response.data.length > 0) {
           setRows(response.data);
         } else {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
         }
       } catch (error) {
-        // If 404, no report exists for this date - that's fine
         if (error.response?.status === 404) {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
         } else {
@@ -144,8 +152,7 @@ export default function DailyReport({ t, lang }) {
       }
     };
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [date]);
+  }, [date, showToast]);
 
   const calculateTotals = (rowsData) => {
     const total = rowsData.reduce((a, r) => a + (r.total || 0), 0);
@@ -186,7 +193,6 @@ export default function DailyReport({ t, lang }) {
   const saveReport = async () => {
     try {
       setSaving(true);
-      // Filter out empty rows
       const entries = rows.filter((r) => r.dept || r.service);
 
       if (entries.length === 0) {
@@ -195,7 +201,6 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
-      // Check if all rows have department and service
       const invalidRows = entries.filter((r) => !r.dept || !r.service);
       if (invalidRows.length > 0) {
         showToast(
@@ -206,13 +211,11 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
-      // Calculate grand total
       const grandTotal = entries.reduce(
         (sum, entry) => sum + (entry.total || 0),
         0,
       );
 
-      // Send data in the format backend expects
       const payload = {
         date: date,
         entries: entries,
@@ -492,7 +495,6 @@ export default function DailyReport({ t, lang }) {
                 </thead>
                 <tbody>
                   {rows.map((r, i) => {
-                    // Get services for this row's department
                     const availableServices = getServicesByDept(r.dept);
 
                     return (
@@ -527,20 +529,24 @@ export default function DailyReport({ t, lang }) {
                             value={r.dept || ""}
                             onChange={(e) => {
                               const selectedDept = e.target.value;
-                              // Update department
                               upd(i, "dept", selectedDept);
-                              // Reset service when department changes
                               upd(i, "service", "");
                             }}
                           >
                             <option value="">
                               {td.selectDept || "Select Dept"}
                             </option>
-                            {departments.map((dept) => (
-                              <option key={dept} value={dept}>
-                                {dept}
+                            {departments.length > 0 ? (
+                              departments.map((dept) => (
+                                <option key={dept} value={dept}>
+                                  {dept}
+                                </option>
+                              ))
+                            ) : (
+                              <option value="" disabled>
+                                No departments available
                               </option>
-                            ))}
+                            )}
                           </select>
                         </td>
                         <td style={td2}>
@@ -561,11 +567,17 @@ export default function DailyReport({ t, lang }) {
                             <option value="">
                               {td.selectService || "Select Service"}
                             </option>
-                            {availableServices.map((s) => (
-                              <option key={s._id} value={s.name}>
-                                {s.name}
+                            {availableServices.length > 0 ? (
+                              availableServices.map((s) => (
+                                <option key={s._id} value={s.name}>
+                                  {s.name}
+                                </option>
+                              ))
+                            ) : (
+                              <option value="" disabled>
+                                No services available
                               </option>
-                            ))}
+                            )}
                           </select>
                         </td>
                         <td style={td2}>
