@@ -11,6 +11,7 @@ export default function AdminServiceManager({ t }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingService, setEditingService] = useState(null);
   const [expandedDepts, setExpandedDepts] = useState({});
+  const [hoveredDept, setHoveredDept] = useState(null);
   const [formData, setFormData] = useState({
     dept: "",
     deptEn: "",
@@ -20,11 +21,9 @@ export default function AdminServiceManager({ t }) {
     stdTime: "",
   });
 
-  // Use ref to track if initial load is done
   const isInitialLoadRef = useRef(true);
   const isExpandedInitializedRef = useRef(false);
 
-  // Group services by department
   const groupServicesByDept = useCallback((services) => {
     const grouped = {};
     services.forEach((service) => {
@@ -50,7 +49,6 @@ export default function AdminServiceManager({ t }) {
     }
   }, [showToast]);
 
-  // Load services on mount
   useEffect(() => {
     if (isInitialLoadRef.current) {
       isInitialLoadRef.current = false;
@@ -58,7 +56,6 @@ export default function AdminServiceManager({ t }) {
     }
   }, [loadServices]);
 
-  // Initialize expanded departments only once when services first load
   useEffect(() => {
     if (services.length > 0 && !isExpandedInitializedRef.current) {
       const grouped = groupServicesByDept(services);
@@ -77,7 +74,6 @@ export default function AdminServiceManager({ t }) {
     try {
       const response = await serviceAPI.seed();
       showToast(response.data.message, "success");
-      // Reset the initialization flag so new departments will be expanded
       isExpandedInitializedRef.current = false;
       await loadServices();
     } catch (err) {
@@ -105,7 +101,6 @@ export default function AdminServiceManager({ t }) {
         active: true,
         stdTime: "",
       });
-      // Reset the initialization flag so new departments will be expanded
       isExpandedInitializedRef.current = false;
       await loadServices();
     } catch (err) {
@@ -119,7 +114,6 @@ export default function AdminServiceManager({ t }) {
     try {
       await serviceAPI.delete(id);
       showToast("Service deleted successfully!", "success");
-      // Reset the initialization flag so departments will be re-initialized
       isExpandedInitializedRef.current = false;
       await loadServices();
     } catch {
@@ -140,7 +134,6 @@ export default function AdminServiceManager({ t }) {
     setShowAddModal(true);
   };
 
-  // Toggle department expansion
   const toggleDepartment = (dept) => {
     setExpandedDepts((prev) => ({
       ...prev,
@@ -155,6 +148,75 @@ export default function AdminServiceManager({ t }) {
 
   return (
     <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
+      <style>{`
+        @keyframes expandIcon {
+          0% { transform: rotate(0deg) scale(1); }
+          50% { transform: rotate(180deg) scale(1.2); }
+          100% { transform: rotate(180deg) scale(1); }
+        }
+        @keyframes collapseIcon {
+          0% { transform: rotate(180deg) scale(1); }
+          50% { transform: rotate(0deg) scale(1.2); }
+          100% { transform: rotate(0deg) scale(1); }
+        }
+        .dept-header {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .dept-header:hover {
+          background: #e8f5f0 !important;
+          transform: translateX(4px);
+        }
+        .expand-icon {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #2a9d8f, #1a6d63);
+          color: white;
+          font-size: 14px;
+          transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+          box-shadow: 0 2px 8px rgba(42, 157, 143, 0.3);
+        }
+        .expand-icon.expanded {
+          animation: expandIcon 0.4s ease forwards;
+        }
+        .expand-icon.collapsed {
+          animation: collapseIcon 0.4s ease forwards;
+        }
+        .expand-icon:hover {
+          box-shadow: 0 4px 16px rgba(42, 157, 143, 0.5);
+          transform: scale(1.1);
+        }
+        .dept-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 4px 14px;
+          border-radius: 20px;
+          font-size: 12px;
+          font-weight: 600;
+          transition: all 0.3s ease;
+        }
+        .dept-badge:hover {
+          transform: scale(1.05);
+        }
+        .service-row-enter {
+          animation: fadeSlideIn 0.3s ease forwards;
+        }
+        @keyframes fadeSlideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+
       <div
         style={{
           display: "flex",
@@ -213,7 +275,6 @@ export default function AdminServiceManager({ t }) {
         </div>
       </div>
 
-      {/* Services Table */}
       {loading ? (
         <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
           ⏳ Loading...
@@ -241,7 +302,13 @@ export default function AdminServiceManager({ t }) {
                 >
                   #
                 </th>
-                <th style={{ padding: "12px 16px", textAlign: "left" }}>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "left",
+                    width: "250px",
+                  }}
+                >
                   Department
                 </th>
                 <th style={{ padding: "12px 16px", textAlign: "left" }}>
@@ -276,61 +343,118 @@ export default function AdminServiceManager({ t }) {
                 const isExpanded = expandedDepts[dept] !== false;
                 const totalCount = deptServices.length;
                 const activeCount = deptServices.filter((s) => s.active).length;
+                const isHovered = hoveredDept === dept;
 
                 return (
                   <React.Fragment key={`dept-${dept}`}>
                     {/* Department Header Row */}
                     <tr
+                      className="dept-header"
                       style={{
-                        background: "#f8f9fa",
+                        background: isHovered ? "#e8f5f0" : "#f8f9fa",
                         cursor: "pointer",
                         borderBottom: `2px solid ${C.border}`,
+                        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                       }}
                       onClick={() => toggleDepartment(dept)}
+                      onMouseEnter={() => setHoveredDept(dept)}
+                      onMouseLeave={() => setHoveredDept(null)}
                     >
                       <td colSpan="6" style={{ padding: "12px 16px" }}>
                         <div
                           style={{
                             display: "flex",
                             alignItems: "center",
-                            gap: 12,
+                            gap: 14,
+                            flexWrap: "wrap",
                           }}
                         >
-                          <span style={{ fontSize: 18 }}>
-                            {isExpanded ? "▼" : "▶"}
-                          </span>
+                          <div
+                            className={`expand-icon ${isExpanded ? "expanded" : "collapsed"}`}
+                            style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 32,
+                              height: 32,
+                              borderRadius: "50%",
+                              background: isExpanded
+                                ? "linear-gradient(135deg, #2a9d8f, #1a6d63)"
+                                : "linear-gradient(135deg, #6c757d, #495057)",
+                              color: "white",
+                              fontSize: 14,
+                              transition:
+                                "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                              boxShadow: isExpanded
+                                ? "0 2px 8px rgba(42, 157, 143, 0.3)"
+                                : "0 2px 8px rgba(108, 117, 125, 0.2)",
+                              transform: isExpanded
+                                ? "rotate(0deg)"
+                                : "rotate(-90deg)",
+                            }}
+                          >
+                            {isExpanded ? "−" : "+"}
+                          </div>
+
                           <span
                             style={{
                               fontWeight: 700,
-                              fontSize: 15,
+                              fontSize: 16,
                               color: C.dark,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
                             }}
                           >
+                            <span style={{ fontSize: 20 }}>🏢</span>
                             {dept}
                           </span>
+
                           <span
+                            className="dept-badge"
                             style={{
-                              fontSize: 13,
-                              color: C.muted,
-                              background: C.white,
-                              padding: "2px 12px",
-                              borderRadius: 12,
-                              border: `1px solid ${C.border}`,
+                              background:
+                                "linear-gradient(135deg, #2a9d8f, #1a6d63)",
+                              color: "white",
+                              padding: "4px 14px",
+                              borderRadius: 20,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              boxShadow: "0 2px 8px rgba(42, 157, 143, 0.3)",
                             }}
                           >
-                            {totalCount}{" "}
+                            📋 {totalCount}{" "}
                             {totalCount === 1 ? "service" : "services"}
                           </span>
+
                           <span
+                            className="dept-badge"
                             style={{
+                              background:
+                                activeCount > 0 ? "#d1fae5" : "#fee2e2",
+                              color: activeCount > 0 ? "#065f46" : "#dc2626",
+                              padding: "4px 14px",
+                              borderRadius: 20,
                               fontSize: 12,
-                              color: "#065f46",
-                              background: "#d1fae5",
-                              padding: "2px 10px",
-                              borderRadius: 12,
+                              fontWeight: 600,
+                              border: `1px solid ${activeCount > 0 ? "#a7f3d0" : "#fecaca"}`,
                             }}
                           >
-                            {activeCount} active
+                            {activeCount > 0 ? "✅" : "❌"} {activeCount} active
+                          </span>
+
+                          <span
+                            style={{
+                              fontSize: 11,
+                              color: C.muted,
+                              marginLeft: "auto",
+                              opacity: 0.6,
+                              fontStyle: "italic",
+                            }}
+                          >
+                            {isExpanded
+                              ? "Click to collapse"
+                              : "Click to expand"}
                           </span>
                         </div>
                       </td>
@@ -339,14 +463,22 @@ export default function AdminServiceManager({ t }) {
                     {/* Service Rows - shown only if expanded */}
                     {isExpanded &&
                       deptServices.map((s, idx) => {
-                        // Calculate global index
                         const globalIndex = services.indexOf(s) + 1;
                         return (
                           <tr
                             key={s._id}
+                            className="service-row-enter"
                             style={{
                               borderBottom: `1px solid ${C.border}`,
                               background: idx % 2 === 0 ? C.white : C.cardBg,
+                              transition: "all 0.3s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "#f0faf7";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background =
+                                idx % 2 === 0 ? C.white : C.cardBg;
                             }}
                           >
                             <td
@@ -358,20 +490,32 @@ export default function AdminServiceManager({ t }) {
                             >
                               {globalIndex}
                             </td>
+                            {/* EMPTY Department cell - no repeat */}
                             <td
                               style={{
                                 padding: "10px 16px",
-                                fontWeight: 400,
-                                paddingLeft: 40,
+                                paddingLeft: 60,
                                 color: C.muted,
-                                fontSize: 13,
+                                fontSize: 12,
                               }}
                             >
-                              {dept}
+                              {/* Intentionally empty to avoid repeating department name */}
+                              <span
+                                style={{ opacity: 0.3, fontStyle: "italic" }}
+                              >
+                                ─
+                              </span>
                             </td>
                             <td
-                              style={{ padding: "10px 16px", fontWeight: 500 }}
+                              style={{
+                                padding: "10px 16px",
+                                fontWeight: 500,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                              }}
                             >
+                              <span style={{ fontSize: 14 }}>📄</span>
                               {s.name}
                             </td>
                             <td
@@ -387,12 +531,15 @@ export default function AdminServiceManager({ t }) {
                             >
                               <span
                                 style={{
-                                  padding: "2px 12px",
-                                  borderRadius: 12,
+                                  padding: "4px 14px",
+                                  borderRadius: 20,
                                   fontSize: 11,
                                   fontWeight: 600,
                                   background: s.active ? "#d1fae5" : "#fee2e2",
                                   color: s.active ? "#065f46" : "#dc2626",
+                                  border: `1px solid ${s.active ? "#a7f3d0" : "#fecaca"}`,
+                                  display: "inline-block",
+                                  transition: "all 0.3s ease",
                                 }}
                               >
                                 {s.active ? "✅ Active" : "❌ Inactive"}
@@ -412,6 +559,19 @@ export default function AdminServiceManager({ t }) {
                                   cursor: "pointer",
                                   fontSize: 16,
                                   marginRight: 8,
+                                  padding: "4px 8px",
+                                  borderRadius: 6,
+                                  transition: "all 0.3s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "#e8f5f0";
+                                  e.currentTarget.style.transform =
+                                    "scale(1.1)";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background =
+                                    "transparent";
+                                  e.currentTarget.style.transform = "scale(1)";
                                 }}
                                 title="Edit"
                               >
@@ -425,6 +585,19 @@ export default function AdminServiceManager({ t }) {
                                   cursor: "pointer",
                                   fontSize: 16,
                                   color: "#dc2626",
+                                  padding: "4px 8px",
+                                  borderRadius: 6,
+                                  transition: "all 0.3s ease",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "#fee2e2";
+                                  e.currentTarget.style.transform =
+                                    "scale(1.1)";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background =
+                                    "transparent";
+                                  e.currentTarget.style.transform = "scale(1)";
                                 }}
                                 title="Delete"
                               >
