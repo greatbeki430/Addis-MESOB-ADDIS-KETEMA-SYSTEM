@@ -11,9 +11,10 @@ import {
 } from "../../utils/roles";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../hooks/useToast";
+import { FiEdit2, FiEye, FiTrash2, FiRefreshCw } from "react-icons/fi";
 
-// ✅ Reusable Action Button Component
-const ActionButton = ({ onClick, icon, label, color = C.primary, title }) => (
+// ✅ Reusable Action Button Component with beautiful icons
+const ActionButton = ({ onClick, Icon, label, color = C.primary, title }) => (
   <button
     onClick={onClick}
     title={title}
@@ -21,28 +22,34 @@ const ActionButton = ({ onClick, icon, label, color = C.primary, title }) => (
       background: "transparent",
       border: "none",
       cursor: "pointer",
-      padding: "6px 10px",
-      borderRadius: 6,
+      padding: "8px 12px",
+      borderRadius: 8,
       display: "inline-flex",
       alignItems: "center",
-      gap: 4,
+      justifyContent: "center",
+      gap: 6,
       fontSize: 13,
-      fontWeight: 500,
+      fontWeight: 600,
       color: color,
-      transition: "all 0.2s ease",
+      transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
       fontFamily: F.sans,
+      position: "relative",
+      minWidth: "36px",
+      minHeight: "36px",
     }}
     onMouseEnter={(e) => {
       e.currentTarget.style.background = color + "15";
-      e.currentTarget.style.transform = "scale(1.05)";
+      e.currentTarget.style.transform = "translateY(-2px) scale(1.05)";
+      e.currentTarget.style.boxShadow = `0 4px 12px ${color}33`;
     }}
     onMouseLeave={(e) => {
       e.currentTarget.style.background = "transparent";
-      e.currentTarget.style.transform = "scale(1)";
+      e.currentTarget.style.transform = "translateY(0) scale(1)";
+      e.currentTarget.style.boxShadow = "none";
     }}
   >
-    <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
-    <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>
+    {Icon && <Icon size={18} />}
+    {label && <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>}
   </button>
 );
 
@@ -808,11 +815,14 @@ export default function UserManagement({ t }) {
                   </td>
                   <td
                     style={{
-                      padding: "8px 16px",
+                      padding: "8px 12px",
                       textAlign: "center",
                       display: "flex",
                       justifyContent: "center",
+                      alignItems: "center",
                       gap: 4,
+                      flexWrap: "wrap",
+                      minWidth: "120px",
                     }}
                   >
                     <ActionButton
@@ -827,16 +837,16 @@ export default function UserManagement({ t }) {
                         });
                         setShowModal(true);
                       }}
-                      icon="✏️"
-                      label={getTranslation("edit")}
+                      Icon={FiEdit2}
+                      label=""
                       color="#3b82f6"
                       title={getTranslation("edit")}
                     />
 
                     <ActionButton
                       onClick={() => openViewModal(user)}
-                      icon="👁️"
-                      label={getTranslation("view")}
+                      Icon={FiEye}
+                      label=""
                       color="#8b5cf6"
                       title={getTranslation("viewDetails")}
                     />
@@ -880,8 +890,8 @@ export default function UserManagement({ t }) {
                             }
                           }
                         }}
-                        icon="🔄"
-                        label={getTranslation("changeRole")}
+                        Icon={FiRefreshCw}
+                        label=""
                         color="#f59e0b"
                         title={getTranslation("changeRole")}
                       />
@@ -890,8 +900,8 @@ export default function UserManagement({ t }) {
                     {canDeleteUser(user) && (
                       <ActionButton
                         onClick={() => openDeleteConfirm(user._id, user.name)}
-                        icon="🗑️"
-                        label={getTranslation("delete")}
+                        Icon={FiTrash2}
+                        label=""
                         color="#ef4444"
                         title={getTranslation("delete")}
                       />

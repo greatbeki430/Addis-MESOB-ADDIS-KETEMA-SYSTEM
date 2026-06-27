@@ -4,7 +4,7 @@ import { teamAPI, authAPI } from "../../services/api";
 import { getRoleDisplayName } from "../../utils/roles";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../hooks/useToast";
-
+import { FiEdit2, FiTrash2 } from "react-icons/fi";
 export default function TeamManagement({ t, isSuperAdmin }) {
   const safeT = t || {};
   const tt = safeT.teamManagement || {};
@@ -278,7 +278,16 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                     </p>
                   </div>
                   {isSuperAdmin && (
-                    <div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        justifyContent: "flex-end",
+                        minWidth: "80px",
+                        paddingTop: "4px",
+                      }}
+                    >
                       <button
                         onClick={() => {
                           setEditingTeam(team);
@@ -290,28 +299,68 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                           setShowModal(true);
                         }}
                         style={{
-                          background: "none",
+                          background: "transparent",
                           border: "none",
                           cursor: "pointer",
-                          fontSize: 18,
-                          marginRight: 8,
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          color: "#3b82f6",
+                          transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: "36px",
+                          minHeight: "36px",
                         }}
                         title={getTranslation("edit")}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "#3b82f615";
+                          e.currentTarget.style.transform =
+                            "translateY(-2px) scale(1.05)";
+                          e.currentTarget.style.boxShadow =
+                            "0 4px 12px #3b82f633";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.transform =
+                            "translateY(0) scale(1)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
                       >
-                        ✏️
+                        <FiEdit2 size={18} />
                       </button>
                       <button
                         onClick={() => openDeleteConfirm(team._id, team.name)}
                         style={{
-                          background: "none",
+                          background: "transparent",
                           border: "none",
                           cursor: "pointer",
-                          fontSize: 18,
-                          color: "#dc2626",
+                          padding: "8px 12px",
+                          borderRadius: 8,
+                          color: "#ef4444",
+                          transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: "36px",
+                          minHeight: "36px",
                         }}
                         title={getTranslation("delete")}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "#ef444415";
+                          e.currentTarget.style.transform =
+                            "translateY(-2px) scale(1.05)";
+                          e.currentTarget.style.boxShadow =
+                            "0 4px 12px #ef444433";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.transform =
+                            "translateY(0) scale(1)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
                       >
-                        🗑️
+                        <FiTrash2 size={18} />
                       </button>
                     </div>
                   )}
