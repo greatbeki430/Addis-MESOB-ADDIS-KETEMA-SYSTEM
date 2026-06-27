@@ -61,7 +61,7 @@ export default function AdminServiceManager({ t }) {
       const grouped = groupServicesByDept(services);
       const allExpanded = {};
       Object.keys(grouped).forEach((dept) => {
-        allExpanded[dept] = true;
+        allExpanded[dept] = false;
       });
       setExpandedDepts(allExpanded);
       isExpandedInitializedRef.current = true;
