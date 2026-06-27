@@ -102,6 +102,8 @@ export const translations = {
       grandTotal: "Grand Total",
       addRow: "+ Add Row",
       save: " Save Report",
+      selectDept: "Select Dept",
+      selectService: "Select Service",
     },
     services: {
       title: "Addis Messob · Services",
@@ -323,6 +325,8 @@ export const translations = {
       grandTotal: "ጠቅላላ ድምር",
       addRow: "+ ረድፍ ጨምር",
       save: " ሪፖርት አስቀምጥ",
+      selectDept: "ዘርፍ ይምረጡ",
+      selectService: "Select Service",
     },
     services: {
       title: "አዲስ መሶብ · አገልግሎቶች",
@@ -545,6 +549,8 @@ export const translations = {
       grandTotal: "Ida'ama Waliigalaa",
       addRow: "+ Tarree Dabali",
       save: " Gabaasa Olkaayi",
+      selectDept: "Kutaa filadhu",
+      selectService: "Tajaajila filadhu",
     },
     services: {
       title: "Addis Messob · Tajaajiloota",
