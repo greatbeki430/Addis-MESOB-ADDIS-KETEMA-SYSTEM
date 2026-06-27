@@ -1,7 +1,8 @@
 // backend/src/controllers/serviceController.js
 const Service = require("../models/Service");
-const SERVICES = require("../../constants/services");
-const cloudinary = require("../config/cloudinary"); // ✅ Fixed path
+// const SERVICES = require("../../constants/services");
+const SERVICES = require("../constants/services");
+const cloudinary = require("../config/cloudinary");
 
 const getServices = async (req, res) => {
   try {
