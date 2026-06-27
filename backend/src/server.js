@@ -1,11 +1,11 @@
-// backend/server.js
+// backend/src/server.js
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const connectDB = require("./config/db");
-const { corsOptions } = require("./middleware/cors");
+const { corsOptions } = require("./middleware/cors"); // ✅ Import from middleware
 
 const authRoutes = require("./routes/authRoutes");
 const teamRoutes = require("./routes/teamRoutes");
@@ -21,61 +21,9 @@ const { notFound, errorHandler } = require("./middleware/errorHandler");
 const app = express();
 
 // =============================================
-// ✅ PROFESSIONAL CORS CONFIGURATION
+// ✅ CORS - Using imported corsOptions
 // =============================================
-
-// Allowed origins - from environment or defaults
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(",")
-  : [
-      "https://akmesob.vercel.app",
-      "https://akmesob.vercel.app/",
-      "https://addis-mesob-addis-ketema-system-production.up.railway.app",
-      "http://localhost:5173",
-      "http://localhost:3000",
-      "http://localhost:5000",
-    ];
-
-// CORS options
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, postman)
-    if (!origin) {
-      return callback(null, true);
-    }
-
-    // Check if origin is allowed
-    if (
-      allowedOrigins.includes(origin) ||
-      process.env.NODE_ENV === "development"
-    ) {
-      callback(null, true);
-    } else {
-      console.warn(`❌ CORS blocked: ${origin}`);
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: true, // Allow cookies/tokens
-  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-    "Origin",
-    "Access-Control-Request-Method",
-    "Access-Control-Request-Headers",
-  ],
-  exposedHeaders: ["Content-Range", "X-Content-Range"],
-  maxAge: 86400, // 24 hours - cache preflight results
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-};
-
-// Apply CORS globally
 app.use(cors(corsOptions));
-
-// Handle preflight requests explicitly
 app.options("*", cors(corsOptions));
 
 // =============================================
@@ -89,7 +37,11 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        connectSrc: ["'self'", ...allowedOrigins],
+        connectSrc: [
+          "'self'",
+          "https://akmesob.vercel.app",
+          "http://localhost:5173",
+        ],
         imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
@@ -105,17 +57,6 @@ app.use(
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(morgan("dev"));
-
-// =============================================
-// ✅ CORS LOGGING (for debugging)
-// =============================================
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && allowedOrigins.includes(origin)) {
-    console.log(`✅ CORS allowed: ${origin} → ${req.method} ${req.path}`);
-  }
-  next();
-});
 
 // =============================================
 // ✅ ROUTES
@@ -138,7 +79,6 @@ app.get("/api/health", (req, res) => {
     message: "🚀 Server is running",
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || "development",
-    allowedOrigins: allowedOrigins,
   });
 });
 
@@ -174,7 +114,6 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-      console.log(`🔗 Allowed Origins: ${allowedOrigins.join(", ")}`);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
