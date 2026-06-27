@@ -10,61 +10,26 @@ import { evaluationAPI } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import {
   FiChevronDown,
-  // FiChevronRight,
   FiUser,
-  // FiUserPlus,
-  // FiUserX,
   FiUsers,
   FiStar,
   FiAward,
-  FiTrophy,
   FiBarChart2,
   FiTrendingUp,
   FiTrendingDown,
   FiCheck,
   FiX,
   FiPlus,
-  // FiMinus,
   FiSave,
   FiDownload,
   FiRefreshCw,
   FiLoader,
-  // FiClock,
   FiCalendar,
-  // FiEdit2,
   FiMessageSquare,
   FiThumbsUp,
-  // FiAward as FiAwardIcon,
   FiTarget,
-  // FiZap,
-  // FiFileText,
   FiClipboard,
-  // FiList,
-  // FiGrid,
-  // FiLayout,
-  // FiMenu,
-  // FiMoreHorizontal,
-  // FiPaperclip,
-  // FiPrinter,
-  // FiSearch,
-  // FiSend,
-  // FiShare2,
-  // FiSliders,
-  // FiTool,
-  // FiUserCheck,
-  // FiUserMinus,
-  // FiUserPlus as FiUserPlusIcon,
-  // FiUsers as FiUsersIcon,
   FiPenTool,
-  // FiFile,
-  // FiFolder,
-  // FiBookmark,
-  // FiFlag,
-  // FiGift,
-  // FiHeart,
-  // FiSmile,
-  // FiMeh,
-  // FiFrown,
   FiAlertCircle,
 } from "react-icons/fi";
 
@@ -820,7 +785,7 @@ export default function Evaluation({ t, lang }) {
                   gap: 4,
                 }}
               >
-                <FiTrophy size={14} color={C.gold} />
+                <FiAward size={14} color={C.gold} />
                 Best: {bestPerformer}
               </span>
               <span
@@ -1037,7 +1002,7 @@ export default function Evaluation({ t, lang }) {
                         >
                           {idx === 0 ? (
                             <>
-                              <FiTrophy size={10} />
+                              <FiAward size={10} />
                               TOP
                             </>
                           ) : idx === 1 ? (
@@ -1247,7 +1212,7 @@ export default function Evaluation({ t, lang }) {
             <div
               style={{ fontSize: "clamp(28px, 7vw, 40px)", marginBottom: 8 }}
             >
-              <FiTrophy
+              <FiAward
                 size={40}
                 color={C.gold}
                 style={{ display: "block", margin: "0 auto" }}
