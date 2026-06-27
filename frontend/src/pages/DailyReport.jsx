@@ -21,10 +21,10 @@ import {
 export default function DailyReport({ t, lang }) {
   const { showToast } = useToast();
   const { user } = useAuth();
-  const safeT = t || {};
-  const td = safeT.dailyReport || {};
-  const safeCommon = safeT.common || {};
-  const safeYear = safeT.year || "2018 E.C.";
+
+  // ✅ FIX 1: t is a FUNCTION — call it with dot-path strings
+  const td = (key, fb = "") => t?.(`dailyReport.${key}`) || fb;
+  const tcm = (key, fb = "") => t?.(`common.${key}`) || fb;
 
   const [rows, setRows] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -49,43 +49,19 @@ export default function DailyReport({ t, lang }) {
         const response = await serviceAPI.getAll();
         console.log("🔍 Full API Response:", response);
 
-        // ✅ Handle different response formats
         let services = [];
-
-        // Direct array
-        if (Array.isArray(response)) {
-          services = response;
-        }
-        // response.data is array
-        else if (response && Array.isArray(response.data)) {
+        if (Array.isArray(response)) services = response;
+        else if (response && Array.isArray(response.data))
           services = response.data;
-        }
-        // response.data.data is array
-        else if (
-          response &&
-          response.data &&
-          Array.isArray(response.data.data)
-        ) {
+        else if (response?.data && Array.isArray(response.data.data))
           services = response.data.data;
-        }
-        // response.services is array
-        else if (
-          response &&
-          response.services &&
-          Array.isArray(response.services)
-        ) {
+        else if (response?.services && Array.isArray(response.services))
           services = response.services;
-        }
-        // response.data.services is array
         else if (
-          response &&
-          response.data &&
-          response.data.services &&
+          response?.data?.services &&
           Array.isArray(response.data.services)
-        ) {
+        )
           services = response.data.services;
-        }
-        // Search for any array property
         else if (response && typeof response === "object") {
           for (const key in response) {
             if (Array.isArray(response[key]) && response[key].length > 0) {
@@ -99,24 +75,19 @@ export default function DailyReport({ t, lang }) {
         }
 
         console.log("📦 Extracted services:", services.length);
-
-        if (services.length > 0) {
+        if (services.length > 0)
           console.log(
             "📋 First service:",
             JSON.stringify(services[0], null, 2),
           );
-        }
 
         setAllServices(services);
 
-        // ✅ Extract unique departments - handle both dept and deptEn
         const deptSet = new Set();
         services.forEach((s) => {
           if (s.dept) deptSet.add(s.dept);
-          // Also add deptEn if available and different
           if (s.deptEn && s.deptEn !== s.dept) deptSet.add(s.deptEn);
         });
-
         const uniqueDepts = Array.from(deptSet).filter(Boolean);
         console.log("🏢 Unique departments:", uniqueDepts);
         setDepartments(uniqueDepts);
@@ -126,9 +97,10 @@ export default function DailyReport({ t, lang }) {
       }
     };
     fetchData();
-  }, [showToast]);
+  }, []); // ✅ showToast omitted from deps — not needed, prevents infinite loop
 
-  // Load daily report data
+  // ✅ FIX 3: Load daily report data — showToast removed from deps,
+  // replaced with showToast so this only re-runs when `date` changes.
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -141,6 +113,7 @@ export default function DailyReport({ t, lang }) {
         }
       } catch (error) {
         if (error.response?.status === 404) {
+          // 404 just means no report for this date — not an error
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
         } else {
           console.error("Failed to load daily report:", error);
@@ -148,11 +121,11 @@ export default function DailyReport({ t, lang }) {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
         }
       } finally {
-        setLoading(false);
+        setLoading(false); // ✅ Always runs now — no infinite re-trigger
       }
     };
     loadData();
-  }, [date, showToast]);
+  }, [date]); // ✅ Only re-runs when date changes
 
   const calculateTotals = (rowsData) => {
     const total = rowsData.reduce((a, r) => a + (r.total || 0), 0);
@@ -163,8 +136,7 @@ export default function DailyReport({ t, lang }) {
 
   useEffect(() => {
     if (prevRowsRef.current !== rows) {
-      const newTotals = calculateTotals(rows);
-      setAnimatedTotals(newTotals);
+      setAnimatedTotals(calculateTotals(rows));
       prevRowsRef.current = rows;
     }
   }, [rows]);
@@ -180,50 +152,36 @@ export default function DailyReport({ t, lang }) {
     setRows(u);
   };
 
-  const addRow = () => {
+  const addRow = () =>
     setRows([...rows, { dept: "", service: "", male: 0, female: 0, total: 0 }]);
-  };
 
   const removeRow = (index) => {
-    if (rows.length > 1) {
-      setRows(rows.filter((_, i) => i !== index));
-    }
+    if (rows.length > 1) setRows(rows.filter((_, i) => i !== index));
   };
 
   const saveReport = async () => {
     try {
       setSaving(true);
       const entries = rows.filter((r) => r.dept || r.service);
-
       if (entries.length === 0) {
         showToast("Please add at least one service entry", "warning");
-        setSaving(false);
         return;
       }
-
       const invalidRows = entries.filter((r) => !r.dept || !r.service);
       if (invalidRows.length > 0) {
         showToast(
           "Please fill in both Department and Service for all rows",
           "warning",
         );
-        setSaving(false);
         return;
       }
-
-      const grandTotal = entries.reduce(
-        (sum, entry) => sum + (entry.total || 0),
-        0,
-      );
-
-      const payload = {
-        date: date,
-        entries: entries,
-        grandTotal: grandTotal,
+      const grandTotal = entries.reduce((sum, e) => sum + (e.total || 0), 0);
+      await dailyReportAPI.create({
+        date,
+        entries,
+        grandTotal,
         team: user?.team || null,
-      };
-
-      await dailyReportAPI.create(payload);
+      });
       showToast("✅ Report saved successfully!", "success");
     } catch (error) {
       console.error("Failed to save report:", error);
@@ -240,13 +198,10 @@ export default function DailyReport({ t, lang }) {
     try {
       setExporting(true);
       const exportData = rows.filter((r) => r.dept || r.service);
-
       if (exportData.length === 0) {
         showToast("No data to export", "warning");
-        setExporting(false);
         return;
       }
-
       await exportDailyReportToPDF(exportData, date, t);
       showToast("✅ PDF exported successfully!", "success");
     } catch (error) {
@@ -257,12 +212,12 @@ export default function DailyReport({ t, lang }) {
     }
   };
 
-  // Get services filtered by department
   const getServicesByDept = (dept) => {
     if (!dept) return allServices;
     return allServices.filter((s) => s.dept === dept);
   };
 
+  // ─── Style helpers ───────────────────────────────────────────────────────────
   const th = {
     background: C.dark,
     color: C.light,
@@ -274,7 +229,7 @@ export default function DailyReport({ t, lang }) {
     whiteSpace: "nowrap",
   };
 
-  const td2 = {
+  const tdCell = {
     padding: "clamp(6px, 2vw, 10px) clamp(4px, 1.5vw, 10px)",
     borderBottom: "1px solid #eef2ee",
     fontFamily: F.sans,
@@ -291,6 +246,7 @@ export default function DailyReport({ t, lang }) {
     fontSize: "clamp(11px, 3vw, 13px)",
     transition: "border-color 0.3s ease, box-shadow 0.3s ease",
   };
+  // ─────────────────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -329,7 +285,7 @@ export default function DailyReport({ t, lang }) {
                 backgroundClip: "text",
               }}
             >
-              {td.title || "Daily Report"}
+              {td("title", "Daily Report")}
             </h1>
             <p
               style={{
@@ -366,7 +322,7 @@ export default function DailyReport({ t, lang }) {
             boxShadow: `0 4px 15px ${C.primary}44`,
           }}
         >
-          {safeYear}
+          {t?.("year") || "2018 E.C."}
         </span>
       </div>
 
@@ -382,7 +338,7 @@ export default function DailyReport({ t, lang }) {
           label={
             <>
               <FiCalendar size={14} style={{ marginRight: 6 }} />
-              {td.reportDate || "Report Date"}
+              {td("reportDate", "Report Date")}
             </>
           }
           value={date}
@@ -416,7 +372,7 @@ export default function DailyReport({ t, lang }) {
             }}
           >
             <FiList size={18} color={C.primary} />
-            {td.serviceList || "Service List"}
+            {td("serviceList", "Service List")}
             <span
               style={{
                 fontSize: "clamp(11px, 3vw, 12px)",
@@ -425,25 +381,23 @@ export default function DailyReport({ t, lang }) {
                 marginLeft: 8,
               }}
             >
-              ({rows.length} {safeCommon.records || "records"})
+              ({rows.length} {tcm("records", "records")})
             </span>
           </h3>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button
-              onClick={addRow}
-              style={{
-                ...btn.secondary,
-                padding: "clamp(6px, 1.5vw, 8px) clamp(12px, 3vw, 18px)",
-                fontSize: "clamp(12px, 3vw, 13px)",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <FiPlus size={14} />
-              {td.addRow || "+ Add Row"}
-            </button>
-          </div>
+          <button
+            onClick={addRow}
+            style={{
+              ...btn.secondary,
+              padding: "clamp(6px, 1.5vw, 8px) clamp(12px, 3vw, 18px)",
+              fontSize: "clamp(12px, 3vw, 13px)",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <FiPlus size={14} />
+            {td("addRow", "+ Add Row")}
+          </button>
         </div>
 
         {loading ? (
@@ -456,7 +410,7 @@ export default function DailyReport({ t, lang }) {
                 margin: "0 auto 12px",
               }}
             />
-            {safeCommon.loading || "Loading..."}
+            {tcm("loading", "Loading...")}
           </div>
         ) : (
           <>
@@ -479,16 +433,16 @@ export default function DailyReport({ t, lang }) {
                 <thead>
                   <tr>
                     <th style={th}>#</th>
-                    <th style={th}>{td.colDept || "Department"}</th>
-                    <th style={th}>{td.colService || "Service"}</th>
+                    <th style={th}>{td("colDept", "Department")}</th>
+                    <th style={th}>{td("colService", "Service")}</th>
                     <th style={{ ...th, textAlign: "center" }}>
-                      {td.colMale || "M"}
+                      {td("colMale", "M")}
                     </th>
                     <th style={{ ...th, textAlign: "center" }}>
-                      {td.colFemale || "F"}
+                      {td("colFemale", "F")}
                     </th>
                     <th style={{ ...th, textAlign: "center" }}>
-                      {td.colTotal || "Total"}
+                      {td("colTotal", "Total")}
                     </th>
                     <th style={{ ...th, textAlign: "center", width: 40 }}>✕</th>
                   </tr>
@@ -496,7 +450,6 @@ export default function DailyReport({ t, lang }) {
                 <tbody>
                   {rows.map((r, i) => {
                     const availableServices = getServicesByDept(r.dept);
-
                     return (
                       <tr
                         key={i}
@@ -509,7 +462,7 @@ export default function DailyReport({ t, lang }) {
                       >
                         <td
                           style={{
-                            ...td2,
+                            ...tdCell,
                             textAlign: "center",
                             color: "#aaa",
                             fontWeight: 600,
@@ -517,7 +470,8 @@ export default function DailyReport({ t, lang }) {
                         >
                           {i + 1}
                         </td>
-                        <td style={td2}>
+
+                        <td style={tdCell}>
                           <select
                             style={{
                               ...ti,
@@ -528,13 +482,12 @@ export default function DailyReport({ t, lang }) {
                             }}
                             value={r.dept || ""}
                             onChange={(e) => {
-                              const selectedDept = e.target.value;
-                              upd(i, "dept", selectedDept);
+                              upd(i, "dept", e.target.value);
                               upd(i, "service", "");
                             }}
                           >
                             <option value="">
-                              {td.selectDept || "Select Dept"}
+                              {td("selectDept", "Select Dept")}
                             </option>
                             {departments.length > 0 ? (
                               departments.map((dept) => (
@@ -549,7 +502,8 @@ export default function DailyReport({ t, lang }) {
                             )}
                           </select>
                         </td>
-                        <td style={td2}>
+
+                        <td style={tdCell}>
                           <select
                             style={{
                               ...ti,
@@ -559,13 +513,10 @@ export default function DailyReport({ t, lang }) {
                               cursor: "pointer",
                             }}
                             value={r.service || ""}
-                            onChange={(e) => {
-                              const selectedService = e.target.value;
-                              upd(i, "service", selectedService);
-                            }}
+                            onChange={(e) => upd(i, "service", e.target.value)}
                           >
                             <option value="">
-                              {td.selectService || "Select Service"}
+                              {td("selectService", "Select Service")}
                             </option>
                             {availableServices.length > 0 ? (
                               availableServices.map((s) => (
@@ -580,7 +531,8 @@ export default function DailyReport({ t, lang }) {
                             )}
                           </select>
                         </td>
-                        <td style={td2}>
+
+                        <td style={tdCell}>
                           <input
                             type="number"
                             style={{
@@ -599,7 +551,8 @@ export default function DailyReport({ t, lang }) {
                             min="0"
                           />
                         </td>
-                        <td style={td2}>
+
+                        <td style={tdCell}>
                           <input
                             type="number"
                             style={{
@@ -618,9 +571,10 @@ export default function DailyReport({ t, lang }) {
                             min="0"
                           />
                         </td>
+
                         <td
                           style={{
-                            ...td2,
+                            ...tdCell,
                             textAlign: "center",
                             fontWeight: 700,
                             color: C.primary,
@@ -629,7 +583,8 @@ export default function DailyReport({ t, lang }) {
                         >
                           {r.total || 0}
                         </td>
-                        <td style={{ ...td2, textAlign: "center" }}>
+
+                        <td style={{ ...tdCell, textAlign: "center" }}>
                           {rows.length > 1 && (
                             <button
                               onClick={() => removeRow(i)}
@@ -671,7 +626,7 @@ export default function DailyReport({ t, lang }) {
                     <td
                       colSpan={3}
                       style={{
-                        ...td2,
+                        ...tdCell,
                         fontWeight: 800,
                         textAlign: "right",
                         fontSize: "clamp(13px, 3.5vw, 15px)",
@@ -679,11 +634,11 @@ export default function DailyReport({ t, lang }) {
                       }}
                     >
                       <FiBarChart2 size={14} style={{ marginRight: 6 }} />
-                      {td.grandTotal || "Grand Total"}
+                      {td("grandTotal", "Grand Total")}
                     </td>
                     <td
                       style={{
-                        ...td2,
+                        ...tdCell,
                         fontWeight: 700,
                         textAlign: "center",
                         fontSize: "clamp(14px, 3.5vw, 16px)",
@@ -694,7 +649,7 @@ export default function DailyReport({ t, lang }) {
                     </td>
                     <td
                       style={{
-                        ...td2,
+                        ...tdCell,
                         fontWeight: 700,
                         textAlign: "center",
                         fontSize: "clamp(14px, 3.5vw, 16px)",
@@ -705,7 +660,7 @@ export default function DailyReport({ t, lang }) {
                     </td>
                     <td
                       style={{
-                        ...td2,
+                        ...tdCell,
                         fontWeight: 900,
                         textAlign: "center",
                         fontSize: "clamp(18px, 4.5vw, 22px)",
@@ -714,7 +669,7 @@ export default function DailyReport({ t, lang }) {
                     >
                       {animatedTotals.total}
                     </td>
-                    <td style={td2}></td>
+                    <td style={tdCell}></td>
                   </tr>
                 </tbody>
               </table>
@@ -765,16 +720,16 @@ export default function DailyReport({ t, lang }) {
                     <FiLoader
                       size={16}
                       style={{ animation: "spin 1s linear infinite" }}
-                    />
+                    />{" "}
                     Exporting...
                   </>
                 ) : (
                   <>
-                    <FiDownload size={16} />
-                    Export PDF
+                    <FiDownload size={16} /> Export PDF
                   </>
                 )}
               </button>
+
               <button
                 style={{
                   ...btn.primary,
@@ -794,13 +749,12 @@ export default function DailyReport({ t, lang }) {
                     <FiLoader
                       size={16}
                       style={{ animation: "spin 1s linear infinite" }}
-                    />
+                    />{" "}
                     Saving...
                   </>
                 ) : (
                   <>
-                    <FiSave size={16} />
-                    {td.save || "Save Report"}
+                    <FiSave size={16} /> {td("save", "Save Report")}
                   </>
                 )}
               </button>
@@ -811,12 +765,12 @@ export default function DailyReport({ t, lang }) {
 
       <style>{`
         @keyframes spin {
-          0% { transform: rotate(0deg); }
+          0%   { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
+          to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
