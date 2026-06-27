@@ -1,16 +1,16 @@
 // frontend/src/pages/admin/AdminServiceManager.jsx
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { btn, C, inp } from "../../styles/theme";
 import { serviceAPI } from "../../services/api";
 import { useToast } from "../../hooks/useToast";
 
 export default function AdminServiceManager({ t }) {
-  // ✅ Only get showToast from useToast (ToastContainer is in App.jsx)
   const { showToast } = useToast();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingService, setEditingService] = useState(null);
+  const [expandedDepts, setExpandedDepts] = useState({});
   const [formData, setFormData] = useState({
     dept: "",
     deptEn: "",
@@ -20,8 +20,24 @@ export default function AdminServiceManager({ t }) {
     stdTime: "",
   });
 
-  // ✅ Load services
-  const loadServices = async () => {
+  // Use ref to track if initial load is done
+  const isInitialLoadRef = useRef(true);
+  const isExpandedInitializedRef = useRef(false);
+
+  // Group services by department
+  const groupServicesByDept = useCallback((services) => {
+    const grouped = {};
+    services.forEach((service) => {
+      const dept = service.dept || "Uncategorized";
+      if (!grouped[dept]) {
+        grouped[dept] = [];
+      }
+      grouped[dept].push(service);
+    });
+    return grouped;
+  }, []);
+
+  const loadServices = useCallback(async () => {
     try {
       setLoading(true);
       const response = await serviceAPI.getAll();
@@ -32,31 +48,43 @@ export default function AdminServiceManager({ t }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
 
-  // ✅ Fixed useEffect - no state update in effect body
+  // Load services on mount
   useEffect(() => {
-    const fetchServices = async () => {
-      await loadServices();
-    };
-    fetchServices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false;
+      loadServices();
+    }
+  }, [loadServices]);
 
-  // ✅ Seed all services from constants
+  // Initialize expanded departments only once when services first load
+  useEffect(() => {
+    if (services.length > 0 && !isExpandedInitializedRef.current) {
+      const grouped = groupServicesByDept(services);
+      const allExpanded = {};
+      Object.keys(grouped).forEach((dept) => {
+        allExpanded[dept] = true;
+      });
+      setExpandedDepts(allExpanded);
+      isExpandedInitializedRef.current = true;
+    }
+  }, [services, groupServicesByDept]);
+
   const handleSeedServices = async () => {
     if (!window.confirm("This will add all default services. Continue?"))
       return;
     try {
       const response = await serviceAPI.seed();
       showToast(response.data.message, "success");
+      // Reset the initialization flag so new departments will be expanded
+      isExpandedInitializedRef.current = false;
       await loadServices();
     } catch (err) {
       showToast(err.response?.data?.message || "Seed failed", "error");
     }
   };
 
-  // ✅ Add/Update service
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -77,26 +105,28 @@ export default function AdminServiceManager({ t }) {
         active: true,
         stdTime: "",
       });
+      // Reset the initialization flag so new departments will be expanded
+      isExpandedInitializedRef.current = false;
       await loadServices();
     } catch (err) {
       showToast(err.response?.data?.message || "Operation failed", "error");
     }
   };
 
-  // ✅ Delete service - fixed unused error variable
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this service?"))
       return;
     try {
       await serviceAPI.delete(id);
       showToast("Service deleted successfully!", "success");
+      // Reset the initialization flag so departments will be re-initialized
+      isExpandedInitializedRef.current = false;
       await loadServices();
     } catch {
       showToast("Delete failed", "error");
     }
   };
 
-  // ✅ Edit button handler
   const handleEdit = (service) => {
     setEditingService(service);
     setFormData({
@@ -110,13 +140,21 @@ export default function AdminServiceManager({ t }) {
     setShowAddModal(true);
   };
 
+  // Toggle department expansion
+  const toggleDepartment = (dept) => {
+    setExpandedDepts((prev) => ({
+      ...prev,
+      [dept]: !prev[dept],
+    }));
+  };
+
   const safeT = t || {};
   const ts = safeT.services || {};
+  const groupedServices = groupServicesByDept(services);
+  const deptKeys = Object.keys(groupedServices);
 
   return (
     <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
-      {/* ✅ REMOVED ToastContainer - it's already in App.jsx */}
-
       <div
         style={{
           display: "flex",
@@ -139,6 +177,7 @@ export default function AdminServiceManager({ t }) {
           </h1>
           <p style={{ color: C.muted, fontSize: "clamp(12px, 3vw, 14px)" }}>
             {services.length} {ts.totalServices || "services"} •{" "}
+            {deptKeys.length} {ts.departments || "departments"} •{" "}
             {ts.manageSubtitle || "Add, edit, or remove services"}
           </p>
         </div>
@@ -193,7 +232,15 @@ export default function AdminServiceManager({ t }) {
           >
             <thead>
               <tr style={{ background: C.dark, color: C.light }}>
-                <th style={{ padding: "12px 16px", textAlign: "left" }}>#</th>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "left",
+                    width: "50px",
+                  }}
+                >
+                  #
+                </th>
                 <th style={{ padding: "12px 16px", textAlign: "left" }}>
                   Department
                 </th>
@@ -203,77 +250,193 @@ export default function AdminServiceManager({ t }) {
                 <th style={{ padding: "12px 16px", textAlign: "left" }}>
                   English Name
                 </th>
-                <th style={{ padding: "12px 16px", textAlign: "center" }}>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "center",
+                    width: "120px",
+                  }}
+                >
                   Status
                 </th>
-                <th style={{ padding: "12px 16px", textAlign: "center" }}>
+                <th
+                  style={{
+                    padding: "12px 16px",
+                    textAlign: "center",
+                    width: "120px",
+                  }}
+                >
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody>
-              {services.map((s, i) => (
-                <tr
-                  key={s._id}
-                  style={{
-                    borderBottom: `1px solid ${C.border}`,
-                    background: i % 2 === 0 ? C.white : C.cardBg,
-                  }}
-                >
-                  <td style={{ padding: "10px 16px", color: "#999" }}>
-                    {i + 1}
-                  </td>
-                  <td style={{ padding: "10px 16px", fontWeight: 600 }}>
-                    {s.dept}
-                  </td>
-                  <td style={{ padding: "10px 16px" }}>{s.name}</td>
-                  <td style={{ padding: "10px 16px", color: C.muted }}>
-                    {s.nameEn}
-                  </td>
-                  <td style={{ padding: "10px 16px", textAlign: "center" }}>
-                    <span
+              {deptKeys.map((dept) => {
+                const deptServices = groupedServices[dept];
+                const isExpanded = expandedDepts[dept] !== false;
+                const totalCount = deptServices.length;
+                const activeCount = deptServices.filter((s) => s.active).length;
+
+                return (
+                  <React.Fragment key={`dept-${dept}`}>
+                    {/* Department Header Row */}
+                    <tr
                       style={{
-                        padding: "2px 12px",
-                        borderRadius: 12,
-                        fontSize: 11,
-                        fontWeight: 600,
-                        background: s.active ? "#d1fae5" : "#fee2e2",
-                        color: s.active ? "#065f46" : "#dc2626",
-                      }}
-                    >
-                      {s.active ? "✅ Active" : "❌ Inactive"}
-                    </span>
-                  </td>
-                  <td style={{ padding: "10px 16px", textAlign: "center" }}>
-                    <button
-                      onClick={() => handleEdit(s)}
-                      style={{
-                        background: "none",
-                        border: "none",
+                        background: "#f8f9fa",
                         cursor: "pointer",
-                        fontSize: 16,
-                        marginRight: 8,
+                        borderBottom: `2px solid ${C.border}`,
                       }}
-                      title="Edit"
+                      onClick={() => toggleDepartment(dept)}
                     >
-                      ✏️
-                    </button>
-                    <button
-                      onClick={() => handleDelete(s._id)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: 16,
-                        color: "#dc2626",
-                      }}
-                      title="Delete"
-                    >
-                      🗑️
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                      <td colSpan="6" style={{ padding: "12px 16px" }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                          }}
+                        >
+                          <span style={{ fontSize: 18 }}>
+                            {isExpanded ? "▼" : "▶"}
+                          </span>
+                          <span
+                            style={{
+                              fontWeight: 700,
+                              fontSize: 15,
+                              color: C.dark,
+                            }}
+                          >
+                            {dept}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 13,
+                              color: C.muted,
+                              background: C.white,
+                              padding: "2px 12px",
+                              borderRadius: 12,
+                              border: `1px solid ${C.border}`,
+                            }}
+                          >
+                            {totalCount}{" "}
+                            {totalCount === 1 ? "service" : "services"}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#065f46",
+                              background: "#d1fae5",
+                              padding: "2px 10px",
+                              borderRadius: 12,
+                            }}
+                          >
+                            {activeCount} active
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Service Rows - shown only if expanded */}
+                    {isExpanded &&
+                      deptServices.map((s, idx) => {
+                        // Calculate global index
+                        const globalIndex = services.indexOf(s) + 1;
+                        return (
+                          <tr
+                            key={s._id}
+                            style={{
+                              borderBottom: `1px solid ${C.border}`,
+                              background: idx % 2 === 0 ? C.white : C.cardBg,
+                            }}
+                          >
+                            <td
+                              style={{
+                                padding: "10px 16px",
+                                color: "#999",
+                                textAlign: "center",
+                              }}
+                            >
+                              {globalIndex}
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 16px",
+                                fontWeight: 400,
+                                paddingLeft: 40,
+                                color: C.muted,
+                                fontSize: 13,
+                              }}
+                            >
+                              {dept}
+                            </td>
+                            <td
+                              style={{ padding: "10px 16px", fontWeight: 500 }}
+                            >
+                              {s.name}
+                            </td>
+                            <td
+                              style={{ padding: "10px 16px", color: C.muted }}
+                            >
+                              {s.nameEn}
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 16px",
+                                textAlign: "center",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  padding: "2px 12px",
+                                  borderRadius: 12,
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  background: s.active ? "#d1fae5" : "#fee2e2",
+                                  color: s.active ? "#065f46" : "#dc2626",
+                                }}
+                              >
+                                {s.active ? "✅ Active" : "❌ Inactive"}
+                              </span>
+                            </td>
+                            <td
+                              style={{
+                                padding: "10px 16px",
+                                textAlign: "center",
+                              }}
+                            >
+                              <button
+                                onClick={() => handleEdit(s)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: 16,
+                                  marginRight: 8,
+                                }}
+                                title="Edit"
+                              >
+                                ✏️
+                              </button>
+                              <button
+                                onClick={() => handleDelete(s._id)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: 16,
+                                  color: "#dc2626",
+                                }}
+                                title="Delete"
+                              >
+                                🗑️
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </React.Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -330,7 +493,7 @@ export default function AdminServiceManager({ t }) {
                       setFormData({ ...formData, dept: e.target.value })
                     }
                     style={inp}
-                    placeholder="e.g., ገቢዎች"
+                    placeholder="e.g., ስርዓቶች"
                   />
                 </div>
                 <div>
@@ -346,7 +509,7 @@ export default function AdminServiceManager({ t }) {
                       setFormData({ ...formData, deptEn: e.target.value })
                     }
                     style={inp}
-                    placeholder="e.g., Revenue"
+                    placeholder="e.g., Systems"
                   />
                 </div>
                 <div>
@@ -363,7 +526,7 @@ export default function AdminServiceManager({ t }) {
                       setFormData({ ...formData, name: e.target.value })
                     }
                     style={inp}
-                    placeholder="e.g., ቲን ሬጅስትሬሽን"
+                    placeholder="e.g., ቲን ፈጅስትፈሸን"
                   />
                 </div>
                 <div>
