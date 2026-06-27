@@ -46,49 +46,69 @@ export default function DailyReport({ t, lang }) {
     const fetchData = async () => {
       try {
         const response = await serviceAPI.getAll();
-        console.log("🔍 Full API Response:", response);
 
-        // Backend returns res.json(services) — a plain array.
-        // Axios wraps it in response.data, so response.data IS the array.
+        // 🔍 Debug — remove after confirming dropdowns work
+        console.log("TYPE:", typeof response);
+        console.log("IS ARRAY:", Array.isArray(response));
+        console.log("KEYS:", Object.keys(response));
+        console.log("response.data type:", typeof response?.data);
+        console.log("response.data is array:", Array.isArray(response?.data));
+        console.log("response.data:", response?.data);
+        console.log("FULL RESPONSE:", JSON.stringify(response, null, 2));
+
+        // Axios always wraps the response — response.data is the actual payload.
+        // The backend does res.json(services) so response.data should be the array.
+        // We try every realistic shape in order, most-likely first.
         let services = [];
-        if (Array.isArray(response)) {
-          services = response;
-        } else if (response?.data && Array.isArray(response.data)) {
+
+        if (response?.data && Array.isArray(response.data)) {
+          // ✅ Most likely: axios({ data: [...] })
           services = response.data;
+        } else if (Array.isArray(response)) {
+          // Raw array (no axios wrapper — shouldn't happen but just in case)
+          services = response;
         } else if (response?.data?.data && Array.isArray(response.data.data)) {
+          // Nested: { data: { data: [...] } }
           services = response.data.data;
-        } else if (response?.services && Array.isArray(response.services)) {
-          services = response.services;
         } else if (
           response?.data?.services &&
           Array.isArray(response.data.services)
         ) {
+          // Nested: { data: { services: [...] } }
           services = response.data.services;
+        } else if (response?.services && Array.isArray(response.services)) {
+          services = response.services;
         } else if (response && typeof response === "object") {
-          for (const key in response) {
-            if (Array.isArray(response[key]) && response[key].length > 0) {
-              const firstItem = response[key][0];
-              if (firstItem && (firstItem.dept || firstItem.name)) {
-                services = response[key];
-                break;
-              }
+          // Last resort: scan all keys for an array of objects with dept/name
+          for (const key of Object.keys(response)) {
+            const val = response[key];
+            if (
+              Array.isArray(val) &&
+              val.length > 0 &&
+              (val[0]?.dept || val[0]?.name)
+            ) {
+              services = val;
+              break;
             }
           }
         }
 
-        console.log("📦 Extracted services:", services.length);
-        if (services.length > 0)
+        console.log("📦 Extracted services count:", services.length);
+        if (services.length > 0) {
           console.log(
             "📋 First service:",
             JSON.stringify(services[0], null, 2),
           );
+        } else {
+          console.warn(
+            "⚠️ services array is EMPTY — check the logs above to see why",
+          );
+        }
 
         setAllServices(services);
 
-        // ✅ KEY FIX: Build a Map where key = raw s.dept (used for filtering)
-        // and value = the localized display label shown in the dropdown.
-        // This means option.value is always the raw DB key, so getServicesByDept
-        // can reliably do s.dept === deptKey regardless of display language.
+        // Build dept map: raw s.dept as the key (used for filtering),
+        // localized label as the display value shown in the dropdown.
         const deptMap = new Map();
         services.forEach((s) => {
           if (s.dept && !deptMap.has(s.dept)) {
@@ -97,11 +117,12 @@ export default function DailyReport({ t, lang }) {
           }
         });
 
-        const deptEntries = Array.from(deptMap.entries()); // [[rawKey, label], ...]
-        console.log("🏢 Departments:", deptEntries);
+        const deptEntries = Array.from(deptMap.entries());
+        console.log("🏢 Departments built:", deptEntries);
         setDepartments(deptEntries);
       } catch (error) {
-        console.error("❌ Failed to fetch services:", error);
+        console.error("❌ fetchData error:", error);
+        console.error("❌ error.response:", error?.response);
         showToast("Failed to load services", "error");
       }
     };
