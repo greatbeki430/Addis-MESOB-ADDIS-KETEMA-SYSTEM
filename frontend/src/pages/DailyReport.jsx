@@ -162,11 +162,26 @@ export default function DailyReport({ t, lang }) {
     });
   };
 
+  // const addRow = () =>
+  //   setRows([...rows, { dept: "", service: "", male: 0, female: 0, total: 0 }]);
+
+  // const removeRow = (index) => {
+  //   if (rows.length > 1) setRows(rows.filter((_, i) => i !== index));
+  // };
   const addRow = () =>
-    setRows([...rows, { dept: "", service: "", male: 0, female: 0, total: 0 }]);
+    setRows((prev) => [
+      ...prev,
+      {
+        dept: "",
+        service: "",
+        male: 0,
+        female: 0,
+        total: 0,
+      },
+    ]);
 
   const removeRow = (index) => {
-    if (rows.length > 1) setRows(rows.filter((_, i) => i !== index));
+    setRows((prev) => prev.filter((_, i) => i !== index));
   };
 
   // ✅ FIX: Filter services by the raw dept key (s.dept), which is what
@@ -408,7 +423,7 @@ export default function DailyReport({ t, lang }) {
             }}
           >
             <FiPlus size={14} />
-            {td("addRow", "+ Add Row")}
+            {td("addRow", "Add Row")}
           </button>
         </div>
 
