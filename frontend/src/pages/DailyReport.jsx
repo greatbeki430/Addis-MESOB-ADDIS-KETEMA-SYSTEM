@@ -43,91 +43,55 @@ export default function DailyReport({ t, lang }) {
 
   // ─── Fetch departments and services ──────────────────────────────────────────
   useEffect(() => {
+    let cancelled = false;
+
     const fetchData = async () => {
       try {
         const response = await serviceAPI.getAll();
 
-        // 🔍 Debug — remove after confirming dropdowns work
-        console.log("TYPE:", typeof response);
-        console.log("IS ARRAY:", Array.isArray(response));
-        console.log("KEYS:", Object.keys(response));
-        console.log("response.data type:", typeof response?.data);
-        console.log("response.data is array:", Array.isArray(response?.data));
-        console.log("response.data:", response?.data);
-        console.log("FULL RESPONSE:", JSON.stringify(response, null, 2));
+        const services = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response?.data?.data)
+            ? response.data.data
+            : Array.isArray(response?.data?.services)
+              ? response.data.services
+              : [];
 
-        // Axios always wraps the response — response.data is the actual payload.
-        // The backend does res.json(services) so response.data should be the array.
-        // We try every realistic shape in order, most-likely first.
-        let services = [];
+        console.log("📦 Services:", services);
 
-        if (response?.data && Array.isArray(response.data)) {
-          // ✅ Most likely: axios({ data: [...] })
-          services = response.data;
-        } else if (Array.isArray(response)) {
-          // Raw array (no axios wrapper — shouldn't happen but just in case)
-          services = response;
-        } else if (response?.data?.data && Array.isArray(response.data.data)) {
-          // Nested: { data: { data: [...] } }
-          services = response.data.data;
-        } else if (
-          response?.data?.services &&
-          Array.isArray(response.data.services)
-        ) {
-          // Nested: { data: { services: [...] } }
-          services = response.data.services;
-        } else if (response?.services && Array.isArray(response.services)) {
-          services = response.services;
-        } else if (response && typeof response === "object") {
-          // Last resort: scan all keys for an array of objects with dept/name
-          for (const key of Object.keys(response)) {
-            const val = response[key];
-            if (
-              Array.isArray(val) &&
-              val.length > 0 &&
-              (val[0]?.dept || val[0]?.name)
-            ) {
-              services = val;
-              break;
-            }
-          }
-        }
-
-        console.log("📦 Extracted services count:", services.length);
-        if (services.length > 0) {
-          console.log(
-            "📋 First service:",
-            JSON.stringify(services[0], null, 2),
-          );
-        } else {
-          console.warn(
-            "⚠️ services array is EMPTY — check the logs above to see why",
-          );
-        }
+        if (cancelled) return;
 
         setAllServices(services);
 
-        // Build dept map: raw s.dept as the key (used for filtering),
-        // localized label as the display value shown in the dropdown.
         const deptMap = new Map();
+
         services.forEach((s) => {
-          if (s.dept && !deptMap.has(s.dept)) {
-            const label = lang === "en" ? s.deptEn || s.dept : s.dept;
-            deptMap.set(s.dept, label);
-          }
+          if (!s?.dept) return;
+
+          deptMap.set(s.dept, lang === "en" ? s.deptEn || s.dept : s.dept);
         });
 
-        const deptEntries = Array.from(deptMap.entries());
-        console.log("🏢 Departments built:", deptEntries);
+        const deptEntries = [...deptMap.entries()];
+
+        console.log("🏢 Departments:", deptEntries);
+
         setDepartments(deptEntries);
-      } catch (error) {
-        console.error("❌ fetchData error:", error);
-        console.error("❌ error.response:", error?.response);
-        showToast("Failed to load services", "error");
+      } catch (err) {
+        console.error("Failed to fetch services:", err);
+
+        if (!cancelled) {
+          setAllServices([]);
+          setDepartments([]);
+        }
       }
     };
+
     fetchData();
-  }, [lang]); // Re-run when lang changes so localized labels update
+
+    return () => {
+      cancelled = true;
+    };
+  }, [lang]);
 
   // ─── Load daily report for selected date ────────────────────────────────────
   useEffect(() => {
@@ -169,15 +133,33 @@ export default function DailyReport({ t, lang }) {
     }
   }, [rows]);
 
-  const upd = (i, f, v) => {
-    const u = [...rows];
-    u[i] = { ...u[i], [f]: v };
-    if (f === "male" || f === "female") {
-      u[i].total =
-        (Number(f === "male" ? v : u[i].male) || 0) +
-        (Number(f === "female" ? v : u[i].female) || 0);
-    }
-    setRows(u);
+  // const upd = (i, f, v) => {
+  //   const u = [...rows];
+  //   u[i] = { ...u[i], [f]: v };
+  //   if (f === "male" || f === "female") {
+  //     u[i].total =
+  //       (Number(f === "male" ? v : u[i].male) || 0) +
+  //       (Number(f === "female" ? v : u[i].female) || 0);
+  //   }
+  //   setRows(u);
+  // };
+  const upd = (index, field, value) => {
+    setRows((prevRows) => {
+      const next = [...prevRows];
+
+      next[index] = {
+        ...next[index],
+        [field]: value,
+      };
+
+      if (field === "male" || field === "female") {
+        next[index].total =
+          (Number(field === "male" ? value : next[index].male) || 0) +
+          (Number(field === "female" ? value : next[index].female) || 0);
+      }
+
+      return next;
+    });
   };
 
   const addRow = () =>
@@ -516,26 +498,28 @@ export default function DailyReport({ t, lang }) {
                             }}
                             value={r.dept || ""}
                             onChange={(e) => {
-                              // Store the raw dept key in state so filtering works
-                              upd(i, "dept", e.target.value);
-                              upd(i, "service", "");
+                              setRows((prev) => {
+                                const next = [...prev];
+
+                                next[i] = {
+                                  ...next[i],
+                                  dept: e.target.value,
+                                  service: "",
+                                };
+
+                                return next;
+                              });
                             }}
                           >
                             <option value="">
                               {td("selectDept", "Select Dept")}
                             </option>
-                            {departments.length > 0 ? (
-                              departments.map(([rawKey, label]) => (
-                                // value = raw DB key; display text = localized label
-                                <option key={rawKey} value={rawKey}>
-                                  {label}
-                                </option>
-                              ))
-                            ) : (
-                              <option value="" disabled>
-                                No departments available
+
+                            {departments.map(([rawKey, label]) => (
+                              <option key={rawKey} value={rawKey}>
+                                {label}
                               </option>
-                            )}
+                            ))}
                           </select>
                         </td>
 
