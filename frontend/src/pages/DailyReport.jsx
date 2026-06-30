@@ -6,6 +6,8 @@ import { dailyReportAPI, serviceAPI } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { generateDailyReportPDF } from "../utils/pdf/reports/dailyReport";
+import AISummary from "../components/ai/AISummary"; // ✅ NEW
+import { aiAPI } from "../services/api"; // ✅ NEW
 import {
   FiCalendar,
   FiList,
@@ -38,6 +40,9 @@ export default function DailyReport({ t, lang }) {
     male: 0,
     female: 0,
   });
+
+  // ✅ NEW — tracks the saved report's DB id so AISummary can fetch insight for it
+  const [savedReportId, setSavedReportId] = useState(null);
 
   const prevRowsRef = useRef(rows);
 
@@ -101,12 +106,16 @@ export default function DailyReport({ t, lang }) {
         const response = await dailyReportAPI.getByDate(date);
         if (response.data && response.data.length > 0) {
           setRows(response.data);
+          // ✅ NEW — if the loaded report has an _id, remember it for AI insight
+          setSavedReportId(response.data[0]?._id || response.data?._id || null);
         } else {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
+          setSavedReportId(null); // ✅ NEW
         }
       } catch (error) {
         if (error.response?.status === 404) {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
+          setSavedReportId(null); // ✅ NEW
         } else {
           console.error("Failed to load daily report:", error);
           showToast("Failed to load daily report", "error");
@@ -191,12 +200,14 @@ export default function DailyReport({ t, lang }) {
         return;
       }
       const grandTotal = entries.reduce((sum, e) => sum + (e.total || 0), 0);
-      await dailyReportAPI.create({
+      const response = await dailyReportAPI.create({
         date,
         entries,
         grandTotal,
         team: user?.team || null,
       });
+      // ✅ NEW — capture the new report's id so AISummary can analyze it
+      setSavedReportId(response?.data?._id || null);
       showToast("✅ Report saved successfully!", "success");
     } catch (error) {
       console.error("Failed to save report:", error);
@@ -783,6 +794,15 @@ export default function DailyReport({ t, lang }) {
                 )}
               </button>
             </div>
+
+            {/* ✅ NEW — AI Insight panel, only shows once a report has been saved */}
+            {savedReportId && (
+              <AISummary
+                fetchFn={(id) => aiAPI.getDailyInsight(id, null)}
+                args={[savedReportId]}
+                label="AI Daily Insight"
+              />
+            )}
           </>
         )}
       </div>
