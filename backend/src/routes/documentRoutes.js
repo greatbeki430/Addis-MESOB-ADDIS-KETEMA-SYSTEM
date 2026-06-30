@@ -11,10 +11,14 @@ const {
   addDocumentVersion,
   flagDocumentDeleted,
   downloadDocument,
+  analyzeDocument,
 } = require("../controllers/documentController");
 
 // GET    /api/documents                — list/search documents
 router.get("/", protect, anyRole, getDocuments);
+
+// POST   /api/documents/analyze        — AI vision analysis (pre-upload, no save)
+router.post("/analyze", protect, anyRole, analyzeDocument);
 
 // POST   /api/documents/upload         — upload new document
 router.post("/upload", protect, anyRole, uploadDocument);

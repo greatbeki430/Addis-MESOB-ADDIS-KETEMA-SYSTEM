@@ -1,11 +1,15 @@
 // backend/src/services/aiService.js
 // Core AI Service — wraps Google Gemini API for all AI features in Addis MESOB System
 // Used by: aiController.js, chatbotController.js, documentService.js
+//
+// ⚠️ Uses @google/genai (the actively maintained Google GenAI SDK), NOT the
+// deprecated @google/generative-ai package. The deprecated SDK does not reliably
+// support the newer "AQ." format API keys issued by AI Studio since mid-2026.
 
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenAI } = require("@google/genai");
 
-const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODEL = "gemini-1.5-flash"; // free tier; switch to "gemini-1.5-pro" for better quality
+const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const MODEL = "gemini-2.5-flash"; // free tier; switch to "gemini-2.5-pro" for better quality
 
 // ============================================================
 // SYSTEM CONTEXT — tells Gemini what this system is
@@ -24,13 +28,15 @@ You must respond in the same language the user writes in (Amharic or English).
 Be concise, professional, and helpful.`;
 
 // ============================================================
-// HELPER — creates a Gemini model instance with system context
+// HELPER — calls Gemini with a system instruction + single prompt
 // ============================================================
-const getModel = (systemInstruction = SYSTEM_CONTEXT) => {
-  return client.getGenerativeModel({
+const generateText = async (prompt, systemInstruction = SYSTEM_CONTEXT) => {
+  const response = await client.models.generateContent({
     model: MODEL,
-    systemInstruction,
+    contents: prompt,
+    config: { systemInstruction },
   });
+  return response.text;
 };
 
 // ============================================================
@@ -54,9 +60,7 @@ Please provide:
 
 Keep your response under 150 words and use plain text (no markdown).`;
 
-  const model = getModel();
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  return generateText(prompt);
 };
 
 // ============================================================
@@ -97,9 +101,7 @@ Write a 3-paragraph professional evaluation narrative:
 
 Keep it under 200 words. Use professional government report tone.`;
 
-  const model = getModel();
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  return generateText(prompt);
 };
 
 // ============================================================
@@ -120,9 +122,7 @@ Stats summary:
 Write 2-3 short sentences (under 80 words) as a digest paragraph for the dashboard header.
 Make it sound like a city government performance update. Plain text only.`;
 
-  const model = getModel();
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  return generateText(prompt);
 };
 
 // ============================================================
@@ -155,9 +155,7 @@ NEXT MEETING: [if mentioned]
 
 Keep it professional. Under 300 words.`;
 
-  const model = getModel();
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  return generateText(prompt);
 };
 
 // ============================================================
@@ -187,17 +185,20 @@ You can help with:
 If asked about live data (e.g., "what are my scores?"), say you don't have real-time access but guide them to the right page.
 Keep responses under 150 words. Be friendly and professional.`;
 
-  const model = getModel(chatSystemPrompt);
-
   // Build Gemini chat history — Gemini uses "model" instead of "assistant"
   const history = conversationHistory.map((m) => ({
     role: m.role === "assistant" ? "model" : "user",
     parts: [{ text: m.content }],
   }));
 
-  const chat = model.startChat({ history });
-  const result = await chat.sendMessage(userMessage);
-  return result.response.text();
+  const chat = client.chats.create({
+    model: MODEL,
+    config: { systemInstruction: chatSystemPrompt },
+    history,
+  });
+
+  const response = await chat.sendMessage({ message: userMessage });
+  return response.text;
 };
 
 // ============================================================
@@ -224,9 +225,7 @@ Return ONLY valid JSON like this, no other text:
   "summary": "..."
 }`;
 
-  const model = getModel();
-  const result = await model.generateContent(prompt);
-  const text = result.response.text();
+  const text = await generateText(prompt);
 
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -238,6 +237,67 @@ Return ONLY valid JSON like this, no other text:
   }
 };
 
+// ============================================================
+// 7. ANALYZE DOCUMENT FILE (VISION) — for CRRSA vault upload form
+// Called by: documentController → POST /api/documents/analyze
+// Input: base64 file (image or PDF) + its mime type
+// Reads the actual document using Gemini's vision capability and
+// returns structured fields to auto-fill the upload form.
+// ============================================================
+const analyzeDocumentImage = async (base64File, mimeType) => {
+  const base64Data = base64File.includes(",")
+    ? base64File.split(",")[1]
+    : base64File;
+
+  const prompt = `You are looking at a scanned government document (likely Ethiopian CRRSA — Civil
+Registration and Residency Service Agency — paperwork, possibly in Amharic, English, or both).
+
+Carefully read the document and extract the following fields. Use your best judgement based on
+what's visually present — headers, stamps, handwriting, printed text, logos, etc.
+
+Return ONLY a valid JSON object, no other text, no markdown fences, in exactly this shape:
+{
+  "documentType": one of ["birth_certificate","death_certificate","marriage_certificate","divorce_certificate","residence_id","name_change","registration_book","circular","directive","correspondence","application_form","other"],
+  "title": "a short descriptive title, e.g. 'Birth Certificate – Abebe Kebede'",
+  "citizenName": "full name in English/Latin script if present, else null",
+  "citizenNameAmharic": "full name in Amharic script if present, else null",
+  "issueDate": "date in YYYY-MM-DD format if found, else null",
+  "issuingOfficer": "name or title of the issuing official if present, else null",
+  "issuingDepartment": "the department or office name if present, else 'Civil Registry'",
+  "nationalId": "any ID number visible, else null",
+  "tags": ["short", "relevant", "keywords"],
+  "notes": "one sentence describing the document's purpose or content",
+  "confidence": "high" | "medium" | "low"
+}
+
+If the image is unclear, blank, or not a recognizable document, set documentType to "other",
+leave uncertain fields as null, and set confidence to "low".`;
+
+  const response = await client.models.generateContent({
+    model: MODEL,
+    contents: [
+      {
+        role: "user",
+        parts: [
+          { text: prompt },
+          { inlineData: { mimeType, data: base64Data } },
+        ],
+      },
+    ],
+    config: { systemInstruction: SYSTEM_CONTEXT },
+  });
+
+  const text = response.text;
+
+  try {
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return { confidence: "low", notes: text };
+    return JSON.parse(jsonMatch[0]);
+  } catch {
+    return { confidence: "low", notes: "AI returned unparseable output." };
+  }
+};
+
 module.exports = {
   generateDailyInsight,
   generateEvaluationSummary,
@@ -245,4 +305,5 @@ module.exports = {
   generateMeetingMinutes,
   handleChatMessage,
   summarizeDocumentContent,
+  analyzeDocumentImage,
 };

@@ -10,6 +10,7 @@ const {
   extractDocumentMetadataWithAI,
   generateReferenceNumber,
 } = require("../services/documentService");
+const { analyzeDocumentImage } = require("../services/aiService");
 
 // ─── Helper: log an audit event ──────────────────────────────
 const logAudit = async (
@@ -434,6 +435,42 @@ const downloadDocument = async (req, res) => {
   }
 };
 
+// ============================================================
+// POST /api/documents/analyze
+// Body: { file (base64), mimeType }
+// Auth: any authenticated user (same access as upload)
+// Reads the document via Gemini vision and returns suggested
+// form field values — does NOT save or upload anything yet.
+// ============================================================
+const analyzeDocument = async (req, res) => {
+  try {
+    const { file, mimeType } = req.body;
+
+    if (!file) {
+      return res.status(400).json({ message: "File is required" });
+    }
+
+    // Derive mime type from the base64 data URL prefix if not explicitly given
+    let resolvedMimeType = mimeType;
+    if (!resolvedMimeType && file.startsWith("data:")) {
+      resolvedMimeType = file.substring(5, file.indexOf(";"));
+    }
+    if (!resolvedMimeType) {
+      return res.status(400).json({ message: "Could not determine file type" });
+    }
+
+    const analysis = await analyzeDocumentImage(file, resolvedMimeType);
+
+    res.json({ analysis });
+  } catch (error) {
+    console.error("Document analysis error:", error);
+    res.status(500).json({
+      message: "AI analysis failed",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   uploadDocument,
   getDocuments,
@@ -442,4 +479,5 @@ module.exports = {
   addDocumentVersion,
   flagDocumentDeleted,
   downloadDocument,
+  analyzeDocument,
 };

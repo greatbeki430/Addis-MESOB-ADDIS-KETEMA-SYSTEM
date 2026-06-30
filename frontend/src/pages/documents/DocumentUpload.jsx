@@ -3,9 +3,9 @@
 
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
-// import { uploadDocument } from "../../services/aiApi";
 import { documentAPI } from "../../services/api";
 const uploadDocument = (data) => documentAPI.upload(data);
+const analyzeDocument = (file, mimeType) => documentAPI.analyze(file, mimeType);
 
 const DOCUMENT_TYPES = [
   { value: "birth_certificate", label: "Birth Certificate / የልደት ምስክር ወረቀት" },
@@ -39,6 +39,12 @@ const inputStyle = {
   fontFamily: "inherit",
 };
 
+const inputStyleFilled = {
+  ...inputStyle,
+  border: "1px solid #93C5FD",
+  background: "#F0F9FF",
+};
+
 const labelStyle = {
   display: "block",
   fontSize: "12px",
@@ -46,6 +52,22 @@ const labelStyle = {
   color: "#374151",
   marginBottom: "4px",
 };
+
+const aiBadge = (
+  <span
+    style={{
+      fontSize: "10px",
+      fontWeight: 600,
+      color: "#1D4ED8",
+      background: "#DBEAFE",
+      padding: "1px 7px",
+      borderRadius: "99px",
+      marginLeft: "6px",
+    }}
+  >
+    ✨ AI
+  </span>
+);
 
 export default function DocumentUpload({ onSuccess, onClose }) {
   const [form, setForm] = useState({
@@ -68,13 +90,95 @@ export default function DocumentUpload({ onSuccess, onClose }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
 
+  // ✅ NEW — AI auto-fill state
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analyzeError, setAnalyzeError] = useState("");
+  const [aiFilledFields, setAiFilledFields] = useState({}); // tracks which fields AI populated, for the visual badge/highlight
+  const [aiConfidence, setAiConfidence] = useState(null);
+
+  // ✅ NEW — calls the backend AI vision analyzer and auto-fills the form
+  const runAiAnalysis = async (base64File, mimeType) => {
+    setIsAnalyzing(true);
+    setAnalyzeError("");
+    setAiFilledFields({});
+    setAiConfidence(null);
+
+    try {
+      const res = await analyzeDocument(base64File, mimeType);
+      const a = res.data?.analysis || {};
+
+      const filled = {};
+      setForm((prev) => {
+        const next = { ...prev };
+
+        if (a.documentType) {
+          next.documentType = a.documentType;
+          filled.documentType = true;
+        }
+        if (a.title) {
+          next.title = a.title;
+          filled.title = true;
+        }
+        if (a.citizenName) {
+          next.citizenName = a.citizenName;
+          filled.citizenName = true;
+        }
+        if (a.citizenNameAmharic) {
+          next.citizenNameAmharic = a.citizenNameAmharic;
+          filled.citizenNameAmharic = true;
+        }
+        if (a.issueDate) {
+          next.issueDate = a.issueDate;
+          filled.issueDate = true;
+        }
+        if (a.issuingOfficer) {
+          next.issuingOfficer = a.issuingOfficer;
+          filled.issuingOfficer = true;
+        }
+        if (a.issuingDepartment) {
+          next.issuingDepartment = a.issuingDepartment;
+          filled.issuingDepartment = true;
+        }
+        if (a.nationalId) {
+          next.nationalId = a.nationalId;
+          filled.nationalId = true;
+        }
+        if (Array.isArray(a.tags) && a.tags.length > 0) {
+          next.tags = a.tags.join(", ");
+          filled.tags = true;
+        }
+        if (a.notes) {
+          next.notes = a.notes;
+          filled.notes = true;
+        }
+
+        return next;
+      });
+
+      setAiFilledFields(filled);
+      setAiConfidence(a.confidence || null);
+    } catch (err) {
+      setAnalyzeError(
+        err.response?.data?.message ||
+          "AI couldn't analyze this document — you can still fill the form manually.",
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   const onDrop = useCallback((acceptedFiles) => {
     const f = acceptedFiles[0];
     if (!f) return;
     setFile(f);
 
     const reader = new FileReader();
-    reader.onload = () => setFileBase64(reader.result);
+    reader.onload = () => {
+      const result = reader.result;
+      setFileBase64(result);
+      // ✅ NEW — automatically trigger AI analysis as soon as the file is read
+      runAiAnalysis(result, f.type);
+    };
     reader.readAsDataURL(f);
   }, []);
 
@@ -90,8 +194,13 @@ export default function DocumentUpload({ onSuccess, onClose }) {
     maxSize: 20 * 1024 * 1024, // 20MB
   });
 
-  const handleChange = (field) => (e) =>
+  const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
+    // Once the user edits a field manually, stop treating it as "AI filled" for styling purposes
+    if (aiFilledFields[field]) {
+      setAiFilledFields((prev) => ({ ...prev, [field]: false }));
+    }
+  };
 
   const handleSubmit = async () => {
     if (!fileBase64) return setError("Please select a file to upload.");
@@ -200,7 +309,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           textAlign: "center",
           cursor: "pointer",
           background: isDragActive ? "#EFF6FF" : file ? "#F0FDF4" : "#F8FAFC",
-          marginBottom: "20px",
+          marginBottom: "12px",
           transition: "all 0.2s",
         }}
       >
@@ -216,18 +325,93 @@ export default function DocumentUpload({ onSuccess, onClose }) {
               : "Drag and drop PDF, JPG, PNG, or TIFF — or click to browse"}
         </p>
         <p style={{ fontSize: "11px", color: "#94A3B8", margin: "4px 0 0" }}>
-          Max 20MB
+          Max 20MB · AI will auto-detect document details
         </p>
       </div>
+
+      {/* ✅ NEW — AI analysis status banner */}
+      {isAnalyzing && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            background: "#EFF6FF",
+            border: "1px solid #BFDBFE",
+            borderRadius: "8px",
+            padding: "10px 14px",
+            marginBottom: "16px",
+            fontSize: "13px",
+            color: "#1D4ED8",
+          }}
+        >
+          <span style={{ animation: "spin 1s linear infinite" }}>✨</span>
+          Reading document with AI — auto-filling fields...
+        </div>
+      )}
+
+      {!isAnalyzing && aiConfidence && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+            background:
+              aiConfidence === "high"
+                ? "#F0FDF4"
+                : aiConfidence === "medium"
+                  ? "#FFFBEB"
+                  : "#FEF2F2",
+            border: `1px solid ${
+              aiConfidence === "high"
+                ? "#86EFAC"
+                : aiConfidence === "medium"
+                  ? "#FDE68A"
+                  : "#FECACA"
+            }`,
+            borderRadius: "8px",
+            padding: "10px 14px",
+            marginBottom: "16px",
+            fontSize: "13px",
+            color:
+              aiConfidence === "high"
+                ? "#15803D"
+                : aiConfidence === "medium"
+                  ? "#B45309"
+                  : "#B91C1C",
+          }}
+        >
+          ✨ AI filled the fields below ({aiConfidence} confidence) — please
+          review before submitting.
+        </div>
+      )}
+
+      {analyzeError && (
+        <div
+          style={{
+            background: "#FEF2F2",
+            border: "1px solid #FECACA",
+            borderRadius: "8px",
+            padding: "10px 14px",
+            marginBottom: "16px",
+            fontSize: "13px",
+            color: "#B91C1C",
+          }}
+        >
+          ⚠ {analyzeError}
+        </div>
+      )}
 
       {/* Form fields */}
       <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
         <div>
-          <label style={labelStyle}>Document Type *</label>
+          <label style={labelStyle}>
+            Document Type *{aiFilledFields.documentType && aiBadge}
+          </label>
           <select
             value={form.documentType}
             onChange={handleChange("documentType")}
-            style={inputStyle}
+            style={aiFilledFields.documentType ? inputStyleFilled : inputStyle}
           >
             <option value="">Select type...</option>
             {DOCUMENT_TYPES.map((t) => (
@@ -239,12 +423,14 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         </div>
 
         <div>
-          <label style={labelStyle}>Title *</label>
+          <label style={labelStyle}>
+            Title *{aiFilledFields.title && aiBadge}
+          </label>
           <input
             value={form.title}
             onChange={handleChange("title")}
             placeholder="e.g. Birth Certificate – Abebe Kebede"
-            style={inputStyle}
+            style={aiFilledFields.title ? inputStyleFilled : inputStyle}
           />
         </div>
 
@@ -256,21 +442,29 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           }}
         >
           <div>
-            <label style={labelStyle}>Citizen Name (English)</label>
+            <label style={labelStyle}>
+              Citizen Name (English){aiFilledFields.citizenName && aiBadge}
+            </label>
             <input
               value={form.citizenName}
               onChange={handleChange("citizenName")}
               placeholder="Full name"
-              style={inputStyle}
+              style={aiFilledFields.citizenName ? inputStyleFilled : inputStyle}
             />
           </div>
           <div>
-            <label style={labelStyle}>ስም (አማርኛ)</label>
+            <label style={labelStyle}>
+              ስም (አማርኛ){aiFilledFields.citizenNameAmharic && aiBadge}
+            </label>
             <input
               value={form.citizenNameAmharic}
               onChange={handleChange("citizenNameAmharic")}
               placeholder="ሙሉ ስም"
-              style={inputStyle}
+              style={
+                aiFilledFields.citizenNameAmharic
+                  ? inputStyleFilled
+                  : inputStyle
+              }
             />
           </div>
         </div>
@@ -283,53 +477,68 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           }}
         >
           <div>
-            <label style={labelStyle}>Issue Date</label>
+            <label style={labelStyle}>
+              Issue Date{aiFilledFields.issueDate && aiBadge}
+            </label>
             <input
               type="date"
               value={form.issueDate}
               onChange={handleChange("issueDate")}
-              style={inputStyle}
+              style={aiFilledFields.issueDate ? inputStyleFilled : inputStyle}
             />
           </div>
           <div>
-            <label style={labelStyle}>Issuing Officer</label>
+            <label style={labelStyle}>
+              Issuing Officer{aiFilledFields.issuingOfficer && aiBadge}
+            </label>
             <input
               value={form.issuingOfficer}
               onChange={handleChange("issuingOfficer")}
               placeholder="Officer name"
-              style={inputStyle}
+              style={
+                aiFilledFields.issuingOfficer ? inputStyleFilled : inputStyle
+              }
             />
           </div>
         </div>
 
         <div>
-          <label style={labelStyle}>National ID (optional)</label>
+          <label style={labelStyle}>
+            National ID (optional){aiFilledFields.nationalId && aiBadge}
+          </label>
           <input
             value={form.nationalId}
             onChange={handleChange("nationalId")}
             placeholder="Citizen ID number"
-            style={inputStyle}
+            style={aiFilledFields.nationalId ? inputStyleFilled : inputStyle}
           />
         </div>
 
         <div>
-          <label style={labelStyle}>Tags (comma-separated)</label>
+          <label style={labelStyle}>
+            Tags (comma-separated){aiFilledFields.tags && aiBadge}
+          </label>
           <input
             value={form.tags}
             onChange={handleChange("tags")}
             placeholder="e.g. 2016, Arada, urgent"
-            style={inputStyle}
+            style={aiFilledFields.tags ? inputStyleFilled : inputStyle}
           />
         </div>
 
         <div>
-          <label style={labelStyle}>Notes</label>
+          <label style={labelStyle}>
+            Notes{aiFilledFields.notes && aiBadge}
+          </label>
           <textarea
             value={form.notes}
             onChange={handleChange("notes")}
             placeholder="Internal notes..."
             rows={2}
-            style={{ ...inputStyle, resize: "vertical" }}
+            style={{
+              ...(aiFilledFields.notes ? inputStyleFilled : inputStyle),
+              resize: "vertical",
+            }}
           />
         </div>
 
@@ -374,22 +583,33 @@ export default function DocumentUpload({ onSuccess, onClose }) {
 
         <button
           onClick={handleSubmit}
-          disabled={isUploading}
+          disabled={isUploading || isAnalyzing}
           style={{
-            background: isUploading ? "#93C5FD" : "#2563EB",
+            background: isUploading || isAnalyzing ? "#93C5FD" : "#2563EB",
             color: "#fff",
             border: "none",
             borderRadius: "10px",
             padding: "12px",
             fontSize: "14px",
             fontWeight: 600,
-            cursor: isUploading ? "default" : "pointer",
+            cursor: isUploading || isAnalyzing ? "default" : "pointer",
             marginTop: "4px",
           }}
         >
-          {isUploading ? "Uploading… Please wait" : "📤 Upload Document"}
+          {isUploading
+            ? "Uploading… Please wait"
+            : isAnalyzing
+              ? "Waiting for AI analysis…"
+              : "📤 Upload Document"}
         </button>
       </div>
+
+      <style>{`
+        @keyframes spin {
+          0%   { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

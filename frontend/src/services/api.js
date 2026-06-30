@@ -136,6 +136,8 @@ export const chatbotAPI = {
 // ✅ NEW: CRRSA Document Vault API
 export const documentAPI = {
   upload: (data) => api.post("/documents/upload", data),
+  analyze: (file, mimeType) =>
+    api.post("/documents/analyze", { file, mimeType }),
   getAll: (params) => api.get("/documents", { params }),
   getById: (id) => api.get(`/documents/${id}`),
   update: (id, updates) => api.put(`/documents/${id}`, updates),
