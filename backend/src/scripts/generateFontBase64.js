@@ -54,7 +54,7 @@ export const FONT_BASE64 = ${JSON.stringify(base64Data, null, 2)};
 
   const outputPath = path.join(
     __dirname,
-    "../../frontend/src/utils/pdf/fonts/fontBase64.js",
+    "../../../frontend/src/utils/pdf/fonts/fontBase64.js",
   );
 
   // Ensure directory exists
