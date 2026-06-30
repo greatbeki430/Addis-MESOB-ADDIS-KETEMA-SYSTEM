@@ -1,6 +1,7 @@
 // src/App.jsx
 import { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { initPDFFonts } from "./utils/pdf/fontPreloader";
 import { C, F } from "./styles/theme";
 import Sidebar from "./components/layout/Sidebar";
 import Header from "./components/layout/Header";
@@ -22,6 +23,10 @@ import { useToast } from "./hooks/useToast";
 import { LanguageProvider } from "./context/LanguageProvider";
 import { useLanguage } from "./hooks/useLanguage";
 import AdminServiceManager from "./pages/admin/AdminServiceManager";
+
+// AI Feature imports
+import ChatbotWidget from "./components/chatbot/ChatbotWidget";
+import DocumentVault from "./pages/documents/DocumentVault";
 
 // =============================================
 // ANIMATED A-MESOB TITLE COMPONENT
@@ -130,7 +135,6 @@ export const AnimatedTitle = ({ t, collapsed }) => {
 function AuthenticatedApp() {
   const { language, t, changeLanguage } = useLanguage();
   const { showToast, toasts, removeToast } = useToast();
-  // ✅ Removed unused navigate
   const location = useLocation();
   const {
     user,
@@ -142,11 +146,33 @@ function AuthenticatedApp() {
     isLeaderOrAbove,
   } = useAuth();
 
-  // ✅ Get current tab from URL path
   const currentTab = location.pathname.replace("/", "") || "dashboard";
   const [collapsed, setCollapsed] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [showRegister, setShowRegister] = useState(false);
+  const [pdfReady, setPdfReady] = useState(false);
+
+  // ✅ Initialize PDF fonts when app loads
+  useEffect(() => {
+    const initializePDF = async () => {
+      try {
+        console.log("📄 Initializing PDF system...");
+        const success = await initPDFFonts();
+        if (success) {
+          console.log("✅ PDF system ready with full font support");
+          setPdfReady(true);
+        } else {
+          console.warn("⚠️ PDF system running with fallback fonts");
+          setPdfReady(true); // Still allow PDF generation with fallbacks
+        }
+      } catch (error) {
+        console.error("❌ PDF initialization failed:", error);
+        setPdfReady(true); // Allow PDF generation even if fonts fail
+      }
+    };
+
+    initializePDF();
+  }, []);
 
   useEffect(() => {
     setToastFunction(showToast);
@@ -177,7 +203,6 @@ function AuthenticatedApp() {
     return "User";
   };
 
-  // ✅ Check if translations are ready
   if (!t || typeof t !== "function") {
     return (
       <div
@@ -267,6 +292,26 @@ function AuthenticatedApp() {
           header       { gap: 6px !important; }
           header > div { gap: 6px !important; }
         }
+
+        /* PDF Status Indicator */
+        .pdf-status {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          font-size: 10px;
+          padding: 2px 8px;
+          border-radius: 12px;
+          background: ${pdfReady ? "#e8f5e9" : "#fff3e0"};
+          color: ${pdfReady ? "#2e7d32" : "#e65100"};
+          margin-left: 8px;
+        }
+        .pdf-status-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: ${pdfReady ? "#4caf50" : "#ff9800"};
+          animation: ${pdfReady ? "pulseGlow 2s ease-in-out infinite" : "none"};
+        }
       `}</style>
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -308,16 +353,16 @@ function AuthenticatedApp() {
         >
           <div className="page-enter">
             <Routes>
-              {/* ✅ Redirect root to dashboard */}
+              {/* Redirect root to dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
-              {/* ✅ Dashboard */}
+              {/* Dashboard */}
               <Route
                 path="/dashboard"
                 element={<Dashboard t={t} lang={language} />}
               />
 
-              {/* ✅ Forum Report */}
+              {/* Forum Report */}
               <Route
                 path="/forum"
                 element={
@@ -332,13 +377,13 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* ✅ Evaluation */}
+              {/* Evaluation */}
               <Route
                 path="/evaluation"
                 element={<Evaluation t={t} lang={language} />}
               />
 
-              {/* ✅ Daily Report - Only Team Leaders and above */}
+              {/* Daily Report - Only Team Leaders and above */}
               <Route
                 path="/report"
                 element={
@@ -350,7 +395,7 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* ✅ Services - Only Admins and Super Admins */}
+              {/* Services - Only Admins and Super Admins */}
               <Route
                 path="/services"
                 element={
@@ -362,7 +407,7 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* ✅ Admin Service Manager - Only Super Admins */}
+              {/* Admin Service Manager - Only Super Admins */}
               <Route
                 path="/admin/services"
                 element={
@@ -374,7 +419,7 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* ✅ User Management - Only Admins and Super Admins */}
+              {/* User Management - Only Admins and Super Admins */}
               <Route
                 path="/users"
                 element={
@@ -391,7 +436,7 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* ✅ Team Management - Only Super Admins */}
+              {/* Team Management - Only Super Admins */}
               <Route
                 path="/teams"
                 element={
@@ -407,7 +452,7 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* ✅ Analytics - Only Team Leaders and above */}
+              {/* Analytics - Only Team Leaders and above */}
               <Route
                 path="/analytics"
                 element={
@@ -419,14 +464,17 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* ✅ Catch all - redirect to dashboard */}
+              {/* CRRSA Document Vault - All authenticated users */}
+              <Route path="/documents" element={<DocumentVault />} />
+
+              {/* Catch all - redirect to dashboard */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>
         </main>
       </div>
 
-      {/* Floating User Badge */}
+      {/* Floating User Badge with PDF Status */}
       <div
         style={{
           position: "fixed",
@@ -468,6 +516,18 @@ function AuthenticatedApp() {
           <div style={{ color: C.muted, fontSize: 10 }}>
             {getRoleDisplay()} • {getUserRoleName()}
           </div>
+        </div>
+        {/* PDF Status Indicator */}
+        <div
+          className="pdf-status"
+          title={
+            pdfReady
+              ? "PDF system ready with fonts"
+              : "PDF system running with fallback fonts"
+          }
+        >
+          <span className="pdf-status-dot"></span>
+          {pdfReady ? "PDF Ready" : "PDF (Fallback)"}
         </div>
       </div>
 
@@ -527,6 +587,9 @@ function AuthenticatedApp() {
           +
         </button>
       )}
+
+      {/* AI Chatbot Widget — floats globally for all authenticated users */}
+      <ChatbotWidget />
     </div>
   );
 }

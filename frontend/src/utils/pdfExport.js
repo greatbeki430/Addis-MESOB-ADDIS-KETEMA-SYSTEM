@@ -34,7 +34,8 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     const hasData =
       formData?.present?.some((m) => m && m.trim() !== "") ||
       formData?.absent?.some((item) => item?.name && item.name.trim() !== "") ||
-      formData?.topics?.some((t) => t && t.trim() !== "");
+      // formData?.topics?.some((t) => t && t.trim() !== "");
+      formData?.topics?.some((topic) => topic && topic.trim() !== "");
 
     if (!hasData) {
       showErrorToast(

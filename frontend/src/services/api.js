@@ -116,4 +116,34 @@ export const reportAPI = {
   delete: (id) => api.delete(`/reports/${id}`),
 };
 
+// ✅ NEW: AI Intelligence API
+export const aiAPI = {
+  getDailyInsight: (reportId, reportData) =>
+    api.post("/ai/daily-insight", { reportId, reportData }),
+  getEvaluationSummary: (evaluationId, evaluationData) =>
+    api.post("/ai/evaluation-summary", { evaluationId, evaluationData }),
+  getDashboardDigest: (stats) => api.post("/ai/dashboard-digest", { stats }),
+  getMeetingMinutes: (data) => api.post("/ai/meeting-minutes", data),
+};
+
+// ✅ NEW: Chatbot API
+export const chatbotAPI = {
+  sendMessage: (message) => api.post("/chatbot/message", { message }),
+  getHistory: () => api.get("/chatbot/history"),
+  clearSession: () => api.delete("/chatbot/clear"),
+};
+
+// ✅ NEW: CRRSA Document Vault API
+export const documentAPI = {
+  upload: (data) => api.post("/documents/upload", data),
+  getAll: (params) => api.get("/documents", { params }),
+  getById: (id) => api.get(`/documents/${id}`),
+  update: (id, updates) => api.put(`/documents/${id}`, updates),
+  addVersion: (id, file, changeNote) =>
+    api.post(`/documents/${id}/version`, { file, changeNote }),
+  getDownloadUrl: (id) => api.get(`/documents/${id}/download`),
+  flagDelete: (id, reason) =>
+    api.delete(`/documents/${id}/flag`, { data: { reason } }),
+};
+
 export default api;

@@ -1,11 +1,10 @@
-// backend/src/server.js
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const connectDB = require("./config/db");
-const { corsOptions } = require("./middleware/cors"); // ✅ Import from middleware
+const { corsOptions } = require("./middleware/cors");
 
 const authRoutes = require("./routes/authRoutes");
 const teamRoutes = require("./routes/teamRoutes");
@@ -15,6 +14,11 @@ const dailyReportRoutes = require("./routes/dailyReportRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 const userRoutes = require("./routes/userRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+
+// ✅ NEW: AI Features
+const aiRoutes = require("./routes/aiRoutes");
+const chatbotRoutes = require("./routes/chatbotRoutes");
+const documentRoutes = require("./routes/documentRoutes");
 
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
@@ -41,6 +45,7 @@ app.use(
           "'self'",
           "https://akmesob.vercel.app",
           "http://localhost:5173",
+          "https://api.anthropic.com", // ✅ NEW: Allow Anthropic API
         ],
         imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
         scriptSrc: ["'self'"],
@@ -54,12 +59,12 @@ app.use(
 // =============================================
 // ✅ MIDDLEWARE
 // =============================================
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+app.use(express.json({ limit: "25mb" })); // ✅ Increased for document uploads (base64)
+app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 app.use(morgan("dev"));
 
 // =============================================
-// ✅ ROUTES
+// ✅ ROUTES — Existing
 // =============================================
 app.use("/api/auth", authRoutes);
 app.use("/api/teams", teamRoutes);
@@ -69,6 +74,13 @@ app.use("/api/daily-reports", dailyReportRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/auth/users", userRoutes);
 app.use("/api/reports", reportRoutes);
+
+// =============================================
+// ✅ ROUTES — NEW: AI Features
+// =============================================
+app.use("/api/ai", aiRoutes);
+app.use("/api/chatbot", chatbotRoutes);
+app.use("/api/documents", documentRoutes);
 
 // =============================================
 // ✅ HEALTH CHECK
@@ -91,6 +103,9 @@ app.get("/", (req, res) => {
       teams: "/api/teams",
       services: "/api/services",
       reports: "/api/reports",
+      ai: "/api/ai", // ✅ NEW
+      chatbot: "/api/chatbot", // ✅ NEW
+      documents: "/api/documents", // ✅ NEW
     },
   });
 });
@@ -114,6 +129,7 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(`🤖 AI routes: /api/ai, /api/chatbot, /api/documents`); // ✅ NEW
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);

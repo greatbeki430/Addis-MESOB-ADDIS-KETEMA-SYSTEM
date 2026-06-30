@@ -364,6 +364,20 @@ export default function Sidebar({
   };
 
   // ✅ Nav item icon mapping
+  // const getNavIcon = (id) => {
+  //   const icons = {
+  //     dashboard: <FiHome size={20} />,
+  //     forum: <FiMessageSquare size={20} />,
+  //     evaluation: <FiStar size={20} />,
+  //     report: <FiFileText size={20} />,
+  //     services: <FiGrid size={20} />,
+  //     "admin/services": <FiSettings size={20} />,
+  //     users: <FiUsersIcon size={20} />,
+  //     teams: <FiUsers size={20} />,
+  //     analytics: <FiBarChart2 size={20} />,
+  //   };
+  //   return icons[id] || <FiMenu size={20} />;
+  // };
   const getNavIcon = (id) => {
     const icons = {
       dashboard: <FiHome size={20} />,
@@ -375,6 +389,7 @@ export default function Sidebar({
       users: <FiUsersIcon size={20} />,
       teams: <FiUsers size={20} />,
       analytics: <FiBarChart2 size={20} />,
+      documents: <FiFileText size={20} />,
     };
     return icons[id] || <FiMenu size={20} />;
   };

@@ -15,6 +15,7 @@
     "hugeicons-react": "^0.4.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
+    "jspdf-font": "^1.0.7",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-dropzone": "^15.0.0",

@@ -16,6 +16,7 @@ export const translations = {
       users: "User Management",
       teams: "Team Management",
       "admin/services": "Service Manager",
+      documents: "Document Vault",
     },
     sidebar: {
       main: "Main Menu",
@@ -240,6 +241,7 @@ export const translations = {
       users: "ተጠቃሚዎች",
       teams: "ቡድኖች",
       "admin/services": "የአገልግሎት አስተዳዳሪ",
+      documents: "ሰነድ ቋት",
     },
     sidebar: {
       main: "ዋና ምናሌ",
@@ -462,6 +464,7 @@ export const translations = {
       users: "Bulchiinsa Fayyadamtootaa",
       teams: "Bulchiinsa Garee",
       "admin/services": "Bulchiinsa Tajaajilaa",
+      documents: "Kuusaa Dookumentiiwwani",
     },
     sidebar: {
       main: "Mana Galmee",

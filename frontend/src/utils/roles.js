@@ -108,6 +108,12 @@ export const NAV_ITEMS = [
     label: "Analytics",
     roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
+  {
+    id: "documents",
+    icon: "📁",
+    label: "Document Vault",
+    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
 ];
 
 export const getFilteredNavItems = (userRole) => {

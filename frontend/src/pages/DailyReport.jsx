@@ -3,9 +3,9 @@ import { useState, useEffect, useRef } from "react";
 import { btn, card, C, F } from "../styles/theme";
 import Field from "../components/ui/Field";
 import { dailyReportAPI, serviceAPI } from "../services/api";
-import { exportDailyReportToPDF } from "../utils/pdfExport";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
+import { generateDailyReportPDF } from "../utils/pdf/reports/dailyReport";
 import {
   FiCalendar,
   FiList,
@@ -133,16 +133,6 @@ export default function DailyReport({ t, lang }) {
     }
   }, [rows]);
 
-  // const upd = (i, f, v) => {
-  //   const u = [...rows];
-  //   u[i] = { ...u[i], [f]: v };
-  //   if (f === "male" || f === "female") {
-  //     u[i].total =
-  //       (Number(f === "male" ? v : u[i].male) || 0) +
-  //       (Number(f === "female" ? v : u[i].female) || 0);
-  //   }
-  //   setRows(u);
-  // };
   const upd = (index, field, value) => {
     setRows((prevRows) => {
       const next = [...prevRows];
@@ -162,12 +152,6 @@ export default function DailyReport({ t, lang }) {
     });
   };
 
-  // const addRow = () =>
-  //   setRows([...rows, { dept: "", service: "", male: 0, female: 0, total: 0 }]);
-
-  // const removeRow = (index) => {
-  //   if (rows.length > 1) setRows(rows.filter((_, i) => i !== index));
-  // };
   const addRow = () =>
     setRows((prev) => [
       ...prev,
@@ -184,8 +168,7 @@ export default function DailyReport({ t, lang }) {
     setRows((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ✅ FIX: Filter services by the raw dept key (s.dept), which is what
-  // the dropdown stores as option.value. This now always matches correctly.
+  // Filter services by the raw dept key
   const getServicesByDept = (deptKey) => {
     if (!deptKey) return [];
     return allServices.filter((s) => s.dept === deptKey);
@@ -229,16 +212,21 @@ export default function DailyReport({ t, lang }) {
   const exportPDF = async () => {
     try {
       setExporting(true);
+
+      // Get valid rows
       const exportData = rows.filter((r) => r.dept || r.service);
+
       if (exportData.length === 0) {
         showToast("No data to export", "warning");
         return;
       }
-      await exportDailyReportToPDF(exportData, date, t);
+
+      // Generate PDF using the new system
+      await generateDailyReportPDF(exportData, date, t);
       showToast("✅ PDF exported successfully!", "success");
     } catch (error) {
       console.error("Failed to export PDF:", error);
-      showToast("Failed to export PDF", "error");
+      showToast("Failed to export PDF: " + error.message, "error");
     } finally {
       setExporting(false);
     }
@@ -273,7 +261,6 @@ export default function DailyReport({ t, lang }) {
     fontSize: "clamp(11px, 3vw, 13px)",
     transition: "border-color 0.3s ease, box-shadow 0.3s ease",
   };
-  // ─────────────────────────────────────────────────────────────────────────────
 
   return (
     <div
@@ -476,9 +463,6 @@ export default function DailyReport({ t, lang }) {
                 </thead>
                 <tbody>
                   {rows.map((r, i) => {
-                    // ✅ FIX: r.dept is the raw DB key (e.g. "ምዝገባ").
-                    // getServicesByDept filters allServices by s.dept === deptKey,
-                    // so this always returns the correct services for the row.
                     const availableServices = getServicesByDept(r.dept);
                     return (
                       <tr
@@ -501,7 +485,7 @@ export default function DailyReport({ t, lang }) {
                           {i + 1}
                         </td>
 
-                        {/* ── Department dropdown ──────────────────────────── */}
+                        {/* Department dropdown */}
                         <td style={tdCell}>
                           <select
                             style={{
@@ -538,7 +522,7 @@ export default function DailyReport({ t, lang }) {
                           </select>
                         </td>
 
-                        {/* ── Service dropdown ─────────────────────────────── */}
+                        {/* Service dropdown */}
                         <td style={tdCell}>
                           <select
                             style={{
@@ -557,7 +541,6 @@ export default function DailyReport({ t, lang }) {
                             {availableServices.length > 0 ? (
                               availableServices.map((s) => (
                                 <option key={s._id} value={s.name}>
-                                  {/* Show localized name; fallback to raw name */}
                                   {lang === "en" ? s.nameEn || s.name : s.name}
                                 </option>
                               ))
