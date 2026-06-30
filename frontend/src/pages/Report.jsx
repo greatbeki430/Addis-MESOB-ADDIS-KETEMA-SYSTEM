@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { btn, card, C, F, inp } from "../styles/theme";
 import { meetingAPI, dailyReportAPI, reportAPI } from "../services/api";
+import { aiAPI } from "../services/api"; // ✅ NEW
+import AISummary from "../components/ai/AISummary"; // ✅ NEW
 import { useAuth } from "../hooks/useAuth";
 
 // ✅ Import export utilities
@@ -1444,6 +1446,24 @@ export default function Report({ t }) {
             </table>
           </div>
         </div>
+      )}
+
+      {/* ✅ NEW — AI Report Digest, generated from this report's summary stats */}
+      {reportData && (
+        <AISummary
+          fetchFn={() =>
+            aiAPI.getDashboardDigest({
+              totalUsers: reportData.summary?.total || 0,
+              activeTeams: teams.length || 0,
+              totalServicesLogged: reportData.summary?.total || 0,
+              evaluationsCompleted: reportData.summary?.completed || 0,
+              topDepartment: getTeamDisplayName() || "All Teams",
+              period: period,
+            })
+          }
+          args={[]}
+          label="AI Report Digest"
+        />
       )}
 
       {/* Empty State */}

@@ -4,6 +4,8 @@ import StatCard from "../components/ui/StatCard";
 import { CRITERIA } from "../constants/criteria";
 import { useAuth } from "../hooks/useAuth";
 import { dailyReportAPI } from "../services/api";
+import { aiAPI } from "../services/api"; // ✅ NEW
+import AISummary from "../components/ai/AISummary"; // ✅ NEW
 
 export default function Dashboard({ t }) {
   // ✅ t is a FUNCTION — call it with dot-path strings
@@ -232,6 +234,24 @@ export default function Dashboard({ t }) {
           </span>
         </div>
       </div>
+
+      {/* ✅ NEW — AI Weekly Digest, generated from current dashboard stats */}
+      {!loading && (
+        <AISummary
+          fetchFn={() =>
+            aiAPI.getDashboardDigest({
+              totalUsers: 1,
+              activeTeams: stats.departments.length,
+              totalServicesLogged: stats.total,
+              evaluationsCompleted: 0,
+              topDepartment: stats.departments[0]?.name || "N/A",
+              period: "this week",
+            })
+          }
+          args={[]}
+          label="AI Weekly Digest"
+        />
+      )}
 
       {/* Stat Cards */}
       <div

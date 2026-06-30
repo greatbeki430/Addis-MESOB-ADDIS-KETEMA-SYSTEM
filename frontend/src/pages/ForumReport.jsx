@@ -4,6 +4,8 @@ import Field from "../components/ui/Field";
 import Section from "../components/ui/Section";
 import { exportForumReportToPDF } from "../utils/pdfExport";
 import { meetingAPI } from "../services/api";
+import { aiAPI } from "../services/api"; // ✅ NEW
+import AISummary from "../components/ai/AISummary"; // ✅ NEW
 import {
   FiPlus,
   FiX,
@@ -441,6 +443,28 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             <FiPlus size={16} style={{ marginRight: 6 }} />
             {tf.newReport || "New Report"}
           </button>
+
+          {/* ✅ NEW — AI Meeting Minutes, generated from the just-submitted form data */}
+          <div style={{ marginTop: 24, textAlign: "left" }}>
+            <AISummary
+              fetchFn={() =>
+                aiAPI.getMeetingMinutes({
+                  title: `${tf.title || "Peer Forum Report"} - ${selectedTeam?.name || ""}`,
+                  date: form.date,
+                  attendees: form.present.filter((p) => p.trim() !== ""),
+                  agenda: STANDING_AGENDAS_AM.join("; "),
+                  notes: [
+                    `Topics: ${form.topics.filter((x) => x.trim()).join("; ")}`,
+                    `Explanation: ${form.explanation}`,
+                    `Gaps: ${form.gaps.filter((x) => x.trim()).join("; ")}`,
+                    `Agreements: ${form.agreements.filter((x) => x.trim()).join("; ")}`,
+                  ].join("\n"),
+                })
+              }
+              args={[]}
+              label="AI Meeting Minutes"
+            />
+          </div>
         </div>
       </div>
     );

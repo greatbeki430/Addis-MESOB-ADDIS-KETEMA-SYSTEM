@@ -7,6 +7,8 @@ import { CRITERIA } from "../constants/criteria";
 import { exportEvaluationReportToPDF } from "../utils/pdfExport";
 import { useAuth } from "../hooks/useAuth";
 import { evaluationAPI } from "../services/api";
+import { aiAPI } from "../services/api"; // ✅ NEW
+import AISummary from "../components/ai/AISummary"; // ✅ NEW
 import { useToast } from "../hooks/useToast";
 import {
   FiChevronDown,
@@ -1542,6 +1544,15 @@ export default function Evaluation({ t, lang }) {
           {te.reset || "Reset"}
         </button>
       </div>
+
+      {/* ✅ NEW — AI Evaluation Narrative, only shows once evaluation has been saved */}
+      {evaluationId && (
+        <AISummary
+          fetchFn={(id) => aiAPI.getEvaluationSummary(id, null)}
+          args={[evaluationId]}
+          label="AI Evaluation Narrative"
+        />
+      )}
 
       <style>{`
         @keyframes spin {
