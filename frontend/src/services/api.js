@@ -139,6 +139,15 @@ export const aiAPI = {
     api.post("/ai/evaluation-summary", { evaluationId, evaluationData }),
   getDashboardDigest: (stats) => api.post("/ai/dashboard-digest", { stats }),
   getMeetingMinutes: (data) => api.post("/ai/meeting-minutes", data),
+  // ✅ NEW
+  getServiceRecommendations: (query) =>
+    api.post("/ai/service-recommendations", { query }),
+  getPerformanceTrend: (data) => api.post("/ai/performance-trend", data),
+  categorizeComplaint: (complaint) =>
+    api.post("/ai/categorize-complaint", { complaint }),
+  translate: (text, targetLanguage) =>
+    api.post("/ai/translate", { text, targetLanguage }),
+  generateReportTitle: (data) => api.post("/ai/generate-title", data),
 };
 
 // Chatbot API

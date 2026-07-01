@@ -763,8 +763,18 @@ export default function Sidebar({
                 gap: 4,
               }}
             >
-              {l.flag}
-              {!collapsed && l.code.toUpperCase()}
+              <span>{l.flag}</span>
+              {!collapsed && (
+                <span style={{ fontSize: 10, letterSpacing: "0.5px" }}>
+                  {l.label === "English"
+                    ? "EN"
+                    : l.label === "አማርኛ"
+                      ? "አማ"
+                      : l.label === "Afaan Oromo"
+                        ? "OR"
+                        : l.code.toUpperCase()}
+                </span>
+              )}
             </button>
           ))}
         </div>
