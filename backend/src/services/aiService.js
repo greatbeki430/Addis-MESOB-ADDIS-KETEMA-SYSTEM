@@ -24,8 +24,8 @@ try {
   console.error("❌ Failed to initialize Gemini AI client:", error.message);
 }
 
-// ✅ Use a model with better free tier quotas
-const MODEL = "gemini-2.0-flash-exp"; // Better free tier limits than gemini-2.5-flash
+// ✅ Use a valid Gemini model - gemini-1.5-flash is widely available
+const MODEL = "gemini-1.5-flash"; // Available and supported for generateContent
 
 // ============================================================
 // SYSTEM CONTEXT — tells Gemini what this system is
@@ -83,6 +83,8 @@ const generateText = async (prompt, systemInstruction = SYSTEM_CONTEXT) => {
         "Invalid or missing Gemini API key. Please check your configuration.";
     } else if (error.status === 429) {
       apiError.message = "Gemini API quota exceeded. Please try again later.";
+    } else if (error.status === 404) {
+      apiError.message = `Model "${MODEL}" not found. Please check the model name.`;
     } else if (error.status === 500) {
       apiError.message = "Gemini API service error. Please try again later.";
     }
@@ -225,14 +227,14 @@ const handleChatMessage = async (
   // ✅ Check if client is initialized
   if (!clientInitialized || !client) {
     console.error("❌ Gemini client not available. Check GEMINI_API_KEY.");
-    return "AI service is currently unavailable. Please contact your system administrator.";
+    return "I'm currently unable to connect to the AI service. Please try again later or contact your system administrator.";
   }
 
   const chatSystemPrompt = `${SYSTEM_CONTEXT}
 
 You are the user-facing chatbot for this system. The current user is:
-Name: ${userContext.name}
-Role: ${userContext.role}
+Name: ${userContext.name || "User"}
+Role: ${userContext.role || "Employee"}
 Team: ${userContext.team || "No team assigned"}
 
 You can help with:
@@ -246,6 +248,10 @@ If asked about live data (e.g., "what are my scores?"), say you don't have real-
 Keep responses under 150 words. Be friendly and professional.`;
 
   try {
+    console.log(
+      `🤖 Chatbot: Processing message from ${userContext.name}: "${userMessage.substring(0, 50)}..."`,
+    );
+
     // Build Gemini chat history — Gemini uses "model" instead of "assistant"
     const history = conversationHistory.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
@@ -259,9 +265,43 @@ Keep responses under 150 words. Be friendly and professional.`;
     });
 
     const response = await chat.sendMessage({ message: userMessage });
-    return response.text;
+    const reply = response.text;
+
+    console.log(`✅ Chatbot: Response sent (${reply.length} chars)`);
+    return reply;
   } catch (error) {
-    console.error("❌ Chatbot error:", error);
+    console.error("❌ Chatbot error:", {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      details: error.details || "No additional details",
+    });
+
+    // ✅ Check for specific error types and return appropriate messages
+    if (
+      error.message?.includes("API key") ||
+      error.message?.includes("invalid")
+    ) {
+      return "I'm having trouble connecting to the AI service. Please contact your system administrator.";
+    }
+
+    if (
+      error.status === 429 ||
+      error.message?.includes("quota") ||
+      error.message?.includes("rate limit")
+    ) {
+      return "The AI service is currently busy due to high demand. Please try again in a few minutes. If you need immediate help, please contact your team leader.";
+    }
+
+    if (error.status === 404) {
+      return `The AI service is currently unavailable. Please contact your system administrator. (Model configuration issue)`;
+    }
+
+    if (error.status === 500) {
+      return "The AI service is temporarily unavailable. Please try again later or contact support if the issue persists.";
+    }
+
+    // Generic fallback
     return "I'm having trouble processing your request. Please try again later or contact support if the issue persists.";
   }
 };
