@@ -10,40 +10,25 @@ const { GoogleGenAI } = require("@google/genai");
 // ============================================================
 const RAW_KEY = (process.env.GEMINI_API_KEY || "").trim();
 
-// Gemini keys from AI Studio always start with "AIza".
-// Keys starting with "AQ." are OAuth access tokens — they look like API keys
-// but are rejected with 401 by every Gemini endpoint. If you see this warning
-// on startup, go to https://aistudio.google.com/app/apikey, create a fresh
-// API key (it will start with "AIza"), and update GEMINI_API_KEY in Railway.
-const looksValid = /^AIza[0-9A-Za-z_-]{20,}$/.test(RAW_KEY);
+// Google AI Studio now issues "AQ." auth keys by default (since June 2026).
+// Both "AIza" (old standard keys) and "AQ." (new auth keys) are valid —
+// the @google/genai SDK handles both transparently via the native API route.
+// We only check that the key exists, not what it starts with.
 
 let client = null;
 let clientInitialized = false;
 
 if (!RAW_KEY) {
   console.error(
-    "[aiService] ❌ GEMINI_API_KEY is not set. All AI endpoints will return errors.",
+    "[aiService] ❌ GEMINI_API_KEY is not set. All AI endpoints will return errors. " +
+      "Get a key at https://aistudio.google.com/app/apikey and add it to Railway Variables.",
   );
-} else if (!looksValid) {
-  console.warn(
-    `[aiService] ⚠️  GEMINI_API_KEY does not look like a valid Gemini API key.\n` +
-      `  Current key prefix: "${RAW_KEY.slice(0, 6)}..."\n` +
-      `  Valid Gemini keys start with "AIza". Keys starting with "AQ." are OAuth tokens, not API keys.\n` +
-      `  Fix: go to https://aistudio.google.com/app/apikey → Create API key → copy the AIza... value → update Railway Variables.`,
-  );
-  // Still try to initialize — in case Google changes their key format in future
-  try {
-    client = new GoogleGenAI({ apiKey: RAW_KEY });
-    clientInitialized = true;
-  } catch (e) {
-    console.error("[aiService] ❌ Client init failed:", e.message);
-  }
 } else {
   try {
     client = new GoogleGenAI({ apiKey: RAW_KEY });
     clientInitialized = true;
     console.log(
-      "[aiService] ✅ Gemini AI client initialized (key looks valid).",
+      `[aiService] ✅ Gemini AI client initialized (key prefix: ${RAW_KEY.slice(0, 6)}...).`,
     );
   } catch (e) {
     console.error("[aiService] ❌ Client init failed:", e.message);
@@ -71,12 +56,14 @@ const normalizeAIError = (err) => {
   if (
     status === 401 ||
     status === 403 ||
-    /API_KEY_INVALID|unauthe|invalid.*key|api.?key.*invalid/i.test(raw)
+    /API_KEY_INVALID|ACCESS_TOKEN_TYPE_UNSUPPORTED|unauthe|invalid.*key|api.?key.*invalid/i.test(
+      raw,
+    )
   ) {
     code = "AI_AUTH_ERROR";
     message =
       "Gemini API rejected the request: authentication failed. " +
-      "The GEMINI_API_KEY in Railway is likely an OAuth token (starts with AQ.) instead of a real API key (starts with AIza). " +
+      "Your GEMINI_API_KEY may be invalid or expired. " +
       "Go to https://aistudio.google.com/app/apikey, generate a new API key, and update the Railway variable.";
   } else if (
     status === 429 ||
