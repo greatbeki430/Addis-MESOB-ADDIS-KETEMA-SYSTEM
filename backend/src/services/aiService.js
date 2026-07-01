@@ -1,53 +1,102 @@
 // backend/src/services/aiService.js
 // Core AI Service — Addis MESOB Digital Management System
-// SDK: @google/genai (active, not deprecated)
-// Model: gemini-2.5-flash (current free-tier model as of mid-2026)
+// Supports: Gemini (primary) → Groq (fallback 1) → Cohere (fallback 2)
+// SDK: @google/genai, groq-sdk, cohere-ai (v2 chat API)
 
 const { GoogleGenAI } = require("@google/genai");
+const { Groq } = require("groq-sdk");
+const { CohereClientV2 } = require("cohere-ai");
 
 // ============================================================
-// CLIENT INITIALIZATION + KEY VALIDATION
+// PROVIDER CONFIGURATION
 // ============================================================
-const RAW_KEY = (process.env.GEMINI_API_KEY || "").trim();
+const PROVIDERS = {
+  GEMINI: "gemini",
+  GROQ: "groq",
+  COHERE: "cohere",
+};
 
-// Google AI Studio now issues "AQ." auth keys by default (since June 2026).
-// Both "AIza" (old standard keys) and "AQ." (new auth keys) are valid —
-// the @google/genai SDK handles both transparently via the native API route.
-// We only check that the key exists, not what it starts with.
+// ============================================================
+// CLIENT INITIALIZATION
+// ============================================================
 
-let client = null;
-let clientInitialized = false;
+// ─── Gemini ────────────────────────────────────────────────────
+let geminiClient = null;
+let geminiInitialized = false;
+const GEMINI_KEY = (process.env.GEMINI_API_KEY || "").trim();
 
-if (!RAW_KEY) {
-  console.error(
-    "[aiService] ❌ GEMINI_API_KEY is not set. All AI endpoints will return errors. " +
-      "Get a key at https://aistudio.google.com/app/apikey and add it to Railway Variables.",
+if (!GEMINI_KEY) {
+  console.error("[aiService] ❌ GEMINI_API_KEY is not set.");
+} else {
+  try {
+    geminiClient = new GoogleGenAI({ apiKey: GEMINI_KEY });
+    geminiInitialized = true;
+    console.log(
+      `[aiService] ✅ Gemini client initialized (${GEMINI_KEY.slice(0, 6)}...)`,
+    );
+  } catch (e) {
+    console.error("[aiService] ❌ Gemini init failed:", e.message);
+  }
+}
+const GEMINI_MODEL = "gemini-2.0-flash";
+
+// ─── Groq ──────────────────────────────────────────────────────
+let groqClient = null;
+let groqInitialized = false;
+const GROQ_KEY = (process.env.GROQ_API_KEY || "").trim();
+
+if (!GROQ_KEY) {
+  console.warn(
+    "[aiService] ⚠️ GROQ_API_KEY is not set. Groq fallback disabled.",
   );
 } else {
   try {
-    client = new GoogleGenAI({ apiKey: RAW_KEY });
-    clientInitialized = true;
+    groqClient = new Groq({ apiKey: GROQ_KEY });
+    groqInitialized = true;
     console.log(
-      `[aiService] ✅ Gemini AI client initialized (key prefix: ${RAW_KEY.slice(0, 6)}...).`,
+      `[aiService] ✅ Groq client initialized (${GROQ_KEY.slice(0, 6)}...)`,
     );
   } catch (e) {
-    console.error("[aiService] ❌ Client init failed:", e.message);
+    console.error("[aiService] ❌ Groq init failed:", e.message);
   }
 }
+// NOTE: Groq periodically retires model IDs. Verify current model list at
+// https://console.groq.com/docs/models before deploying — if this model 404s,
+// swap it here.
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
-// gemini-2.5-flash is the current recommended free-tier model.
-// gemini-2.0-flash also works but is an older generation.
-// Do NOT use gemini-1.5-flash — it was deprecated and returns 404.
-const MODEL = "gemini-2.5-flash";
+// ─── Cohere ────────────────────────────────────────────────────
+// Cohere's Generate API (co.generate()) was retired Aug 26, 2025.
+// We use the v2 Chat API via CohereClientV2 instead.
+let cohereClient = null;
+let cohereInitialized = false;
+const COHERE_KEY = (process.env.COHERE_API_KEY || "").trim();
+
+if (!COHERE_KEY) {
+  console.warn(
+    "[aiService] ⚠️ COHERE_API_KEY is not set. Cohere fallback disabled.",
+  );
+} else {
+  try {
+    cohereClient = new CohereClientV2({ token: COHERE_KEY });
+    cohereInitialized = true;
+    console.log(
+      `[aiService] ✅ Cohere client initialized (${COHERE_KEY.slice(0, 6)}...)`,
+    );
+  } catch (e) {
+    console.error("[aiService] ❌ Cohere init failed:", e.message);
+  }
+}
+// Use a versioned model ID — unversioned aliases like "command-r" are deprecated.
+// command-r-08-2024 is the lightweight free-tier-friendly option.
+const COHERE_MODEL = "command-r-08-2024";
 
 // ============================================================
 // ERROR NORMALIZER
-// Every SDK call goes through this so callers always get a structured
-// error with a machine-readable `code` and a human-readable `message`
-// that actually explains what went wrong (instead of generic "AI error").
 // ============================================================
-const normalizeAIError = (err) => {
-  const status = err?.status ?? err?.response?.status ?? null;
+const normalizeAIError = (err, provider = "unknown") => {
+  const status =
+    err?.status ?? err?.response?.status ?? err?.statusCode ?? null;
   const raw = err?.message ?? String(err);
 
   let code = "AI_UNKNOWN_ERROR";
@@ -56,40 +105,36 @@ const normalizeAIError = (err) => {
   if (
     status === 401 ||
     status === 403 ||
-    /API_KEY_INVALID|ACCESS_TOKEN_TYPE_UNSUPPORTED|unauthe|invalid.*key|api.?key.*invalid/i.test(
+    /API_KEY_INVALID|unauthe|invalid.*key|api.?key.*invalid|access.*denied/i.test(
       raw,
     )
   ) {
     code = "AI_AUTH_ERROR";
-    message =
-      "Gemini API rejected the request: authentication failed. " +
-      "Your GEMINI_API_KEY may be invalid or expired. " +
-      "Go to https://aistudio.google.com/app/apikey, generate a new API key, and update the Railway variable.";
+    message = `Authentication failed for ${provider}. Check your API key.`;
   } else if (
     status === 429 ||
-    /RESOURCE_EXHAUSTED|rate.?limit|quota/i.test(raw)
+    /RESOURCE_EXHAUSTED|rate.?limit|quota|too many requests/i.test(raw)
   ) {
     code = "AI_RATE_LIMIT";
-    message =
-      "Gemini API rate limit or quota exceeded. Wait a moment then try again.";
+    message = `Rate limit or quota exceeded for ${provider}.`;
   } else if (status === 404 || /model.*not.*found|404/i.test(raw)) {
     code = "AI_MODEL_NOT_FOUND";
-    message = `Gemini model "${MODEL}" not found. The model name may have changed — update MODEL in aiService.js.`;
+    message = `Model not found for ${provider}.`;
   } else if (/network|ECONNRESET|ENOTFOUND|ETIMEDOUT|fetch.?fail/i.test(raw)) {
     code = "AI_NETWORK_ERROR";
-    message =
-      "Could not reach the Gemini API. Check Railway's internet access or Gemini status at https://status.cloud.google.com.";
+    message = `Network error connecting to ${provider}.`;
   }
 
   const normalized = new Error(message);
   normalized.code = code;
   normalized.status = status;
+  normalized.provider = provider;
   normalized.cause = err;
   return normalized;
 };
 
 // ============================================================
-// SYSTEM CONTEXT — identity + domain knowledge for every prompt
+// SYSTEM CONTEXT
 // ============================================================
 const SYSTEM_CONTEXT = `You are an AI assistant embedded in the Addis MESOB Digital Management System,
 a government service management platform for Addis Ketema Sub-City administration in Addis Ababa, Ethiopia.
@@ -105,37 +150,173 @@ Always respond in the same language the user writes in (Amharic or English).
 Be concise, professional, and helpful. For Amharic, use proper Ethiopic script.`;
 
 // ============================================================
-// HELPER — single-turn text generation with error normalization
+// PROVIDER CALLERS
+// Each caller accepts an optional `history` array of
+// { role: "user" | "assistant", content: string } turns, in chronological
+// order, so multi-turn context survives a mid-conversation provider switch.
 // ============================================================
-const generateText = async (prompt, systemInstruction = SYSTEM_CONTEXT) => {
-  if (!clientInitialized || !client) {
-    const err = new Error(
-      "AI service is not configured (missing or invalid GEMINI_API_KEY). Contact system administrator.",
-    );
-    err.code = "AI_NOT_CONFIGURED";
-    throw err;
+
+// ─── Gemini Caller ────────────────────────────────────────────
+const callGemini = async (
+  prompt,
+  systemInstruction = SYSTEM_CONTEXT,
+  history = [],
+) => {
+  if (!geminiInitialized || !geminiClient) {
+    throw new Error("Gemini client not initialized");
   }
 
   try {
-    const response = await client.models.generateContent({
-      model: MODEL,
-      contents: prompt,
+    const geminiHistory = history.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
+
+    const chat = geminiClient.chats.create({
+      model: GEMINI_MODEL,
       config: { systemInstruction },
+      history: geminiHistory,
     });
-    return response.text;
+
+    const response = await chat.sendMessage({ message: prompt });
+    return { text: response.text, provider: PROVIDERS.GEMINI };
   } catch (err) {
-    const normalized = normalizeAIError(err);
-    console.error(
-      `[aiService] generateText failed [${normalized.code}]:`,
-      normalized.message,
-    );
-    throw normalized;
+    throw normalizeAIError(err, PROVIDERS.GEMINI);
+  }
+};
+
+// ─── Groq Caller ──────────────────────────────────────────────
+const callGroq = async (
+  prompt,
+  systemInstruction = SYSTEM_CONTEXT,
+  history = [],
+) => {
+  if (!groqInitialized || !groqClient) {
+    throw new Error("Groq client not initialized");
+  }
+
+  try {
+    const response = await groqClient.chat.completions.create({
+      model: GROQ_MODEL,
+      messages: [
+        { role: "system", content: systemInstruction },
+        ...history.map((m) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content,
+        })),
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 1024,
+    });
+    return {
+      text: response.choices[0]?.message?.content || "",
+      provider: PROVIDERS.GROQ,
+    };
+  } catch (err) {
+    throw normalizeAIError(err, PROVIDERS.GROQ);
+  }
+};
+
+// ─── Cohere Caller (v2 Chat API) ───────────────────────────────
+const callCohere = async (
+  prompt,
+  systemInstruction = SYSTEM_CONTEXT,
+  history = [],
+) => {
+  if (!cohereInitialized || !cohereClient) {
+    throw new Error("Cohere client not initialized");
+  }
+
+  try {
+    const response = await cohereClient.chat({
+      model: COHERE_MODEL,
+      messages: [
+        { role: "system", content: systemInstruction },
+        ...history.map((m) => ({
+          role: m.role === "assistant" ? "assistant" : "user",
+          content: m.content,
+        })),
+        { role: "user", content: prompt },
+      ],
+    });
+    const text = response?.message?.content?.[0]?.text || "";
+    return { text, provider: PROVIDERS.COHERE };
+  } catch (err) {
+    throw normalizeAIError(err, PROVIDERS.COHERE);
   }
 };
 
 // ============================================================
+// MAIN GENERATE TEXT — Auto-fallback chain
+// Any error from a non-final provider falls through to the next one;
+// we only give up once every configured provider has failed.
+// ============================================================
+const generateText = async (
+  prompt,
+  systemInstruction = SYSTEM_CONTEXT,
+  history = [],
+) => {
+  const callers = [
+    {
+      name: PROVIDERS.GEMINI,
+      ready: geminiInitialized && geminiClient,
+      fn: callGemini,
+    },
+    {
+      name: PROVIDERS.GROQ,
+      ready: groqInitialized && groqClient,
+      fn: callGroq,
+    },
+    {
+      name: PROVIDERS.COHERE,
+      ready: cohereInitialized && cohereClient,
+      fn: callCohere,
+    },
+  ];
+
+  const errors = [];
+  let lastError = null;
+
+  for (const provider of callers) {
+    if (!provider.ready) continue;
+
+    try {
+      const result = await provider.fn(prompt, systemInstruction, history);
+      if (errors.length > 0) {
+        console.log(
+          `[aiService] ✅ Used ${result.provider} (fallback after ${errors.length} failure(s))`,
+        );
+      } else {
+        console.log(`[aiService] ✅ Used ${result.provider}`);
+      }
+      return result.text;
+    } catch (err) {
+      console.warn(
+        `[aiService] ⚠️ ${provider.name} failed: ${err.code || "unknown"} - ${err.message}`,
+      );
+      errors.push({ provider: provider.name, error: err });
+      lastError = err;
+      // Fall through to the next provider regardless of error type —
+      // an auth typo or model-name change on one provider shouldn't
+      // sink the whole request when another provider is still available.
+    }
+  }
+
+  console.error(
+    "[aiService] ❌ All providers failed. Errors:",
+    errors.map((e) => `${e.provider}:${e.error.code}`),
+  );
+  const finalError = new Error(
+    `All AI providers failed. Last error: ${lastError?.message || "Unknown"}`,
+  );
+  finalError.code = "ALL_PROVIDERS_FAILED";
+  finalError.errors = errors;
+  throw finalError;
+};
+
+// ============================================================
 // 1. DAILY REPORT INSIGHT
-// POST /api/ai/daily-insight
 // ============================================================
 const generateDailyInsight = async (reportData) => {
   const { date, entries, grandTotal, teamName } = reportData;
@@ -159,7 +340,6 @@ Under 150 words, plain text only.`;
 
 // ============================================================
 // 2. EVALUATION NARRATIVE
-// POST /api/ai/evaluation-summary
 // ============================================================
 const generateEvaluationSummary = async (evaluationData) => {
   const { teamName, members, totalScores, comments, evaluatedBy, period } =
@@ -199,7 +379,6 @@ Under 200 words. Professional government report tone.`;
 
 // ============================================================
 // 3. DASHBOARD DIGEST
-// POST /api/ai/dashboard-digest
 // ============================================================
 const generateDashboardDigest = async (stats) => {
   const prompt = `Generate a concise executive digest for Addis MESOB system dashboard.
@@ -220,7 +399,6 @@ Sound like a city government performance update. Plain text only.`;
 
 // ============================================================
 // 4. MEETING MINUTES
-// POST /api/ai/meeting-minutes
 // ============================================================
 const generateMeetingMinutes = async (meetingData) => {
   const { title, date, attendees, agenda, notes } = meetingData;
@@ -253,17 +431,14 @@ Professional tone. Under 300 words.`;
 
 // ============================================================
 // 5. CHATBOT CONVERSATION HANDLER
-// POST /api/chatbot/message
-// Returns a friendly string on error (never throws) so the chatbot
-// always gives the user a response rather than a blank error.
 // ============================================================
 const handleChatMessage = async (
   conversationHistory,
   userMessage,
   userContext,
 ) => {
-  if (!clientInitialized || !client) {
-    return "I'm currently unable to connect to the AI service. Please try again later or contact your system administrator.";
+  if (!geminiInitialized && !groqInitialized && !cohereInitialized) {
+    return "I'm currently unable to connect to any AI service. Please try again later or contact your system administrator.";
   }
 
   const chatSystemPrompt = `${SYSTEM_CONTEXT}
@@ -296,35 +471,26 @@ System pages:
 If asked about live data, guide them to the correct page. Keep responses under 200 words.`;
 
   try {
-    const history = conversationHistory.map((m) => ({
-      role: m.role === "assistant" ? "model" : "user",
-      parts: [{ text: m.content }],
+    // Normalize incoming history into the { role, content } shape every
+    // provider caller expects, and cap it so prompts don't grow unbounded.
+    const history = (conversationHistory || []).slice(-10).map((m) => ({
+      role: m.role === "assistant" ? "assistant" : "user",
+      content: m.content,
     }));
 
-    const chat = client.chats.create({
-      model: MODEL,
-      config: { systemInstruction: chatSystemPrompt },
-      history,
-    });
-
-    const response = await chat.sendMessage({ message: userMessage });
-    return response.text;
+    const result = await generateText(userMessage, chatSystemPrompt, history);
+    return result;
   } catch (err) {
-    const normalized = normalizeAIError(err);
-    console.error(
-      `[aiService] chatbot failed [${normalized.code}]:`,
-      normalized.message,
-    );
+    console.error("[aiService] chatbot failed:", err.message);
 
-    // Return a user-friendly string so the chatbot always shows something
-    if (normalized.code === "AI_AUTH_ERROR") {
-      return "I'm unable to process requests right now due to an authentication issue with the AI service. Please contact your system administrator.";
+    if (err.code === "AI_AUTH_ERROR") {
+      return "I'm unable to process requests right now due to an authentication issue. Please contact your system administrator.";
     }
-    if (normalized.code === "AI_RATE_LIMIT") {
+    if (err.code === "AI_RATE_LIMIT") {
       return "The AI service is currently busy. Please try again in a few minutes.";
     }
-    if (normalized.code === "AI_MODEL_NOT_FOUND") {
-      return "AI model configuration error. Please contact your system administrator.";
+    if (err.code === "ALL_PROVIDERS_FAILED") {
+      return "All AI services are currently unavailable. Please try again later or contact support.";
     }
     return "I'm having trouble processing your request. Please try again.";
   }
@@ -332,12 +498,11 @@ If asked about live data, guide them to the correct page. Keep responses under 2
 
 // ============================================================
 // 6. DOCUMENT OCR SUMMARY
-// Called after Cloudinary upload
 // ============================================================
 const summarizeDocumentContent = async (documentText, documentType) => {
-  if (!clientInitialized || !client) {
+  if (!geminiInitialized && !groqInitialized && !cohereInitialized) {
     return {
-      summary: "Document uploaded. AI analysis unavailable.",
+      summary: "Document uploaded. No AI service available.",
       extractedAt: new Date(),
     };
   }
@@ -369,14 +534,15 @@ Use null for missing fields.`;
 };
 
 // ============================================================
-// 7. DOCUMENT VISION ANALYSIS (auto-fill upload form)
-// POST /api/documents/analyze
+// 7. DOCUMENT VISION ANALYSIS
+// Only Gemini supports vision here — Groq/Cohere text models can't
+// process images, so there is no fallback for this one call.
 // ============================================================
 const analyzeDocumentImage = async (base64File, mimeType) => {
-  if (!clientInitialized || !client) {
+  if (!geminiInitialized) {
     return {
       confidence: "low",
-      notes: "AI analysis unavailable. Fill fields manually.",
+      notes: "AI vision analysis unavailable. Fill fields manually.",
       documentType: "other",
     };
   }
@@ -410,8 +576,8 @@ Extract all visible information and return ONLY valid JSON (no markdown fences):
 If not recognizable: set documentType to "other", uncertain fields to null, confidence to "low".`;
 
   try {
-    const response = await client.models.generateContent({
-      model: MODEL,
+    const response = await geminiClient.models.generateContent({
+      model: GEMINI_MODEL,
       contents: [
         {
           role: "user",
@@ -442,7 +608,7 @@ If not recognizable: set documentType to "other", uncertain fields to null, conf
     if (!result.confidence) result.confidence = "low";
     return result;
   } catch (err) {
-    const normalized = normalizeAIError(err);
+    const normalized = normalizeAIError(err, PROVIDERS.GEMINI);
     console.error(
       `[aiService] analyzeDocumentImage failed [${normalized.code}]:`,
       normalized.message,
@@ -457,7 +623,6 @@ If not recognizable: set documentType to "other", uncertain fields to null, conf
 
 // ============================================================
 // 8. SMART SERVICE RECOMMENDATIONS
-// POST /api/ai/service-recommendations
 // ============================================================
 const generateServiceRecommendations = async (query, availableServices) => {
   const serviceList = availableServices
@@ -489,7 +654,6 @@ Return ONLY valid JSON (no markdown):
 
 // ============================================================
 // 9. PERFORMANCE TREND ANALYSIS
-// POST /api/ai/performance-trend
 // ============================================================
 const generatePerformanceTrend = async (reportsArray, teamName) => {
   const reportSummary = reportsArray
@@ -518,7 +682,6 @@ Under 250 words. Plain text, no markdown.`;
 
 // ============================================================
 // 10. CITIZEN COMPLAINT CATEGORIZER
-// POST /api/ai/categorize-complaint
 // ============================================================
 const categorizeComplaint = async (complaintText) => {
   const prompt = `A citizen submitted this complaint/feedback to Addis Ketema sub-city CRRSA office:
@@ -544,7 +707,6 @@ Analyze and return ONLY valid JSON (no markdown):
 
 // ============================================================
 // 11. AMHARIC / ENGLISH TRANSLATION
-// POST /api/ai/translate
 // ============================================================
 const translateContent = async (text, targetLanguage) => {
   const prompt = `Translate the following text to ${targetLanguage === "am" ? "Amharic (አማርኛ)" : "English"}.
@@ -560,7 +722,6 @@ Return ONLY the translated text, nothing else.`;
 
 // ============================================================
 // 12. SMART REPORT TITLE GENERATOR
-// POST /api/ai/generate-title
 // ============================================================
 const generateReportTitle = async (reportContext) => {
   const { type, period, teamName, highlights } = reportContext;
