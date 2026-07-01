@@ -7,8 +7,8 @@ import { CRITERIA } from "../constants/criteria";
 import { exportEvaluationReportToPDF } from "../utils/pdfExport";
 import { useAuth } from "../hooks/useAuth";
 import { evaluationAPI } from "../services/api";
-import { aiAPI } from "../services/api"; // ✅ NEW
-import AISummary from "../components/ai/AISummary"; // ✅ NEW
+import { aiAPI } from "../services/api";
+import { AISummary, AIEvaluationHelper } from "../components/ai"; // ✅ Updated imports
 import { useToast } from "../hooks/useToast";
 import {
   FiChevronDown,
@@ -36,7 +36,6 @@ import {
 } from "react-icons/fi";
 
 export default function Evaluation({ t, lang }) {
-  // ✅ Safe access to translations
   const safeT = t || {};
   const te = safeT.evaluation || {};
   const safeCriteria = safeT.criteria || {};
@@ -51,10 +50,8 @@ export default function Evaluation({ t, lang }) {
   const [saving, setSaving] = useState(false);
   const [evaluationId, setEvaluationId] = useState(null);
 
-  // ✅ Create refs for all input fields
   const inputRefs = useRef({});
 
-  // ✅ Load existing evaluation if editing - FIXED: wrap in a function with cleanup
   useEffect(() => {
     let isMounted = true;
 
@@ -63,7 +60,6 @@ export default function Evaluation({ t, lang }) {
       if (savedEvaluation) {
         try {
           const data = JSON.parse(savedEvaluation);
-          // Only update state if component is still mounted
           if (isMounted) {
             if (data.members) setMembers(data.members);
             if (data.scores) setScores(data.scores);
@@ -82,9 +78,8 @@ export default function Evaluation({ t, lang }) {
     return () => {
       isMounted = false;
     };
-  }, []); // ✅ Empty dependency array - runs once on mount
+  }, []);
 
-  // ✅ Auto-save to localStorage - FIXED: use a debounced approach
   useEffect(() => {
     const hasData =
       members.some((m) => m.trim() !== "") || Object.keys(scores).length > 0;
@@ -100,7 +95,6 @@ export default function Evaluation({ t, lang }) {
       lastUpdated: new Date().toISOString(),
     };
 
-    // Use a timeout to debounce saves
     const timer = setTimeout(() => {
       localStorage.setItem("currentEvaluation", JSON.stringify(data));
     }, 500);
@@ -108,18 +102,15 @@ export default function Evaluation({ t, lang }) {
     return () => clearTimeout(timer);
   }, [members, scores, comments, teamName, evaluationId]);
 
-  // Add new member (max 7)
   const addMember = () => {
     if (members.length < 7) {
       setMembers([...members, ""]);
-      // Initialize comment for new member
       const newComments = { ...comments };
       newComments[members.length] = "";
       setComments(newComments);
     }
   };
 
-  // Remove member
   const removeMember = (index) => {
     if (members.length > 1) {
       const newMembers = members.filter((_, i) => i !== index);
@@ -131,21 +122,18 @@ export default function Evaluation({ t, lang }) {
         }
       });
       setScores(newScores);
-      // Remove comment
       const newComments = { ...comments };
       delete newComments[index];
       setComments(newComments);
     }
   };
 
-  // Update member name
   const updateMemberName = (index, name) => {
     const newMembers = [...members];
     newMembers[index] = name;
     setMembers(newMembers);
   };
 
-  // Update comment for a member
   const updateComment = (index, comment) => {
     const newComments = { ...comments };
     newComments[index] = comment;
@@ -172,13 +160,11 @@ export default function Evaluation({ t, lang }) {
       comment: comments[idx] || "",
     }));
 
-  // ✅ Sort by score descending, then by name for equal scores
   const sortedMembers = [...totals].sort((a, b) => {
     if (b.total !== a.total) return b.total - a.total;
     return a.name.localeCompare(b.name);
   });
 
-  // Calculate summary stats
   const totalMembers = sortedMembers.length;
   const averageScore =
     totalMembers > 0
@@ -190,7 +176,6 @@ export default function Evaluation({ t, lang }) {
   const lowestScore = sortedMembers[sortedMembers.length - 1]?.total || 0;
   const bestPerformer = sortedMembers[0]?.name || "—";
 
-  // ✅ Save evaluation to database
   const saveEvaluation = async () => {
     const validMembers = members.filter((m) => m.trim() !== "");
     if (validMembers.length === 0) {
@@ -201,19 +186,16 @@ export default function Evaluation({ t, lang }) {
     try {
       setSaving(true);
 
-      // Calculate total scores for each member
       const totalScoresData = validMembers.map((m) => ({
         name: m,
         total: total(m),
       }));
 
-      // Find best performer
       const bestPerformerName =
         totalScoresData.length > 0
           ? totalScoresData.reduce((a, b) => (a.total > b.total ? a : b)).name
           : null;
 
-      // Prepare data for backend
       const evaluationData = {
         teamName: teamName || "Untitled Team",
         members: validMembers,
@@ -229,17 +211,14 @@ export default function Evaluation({ t, lang }) {
 
       let response;
       if (evaluationId) {
-        // Update existing
         response = await evaluationAPI.update(evaluationId, evaluationData);
         showToast("✅ Evaluation updated successfully!", "success");
       } else {
-        // Create new
         response = await evaluationAPI.create(evaluationData);
         setEvaluationId(response.data._id);
         showToast("✅ Evaluation saved successfully!", "success");
       }
 
-      // Clear localStorage after successful save
       localStorage.removeItem("currentEvaluation");
     } catch (error) {
       console.error("Failed to save evaluation:", error);
@@ -253,7 +232,6 @@ export default function Evaluation({ t, lang }) {
     }
   };
 
-  // ✅ Get rank badge
   const getRankBadge = (index, total) => {
     if (total <= 1) return "🥇";
     if (index === 0) return "🥇";
@@ -262,7 +240,6 @@ export default function Evaluation({ t, lang }) {
     return `#${index + 1}`;
   };
 
-  // ✅ Get performance level
   const getPerformanceLevel = (score) => {
     if (score >= 90)
       return {
@@ -301,7 +278,6 @@ export default function Evaluation({ t, lang }) {
     };
   };
 
-  // Keyboard navigation
   const handleKeyDown = (e, cId, itemIdx, member) => {
     const allMembers = members.filter((m) => m.trim() !== "");
     const currentMemberIndex = allMembers.indexOf(member);
@@ -712,7 +688,7 @@ export default function Evaluation({ t, lang }) {
         </div>
       ))}
 
-      {/* ✅ RANKINGS WITH DYNAMIC COMMENTS */}
+      {/* RANKINGS WITH DYNAMIC COMMENTS */}
       <div style={card}>
         <div
           onClick={() => setShowRankings(!showRankings)}
@@ -943,7 +919,7 @@ export default function Evaluation({ t, lang }) {
               </div>
             </div>
 
-            {/* ✅ Compact Cards with Comments */}
+            {/* Compact Cards with Comments */}
             <div
               style={{
                 display: "grid",
@@ -984,7 +960,6 @@ export default function Evaluation({ t, lang }) {
                           : "0 2px 8px rgba(0,0,0,0.04)";
                       }}
                     >
-                      {/* Top performer badge */}
                       {isTopThree && (
                         <div
                           style={{
@@ -1069,7 +1044,6 @@ export default function Evaluation({ t, lang }) {
                         </span>
                       </div>
 
-                      {/* Progress bar */}
                       <div
                         style={{
                           background: C.bg,
@@ -1090,7 +1064,6 @@ export default function Evaluation({ t, lang }) {
                         />
                       </div>
 
-                      {/* Performance level */}
                       <div
                         style={{
                           display: "flex",
@@ -1111,7 +1084,6 @@ export default function Evaluation({ t, lang }) {
                         </span>
                       </div>
 
-                      {/* ✅ DYNAMIC COMMENT INPUT */}
                       <div style={{ marginTop: 4 }}>
                         <label
                           style={{
@@ -1191,9 +1163,7 @@ export default function Evaluation({ t, lang }) {
         )}
       </div>
 
-      {/* ✅ BEST PERFORMER DECLARATION + SIGNATURES
-           Matches physical document: "የወሩ ምርጥ ፈፃሚ …ሆኖ ተመርጧል"
-           Team Leader + up to 5 member signatures as per official form */}
+      {/* BEST PERFORMER DECLARATION + SIGNATURES */}
       {sortedMembers.length > 0 && (
         <div
           style={{
@@ -1258,7 +1228,7 @@ export default function Evaluation({ t, lang }) {
             </div>
           </div>
 
-          {/* Signature Grid — Team Leader + up to 5 members */}
+          {/* Signature Grid */}
           <div>
             <div
               style={{
@@ -1347,7 +1317,7 @@ export default function Evaluation({ t, lang }) {
                 </div>
               </div>
 
-              {/* Member signature boxes — one per evaluated member, max 5 */}
+              {/* Member signature boxes */}
               {sortedMembers.slice(0, 5).map(({ name }, idx) => (
                 <div
                   key={idx}
@@ -1451,6 +1421,29 @@ export default function Evaluation({ t, lang }) {
         </div>
       )}
 
+      {/* ✅ NEW — AI Evaluation Helper */}
+      {evaluationId && (
+        <div style={{ marginTop: "clamp(12px, 3vw, 16px)" }}>
+          <AIEvaluationHelper
+            evaluationData={{
+              teamName: teamName || "Untitled Team",
+              members: members.filter((m) => m.trim() !== ""),
+              totalScores: sortedMembers.map((m) => ({
+                member: m.name,
+                total: m.total,
+              })),
+              comments: comments,
+              evaluatedBy: user?.name || "Administrator",
+              period: "current period",
+            }}
+            onApplyFeedback={(feedback) => {
+              showToast("AI feedback generated successfully!", "success");
+              console.log("AI Feedback:", feedback);
+            }}
+          />
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div
         style={{
@@ -1545,7 +1538,7 @@ export default function Evaluation({ t, lang }) {
         </button>
       </div>
 
-      {/* ✅ NEW — AI Evaluation Narrative, only shows once evaluation has been saved */}
+      {/* AI Evaluation Narrative */}
       {evaluationId && (
         <AISummary
           fetchFn={(id) => aiAPI.getEvaluationSummary(id, null)}

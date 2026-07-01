@@ -1,12 +1,12 @@
 // frontend/src/pages/documents/DocumentVault.jsx
 // Main CRRSA Document Vault page — list, search, and upload documents
 
-import { useState, useEffect, useCallback } from "react";
-import { createPortal } from "react-dom"; // ✅ NEW — escapes the scrollable <main> layout container
-// import { fetchDocuments, getDocumentDownloadUrl } from "../../services/aiApi";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { documentAPI } from "../../services/api";
 import DocumentUpload from "./DocumentUpload";
 import { useAuth } from "../../hooks/useAuth";
+import { AISmartSearch } from "../../components/ai";
 
 const fetchDocuments = (params) => documentAPI.getAll(params);
 const getDocumentDownloadUrl = (id) => documentAPI.getDownloadUrl(id);
@@ -171,8 +171,22 @@ export default function DocumentVault() {
   const [showUpload, setShowUpload] = useState(false);
   const { user } = useAuth();
 
-  // ✅ Load documents function
+  // ✅ Use ref to track if component is mounted
+  const isMounted = useRef(true);
+
+  // ✅ Cleanup on unmount
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // ✅ Load documents function with mounted check
   const loadDocuments = useCallback(async () => {
+    // Don't set loading if already loading or unmounted
+    if (!isMounted.current) return;
+
     setIsLoading(true);
     try {
       const params = { page, limit: 12 };
@@ -180,20 +194,59 @@ export default function DocumentVault() {
       if (typeFilter) params.type = typeFilter;
 
       const res = await fetchDocuments(params);
-      setDocuments(res.data.documents);
-      setPagination(res.data.pagination);
+
+      // ✅ Only update state if component is still mounted
+      if (isMounted.current) {
+        setDocuments(res.data.documents);
+        setPagination(res.data.pagination);
+      }
     } catch (error) {
       console.error("Failed to load documents:", error);
+      if (isMounted.current) {
+        // Optionally set error state here
+      }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   }, [page, search, typeFilter]);
 
-  // ✅ Load documents when page, search, or typeFilter changes
+  // ✅ Load documents when dependencies change - using a cleanup flag pattern
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadDocuments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let isEffectActive = true;
+
+    const loadData = async () => {
+      if (!isEffectActive) return;
+
+      setIsLoading(true);
+      try {
+        const params = { page, limit: 12 };
+        if (search.trim()) params.search = search.trim();
+        if (typeFilter) params.type = typeFilter;
+
+        const res = await fetchDocuments(params);
+
+        // ✅ Only update state if effect is still active
+        if (isEffectActive) {
+          setDocuments(res.data.documents);
+          setPagination(res.data.pagination);
+        }
+      } catch (error) {
+        console.error("Failed to load documents:", error);
+      } finally {
+        if (isEffectActive) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    // ✅ Cleanup function - marks effect as inactive
+    return () => {
+      isEffectActive = false;
+    };
   }, [page, search, typeFilter]);
 
   // ✅ Reset to page 1 when search or filter changes
@@ -218,7 +271,13 @@ export default function DocumentVault() {
 
   const handleUploadComplete = () => {
     setShowUpload(false);
+    // Reload documents after upload
     loadDocuments();
+  };
+
+  // ✅ Handle AI smart search selection
+  const handleSmartSelect = (doc) => {
+    handleDownload(doc._id);
   };
 
   return (
@@ -267,8 +326,7 @@ export default function DocumentVault() {
         )}
       </div>
 
-      {/* Upload modal — rendered via portal so position:fixed centers on the
-          real browser viewport instead of the scrollable <main> container */}
+      {/* Upload modal */}
       {showUpload &&
         createPortal(
           <div
@@ -292,6 +350,14 @@ export default function DocumentVault() {
           </div>,
           document.body,
         )}
+
+      {/* ✅ AI Smart Search */}
+      <div style={{ marginBottom: "16px" }}>
+        <AISmartSearch
+          onSelect={handleSmartSelect}
+          placeholder="AI-powered search by name, reference, content..."
+        />
+      </div>
 
       {/* Filters */}
       <div

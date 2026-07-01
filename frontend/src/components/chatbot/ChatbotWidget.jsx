@@ -3,13 +3,9 @@
 // Works for all authenticated users in Amharic or English
 
 import { useState, useEffect, useRef } from "react";
-// import {
-//   sendChatMessage,
-//   getChatHistory,
-//   clearChatSession,
-// } from "../../services/aiApi";
 import { useAuth } from "../../hooks/useAuth";
-import { chatbotAPI } from "../../services/api";
+import { chatbotAPI, documentAPI } from "../../services/api";
+
 const sendChatMessage = (msg) => chatbotAPI.sendMessage(msg);
 const getChatHistory = () => chatbotAPI.getHistory();
 const clearChatSession = () => chatbotAPI.clearSession();
@@ -92,7 +88,50 @@ export default function ChatbotWidget() {
     setIsLoading(true);
 
     try {
-      const res = await sendChatMessage(text);
+      // ✅ Check if user is asking about documents
+      const docKeywords = [
+        "document",
+        "file",
+        "find",
+        "search",
+        "look for",
+        "where is",
+        "show me",
+        "upload",
+        "download",
+      ];
+      const isDocQuery = docKeywords.some((keyword) =>
+        text.toLowerCase().includes(keyword),
+      );
+
+      let context = "";
+      if (isDocQuery) {
+        // Search for relevant documents
+        try {
+          const docResults = await documentAPI.getAll({
+            search: text,
+            limit: 3,
+          });
+
+          if (docResults.data.documents.length > 0) {
+            context = "📄 Relevant documents found:\n";
+            docResults.data.documents.forEach((doc) => {
+              context += `- ${doc.title} (Ref: ${doc.referenceNumber})\n`;
+            });
+            context += "\n";
+          }
+        } catch (docError) {
+          // Silently fail document search
+          console.debug("Document search failed:", docError);
+        }
+      }
+
+      // Send message with context if available
+      const finalMessage = context
+        ? `${context}\nUser question: ${text}`
+        : text;
+      const res = await sendChatMessage(finalMessage);
+
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: res.data.reply },

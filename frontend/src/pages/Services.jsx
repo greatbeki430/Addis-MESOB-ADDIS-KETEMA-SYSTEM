@@ -24,7 +24,6 @@ import {
   FiGlobe,
   FiChevronLeft,
   FiChevronRight,
-  // FiLoader,
 } from "react-icons/fi";
 
 export default function Services({ t, lang }) {
@@ -40,7 +39,6 @@ export default function Services({ t, lang }) {
   const [searchFocused, setSearchFocused] = useState(false);
   const [error, setError] = useState(null);
 
-  // ✅ Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(12);
 
@@ -102,7 +100,6 @@ export default function Services({ t, lang }) {
     loadServices();
   }, []);
 
-  // Map localized names
   const localizedServices = services.map((s) => ({
     ...s,
     displayName:
@@ -115,13 +112,11 @@ export default function Services({ t, lang }) {
         : s.dept || "Uncategorized",
   }));
 
-  // ✅ Get unique departments
   const depts = [
     "All",
     ...new Set(localizedServices.map((s) => s.displayDept).filter(Boolean)),
   ];
 
-  // ✅ Filter services using useMemo to avoid unnecessary recalculations
   const filtered = useMemo(() => {
     return localizedServices.filter((s) => {
       const matchesDept = filter === "All" || s.displayDept === filter;
@@ -134,14 +129,12 @@ export default function Services({ t, lang }) {
     });
   }, [localizedServices, filter, search]);
 
-  // ✅ Pagination calculations
   const totalItems = filtered.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentItems = filtered.slice(startIndex, endIndex);
 
-  // ✅ Reset page when filter or search changes (in the handlers)
   const handleFilterChange = (value) => {
     setFilter(value);
     setCurrentPage(1);
@@ -738,7 +731,6 @@ export default function Services({ t, lang }) {
             </div>
           )}
 
-          {/* Show total count at bottom */}
           {totalItems > 0 && (
             <div
               style={{

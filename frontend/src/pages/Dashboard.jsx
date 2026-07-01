@@ -4,11 +4,9 @@ import StatCard from "../components/ui/StatCard";
 import { CRITERIA } from "../constants/criteria";
 import { useAuth } from "../hooks/useAuth";
 import { dailyReportAPI } from "../services/api";
-import { aiAPI } from "../services/api"; // ✅ NEW
-import AISummary from "../components/ai/AISummary"; // ✅ NEW
+import { AIDashboardWidget } from "../components/ai";
 
 export default function Dashboard({ t }) {
-  // ✅ t is a FUNCTION — call it with dot-path strings
   const td = (key, fb = "") => t?.(`dashboard.${key}`) || fb;
   const tc = (key, fb = "") => t?.(`criteria.${key}`) || fb;
   const tcm = (key, fb = "") => t?.(`common.${key}`) || fb;
@@ -119,8 +117,17 @@ export default function Dashboard({ t }) {
       ? Math.max(...stats.departments.map((d) => d.value))
       : 1;
 
-  // ✅ agendas is an array — call t("agendas") which returns the array directly
   const agendas = t?.("agendas") || [];
+
+  // ✅ Prepare stats for AI widget
+  const aiStats = {
+    totalUsers: 1,
+    activeTeams: stats.departments.length,
+    totalServicesLogged: stats.total,
+    evaluationsCompleted: 0,
+    topDepartment: stats.departments[0]?.name || "N/A",
+    period: "this week",
+  };
 
   return (
     <div style={{ width: "100%", padding: "20px" }}>
@@ -235,22 +242,14 @@ export default function Dashboard({ t }) {
         </div>
       </div>
 
-      {/* ✅ NEW — AI Weekly Digest, generated from current dashboard stats */}
+      {/* ✅ AI Dashboard Widget with auto-refresh */}
       {!loading && (
-        <AISummary
-          fetchFn={() =>
-            aiAPI.getDashboardDigest({
-              totalUsers: 1,
-              activeTeams: stats.departments.length,
-              totalServicesLogged: stats.total,
-              evaluationsCompleted: 0,
-              topDepartment: stats.departments[0]?.name || "N/A",
-              period: "this week",
-            })
-          }
-          args={[]}
-          label="AI Weekly Digest"
-        />
+        <div style={{ marginBottom: 24 }}>
+          <AIDashboardWidget
+            stats={aiStats}
+            refreshInterval={120000} // Refresh every 2 minutes
+          />
+        </div>
       )}
 
       {/* Stat Cards */}

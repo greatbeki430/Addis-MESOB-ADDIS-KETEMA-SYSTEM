@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { btn, card, C, F, inp } from "../styles/theme";
 import { meetingAPI, dailyReportAPI, reportAPI } from "../services/api";
-import { aiAPI } from "../services/api"; // ✅ NEW
-import AISummary from "../components/ai/AISummary"; // ✅ NEW
+import { aiAPI } from "../services/api";
+import { AISummary } from "../components/ai";
 import { useAuth } from "../hooks/useAuth";
 
 // ✅ Import export utilities
@@ -29,40 +29,11 @@ import {
   FiTrendingUp,
   FiAward,
   FiAlertCircle,
-  FiClock as FiClockIcon,
   FiDatabase,
   FiFolder,
 } from "react-icons/fi";
 
-// ✅ Also import specific icons we actually need
-// import {
-//   FiBarChart2 as FiBarChart2Icon,
-//   FiCalendar as FiCalendarIcon,
-//   FiCheck as FiCheckIcon,
-//   FiChevronDown as FiChevronDownIcon,
-//   FiClock as FiClockIcon2,
-//   FiDownload as FiDownloadIcon,
-//   FiFile as FiFileIcon,
-//   FiFileText as FiFileTextIcon,
-//   FiFolder as FiFolderIcon,
-//   FiGrid as FiGridIcon,
-//   FiHome as FiHomeIcon,
-//   FiList as FiListIcon,
-//   FiPlus as FiPlusIcon,
-//   FiPrinter as FiPrinterIcon,
-//   FiRefreshCw as FiRefreshCwIcon,
-//   FiSave as FiSaveIcon,
-//   FiSearch as FiSearchIcon2,
-//   FiSettings as FiSettingsIcon,
-//   FiStar as FiStarIcon2,
-//   FiTrash2 as FiTrash2Icon,
-//   FiUser as FiUserIcon2,
-//   FiUsers as FiUsersIcon3,
-//   FiX as FiXIcon2,
-// } from "react-icons/fi";
-
 export default function Report({ t }) {
-  // ✅ FIX: Safe access to translations with fallback
   const safeT = t || {};
   const safeReport = safeT.report || {};
   const safePeriod = safeT.period || {};
@@ -81,7 +52,6 @@ export default function Report({ t }) {
   const [error, setError] = useState(null);
   const [showExportOptions, setShowExportOptions] = useState(false);
 
-  // ✅ Report History states
   const [savedReports, setSavedReports] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
@@ -106,7 +76,19 @@ export default function Report({ t }) {
     { value: "yearly", label: safePeriod.yearly || "Yearly" },
   ];
 
-  // ✅ Load teams and determine user's team
+  // ✅ Define loadSavedReports FIRST before it's used
+  const loadSavedReports = async () => {
+    try {
+      setLoadingHistory(true);
+      const response = await reportAPI.getAll();
+      setSavedReports(response.data || []);
+    } catch (error) {
+      console.error("Failed to load saved reports:", error);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const loadTeamsAndUserTeam = useCallback(() => {
     try {
       const savedTeams = localStorage.getItem("forumTeams");
@@ -132,12 +114,12 @@ export default function Report({ t }) {
     }
   }, [isLeader, user]);
 
+  // ✅ Now useEffect can safely call loadSavedReports
   useEffect(() => {
     let isMounted = true;
     const loadInitialData = () => {
       if (isMounted) {
         loadTeamsAndUserTeam();
-        // eslint-disable-next-line react-hooks/immutability
         loadSavedReports();
       }
     };
@@ -147,20 +129,6 @@ export default function Report({ t }) {
     };
   }, [loadTeamsAndUserTeam]);
 
-  // ✅ Load saved reports from database
-  const loadSavedReports = async () => {
-    try {
-      setLoadingHistory(true);
-      const response = await reportAPI.getAll();
-      setSavedReports(response.data || []);
-    } catch (error) {
-      console.error("Failed to load saved reports:", error);
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  // ✅ Get team display name for header
   const getTeamDisplayName = () => {
     if (isLeader && userTeam) {
       return ` (${userTeam.name})`;
@@ -172,7 +140,6 @@ export default function Report({ t }) {
     return "";
   };
 
-  // ✅ Generate sample data - FILTERED by selected team
   const generateSampleData = (type, period, teamFilter) => {
     const data = [];
     const now = new Date();
@@ -258,7 +225,51 @@ export default function Report({ t }) {
     return data;
   };
 
-  // ✅ Generate and save report
+  const processReportData = (data, type, period) => {
+    const total = data?.length || 0;
+    const completed =
+      data?.filter((item) => item.status === "Completed").length || 0;
+    const pending = total - completed;
+    const avgValue =
+      total > 0
+        ? Math.round(
+            data.reduce((sum, item) => sum + (item.value || 0), 0) / total,
+          )
+        : 0;
+
+    return {
+      summary: {
+        total: total,
+        period: period,
+        type: type,
+        completed: completed,
+        pending: pending,
+        average: avgValue,
+      },
+      data: data || [],
+      generatedAt: new Date().toISOString(),
+    };
+  };
+
+  const saveReportToDatabase = async (data, teamId) => {
+    try {
+      await reportAPI.create({
+        title: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report - ${new Date().toLocaleDateString()}`,
+        type: reportType,
+        period: period,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        team: teamId || null,
+        data: data.data,
+        summary: data.summary,
+      });
+
+      console.log("✅ Report saved to database");
+    } catch (error) {
+      console.error("Failed to save report:", error);
+    }
+  };
+
   const generateReport = async () => {
     setLoading(true);
     setError(null);
@@ -311,27 +322,6 @@ export default function Report({ t }) {
     }
   };
 
-  // ✅ Save report to database
-  const saveReportToDatabase = async (data, teamId) => {
-    try {
-      await reportAPI.create({
-        title: `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report - ${new Date().toLocaleDateString()}`,
-        type: reportType,
-        period: period,
-        startDate: startDate || null,
-        endDate: endDate || null,
-        team: teamId || null,
-        data: data.data,
-        summary: data.summary,
-      });
-
-      console.log("✅ Report saved to database");
-    } catch (error) {
-      console.error("Failed to save report:", error);
-    }
-  };
-
-  // ✅ Load a saved report
   const loadSavedReport = (report) => {
     setSelectedSavedReport(report);
     setReportData({
@@ -342,33 +332,6 @@ export default function Report({ t }) {
     setShowHistory(false);
   };
 
-  const processReportData = (data, type, period) => {
-    const total = data?.length || 0;
-    const completed =
-      data?.filter((item) => item.status === "Completed").length || 0;
-    const pending = total - completed;
-    const avgValue =
-      total > 0
-        ? Math.round(
-            data.reduce((sum, item) => sum + (item.value || 0), 0) / total,
-          )
-        : 0;
-
-    return {
-      summary: {
-        total: total,
-        period: period,
-        type: type,
-        completed: completed,
-        pending: pending,
-        average: avgValue,
-      },
-      data: data || [],
-      generatedAt: new Date().toISOString(),
-    };
-  };
-
-  // ✅ EXPORT FUNCTIONS
   const exportToExcel = () => {
     if (!reportData || !reportData.data.length) return;
 
@@ -557,7 +520,6 @@ export default function Report({ t }) {
     setShowExportOptions(false);
   };
 
-  // ✅ Delete saved report
   const deleteSavedReport = async (reportId) => {
     if (window.confirm("Are you sure you want to delete this saved report?")) {
       try {
@@ -655,7 +617,6 @@ export default function Report({ t }) {
         </div>
       </div>
 
-      {/* ✅ Description - Only show when no report has been generated yet */}
       {!reportData && !loading && (
         <p
           style={{
@@ -670,7 +631,6 @@ export default function Report({ t }) {
         </p>
       )}
 
-      {/* Team Leader Info Banner */}
       {isLeader && userTeam && (
         <div
           style={{
@@ -700,7 +660,6 @@ export default function Report({ t }) {
         </div>
       )}
 
-      {/* ✅ Saved Reports History */}
       {showHistory && (
         <div
           style={{
@@ -806,7 +765,6 @@ export default function Report({ t }) {
         </div>
       )}
 
-      {/* Error Message */}
       {error && (
         <div
           style={{
@@ -1190,7 +1148,6 @@ export default function Report({ t }) {
             </span>
           </div>
 
-          {/* Summary Cards */}
           <div
             style={{
               display: "grid",
@@ -1288,7 +1245,7 @@ export default function Report({ t }) {
                   gap: 4,
                 }}
               >
-                <FiClockIcon size={12} />
+                <FiClock size={12} />
                 {safeReport.pending || "Pending"}
               </div>
             </div>
@@ -1325,7 +1282,6 @@ export default function Report({ t }) {
             </div>
           </div>
 
-          {/* Data Table */}
           <div style={{ overflowX: "auto" }}>
             <table
               style={{
@@ -1435,7 +1391,7 @@ export default function Report({ t }) {
                         {item.status === "Completed" ? (
                           <FiCheck size={10} />
                         ) : (
-                          <FiClockIcon size={10} />
+                          <FiClock size={10} />
                         )}
                         {item.status}
                       </span>
@@ -1448,7 +1404,7 @@ export default function Report({ t }) {
         </div>
       )}
 
-      {/* ✅ NEW — AI Report Digest, generated from this report's summary stats */}
+      {/* ✅ AI Report Digest */}
       {reportData && (
         <AISummary
           fetchFn={() =>
@@ -1466,7 +1422,6 @@ export default function Report({ t }) {
         />
       )}
 
-      {/* Empty State */}
       {showEmptyState && (
         <div
           style={{

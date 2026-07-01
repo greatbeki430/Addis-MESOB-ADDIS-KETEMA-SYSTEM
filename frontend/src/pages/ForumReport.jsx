@@ -4,22 +4,19 @@ import Field from "../components/ui/Field";
 import Section from "../components/ui/Section";
 import { exportForumReportToPDF } from "../utils/pdfExport";
 import { meetingAPI } from "../services/api";
-import { aiAPI } from "../services/api"; // ✅ NEW
-import AISummary from "../components/ai/AISummary"; // ✅ NEW
+import { aiAPI } from "../services/api";
+import { AISummary, AIReportAssistant } from "../components/ai"; // ✅ Updated import
 import {
   FiPlus,
   FiX,
   FiUsers,
-  // FiUser,
   FiUserX,
   FiCalendar,
-  // FiClock,
   FiFileText,
   FiMessageSquare,
   FiCheckCircle,
   FiAlertCircle,
   FiBookOpen,
-  // FiList,
   FiEdit3,
   FiPenTool,
   FiDownload,
@@ -28,38 +25,7 @@ import {
   FiChevronDown,
   FiChevronRight,
   FiCheck,
-  // FiCircle,
-  // FiStar,
-  // FiAward,
-  // FiInfo,
-  // FiHelpCircle,
-  // FiSettings,
-  // FiTool,
-  // FiBarChart2,
-  // FiPieChart,
-  // FiTrendingUp,
-  // FiTrendingDown,
-  // FiActivity,
-  // FiClipboard,
-  // FiFile,
-  // FiFolder,
-  // FiGrid,
-  // FiLayout,
-  // FiMenu,
-  // FiMoreHorizontal,
-  // FiPaperclip,
-  // FiPrinter,
-  // FiRefreshCw,
-  // FiSearch,
-  // FiSend,
-  // FiShare2,
-  // FiSliders,
-  // FiTarget,
-  // FiThumbsUp,
   FiUserCheck,
-  // FiUserMinus,
-  // FiUserPlus,
-  // FiUsers as FiUsersIcon,
 } from "react-icons/fi";
 
 function DynamicFieldGroup({
@@ -169,8 +135,6 @@ function DynamicFieldGroup({
 
 // ════════════════════════════════════════════════════════════
 // Standing Agendas Panel
-// Shows the 7 fixed forum agenda items from the physical form
-// "ቋሚ የአቻ ፎረም አጀንዳዎች" — present on every meeting report
 // ════════════════════════════════════════════════════════════
 const STANDING_AGENDAS_AM = [
   "በተቋሙ መልካም አስተዳደር ማስፈን በተመለከተ",
@@ -294,7 +258,6 @@ function StandingAgendasPanel({ t }) {
 }
 
 export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
-  // ✅ FIX: Safe access to translations with fallback
   const safeT = t || {};
   const tf = safeT.forum || {};
   const safeYear = safeT.year || "2018 E.C.";
@@ -376,6 +339,15 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
     gap: "clamp(10px, 3vw, 16px)",
   };
 
+  // ✅ Handle AI suggestion application
+  const handleApplySuggestion = (text) => {
+    // Add the suggestion to the explanation or notes
+    setForm((prev) => ({
+      ...prev,
+      explanation: prev.explanation ? `${prev.explanation}\n\n${text}` : text,
+    }));
+  };
+
   if (submitted) {
     return (
       <div style={{ maxWidth: 600, margin: "60px auto", padding: "0 20px" }}>
@@ -444,7 +416,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             {tf.newReport || "New Report"}
           </button>
 
-          {/* ✅ NEW — AI Meeting Minutes, generated from the just-submitted form data */}
+          {/* ✅ AI Meeting Minutes */}
           <div style={{ marginTop: 24, textAlign: "left" }}>
             <AISummary
               fetchFn={() =>
@@ -580,7 +552,6 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         </span>
       </div>
 
-      {/* ✅ Standing Agendas — shown on every forum report per official form */}
       <StandingAgendasPanel t={safeT} />
 
       <div
@@ -929,6 +900,27 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             Add
           </button>
         </Section>
+
+        {/* ✅ AI Report Assistant */}
+        {form.topics.some((t) => t.trim()) && (
+          <div style={{ marginTop: "clamp(12px, 3vw, 16px)" }}>
+            <AIReportAssistant
+              reportContext={{
+                date: form.date,
+                entries: form.topics
+                  .filter((t) => t.trim())
+                  .map((topic) => ({
+                    dept: selectedTeam?.name || "Team",
+                    service: topic,
+                    total: 1,
+                  })),
+                grandTotal: form.topics.filter((t) => t.trim()).length,
+                teamName: selectedTeam?.name || "Team",
+              }}
+              onApply={handleApplySuggestion}
+            />
+          </div>
+        )}
 
         <div
           style={{

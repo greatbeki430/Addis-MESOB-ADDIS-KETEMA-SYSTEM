@@ -6,8 +6,8 @@ import { dailyReportAPI, serviceAPI } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { generateDailyReportPDF } from "../utils/pdf/reports/dailyReport";
-import AISummary from "../components/ai/AISummary"; // ✅ NEW
-import { aiAPI } from "../services/api"; // ✅ NEW
+import { AISummary, AIReportAssistant } from "../components/ai"; // ✅ Updated imports
+import { aiAPI } from "../services/api";
 import {
   FiCalendar,
   FiList,
@@ -33,15 +33,13 @@ export default function DailyReport({ t, lang }) {
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [hoveredRow, setHoveredRow] = useState(null);
-  const [departments, setDepartments] = useState([]); // [ [rawKey, label], ... ]
+  const [departments, setDepartments] = useState([]);
   const [allServices, setAllServices] = useState([]);
   const [animatedTotals, setAnimatedTotals] = useState({
     total: 0,
     male: 0,
     female: 0,
   });
-
-  // ✅ NEW — tracks the saved report's DB id so AISummary can fetch insight for it
   const [savedReportId, setSavedReportId] = useState(null);
 
   const prevRowsRef = useRef(rows);
@@ -106,16 +104,15 @@ export default function DailyReport({ t, lang }) {
         const response = await dailyReportAPI.getByDate(date);
         if (response.data && response.data.length > 0) {
           setRows(response.data);
-          // ✅ NEW — if the loaded report has an _id, remember it for AI insight
           setSavedReportId(response.data[0]?._id || response.data?._id || null);
         } else {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
-          setSavedReportId(null); // ✅ NEW
+          setSavedReportId(null);
         }
       } catch (error) {
         if (error.response?.status === 404) {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
-          setSavedReportId(null); // ✅ NEW
+          setSavedReportId(null);
         } else {
           console.error("Failed to load daily report:", error);
           showToast("Failed to load daily report", "error");
@@ -177,7 +174,6 @@ export default function DailyReport({ t, lang }) {
     setRows((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Filter services by the raw dept key
   const getServicesByDept = (deptKey) => {
     if (!deptKey) return [];
     return allServices.filter((s) => s.dept === deptKey);
@@ -206,7 +202,6 @@ export default function DailyReport({ t, lang }) {
         grandTotal,
         team: user?.team || null,
       });
-      // ✅ NEW — capture the new report's id so AISummary can analyze it
       setSavedReportId(response?.data?._id || null);
       showToast("✅ Report saved successfully!", "success");
     } catch (error) {
@@ -224,7 +219,6 @@ export default function DailyReport({ t, lang }) {
     try {
       setExporting(true);
 
-      // Get valid rows
       const exportData = rows.filter((r) => r.dept || r.service);
 
       if (exportData.length === 0) {
@@ -232,7 +226,6 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
-      // Generate PDF using the new system
       await generateDailyReportPDF(exportData, date, t);
       showToast("✅ PDF exported successfully!", "success");
     } catch (error) {
@@ -496,7 +489,6 @@ export default function DailyReport({ t, lang }) {
                           {i + 1}
                         </td>
 
-                        {/* Department dropdown */}
                         <td style={tdCell}>
                           <select
                             style={{
@@ -533,7 +525,6 @@ export default function DailyReport({ t, lang }) {
                           </select>
                         </td>
 
-                        {/* Service dropdown */}
                         <td style={tdCell}>
                           <select
                             style={{
@@ -710,6 +701,27 @@ export default function DailyReport({ t, lang }) {
               </table>
             </div>
 
+            {/* ✅ NEW — AI Report Assistant */}
+            {rows.length > 0 && rows.some((r) => r.dept || r.service) && (
+              <div style={{ marginTop: "clamp(12px, 3vw, 16px)" }}>
+                <AIReportAssistant
+                  reportContext={{
+                    date: date,
+                    entries: rows.filter((r) => r.dept || r.service),
+                    grandTotal: rows.reduce(
+                      (sum, e) => sum + (e.total || 0),
+                      0,
+                    ),
+                    teamName: user?.team || "My Team",
+                  }}
+                  onApply={(text) => {
+                    showToast("AI suggestion applied to report!", "success");
+                    console.log("Applied suggestion:", text);
+                  }}
+                />
+              </div>
+            )}
+
             {/* Action Buttons */}
             <div
               style={{
@@ -795,7 +807,7 @@ export default function DailyReport({ t, lang }) {
               </button>
             </div>
 
-            {/* ✅ NEW — AI Insight panel, only shows once a report has been saved */}
+            {/* AI Insight panel, only shows once a report has been saved */}
             {savedReportId && (
               <AISummary
                 fetchFn={(id) => aiAPI.getDailyInsight(id, null)}
