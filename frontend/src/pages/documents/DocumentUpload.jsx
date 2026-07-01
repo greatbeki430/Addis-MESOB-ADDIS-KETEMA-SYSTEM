@@ -22,8 +22,6 @@ import {
   FiBook,
   FiClock,
   FiAlertTriangle,
-  // FiFolder,
-  // FiDownload,
 } from "react-icons/fi";
 
 const uploadDocument = (data) => documentAPI.upload(data);
@@ -148,7 +146,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         a.notes?.toLowerCase().includes("not a government document") ||
         a.notes?.toLowerCase().includes("business card") ||
         a.notes?.toLowerCase().includes("professional profile") ||
-        (a.confidence === "low" && !a.citizenName && !a.issueDate);
+        a.notes?.toLowerCase().includes("promotional") ||
+        a.notes?.toLowerCase().includes("digital solutions") ||
+        a.notes?.toLowerCase().includes("not a crrsa") ||
+        (a.confidence === "low" && !a.citizenName && !a.issueDate && !a.title);
 
       if (isNotCRRSA) {
         setIsNotCRRSADocument(true);
