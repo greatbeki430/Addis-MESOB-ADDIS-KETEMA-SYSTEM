@@ -4,6 +4,28 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { documentAPI } from "../../services/api";
+
+// ✅ Import react-icons
+import {
+  FiUpload,
+  FiX,
+  FiFile,
+  FiCheck,
+  FiAlertCircle,
+  FiInfo,
+  FiTag,
+  FiUser,
+  FiCalendar,
+  FiLock,
+  FiLoader,
+  FiFileText,
+  FiBook,
+  FiClock,
+  FiAlertTriangle,
+  // FiFolder,
+  // FiDownload,
+} from "react-icons/fi";
+
 const uploadDocument = (data) => documentAPI.upload(data);
 const analyzeDocument = (file, mimeType) => documentAPI.analyze(file, mimeType);
 
@@ -63,9 +85,12 @@ const aiBadge = (
       padding: "1px 7px",
       borderRadius: "99px",
       marginLeft: "6px",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "3px",
     }}
   >
-    ✨ AI
+    <FiBook size={10} /> AI
   </span>
 );
 
@@ -90,28 +115,81 @@ export default function DocumentUpload({ onSuccess, onClose }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
 
-  // ✅ NEW — AI auto-fill state
+  // ✅ AI auto-fill state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState("");
-  const [aiFilledFields, setAiFilledFields] = useState({}); // tracks which fields AI populated, for the visual badge/highlight
+  const [aiFilledFields, setAiFilledFields] = useState({});
   const [aiConfidence, setAiConfidence] = useState(null);
+  const [aiNotes, setAiNotes] = useState("");
+  const [isNotCRRSADocument, setIsNotCRRSADocument] = useState(false);
+  const [detectedDocumentType, setDetectedDocumentType] = useState("");
 
-  // ✅ NEW — calls the backend AI vision analyzer and auto-fills the form
+  // ✅ Calls the backend AI vision analyzer and auto-fills the form
   const runAiAnalysis = async (base64File, mimeType) => {
     setIsAnalyzing(true);
     setAnalyzeError("");
     setAiFilledFields({});
     setAiConfidence(null);
+    setAiNotes("");
+    setIsNotCRRSADocument(false);
+    setDetectedDocumentType("");
 
     try {
       const res = await analyzeDocument(base64File, mimeType);
       const a = res.data?.analysis || {};
 
+      // ✅ Store AI notes and detected type
+      if (a.notes) setAiNotes(a.notes);
+      if (a.documentType) setDetectedDocumentType(a.documentType);
+
+      // ✅ Check if AI detected this is NOT a CRRSA document
+      const isNotCRRSA =
+        a.documentType === "other" ||
+        a.notes?.toLowerCase().includes("not a government document") ||
+        a.notes?.toLowerCase().includes("business card") ||
+        a.notes?.toLowerCase().includes("professional profile") ||
+        (a.confidence === "low" && !a.citizenName && !a.issueDate);
+
+      if (isNotCRRSA) {
+        setIsNotCRRSADocument(true);
+        // ✅ Still fill what we can (name, title, tags)
+        const filled = {};
+        setForm((prev) => {
+          const next = { ...prev };
+
+          if (a.citizenName) {
+            next.citizenName = a.citizenName;
+            filled.citizenName = true;
+          }
+          if (a.title) {
+            next.title = a.title;
+            filled.title = true;
+          }
+          if (a.tags && Array.isArray(a.tags)) {
+            next.tags = a.tags.join(", ");
+            filled.tags = true;
+          }
+          if (a.notes) {
+            next.notes = a.notes;
+            filled.notes = true;
+          }
+          // ✅ Set document type to "other" for non-CRRSA documents
+          next.documentType = "other";
+          filled.documentType = true;
+
+          return next;
+        });
+        setAiFilledFields(filled);
+        setAiConfidence(a.confidence || "low");
+        return;
+      }
+
+      // ✅ Normal CRRSA document processing
       const filled = {};
       setForm((prev) => {
         const next = { ...prev };
 
-        if (a.documentType) {
+        if (a.documentType && a.documentType !== "other") {
           next.documentType = a.documentType;
           filled.documentType = true;
         }
@@ -158,10 +236,11 @@ export default function DocumentUpload({ onSuccess, onClose }) {
       setAiFilledFields(filled);
       setAiConfidence(a.confidence || null);
     } catch (err) {
-      setAnalyzeError(
+      const errorMsg =
         err.response?.data?.message ||
-          "AI couldn't analyze this document — you can still fill the form manually.",
-      );
+        "AI analysis failed. Please fill in the fields manually.";
+      setAnalyzeError(errorMsg);
+      console.error("AI Analysis error:", err);
     } finally {
       setIsAnalyzing(false);
     }
@@ -176,7 +255,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
     reader.onload = () => {
       const result = reader.result;
       setFileBase64(result);
-      // ✅ NEW — automatically trigger AI analysis as soon as the file is read
+      // ✅ Automatically trigger AI analysis as soon as the file is read
       runAiAnalysis(result, f.type);
     };
     reader.readAsDataURL(f);
@@ -234,7 +313,13 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           width: "440px",
         }}
       >
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>✅</div>
+        <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+          <FiCheck
+            size={48}
+            color="#22C55E"
+            style={{ display: "block", margin: "0 auto" }}
+          />
+        </div>
         <h3 style={{ fontWeight: 700, color: "#0F172A" }}>
           Document Uploaded!
         </h3>
@@ -251,11 +336,17 @@ export default function DocumentUpload({ onSuccess, onClose }) {
               fontSize: "13px",
               color: "#1D4ED8",
               textAlign: "left",
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "8px",
             }}
           >
-            <strong>✨ AI Extracted:</strong>
-            <br />
-            {success.document.aiExtractedData.summary}
+            <FiInfo size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
+            <div>
+              <strong>AI Extracted:</strong>
+              <br />
+              {success.document.aiExtractedData.summary}
+            </div>
           </div>
         )}
       </div>
@@ -282,8 +373,18 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           marginBottom: "20px",
         }}
       >
-        <h2 style={{ fontSize: "18px", fontWeight: 700, margin: 0 }}>
-          📤 Upload CRRSA Document
+        <h2
+          style={{
+            fontSize: "18px",
+            fontWeight: 700,
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <FiUpload size={20} color="#2563EB" />
+          Upload CRRSA Document
         </h2>
         <button
           onClick={onClose}
@@ -293,9 +394,13 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             fontSize: "20px",
             cursor: "pointer",
             color: "#64748B",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "4px",
           }}
         >
-          ✕
+          <FiX size={20} />
         </button>
       </div>
 
@@ -314,8 +419,20 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         }}
       >
         <input {...getInputProps()} />
-        <div style={{ fontSize: "32px", marginBottom: "8px" }}>
-          {file ? "✅" : isDragActive ? "📂" : "📁"}
+        <div
+          style={{
+            fontSize: "32px",
+            marginBottom: "8px",
+            color: file ? "#22C55E" : "#64748B",
+          }}
+        >
+          {file ? (
+            <FiCheck size={32} />
+          ) : isDragActive ? (
+            <FiUpload size={32} />
+          ) : (
+            <FiFile size={32} />
+          )}
         </div>
         <p style={{ fontSize: "13px", color: "#475569", margin: 0 }}>
           {file
@@ -324,12 +441,23 @@ export default function DocumentUpload({ onSuccess, onClose }) {
               ? "Drop the file here..."
               : "Drag and drop PDF, JPG, PNG, or TIFF — or click to browse"}
         </p>
-        <p style={{ fontSize: "11px", color: "#94A3B8", margin: "4px 0 0" }}>
+        <p
+          style={{
+            fontSize: "11px",
+            color: "#94A3B8",
+            margin: "4px 0 0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "4px",
+          }}
+        >
+          <FiInfo size={12} />
           Max 20MB · AI will auto-detect document details
         </p>
       </div>
 
-      {/* ✅ NEW — AI analysis status banner */}
+      {/* ✅ AI analysis status banner */}
       {isAnalyzing && (
         <div
           style={{
@@ -345,12 +473,44 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             color: "#1D4ED8",
           }}
         >
-          <span style={{ animation: "spin 1s linear infinite" }}>✨</span>
+          <span style={{ animation: "spin 1s linear infinite" }}>
+            <FiLoader size={16} />
+          </span>
           Reading document with AI — auto-filling fields...
         </div>
       )}
 
-      {!isAnalyzing && aiConfidence && (
+      {/* ✅ Not a CRRSA document warning */}
+      {!isAnalyzing && isNotCRRSADocument && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "8px",
+            background: "#FFFBEB",
+            border: "1px solid #FDE68A",
+            borderRadius: "8px",
+            padding: "10px 14px",
+            marginBottom: "16px",
+            fontSize: "13px",
+            color: "#92400E",
+          }}
+        >
+          <FiAlertTriangle
+            size={16}
+            style={{ flexShrink: 0, marginTop: "1px" }}
+          />
+          <div>
+            <strong>Document type not recognized as a CRRSA document.</strong>
+            <br />
+            {aiNotes ||
+              "This appears to be a non-government document. Please select the appropriate document type or use 'Other'."}
+          </div>
+        </div>
+      )}
+
+      {/* ✅ AI confidence banner */}
+      {!isAnalyzing && aiConfidence && !isNotCRRSADocument && (
         <div
           style={{
             display: "flex",
@@ -381,14 +541,47 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                   : "#B91C1C",
           }}
         >
-          ✨ AI filled the fields below ({aiConfidence} confidence) — please
-          review before submitting.
+          {aiConfidence === "high" ? (
+            <FiCheck size={16} />
+          ) : (
+            <FiAlertCircle size={16} />
+          )}
+          AI filled the fields below ({aiConfidence} confidence) — please review
+          before submitting.
+        </div>
+      )}
+
+      {/* ✅ AI notes display for low confidence */}
+      {!isAnalyzing && aiNotes && !isNotCRRSADocument && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "8px",
+            background: "#F0F9FF",
+            border: "1px solid #93C5FD",
+            borderRadius: "8px",
+            padding: "10px 14px",
+            marginBottom: "16px",
+            fontSize: "13px",
+            color: "#1D4ED8",
+          }}
+        >
+          <FiInfo size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
+          <div>
+            <strong>AI Analysis Notes:</strong>
+            <br />
+            {aiNotes}
+          </div>
         </div>
       )}
 
       {analyzeError && (
         <div
           style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "8px",
             background: "#FEF2F2",
             border: "1px solid #FECACA",
             borderRadius: "8px",
@@ -398,7 +591,11 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             color: "#B91C1C",
           }}
         >
-          ⚠ {analyzeError}
+          <FiAlertCircle
+            size={16}
+            style={{ flexShrink: 0, marginTop: "1px" }}
+          />
+          {analyzeError}
         </div>
       )}
 
@@ -406,6 +603,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
       <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
         <div>
           <label style={labelStyle}>
+            <FiBook size={12} style={{ marginRight: "4px" }} />
             Document Type *{aiFilledFields.documentType && aiBadge}
           </label>
           <select
@@ -420,10 +618,19 @@ export default function DocumentUpload({ onSuccess, onClose }) {
               </option>
             ))}
           </select>
+          {detectedDocumentType && !form.documentType && (
+            <div
+              style={{ fontSize: "11px", color: "#64748B", marginTop: "4px" }}
+            >
+              <FiInfo size={12} style={{ marginRight: "4px" }} />
+              AI detected: {detectedDocumentType.replace(/_/g, " ")}
+            </div>
+          )}
         </div>
 
         <div>
           <label style={labelStyle}>
+            <FiFileText size={12} style={{ marginRight: "4px" }} />
             Title *{aiFilledFields.title && aiBadge}
           </label>
           <input
@@ -443,6 +650,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         >
           <div>
             <label style={labelStyle}>
+              <FiUser size={12} style={{ marginRight: "4px" }} />
               Citizen Name (English){aiFilledFields.citizenName && aiBadge}
             </label>
             <input
@@ -478,6 +686,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         >
           <div>
             <label style={labelStyle}>
+              <FiCalendar size={12} style={{ marginRight: "4px" }} />
               Issue Date{aiFilledFields.issueDate && aiBadge}
             </label>
             <input
@@ -516,6 +725,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
 
         <div>
           <label style={labelStyle}>
+            <FiTag size={12} style={{ marginRight: "4px" }} />
             Tags (comma-separated){aiFilledFields.tags && aiBadge}
           </label>
           <input
@@ -528,6 +738,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
 
         <div>
           <label style={labelStyle}>
+            <FiFileText size={12} style={{ marginRight: "4px" }} />
             Notes{aiFilledFields.notes && aiBadge}
           </label>
           <textarea
@@ -550,7 +761,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           }}
         >
           <div>
-            <label style={labelStyle}>Access Level</label>
+            <label style={labelStyle}>
+              <FiLock size={12} style={{ marginRight: "4px" }} />
+              Access Level
+            </label>
             <select
               value={form.accessLevel}
               onChange={handleChange("accessLevel")}
@@ -562,7 +776,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             </select>
           </div>
           <div>
-            <label style={labelStyle}>Retention Policy</label>
+            <label style={labelStyle}>
+              <FiClock size={12} style={{ marginRight: "4px" }} />
+              Retention Policy
+            </label>
             <select
               value={form.retentionPolicy}
               onChange={handleChange("retentionPolicy")}
@@ -576,8 +793,18 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         </div>
 
         {error && (
-          <p style={{ color: "#DC2626", fontSize: "13px", margin: 0 }}>
-            ⚠ {error}
+          <p
+            style={{
+              color: "#DC2626",
+              fontSize: "13px",
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+            }}
+          >
+            <FiAlertCircle size={14} />
+            {error}
           </p>
         )}
 
@@ -594,13 +821,32 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             fontWeight: 600,
             cursor: isUploading || isAnalyzing ? "default" : "pointer",
             marginTop: "4px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
           }}
         >
-          {isUploading
-            ? "Uploading… Please wait"
-            : isAnalyzing
-              ? "Waiting for AI analysis…"
-              : "📤 Upload Document"}
+          {isUploading ? (
+            <>
+              <span style={{ animation: "spin 1s linear infinite" }}>
+                <FiLoader size={16} />
+              </span>
+              Uploading… Please wait
+            </>
+          ) : isAnalyzing ? (
+            <>
+              <span style={{ animation: "spin 1s linear infinite" }}>
+                <FiLoader size={16} />
+              </span>
+              Waiting for AI analysis…
+            </>
+          ) : (
+            <>
+              <FiUpload size={16} />
+              Upload Document
+            </>
+          )}
         </button>
       </div>
 
