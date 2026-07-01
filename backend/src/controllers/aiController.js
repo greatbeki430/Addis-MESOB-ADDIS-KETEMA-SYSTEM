@@ -48,7 +48,24 @@ const getDailyInsight = async (req, res) => {
     res.json({ insight, generatedAt: new Date().toISOString() });
   } catch (error) {
     console.error("AI daily insight error:", error);
-    res.status(500).json({ message: "AI service error", error: error.message });
+    const isQuotaError =
+      error.status === 429 ||
+      error.message?.includes("quota") ||
+      error.message?.includes("RESOURCE_EXHAUSTED");
+
+    if (isQuotaError) {
+      return res.status(429).json({
+        message: "AI service quota exceeded. Please try again later.",
+        code: "QUOTA_EXCEEDED",
+        retryAfter: 60,
+      });
+    }
+
+    res.status(500).json({
+      message: "AI service error",
+      error: error.message,
+      code: "AI_SERVICE_ERROR",
+    });
   }
 };
 
@@ -78,7 +95,24 @@ const getEvaluationSummary = async (req, res) => {
     res.json({ summary, generatedAt: new Date().toISOString() });
   } catch (error) {
     console.error("AI evaluation summary error:", error);
-    res.status(500).json({ message: "AI service error", error: error.message });
+    const isQuotaError =
+      error.status === 429 ||
+      error.message?.includes("quota") ||
+      error.message?.includes("RESOURCE_EXHAUSTED");
+
+    if (isQuotaError) {
+      return res.status(429).json({
+        message: "AI service quota exceeded. Please try again later.",
+        code: "QUOTA_EXCEEDED",
+        retryAfter: 60,
+      });
+    }
+
+    res.status(500).json({
+      message: "AI service error",
+      error: error.message,
+      code: "AI_SERVICE_ERROR",
+    });
   }
 };
 
@@ -95,11 +129,58 @@ const getDashboardDigest = async (req, res) => {
       return res.status(400).json({ message: "Stats object is required" });
     }
 
-    const digest = await generateDashboardDigest(stats);
+    console.log("📊 Generating dashboard digest with stats:", stats);
+
+    let digest;
+    try {
+      digest = await generateDashboardDigest(stats);
+    } catch (aiError) {
+      console.error("❌ AI generation failed:", aiError.message);
+
+      // ✅ Check if it's a quota error (429)
+      const isQuotaError =
+        aiError.status === 429 ||
+        aiError.message?.includes("quota") ||
+        aiError.message?.includes("RESOURCE_EXHAUSTED") ||
+        aiError.message?.includes("rate limit");
+
+      if (isQuotaError) {
+        console.log("⚠️ Gemini API quota exceeded, using static fallback");
+        // ✅ Static fallback digest - never fails
+        const {
+          totalUsers,
+          activeTeams,
+          totalServicesLogged,
+          topDepartment,
+          period,
+        } = stats;
+        digest = `📊 System Summary: ${activeTeams || 0} teams active, ${totalServicesLogged || 0} services logged this ${period || "period"}. ${topDepartment && topDepartment !== "N/A" ? `Top department: ${topDepartment}.` : ""} ${totalUsers ? `Total users: ${totalUsers}.` : ""} Continue delivering quality service to citizens.`;
+
+        // ✅ Return with a warning header but success status
+        return res.status(200).json({
+          digest,
+          generatedAt: new Date().toISOString(),
+          _warning: "AI service quota exceeded, using fallback digest",
+        });
+      } else {
+        // For other errors, re-throw
+        throw aiError;
+      }
+    }
+
     res.json({ digest, generatedAt: new Date().toISOString() });
   } catch (error) {
-    console.error("AI dashboard digest error:", error);
-    res.status(500).json({ message: "AI service error", error: error.message });
+    console.error("❌ AI dashboard digest error:", error);
+
+    // ✅ Last resort fallback - never fail completely
+    const { stats } = req.body || {};
+    const fallbackDigest = `📊 System active: ${stats?.activeTeams || 0} teams, ${stats?.totalServicesLogged || 0} services logged. ${stats?.topDepartment && stats?.topDepartment !== "N/A" ? `Top: ${stats.topDepartment}.` : ""}`;
+
+    res.status(200).json({
+      digest: fallbackDigest,
+      generatedAt: new Date().toISOString(),
+      _error: "AI service temporarily unavailable",
+    });
   }
 };
 
@@ -128,7 +209,24 @@ const getMeetingMinutes = async (req, res) => {
     res.json({ minutes, generatedAt: new Date().toISOString() });
   } catch (error) {
     console.error("AI meeting minutes error:", error);
-    res.status(500).json({ message: "AI service error", error: error.message });
+    const isQuotaError =
+      error.status === 429 ||
+      error.message?.includes("quota") ||
+      error.message?.includes("RESOURCE_EXHAUSTED");
+
+    if (isQuotaError) {
+      return res.status(429).json({
+        message: "AI service quota exceeded. Please try again later.",
+        code: "QUOTA_EXCEEDED",
+        retryAfter: 60,
+      });
+    }
+
+    res.status(500).json({
+      message: "AI service error",
+      error: error.message,
+      code: "AI_SERVICE_ERROR",
+    });
   }
 };
 

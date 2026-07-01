@@ -8,8 +8,24 @@
 
 const { GoogleGenAI } = require("@google/genai");
 
-const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-const MODEL = "gemini-2.5-flash"; // free tier; switch to "gemini-2.5-pro" for better quality
+// ✅ Better error handling for client initialization
+let client;
+let clientInitialized = false;
+
+try {
+  if (!process.env.GEMINI_API_KEY) {
+    console.error("❌ GEMINI_API_KEY environment variable is NOT set!");
+  } else {
+    client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    clientInitialized = true;
+    console.log("✅ Gemini AI client initialized successfully");
+  }
+} catch (error) {
+  console.error("❌ Failed to initialize Gemini AI client:", error.message);
+}
+
+// ✅ Use a model with better free tier quotas
+const MODEL = "gemini-2.0-flash-exp"; // Better free tier limits than gemini-2.5-flash
 
 // ============================================================
 // SYSTEM CONTEXT — tells Gemini what this system is
@@ -31,12 +47,48 @@ Be concise, professional, and helpful.`;
 // HELPER — calls Gemini with a system instruction + single prompt
 // ============================================================
 const generateText = async (prompt, systemInstruction = SYSTEM_CONTEXT) => {
-  const response = await client.models.generateContent({
-    model: MODEL,
-    contents: prompt,
-    config: { systemInstruction },
-  });
-  return response.text;
+  // ✅ Check if client is initialized
+  if (!clientInitialized || !client) {
+    console.error("❌ Gemini client not available. Check GEMINI_API_KEY.");
+    throw new Error(
+      "AI service is not configured. Please contact system administrator.",
+    );
+  }
+
+  try {
+    console.log(`🤖 Calling Gemini API with model: ${MODEL}`);
+
+    const response = await client.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: { systemInstruction },
+    });
+
+    console.log("✅ Gemini API response received");
+    return response.text;
+  } catch (error) {
+    console.error("❌ Gemini API error details:", {
+      message: error.message,
+      status: error.status,
+      code: error.code,
+      details: error.details || "No additional details",
+    });
+
+    // ✅ Throw a more specific error with status code
+    const apiError = new Error(error.message);
+    apiError.status = error.status || 500;
+
+    if (error.message?.includes("API key")) {
+      apiError.message =
+        "Invalid or missing Gemini API key. Please check your configuration.";
+    } else if (error.status === 429) {
+      apiError.message = "Gemini API quota exceeded. Please try again later.";
+    } else if (error.status === 500) {
+      apiError.message = "Gemini API service error. Please try again later.";
+    }
+
+    throw apiError;
+  }
 };
 
 // ============================================================
@@ -109,6 +161,8 @@ Keep it under 200 words. Use professional government report tone.`;
 // Called by: aiController → POST /api/ai/dashboard-digest
 // ============================================================
 const generateDashboardDigest = async (stats) => {
+  console.log("📊 Generating dashboard digest with stats:", stats);
+
   const prompt = `Generate a concise executive digest for the Addis MESOB system dashboard.
 
 Stats summary:
@@ -168,6 +222,12 @@ const handleChatMessage = async (
   userMessage,
   userContext,
 ) => {
+  // ✅ Check if client is initialized
+  if (!clientInitialized || !client) {
+    console.error("❌ Gemini client not available. Check GEMINI_API_KEY.");
+    return "AI service is currently unavailable. Please contact your system administrator.";
+  }
+
   const chatSystemPrompt = `${SYSTEM_CONTEXT}
 
 You are the user-facing chatbot for this system. The current user is:
@@ -185,20 +245,25 @@ You can help with:
 If asked about live data (e.g., "what are my scores?"), say you don't have real-time access but guide them to the right page.
 Keep responses under 150 words. Be friendly and professional.`;
 
-  // Build Gemini chat history — Gemini uses "model" instead of "assistant"
-  const history = conversationHistory.map((m) => ({
-    role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
-  }));
+  try {
+    // Build Gemini chat history — Gemini uses "model" instead of "assistant"
+    const history = conversationHistory.map((m) => ({
+      role: m.role === "assistant" ? "model" : "user",
+      parts: [{ text: m.content }],
+    }));
 
-  const chat = client.chats.create({
-    model: MODEL,
-    config: { systemInstruction: chatSystemPrompt },
-    history,
-  });
+    const chat = client.chats.create({
+      model: MODEL,
+      config: { systemInstruction: chatSystemPrompt },
+      history,
+    });
 
-  const response = await chat.sendMessage({ message: userMessage });
-  return response.text;
+    const response = await chat.sendMessage({ message: userMessage });
+    return response.text;
+  } catch (error) {
+    console.error("❌ Chatbot error:", error);
+    return "I'm having trouble processing your request. Please try again later or contact support if the issue persists.";
+  }
 };
 
 // ============================================================
@@ -206,6 +271,15 @@ Keep responses under 150 words. Be friendly and professional.`;
 // Called by: documentService → after Cloudinary upload
 // ============================================================
 const summarizeDocumentContent = async (documentText, documentType) => {
+  // ✅ Check if client is initialized
+  if (!clientInitialized || !client) {
+    console.error("❌ Gemini client not available. Check GEMINI_API_KEY.");
+    return {
+      summary: "Document uploaded successfully. AI analysis unavailable.",
+      extractedAt: new Date(),
+    };
+  }
+
   const prompt = `You are reviewing a scanned government document of type: "${documentType}".
 Here is the extracted text content:
 
@@ -225,15 +299,18 @@ Return ONLY valid JSON like this, no other text:
   "summary": "..."
 }`;
 
-  const text = await generateText(prompt);
-
   try {
+    const text = await generateText(prompt);
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     return jsonMatch
       ? { ...JSON.parse(jsonMatch[0]), extractedAt: new Date() }
       : { summary: text, extractedAt: new Date() };
-  } catch {
-    return { summary: text, extractedAt: new Date() };
+  } catch (error) {
+    console.error("❌ Document summarization error:", error);
+    return {
+      summary: "Document uploaded successfully. AI analysis unavailable.",
+      extractedAt: new Date(),
+    };
   }
 };
 
@@ -245,6 +322,16 @@ Return ONLY valid JSON like this, no other text:
 // returns structured fields to auto-fill the upload form.
 // ============================================================
 const analyzeDocumentImage = async (base64File, mimeType) => {
+  // ✅ Check if client is initialized
+  if (!clientInitialized || !client) {
+    console.error("❌ Gemini client not available. Check GEMINI_API_KEY.");
+    return {
+      confidence: "low",
+      notes: "AI analysis unavailable. Please fill in the fields manually.",
+      documentType: "other",
+    };
+  }
+
   const base64Data = base64File.includes(",")
     ? base64File.split(",")[1]
     : base64File;
@@ -273,28 +360,37 @@ Return ONLY a valid JSON object, no other text, no markdown fences, in exactly t
 If the image is unclear, blank, or not a recognizable document, set documentType to "other",
 leave uncertain fields as null, and set confidence to "low".`;
 
-  const response = await client.models.generateContent({
-    model: MODEL,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: prompt },
-          { inlineData: { mimeType, data: base64Data } },
-        ],
-      },
-    ],
-    config: { systemInstruction: SYSTEM_CONTEXT },
-  });
-
-  const text = response.text;
-
   try {
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { confidence: "low", notes: text };
-    return JSON.parse(jsonMatch[0]);
-  } catch {
-    return { confidence: "low", notes: "AI returned unparseable output." };
+    const response = await client.models.generateContent({
+      model: MODEL,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            { inlineData: { mimeType, data: base64Data } },
+          ],
+        },
+      ],
+      config: { systemInstruction: SYSTEM_CONTEXT },
+    });
+
+    const text = response.text;
+
+    try {
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) return { confidence: "low", notes: text };
+      return JSON.parse(jsonMatch[0]);
+    } catch {
+      return { confidence: "low", notes: "AI returned unparseable output." };
+    }
+  } catch (error) {
+    console.error("❌ Document analysis error:", error);
+    return {
+      confidence: "low",
+      notes: "AI analysis failed. Please fill in the fields manually.",
+      documentType: "other",
+    };
   }
 };
 
