@@ -9,13 +9,13 @@ const {
   clearChatSession,
 } = require("../controllers/chatbotController");
 
-// POST /api/chatbot/message    — send a message, get AI reply
+// ✅ POST /api/chatbot/message    — send a message, get AI reply
 router.post("/message", protect, anyRole, sendMessage);
 
-// GET  /api/chatbot/history    — get current session history
+// ✅ GET  /api/chatbot/history    — get current session history
 router.get("/history", protect, anyRole, getChatHistory);
 
-// DELETE /api/chatbot/clear    — clear the session
+// ✅ DELETE /api/chatbot/clear    — clear the session
 router.delete("/clear", protect, anyRole, clearChatSession);
 
 module.exports = router;

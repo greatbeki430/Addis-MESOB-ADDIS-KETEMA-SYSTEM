@@ -15,47 +15,95 @@ const sendMessage = async (req, res) => {
   try {
     const { message } = req.body;
 
+    // ✅ Validate input
     if (!message || typeof message !== "string" || message.trim() === "") {
-      return res.status(400).json({ message: "Message text is required" });
+      return res.status(400).json({
+        message: "Message text is required",
+        code: "MESSAGE_REQUIRED",
+      });
     }
 
     if (message.length > 1000) {
-      return res
-        .status(400)
-        .json({ message: "Message too long (max 1000 characters)" });
+      return res.status(400).json({
+        message: "Message too long (max 1000 characters)",
+        code: "MESSAGE_TOO_LONG",
+      });
     }
 
-    // Find or create session for this user
+    // ✅ Find or create session for this user
     let session = await ChatSession.findOne({
       user: req.user._id,
       isActive: true,
     });
 
     if (!session) {
-      session = new ChatSession({ user: req.user._id, messages: [] });
+      session = new ChatSession({
+        user: req.user._id,
+        messages: [],
+        isActive: true,
+      });
     }
 
-    // Build conversation history for Claude (last 20 messages for context)
+    // ✅ Build conversation history for AI (last 20 messages for context)
     const recentMessages = session.messages.slice(-20).map((m) => ({
       role: m.role,
       content: m.content,
     }));
 
-    // User context for personalized responses
+    // ✅ User context for personalized responses
     const userContext = {
-      name: req.user.name,
-      role: req.user.role,
+      name: req.user.name || "User",
+      role: req.user.role || "Employee",
       team: req.user.team?.toString() || null,
     };
 
-    // Get AI reply
-    const reply = await handleChatMessage(
-      recentMessages,
-      message.trim(),
-      userContext,
+    console.log(
+      `🤖 Chatbot: User ${userContext.name} asked: "${message.trim().substring(0, 50)}..."`,
     );
 
-    // Save both messages to session
+    // ✅ Get AI reply with error handling
+    let reply;
+    try {
+      reply = await handleChatMessage(
+        recentMessages,
+        message.trim(),
+        userContext,
+      );
+    } catch (aiError) {
+      console.error("❌ AI service error:", {
+        message: aiError.message,
+        status: aiError.status,
+        code: aiError.code,
+      });
+
+      // ✅ Return friendly error messages based on error type
+      if (
+        aiError.status === 429 ||
+        aiError.message?.includes("quota") ||
+        aiError.message?.includes("rate limit")
+      ) {
+        reply =
+          "The AI service is currently busy due to high demand. Please try again in a few minutes. If you need immediate help, please contact your team leader.";
+      } else if (
+        aiError.message?.includes("API key") ||
+        aiError.message?.includes("invalid") ||
+        aiError.message?.includes("not found")
+      ) {
+        reply =
+          "I'm having trouble connecting to the AI service. Please contact your system administrator.";
+      } else if (aiError.status === 404) {
+        reply =
+          "The AI service is currently unavailable. Please contact your system administrator.";
+      } else if (aiError.status === 500) {
+        reply =
+          "The AI service is temporarily unavailable. Please try again later or contact support if the issue persists.";
+      } else {
+        reply =
+          "I'm having trouble processing your request. Please try again later or contact support if the issue persists.";
+      }
+    }
+
+    // ✅ Save both messages to session
     session.messages.push({ role: "user", content: message.trim() });
     session.messages.push({ role: "assistant", content: reply });
     await session.save();
@@ -66,10 +114,12 @@ const sendMessage = async (req, res) => {
       messageCount: session.messages.length,
     });
   } catch (error) {
-    console.error("Chatbot error:", error);
-    res
-      .status(500)
-      .json({ message: "Chatbot service error", error: error.message });
+    console.error("❌ Chatbot controller error:", error);
+    res.status(500).json({
+      message: "Chatbot service error",
+      error: error.message,
+      code: "CHATBOT_ERROR",
+    });
   }
 };
 
@@ -86,15 +136,26 @@ const getChatHistory = async (req, res) => {
     });
 
     if (!session) {
-      return res.json({ messages: [], sessionId: null });
+      return res.json({
+        messages: [],
+        sessionId: null,
+        messageCount: 0,
+      });
     }
 
-    // Return last 30 messages
+    // ✅ Return last 30 messages
     const messages = session.messages.slice(-30);
-    res.json({ messages, sessionId: session._id });
+    res.json({
+      messages,
+      sessionId: session._id,
+      messageCount: session.messages.length,
+    });
   } catch (error) {
-    console.error("Get chat history error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Get chat history error:", error);
+    res.status(500).json({
+      message: error.message,
+      code: "HISTORY_ERROR",
+    });
   }
 };
 
@@ -105,15 +166,35 @@ const getChatHistory = async (req, res) => {
 // ============================================================
 const clearChatSession = async (req, res) => {
   try {
-    await ChatSession.findOneAndUpdate(
+    const session = await ChatSession.findOneAndUpdate(
       { user: req.user._id, isActive: true },
       { isActive: false },
+      { new: true },
     );
-    res.json({ message: "Chat session cleared" });
+
+    // ✅ Create a new session for future messages
+    const newSession = new ChatSession({
+      user: req.user._id,
+      messages: [],
+      isActive: true,
+    });
+    await newSession.save();
+
+    res.json({
+      message: "Chat session cleared successfully",
+      sessionId: newSession._id,
+    });
   } catch (error) {
-    console.error("Clear chat session error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Clear chat session error:", error);
+    res.status(500).json({
+      message: error.message,
+      code: "CLEAR_ERROR",
+    });
   }
 };
 
-module.exports = { sendMessage, getChatHistory, clearChatSession };
+module.exports = {
+  sendMessage,
+  getChatHistory,
+  clearChatSession,
+};
