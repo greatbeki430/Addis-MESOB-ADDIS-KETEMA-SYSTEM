@@ -2,6 +2,7 @@
 // Main CRRSA Document Vault page — list, search, and upload documents
 
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom"; // ✅ NEW — escapes the scrollable <main> layout container
 // import { fetchDocuments, getDocumentDownloadUrl } from "../../services/aiApi";
 import { documentAPI } from "../../services/api";
 import DocumentUpload from "./DocumentUpload";
@@ -266,28 +267,31 @@ export default function DocumentVault() {
         )}
       </div>
 
-      {/* Upload modal */}
-      {showUpload && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            zIndex: 200,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-          onClick={() => setShowUpload(false)}
-        >
-          <div onClick={(e) => e.stopPropagation()}>
-            <DocumentUpload
-              onSuccess={handleUploadComplete}
-              onClose={() => setShowUpload(false)}
-            />
-          </div>
-        </div>
-      )}
+      {/* Upload modal — rendered via portal so position:fixed centers on the
+          real browser viewport instead of the scrollable <main> container */}
+      {showUpload &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.5)",
+              zIndex: 200,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+            onClick={() => setShowUpload(false)}
+          >
+            <div onClick={(e) => e.stopPropagation()}>
+              <DocumentUpload
+                onSuccess={handleUploadComplete}
+                onClose={() => setShowUpload(false)}
+              />
+            </div>
+          </div>,
+          document.body,
+        )}
 
       {/* Filters */}
       <div
