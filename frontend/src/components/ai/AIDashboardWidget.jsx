@@ -21,6 +21,7 @@ const AIDashboardWidget = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null); // { message, code } | null
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Track mount/effect lifetime so we never set state after unmount
   const isMountedRef = useRef(true);
@@ -41,20 +42,44 @@ const AIDashboardWidget = ({
     setLoading(true);
     setError(null);
     try {
+      console.log("📊 Fetching dashboard digest with stats:", stats);
       const response = await aiAPI.getDashboardDigest(stats);
+
       // ✅ Only update state if component is still mounted
       if (isMountedRef.current) {
         setDigest(response.data.digest);
         setLastUpdated(new Date());
+        setRetryCount(0); // Reset retry count on success
       }
     } catch (err) {
       // ✅ Only update state if component is still mounted
       if (isMountedRef.current) {
-        const code = err?.response?.data?.code || "AI_UNKNOWN_ERROR";
-        const message =
+        const code =
+          err?.response?.data?.code ||
+          err?.response?.status ||
+          "AI_UNKNOWN_ERROR";
+        const status = err?.response?.status;
+
+        let message =
           err?.response?.data?.message ||
           "AI insights are temporarily unavailable.";
-        setError({ message, code });
+
+        // ✅ Check if it's a quota error (429)
+        const isQuotaError =
+          status === 429 ||
+          message.includes("quota") ||
+          message.includes("rate limit") ||
+          message.includes("RESOURCE_EXHAUSTED");
+
+        if (isQuotaError) {
+          message = "AI service is busy. Please try again in a few minutes.";
+          console.warn("⚠️ API quota exceeded, will retry later");
+
+          // ✅ Increment retry count for exponential backoff
+          setRetryCount((prev) => prev + 1);
+        }
+
+        setError({ message, code, isQuotaError });
         console.error(
           "[AIDashboardWidget] failed to load digest:",
           code,
@@ -74,6 +99,7 @@ const AIDashboardWidget = ({
   useEffect(() => {
     // ✅ Use a flag to track if this effect is still active
     let isEffectActive = true;
+    let retryTimeout = null;
 
     const loadData = async () => {
       if (!isEffectActive || !isMountedRef.current) return;
@@ -85,14 +111,33 @@ const AIDashboardWidget = ({
         if (isEffectActive && isMountedRef.current) {
           setDigest(response.data.digest);
           setLastUpdated(new Date());
+          setRetryCount(0);
         }
       } catch (err) {
         if (isEffectActive && isMountedRef.current) {
-          const code = err?.response?.data?.code || "AI_UNKNOWN_ERROR";
-          const message =
+          const code =
+            err?.response?.data?.code ||
+            err?.response?.status ||
+            "AI_UNKNOWN_ERROR";
+          const status = err?.response?.status;
+
+          let message =
             err?.response?.data?.message ||
             "AI insights are temporarily unavailable.";
-          setError({ message, code });
+
+          const isQuotaError =
+            status === 429 ||
+            message.includes("quota") ||
+            message.includes("rate limit") ||
+            message.includes("RESOURCE_EXHAUSTED");
+
+          if (isQuotaError) {
+            message = "AI service is busy. Please try again in a few minutes.";
+            console.warn("⚠️ API quota exceeded, will retry later");
+            setRetryCount((prev) => prev + 1);
+          }
+
+          setError({ message, code, isQuotaError });
           console.error(
             "[AIDashboardWidget] failed to load digest:",
             code,
@@ -110,19 +155,35 @@ const AIDashboardWidget = ({
     // ✅ Call the async function
     loadData();
 
-    // ✅ Set up interval
+    // ✅ Set up interval with exponential backoff for retries
+    const getInterval = () => {
+      // If we have quota errors, use longer intervals
+      if (retryCount > 0) {
+        const backoffTime = Math.min(
+          60000 * Math.pow(2, retryCount - 1),
+          300000,
+        ); // Max 5 minutes
+        console.log(`⏳ Using backoff: ${backoffTime}ms (retry ${retryCount})`);
+        return backoffTime;
+      }
+      return refreshInterval;
+    };
+
     const interval = setInterval(() => {
       if (isEffectActive && isMountedRef.current) {
         loadData();
       }
-    }, refreshInterval);
+    }, getInterval());
 
     // ✅ Cleanup: mark effect as inactive and clear interval
     return () => {
       isEffectActive = false;
       clearInterval(interval);
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
     };
-  }, [stats, refreshInterval]);
+  }, [stats, refreshInterval, retryCount]);
 
   // Loading state (first load only — subsequent refreshes keep showing
   // the last good digest while loading, see "Refreshing..." button state)
@@ -153,6 +214,11 @@ const AIDashboardWidget = ({
   // No red/alert styling: a missing AI digest is not a system failure from
   // the end user's point of view.
   if (error && !digest) {
+    const isQuotaError = error.isQuotaError;
+    const displayMessage = isQuotaError
+      ? "AI service is busy. Please try again in a few minutes."
+      : "AI insights are temporarily unavailable.";
+
     return (
       <div
         style={{
@@ -169,11 +235,24 @@ const AIDashboardWidget = ({
         className={className}
       >
         <span style={{ color: "#64748B", fontSize: "13px" }}>
-          AI insights are temporarily unavailable.
+          {displayMessage}
+          {isQuotaError && retryCount > 1 && (
+            <span
+              style={{
+                fontSize: "11px",
+                display: "block",
+                marginTop: "2px",
+                color: "#94A3B8",
+              }}
+            >
+              Auto-retry in {Math.min(60 * Math.pow(2, retryCount - 1), 300)}{" "}
+              seconds...
+            </span>
+          )}
         </span>
         <button
           onClick={() => {
-            // ✅ Use fetchDigest for retry
+            setRetryCount(0);
             fetchDigest();
           }}
           disabled={loading}
@@ -268,7 +347,7 @@ const AIDashboardWidget = ({
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <button
               onClick={() => {
-                // ✅ Use fetchDigest for manual refresh
+                setRetryCount(0);
                 fetchDigest();
               }}
               disabled={loading}
