@@ -137,7 +137,13 @@ export default function DocumentUpload({ onSuccess, onClose }) {
       const a = res.data?.analysis || {};
 
       // ✅ Store AI notes and detected type
-      if (a.notes) setAiNotes(a.notes);
+      if (a.notes) {
+        setAiNotes(a.notes);
+        // ✅ Also set the notes field in the form for non-CRRSA documents
+        if (a.documentType === "other" || a.confidence === "low") {
+          setForm((prev) => ({ ...prev, notes: a.notes }));
+        }
+      }
       if (a.documentType) setDetectedDocumentType(a.documentType);
 
       // ✅ Check if AI detected this is NOT a CRRSA document
@@ -170,6 +176,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             next.tags = a.tags.join(", ");
             filled.tags = true;
           }
+          // ✅ Always store AI notes in the notes field
           if (a.notes) {
             next.notes = a.notes;
             filled.notes = true;
@@ -481,7 +488,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         </div>
       )}
 
-      {/* ✅ Not a CRRSA document warning */}
+      {/* ✅ Not a CRRSA document warning with AI notes */}
       {!isAnalyzing && isNotCRRSADocument && (
         <div
           style={{
@@ -504,8 +511,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           <div>
             <strong>Document type not recognized as a CRRSA document.</strong>
             <br />
-            {aiNotes ||
-              "This appears to be a non-government document. Please select the appropriate document type or use 'Other'."}
+            <span style={{ fontSize: "13px", color: "#78350F" }}>
+              {aiNotes ||
+                "This document does not appear to be a government CRRSA document. You can still upload it using the 'Other' document type."}
+            </span>
           </div>
         </div>
       )}
@@ -552,30 +561,33 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         </div>
       )}
 
-      {/* ✅ AI notes display for low confidence */}
-      {!isAnalyzing && aiNotes && !isNotCRRSADocument && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "flex-start",
-            gap: "8px",
-            background: "#F0F9FF",
-            border: "1px solid #93C5FD",
-            borderRadius: "8px",
-            padding: "10px 14px",
-            marginBottom: "16px",
-            fontSize: "13px",
-            color: "#1D4ED8",
-          }}
-        >
-          <FiInfo size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
-          <div>
-            <strong>AI Analysis Notes:</strong>
-            <br />
-            {aiNotes}
+      {/* ✅ AI notes display for low confidence documents */}
+      {!isAnalyzing &&
+        aiNotes &&
+        !isNotCRRSADocument &&
+        aiConfidence === "low" && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "8px",
+              background: "#F0F9FF",
+              border: "1px solid #93C5FD",
+              borderRadius: "8px",
+              padding: "10px 14px",
+              marginBottom: "16px",
+              fontSize: "13px",
+              color: "#1D4ED8",
+            }}
+          >
+            <FiInfo size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
+            <div>
+              <strong>AI Note:</strong>
+              <br />
+              {aiNotes}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {analyzeError && (
         <div
