@@ -1,62 +1,149 @@
 // backend/src/services/aiService.js
 // Core AI Service — Addis MESOB Digital Management System
-// SDK: @google/genai (active, supports AQ. keys)
-// Model: gemini-2.0-flash (free tier, replaces deprecated gemini-1.5-flash)
+// SDK: @google/genai (active, not deprecated)
+// Model: gemini-2.5-flash (current free-tier model as of mid-2026)
 
 const { GoogleGenAI } = require("@google/genai");
 
-let client;
+// ============================================================
+// CLIENT INITIALIZATION + KEY VALIDATION
+// ============================================================
+const RAW_KEY = (process.env.GEMINI_API_KEY || "").trim();
+
+// Gemini keys from AI Studio always start with "AIza".
+// Keys starting with "AQ." are OAuth access tokens — they look like API keys
+// but are rejected with 401 by every Gemini endpoint. If you see this warning
+// on startup, go to https://aistudio.google.com/app/apikey, create a fresh
+// API key (it will start with "AIza"), and update GEMINI_API_KEY in Railway.
+const looksValid = /^AIza[0-9A-Za-z_-]{20,}$/.test(RAW_KEY);
+
+let client = null;
 let clientInitialized = false;
 
-try {
-  if (!process.env.GEMINI_API_KEY) {
-    console.error("❌ GEMINI_API_KEY environment variable is NOT set!");
-  } else {
-    client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+if (!RAW_KEY) {
+  console.error(
+    "[aiService] ❌ GEMINI_API_KEY is not set. All AI endpoints will return errors.",
+  );
+} else if (!looksValid) {
+  console.warn(
+    `[aiService] ⚠️  GEMINI_API_KEY does not look like a valid Gemini API key.\n` +
+      `  Current key prefix: "${RAW_KEY.slice(0, 6)}..."\n` +
+      `  Valid Gemini keys start with "AIza". Keys starting with "AQ." are OAuth tokens, not API keys.\n` +
+      `  Fix: go to https://aistudio.google.com/app/apikey → Create API key → copy the AIza... value → update Railway Variables.`,
+  );
+  // Still try to initialize — in case Google changes their key format in future
+  try {
+    client = new GoogleGenAI({ apiKey: RAW_KEY });
     clientInitialized = true;
-    console.log("✅ Gemini AI client initialized successfully");
+  } catch (e) {
+    console.error("[aiService] ❌ Client init failed:", e.message);
   }
-} catch (error) {
-  console.error("❌ Failed to initialize Gemini AI client:", error.message);
+} else {
+  try {
+    client = new GoogleGenAI({ apiKey: RAW_KEY });
+    clientInitialized = true;
+    console.log(
+      "[aiService] ✅ Gemini AI client initialized (key looks valid).",
+    );
+  } catch (e) {
+    console.error("[aiService] ❌ Client init failed:", e.message);
+  }
 }
 
-// ✅ FIXED: gemini-1.5-flash is deprecated — gemini-2.0-flash is the
-//    current free-tier model. This was causing the 404 "Model not found"
-//    error that produced "AI service currently unavailable (Model configuration issue)"
-const MODEL = "gemini-2.0-flash";
+// gemini-2.5-flash is the current recommended free-tier model.
+// gemini-2.0-flash also works but is an older generation.
+// Do NOT use gemini-1.5-flash — it was deprecated and returns 404.
+const MODEL = "gemini-2.5-flash";
 
 // ============================================================
-// SYSTEM CONTEXT
+// ERROR NORMALIZER
+// Every SDK call goes through this so callers always get a structured
+// error with a machine-readable `code` and a human-readable `message`
+// that actually explains what went wrong (instead of generic "AI error").
+// ============================================================
+const normalizeAIError = (err) => {
+  const status = err?.status ?? err?.response?.status ?? null;
+  const raw = err?.message ?? String(err);
+
+  let code = "AI_UNKNOWN_ERROR";
+  let message = raw;
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    /API_KEY_INVALID|unauthe|invalid.*key|api.?key.*invalid/i.test(raw)
+  ) {
+    code = "AI_AUTH_ERROR";
+    message =
+      "Gemini API rejected the request: authentication failed. " +
+      "The GEMINI_API_KEY in Railway is likely an OAuth token (starts with AQ.) instead of a real API key (starts with AIza). " +
+      "Go to https://aistudio.google.com/app/apikey, generate a new API key, and update the Railway variable.";
+  } else if (
+    status === 429 ||
+    /RESOURCE_EXHAUSTED|rate.?limit|quota/i.test(raw)
+  ) {
+    code = "AI_RATE_LIMIT";
+    message =
+      "Gemini API rate limit or quota exceeded. Wait a moment then try again.";
+  } else if (status === 404 || /model.*not.*found|404/i.test(raw)) {
+    code = "AI_MODEL_NOT_FOUND";
+    message = `Gemini model "${MODEL}" not found. The model name may have changed — update MODEL in aiService.js.`;
+  } else if (/network|ECONNRESET|ENOTFOUND|ETIMEDOUT|fetch.?fail/i.test(raw)) {
+    code = "AI_NETWORK_ERROR";
+    message =
+      "Could not reach the Gemini API. Check Railway's internet access or Gemini status at https://status.cloud.google.com.";
+  }
+
+  const normalized = new Error(message);
+  normalized.code = code;
+  normalized.status = status;
+  normalized.cause = err;
+  return normalized;
+};
+
+// ============================================================
+// SYSTEM CONTEXT — identity + domain knowledge for every prompt
 // ============================================================
 const SYSTEM_CONTEXT = `You are an AI assistant embedded in the Addis MESOB Digital Management System,
-a government service management platform for Addis Ababa city administration (Addis Ketema sub-city).
+a government service management platform for Addis Ketema Sub-City administration in Addis Ababa, Ethiopia.
 
 The system manages these CRRSA (Civil Registration and Residency Service Agency) departments:
 Revenue (ገቢዎች), Civil Registry (ሲቪል ምዝገባ), Labor & Skills (ስራና ክህሎት),
 Housing (ቤቶች), Traffic (ትራፊክ), Transport (አሽ/ተሽ), Investment (ኢንቨስትመንት),
 Construction (ግንባታ), Land (መሬት), Planning (ፕላን).
 
-Users: employees, team leaders, admins, superadmins.
-The system tracks daily service reports, team evaluations, peer forum meetings, and documents.
+Users include: employees, team leaders, admins, and superadmins.
+The system tracks daily service reports, team evaluations, peer forum meetings, and civil registration documents.
 Always respond in the same language the user writes in (Amharic or English).
 Be concise, professional, and helpful. For Amharic, use proper Ethiopic script.`;
 
 // ============================================================
-// HELPER — single-turn text generation
+// HELPER — single-turn text generation with error normalization
 // ============================================================
 const generateText = async (prompt, systemInstruction = SYSTEM_CONTEXT) => {
   if (!clientInitialized || !client) {
-    throw new Error(
-      "AI service is not configured. Please contact system administrator.",
+    const err = new Error(
+      "AI service is not configured (missing or invalid GEMINI_API_KEY). Contact system administrator.",
     );
+    err.code = "AI_NOT_CONFIGURED";
+    throw err;
   }
 
-  const response = await client.models.generateContent({
-    model: MODEL,
-    contents: prompt,
-    config: { systemInstruction },
-  });
-  return response.text;
+  try {
+    const response = await client.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: { systemInstruction },
+    });
+    return response.text;
+  } catch (err) {
+    const normalized = normalizeAIError(err);
+    console.error(
+      `[aiService] generateText failed [${normalized.code}]:`,
+      normalized.message,
+    );
+    throw normalized;
+  }
 };
 
 // ============================================================
@@ -180,6 +267,8 @@ Professional tone. Under 300 words.`;
 // ============================================================
 // 5. CHATBOT CONVERSATION HANDLER
 // POST /api/chatbot/message
+// Returns a friendly string on error (never throws) so the chatbot
+// always gives the user a response rather than a blank error.
 // ============================================================
 const handleChatMessage = async (
   conversationHistory,
@@ -200,10 +289,9 @@ Team: ${userContext.team || "No team assigned"}
 You can help with:
 - Explaining how to use any part of the system (Dashboard, Daily Reports, Evaluation, Forum, Services, Document Vault)
 - Describing CRRSA departments and their services in detail
-- Guiding navigation: tell the user exactly which menu item to click
+- Guiding navigation: tell the user exactly which menu item or path to use
 - Answering questions about evaluations, reports, daily logs, and documents
 - Explaining what each evaluation criterion means
-- Helping fill out forms and reports
 - Answering in Amharic or English — always match the user's language
 - Providing tips and best practices for government service delivery
 
@@ -234,16 +322,21 @@ If asked about live data, guide them to the correct page. Keep responses under 2
 
     const response = await chat.sendMessage({ message: userMessage });
     return response.text;
-  } catch (error) {
-    console.error("❌ Chatbot error:", {
-      message: error.message,
-      status: error.status,
-    });
+  } catch (err) {
+    const normalized = normalizeAIError(err);
+    console.error(
+      `[aiService] chatbot failed [${normalized.code}]:`,
+      normalized.message,
+    );
 
-    if (error.status === 429 || error.message?.includes("quota")) {
+    // Return a user-friendly string so the chatbot always shows something
+    if (normalized.code === "AI_AUTH_ERROR") {
+      return "I'm unable to process requests right now due to an authentication issue with the AI service. Please contact your system administrator.";
+    }
+    if (normalized.code === "AI_RATE_LIMIT") {
       return "The AI service is currently busy. Please try again in a few minutes.";
     }
-    if (error.status === 404) {
+    if (normalized.code === "AI_MODEL_NOT_FOUND") {
       return "AI model configuration error. Please contact your system administrator.";
     }
     return "I'm having trouble processing your request. Please try again.";
@@ -327,7 +420,7 @@ Extract all visible information and return ONLY valid JSON (no markdown fences):
   "confidence": "high|medium|low"
 }
 
-Be honest. If the document is not recognizable, set documentType to "other" and confidence to "low".`;
+If not recognizable: set documentType to "other", uncertain fields to null, confidence to "low".`;
 
   try {
     const response = await client.models.generateContent({
@@ -361,8 +454,12 @@ Be honest. If the document is not recognizable, set documentType to "other" and 
           : "CRRSA document detected.";
     if (!result.confidence) result.confidence = "low";
     return result;
-  } catch (error) {
-    console.error("❌ Document analysis error:", error);
+  } catch (err) {
+    const normalized = normalizeAIError(err);
+    console.error(
+      `[aiService] analyzeDocumentImage failed [${normalized.code}]:`,
+      normalized.message,
+    );
     return {
       confidence: "low",
       notes: "AI analysis failed. Please fill fields manually.",
@@ -373,8 +470,7 @@ Be honest. If the document is not recognizable, set documentType to "other" and 
 
 // ============================================================
 // 8. SMART SERVICE RECOMMENDATIONS
-// NEW: POST /api/ai/service-recommendations
-// Given a user's query, recommends relevant CRRSA services
+// POST /api/ai/service-recommendations
 // ============================================================
 const generateServiceRecommendations = async (query, availableServices) => {
   const serviceList = availableServices
@@ -385,10 +481,10 @@ const generateServiceRecommendations = async (query, availableServices) => {
   const prompt = `A citizen is asking: "${query}"
 
 Available CRRSA services:
-${serviceList}
+${serviceList || "- No services currently in database"}
 
 Recommend the most relevant 3-5 services for this citizen.
-Return ONLY valid JSON:
+Return ONLY valid JSON (no markdown):
 {
   "recommendations": [
     {
@@ -406,8 +502,7 @@ Return ONLY valid JSON:
 
 // ============================================================
 // 9. PERFORMANCE TREND ANALYSIS
-// NEW: POST /api/ai/performance-trend
-// Analyzes multiple daily reports to find patterns
+// POST /api/ai/performance-trend
 // ============================================================
 const generatePerformanceTrend = async (reportsArray, teamName) => {
   const reportSummary = reportsArray
@@ -436,22 +531,21 @@ Under 250 words. Plain text, no markdown.`;
 
 // ============================================================
 // 10. CITIZEN COMPLAINT CATEGORIZER
-// NEW: POST /api/ai/categorize-complaint
-// Categorizes and drafts responses to citizen complaints
+// POST /api/ai/categorize-complaint
 // ============================================================
 const categorizeComplaint = async (complaintText) => {
   const prompt = `A citizen submitted this complaint/feedback to Addis Ketema sub-city CRRSA office:
 
 "${complaintText}"
 
-Analyze and return ONLY valid JSON:
+Analyze and return ONLY valid JSON (no markdown):
 {
   "category": "service_delay|staff_conduct|document_error|facility_issue|process_unclear|other",
   "severity": "high|medium|low",
   "department": "most likely responsible department or null",
-  "suggestedResponse": "professional Amharic/English response draft (2-3 sentences)",
+  "suggestedResponse": "professional response draft in 2-3 sentences",
   "actionRequired": "specific action the office should take",
-  "estimatedResolutionDays": number
+  "estimatedResolutionDays": 3
 }`;
 
   const text = await generateText(prompt);
@@ -462,9 +556,8 @@ Analyze and return ONLY valid JSON:
 };
 
 // ============================================================
-// 11. AMHARIC TRANSLATION ASSISTANT
-// NEW: POST /api/ai/translate
-// Translates between Amharic and English for government content
+// 11. AMHARIC / ENGLISH TRANSLATION
+// POST /api/ai/translate
 // ============================================================
 const translateContent = async (text, targetLanguage) => {
   const prompt = `Translate the following text to ${targetLanguage === "am" ? "Amharic (አማርኛ)" : "English"}.
@@ -480,8 +573,7 @@ Return ONLY the translated text, nothing else.`;
 
 // ============================================================
 // 12. SMART REPORT TITLE GENERATOR
-// NEW: POST /api/ai/generate-title
-// Generates professional titles for reports
+// POST /api/ai/generate-title
 // ============================================================
 const generateReportTitle = async (reportContext) => {
   const { type, period, teamName, highlights } = reportContext;
@@ -492,7 +584,7 @@ Period: ${period}
 Team: ${teamName || "Addis Ketema CRRSA"}
 Key highlights: ${highlights || "standard performance report"}
 
-Generate 3 title options in this JSON format:
+Generate 3 title options in this JSON format (no markdown):
 {
   "titles": [
     {"en": "English title", "am": "Amharic title"},
@@ -515,7 +607,6 @@ Generate 3 title options in this JSON format:
 };
 
 module.exports = {
-  // Existing (fixed)
   generateDailyInsight,
   generateEvaluationSummary,
   generateDashboardDigest,
@@ -523,7 +614,6 @@ module.exports = {
   handleChatMessage,
   summarizeDocumentContent,
   analyzeDocumentImage,
-  // New
   generateServiceRecommendations,
   generatePerformanceTrend,
   categorizeComplaint,

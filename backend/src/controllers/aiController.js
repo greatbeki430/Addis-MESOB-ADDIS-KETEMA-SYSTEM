@@ -17,23 +17,41 @@ const DailyReport = require("../models/DailyReport");
 const Evaluation = require("../models/Evaluation");
 const Service = require("../models/Service");
 
-// ─── helper: wrap quota errors consistently ──────────────────
+// ─── Unified error handler ───────────────────────────────────
+// Logs the real error code/message, returns a structured JSON response.
+// 429 quota errors get their own status code so the frontend can detect them.
+// Auth errors (bad key) return 503 Service Unavailable — the service itself
+// is broken, not the client request.
 const handleAIError = (res, error, context = "") => {
-  console.error(`❌ AI ${context} error:`, error.message, error.status);
-  const isQuota =
-    error.status === 429 ||
-    error.message?.includes("quota") ||
-    error.message?.includes("RESOURCE_EXHAUSTED");
-  if (isQuota)
+  const code = error.code || "AI_UNKNOWN_ERROR";
+  console.error(`[aiController] ❌ ${context} [${code}]:`, error.message);
+
+  if (code === "AI_RATE_LIMIT") {
     return res.status(429).json({
-      message: "AI service quota exceeded. Please try again later.",
-      code: "QUOTA_EXCEEDED",
+      message: "AI service quota exceeded. Please try again in a few minutes.",
+      code,
       retryAfter: 60,
     });
+  }
+
+  if (code === "AI_AUTH_ERROR" || code === "AI_NOT_CONFIGURED") {
+    return res.status(503).json({
+      message:
+        "AI service is not available due to a configuration error. Contact system administrator.",
+      code,
+    });
+  }
+
+  if (code === "AI_MODEL_NOT_FOUND") {
+    return res.status(503).json({
+      message: "AI model configuration error. Contact system administrator.",
+      code,
+    });
+  }
+
   return res.status(500).json({
-    message: "AI service error",
-    error: error.message,
-    code: "AI_SERVICE_ERROR",
+    message: error.message || "AI service error",
+    code,
   });
 };
 
@@ -58,10 +76,11 @@ const getDailyInsight = async (req, res) => {
       };
     }
 
-    if (!reportData?.entries)
+    if (!reportData?.entries) {
       return res
         .status(400)
         .json({ message: "Report data or reportId is required" });
+    }
 
     const insight = await generateDailyInsight(reportData);
     res.json({ insight, generatedAt: new Date().toISOString() });
@@ -84,10 +103,11 @@ const getEvaluationSummary = async (req, res) => {
       evaluationData = evaluation.toObject();
     }
 
-    if (!evaluationData)
+    if (!evaluationData) {
       return res
         .status(400)
         .json({ message: "Evaluation data or evaluationId required" });
+    }
 
     const summary = await generateEvaluationSummary(evaluationData);
     res.json({ summary, generatedAt: new Date().toISOString() });
@@ -98,40 +118,40 @@ const getEvaluationSummary = async (req, res) => {
 
 // ============================================================
 // POST /api/ai/dashboard-digest
+// Always returns a 200 with a digest — uses a plain-text fallback
+// when AI fails so the Dashboard never shows a hard error.
 // ============================================================
 const getDashboardDigest = async (req, res) => {
-  try {
-    const { stats } = req.body;
-    if (!stats)
-      return res.status(400).json({ message: "Stats object is required" });
+  const { stats } = req.body || {};
 
-    let digest;
-    try {
-      digest = await generateDashboardDigest(stats);
-    } catch (aiError) {
-      const isQuota =
-        aiError.status === 429 || aiError.message?.includes("quota");
-      if (isQuota) {
-        // Graceful fallback — never crash the dashboard
-        const { activeTeams, totalServicesLogged, topDepartment, period } =
-          stats;
-        digest = `📊 System Summary: ${activeTeams || 0} teams active, ${totalServicesLogged || 0} services logged this ${period || "period"}. ${topDepartment && topDepartment !== "N/A" ? `Top department: ${topDepartment}.` : ""} Continue delivering quality service to citizens.`;
-        return res.json({
-          digest,
-          generatedAt: new Date().toISOString(),
-          _warning: "Quota exceeded, using fallback",
-        });
-      }
-      throw aiError;
-    }
+  if (!stats) {
+    return res.status(400).json({ message: "Stats object is required" });
+  }
+
+  try {
+    const digest = await generateDashboardDigest(stats);
     res.json({ digest, generatedAt: new Date().toISOString() });
   } catch (error) {
-    // Final fallback — dashboard must never show a hard error
-    const { stats } = req.body || {};
+    const code = error.code || "AI_UNKNOWN_ERROR";
+    console.warn(
+      `[aiController] dashboard-digest AI failed [${code}], using fallback:`,
+      error.message,
+    );
+
+    // Fallback digest — always return 200 so the dashboard card stays visible
+    const fallback =
+      `System active: ${stats.activeTeams || 0} teams, ` +
+      `${stats.totalServicesLogged || 0} services logged this ${stats.period || "period"}.` +
+      (stats.topDepartment && stats.topDepartment !== "N/A"
+        ? ` Top department: ${stats.topDepartment}.`
+        : "") +
+      " Continue delivering quality service to citizens of Addis Ketema.";
+
     res.json({
-      digest: `System active: ${stats?.activeTeams || 0} teams, ${stats?.totalServicesLogged || 0} services logged.`,
+      digest: fallback,
       generatedAt: new Date().toISOString(),
-      _error: "AI temporarily unavailable",
+      _fallback: true,
+      _reason: code,
     });
   }
 };
@@ -144,6 +164,7 @@ const getMeetingMinutes = async (req, res) => {
     const { title, date, attendees, agenda, notes } = req.body;
     if (!notes)
       return res.status(400).json({ message: "Meeting notes are required" });
+
     const minutes = await generateMeetingMinutes({
       title,
       date,
@@ -158,9 +179,7 @@ const getMeetingMinutes = async (req, res) => {
 };
 
 // ============================================================
-// POST /api/ai/service-recommendations  ← NEW
-// Body: { query: "citizen's question or need" }
-// Auth: any authenticated user
+// POST /api/ai/service-recommendations
 // ============================================================
 const getServiceRecommendations = async (req, res) => {
   try {
@@ -168,7 +187,6 @@ const getServiceRecommendations = async (req, res) => {
     if (!query?.trim())
       return res.status(400).json({ message: "Query is required" });
 
-    // Fetch available services from DB
     const services = await Service.find({ active: true })
       .select("name nameEn dept deptEn")
       .limit(100);
@@ -192,9 +210,7 @@ const getServiceRecommendations = async (req, res) => {
 };
 
 // ============================================================
-// POST /api/ai/performance-trend  ← NEW
-// Body: { teamId, startDate, endDate }
-// Auth: leader or above
+// POST /api/ai/performance-trend
 // ============================================================
 const getPerformanceTrend = async (req, res) => {
   try {
@@ -213,10 +229,11 @@ const getPerformanceTrend = async (req, res) => {
       .sort({ date: -1 })
       .limit(30);
 
-    if (reports.length === 0)
+    if (reports.length === 0) {
       return res
         .status(400)
         .json({ message: "No reports found for the specified period" });
+    }
 
     const teamName = reports[0]?.team?.name || "Unknown Team";
     const trend = await generatePerformanceTrend(reports, teamName);
@@ -232,9 +249,7 @@ const getPerformanceTrend = async (req, res) => {
 };
 
 // ============================================================
-// POST /api/ai/categorize-complaint  ← NEW
-// Body: { complaint: "citizen complaint text" }
-// Auth: any authenticated user
+// POST /api/ai/categorize-complaint
 // ============================================================
 const getCategoryAndResponse = async (req, res) => {
   try {
@@ -250,19 +265,18 @@ const getCategoryAndResponse = async (req, res) => {
 };
 
 // ============================================================
-// POST /api/ai/translate  ← NEW
-// Body: { text, targetLanguage: "am" | "en" }
-// Auth: any authenticated user
+// POST /api/ai/translate
 // ============================================================
 const getTranslation = async (req, res) => {
   try {
     const { text, targetLanguage } = req.body;
     if (!text?.trim())
       return res.status(400).json({ message: "Text is required" });
-    if (!["am", "en"].includes(targetLanguage))
+    if (!["am", "en"].includes(targetLanguage)) {
       return res
         .status(400)
         .json({ message: "targetLanguage must be 'am' or 'en'" });
+    }
 
     const translated = await translateContent(text, targetLanguage);
     res.json({
@@ -277,17 +291,16 @@ const getTranslation = async (req, res) => {
 };
 
 // ============================================================
-// POST /api/ai/generate-title  ← NEW
-// Body: { type, period, teamName, highlights }
-// Auth: any authenticated user
+// POST /api/ai/generate-title
 // ============================================================
 const getReportTitle = async (req, res) => {
   try {
     const { type, period, teamName, highlights } = req.body;
-    if (!type || !period)
+    if (!type || !period) {
       return res
         .status(400)
         .json({ message: "Report type and period are required" });
+    }
 
     const result = await generateReportTitle({
       type,

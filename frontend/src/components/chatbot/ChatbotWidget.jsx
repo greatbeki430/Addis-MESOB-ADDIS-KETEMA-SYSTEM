@@ -322,6 +322,30 @@ export default function ChatbotWidget() {
     },
   ];
 
+  // ─── Helper: extract a human-readable error message from an Axios error ──
+  const getToolErrorMessage = (err, action) => {
+    const code = err?.response?.data?.code;
+    const serverMsg = err?.response?.data?.message;
+    const status = err?.response?.status;
+
+    if (code === "AI_AUTH_ERROR" || code === "AI_NOT_CONFIGURED") {
+      return "The AI service is misconfigured on the server (invalid API key). Contact your system administrator.";
+    }
+    if (code === "AI_RATE_LIMIT" || status === 429) {
+      return "The AI service is temporarily busy. Wait a moment and try again.";
+    }
+    if (code === "AI_MODEL_NOT_FOUND" || status === 503) {
+      return (
+        serverMsg ||
+        "AI service unavailable. Contact your system administrator."
+      );
+    }
+    if (status === 401 || status === 403) {
+      return "Authentication error. Please refresh the page and log in again.";
+    }
+    return serverMsg || `${action} failed. Please try again.`;
+  };
+
   // ─── Tool: Complaint Categorizer ────────────────────────────
   const handleComplaint = async () => {
     if (!toolInput.trim()) return;
@@ -330,10 +354,10 @@ export default function ChatbotWidget() {
     try {
       const res = await aiAPI.categorizeComplaint(toolInput);
       setToolResult({ type: "complaint", data: res.data });
-    } catch {
+    } catch (err) {
       setToolResult({
         type: "error",
-        data: "Failed to analyze complaint. Please try again.",
+        data: getToolErrorMessage(err, "Complaint analysis"),
       });
     } finally {
       setToolLoading(false);
@@ -348,10 +372,10 @@ export default function ChatbotWidget() {
     try {
       const res = await aiAPI.translate(toolInput, translateTarget);
       setToolResult({ type: "translation", data: res.data.translation });
-    } catch {
+    } catch (err) {
       setToolResult({
         type: "error",
-        data: "Translation failed. Please try again.",
+        data: getToolErrorMessage(err, "Translation"),
       });
     } finally {
       setToolLoading(false);
@@ -366,10 +390,10 @@ export default function ChatbotWidget() {
     try {
       const res = await aiAPI.getServiceRecommendations(toolInput);
       setToolResult({ type: "services", data: res.data });
-    } catch {
+    } catch (err) {
       setToolResult({
         type: "error",
-        data: "Service search failed. Please try again.",
+        data: getToolErrorMessage(err, "Service search"),
       });
     } finally {
       setToolLoading(false);
