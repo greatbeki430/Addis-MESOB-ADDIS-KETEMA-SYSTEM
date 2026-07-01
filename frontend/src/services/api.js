@@ -28,15 +28,38 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// ✅ Response interceptor to handle 401 errors - FIXED
+// ✅ Response interceptor to handle 401 errors - IMPROVED
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Handle 401 Unauthorized - token expired
+    // Handle 401 Unauthorized - token expired or invalid
     if (error.response?.status === 401) {
-      localStorage.removeItem("token");
-      // Optionally redirect to login
-      // window.location.href = "/login";
+      const errorData = error.response?.data || {};
+      const message = errorData.message || "Unauthorized";
+
+      console.log("🔐 Auth error:", message);
+
+      // Check if it's a token expiration
+      if (message.includes("expired") || message.includes("token failed")) {
+        console.log("⏰ Token expired, clearing session...");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+
+        // Show a friendly message
+        const shouldRedirect = !window.location.pathname.includes("/login");
+
+        if (shouldRedirect) {
+          alert("Your session has expired. Please login again.");
+          // Redirect to login after a short delay
+          setTimeout(() => {
+            window.location.href = "/login";
+          }, 500);
+        }
+      } else {
+        // For other auth errors, just clear token
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+      }
     }
     return Promise.reject(error);
   },
@@ -47,7 +70,6 @@ export const authAPI = {
   register: (userData) => api.post("/auth/register", userData),
   login: (credentials) => api.post("/auth/login", credentials),
   getMe: () => api.get("/auth/me"),
-  // User management endpoints
   getUsers: () => api.get("/auth/users"),
   getUser: (id) => api.get(`/auth/users/${id}`),
   updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
@@ -63,7 +85,7 @@ export const meetingAPI = {
   delete: (id) => api.delete(`/meetings/${id}`),
 };
 
-// ✅ Evaluations API - COMPLETE
+// Evaluations API
 export const evaluationAPI = {
   create: (data) => api.post("/evaluations", data),
   getAll: () => api.get("/evaluations"),
@@ -73,8 +95,6 @@ export const evaluationAPI = {
   delete: (id) => api.delete(`/evaluations/${id}`),
 };
 
-// frontend/src/services/api.js - Update dailyReportAPI
-
 // Daily Reports API
 export const dailyReportAPI = {
   create: (data) => api.post("/daily-reports", data),
@@ -83,7 +103,7 @@ export const dailyReportAPI = {
   deleteByDate: (date) => api.delete(`/daily-reports/date/${date}`),
 };
 
-// ✅ Teams API - COMPLETE
+// Teams API
 export const teamAPI = {
   getAll: () => api.get("/teams"),
   getById: (id) => api.get(`/teams/${id}`),
@@ -93,13 +113,8 @@ export const teamAPI = {
 };
 
 // Services API
-// export const serviceAPI = {
-//   getAll: () => api.get("/services"),
-// };
-
 export const serviceAPI = {
   getAll: () => api.get("/services"),
-  // ✅ New methods
   seed: () => api.post("/services/seed"),
   create: (data) => api.post("/services", data),
   update: (id, data) => api.put(`/services/${id}`, data),
@@ -116,7 +131,7 @@ export const reportAPI = {
   delete: (id) => api.delete(`/reports/${id}`),
 };
 
-// ✅ NEW: AI Intelligence API
+// AI Intelligence API
 export const aiAPI = {
   getDailyInsight: (reportId, reportData) =>
     api.post("/ai/daily-insight", { reportId, reportData }),
@@ -126,14 +141,14 @@ export const aiAPI = {
   getMeetingMinutes: (data) => api.post("/ai/meeting-minutes", data),
 };
 
-// ✅ NEW: Chatbot API
+// Chatbot API
 export const chatbotAPI = {
   sendMessage: (message) => api.post("/chatbot/message", { message }),
   getHistory: () => api.get("/chatbot/history"),
   clearSession: () => api.delete("/chatbot/clear"),
 };
 
-// ✅ NEW: CRRSA Document Vault API
+// CRRSA Document Vault API
 export const documentAPI = {
   upload: (data) => api.post("/documents/upload", data),
   analyze: (file, mimeType) =>
