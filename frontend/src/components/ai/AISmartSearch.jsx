@@ -5,6 +5,18 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { documentAPI } from "../../services/api";
 import { C } from "../../styles/theme";
 
+// ✅ Import react-icons
+import {
+  FiSearch,
+  FiX,
+  FiFile,
+  FiFileText,
+  FiUser,
+  FiTag,
+  FiDownload,
+  FiClock,
+} from "react-icons/fi";
+
 const AISmartSearch = ({
   onSelect,
   placeholder = "Search documents by name, reference, or keywords...",
@@ -152,12 +164,17 @@ const AISmartSearch = ({
             transform: "translateY(-50%)",
             color: "#94A3B8",
             fontSize: "16px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
           }}
         >
           {loading ? (
-            <span style={{ animation: "spin 1s linear infinite" }}>⚡</span>
+            <span style={{ animation: "spin 1s linear infinite" }}>
+              <FiSearch size={18} />
+            </span>
           ) : (
-            "🔍"
+            <FiSearch size={18} />
           )}
         </div>
         {query && (
@@ -174,9 +191,12 @@ const AISmartSearch = ({
               cursor: "pointer",
               fontSize: "16px",
               padding: "4px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            ✕
+            <FiX size={18} />
           </button>
         )}
       </div>
@@ -204,9 +224,15 @@ const AISmartSearch = ({
                 padding: "20px",
                 textAlign: "center",
                 color: "#94A3B8",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
               }}
             >
-              <span style={{ animation: "spin 1s linear infinite" }}>⚡</span>
+              <span style={{ animation: "spin 1s linear infinite" }}>
+                <FiSearch size={18} />
+              </span>
               {" Searching..."}
             </div>
           ) : error ? (
@@ -227,7 +253,12 @@ const AISmartSearch = ({
                 color: "#94A3B8",
               }}
             >
-              <div style={{ fontSize: "32px", marginBottom: "8px" }}>🔍</div>
+              <div style={{ fontSize: "32px", marginBottom: "8px" }}>
+                <FiSearch
+                  size={32}
+                  style={{ display: "block", margin: "0 auto" }}
+                />
+              </div>
               <p style={{ margin: 0, fontWeight: 500 }}>No documents found</p>
               <p style={{ fontSize: "13px", margin: "4px 0 0" }}>
                 Try different keywords or check your spelling
@@ -256,9 +287,14 @@ const AISmartSearch = ({
                   style={{
                     fontSize: "20px",
                     flexShrink: 0,
+                    color: "#64748B",
                   }}
                 >
-                  {doc.fileType === "pdf" ? "📄" : "📎"}
+                  {doc.fileType === "pdf" ? (
+                    <FiFile size={20} />
+                  ) : (
+                    <FiFileText size={20} />
+                  )}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
@@ -289,8 +325,12 @@ const AISmartSearch = ({
                           background: "#F1F5F9",
                           padding: "1px 8px",
                           borderRadius: "4px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
                         }}
                       >
+                        <FiTag size={10} />
                         {doc.referenceNumber}
                       </span>
                     )}
@@ -302,8 +342,12 @@ const AISmartSearch = ({
                           background: "#DBEAFE",
                           padding: "1px 8px",
                           borderRadius: "4px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
                         }}
                       >
+                        <FiFileText size={10} />
                         {doc.documentType.replace(/_/g, " ")}
                       </span>
                     )}
@@ -312,9 +356,13 @@ const AISmartSearch = ({
                         style={{
                           fontSize: "11px",
                           color: "#475569",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
                         }}
                       >
-                        👤 {doc.citizenName}
+                        <FiUser size={10} />
+                        {doc.citizenName}
                       </span>
                     )}
                   </div>
@@ -325,9 +373,13 @@ const AISmartSearch = ({
                         color: "#64748B",
                         marginTop: "4px",
                         fontStyle: "italic",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
                       }}
                     >
-                      🤖 {doc.aiExtractedData.summary}
+                      <FiClock size={12} />
+                      {doc.aiExtractedData.summary}
                     </div>
                   )}
                 </div>
@@ -348,6 +400,9 @@ const AISmartSearch = ({
                     cursor: "pointer",
                     transition: "all 0.2s",
                     flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.opacity = "0.8";
@@ -356,6 +411,7 @@ const AISmartSearch = ({
                     e.currentTarget.style.opacity = "1";
                   }}
                 >
+                  <FiDownload size={12} />
                   View
                 </button>
               </div>
