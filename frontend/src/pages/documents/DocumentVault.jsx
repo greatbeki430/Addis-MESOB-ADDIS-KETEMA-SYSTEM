@@ -8,26 +8,23 @@ import DocumentUpload from "./DocumentUpload";
 import { useAuth } from "../../hooks/useAuth";
 import { AISmartSearch } from "../../components/ai";
 
-// ✅ Import react-icons
+// ✅ Import react-icons - Fixed: Removed FiFileType (doesn't exist)
 import {
   FiFolder,
   FiFile,
   FiImage,
   FiFileText,
   FiDownload,
-  // FiPlus,
   FiChevronLeft,
   FiChevronRight,
   FiSearch,
   FiFilter,
   FiLayers,
-  // FiClock,
   FiUser,
-  FiFileType,
   FiHardDrive,
   FiUpload,
   FiDatabase,
-  // FiInfo,
+  FiInfo,
   FiBook,
   FiArchive,
 } from "react-icons/fi";
@@ -123,7 +120,7 @@ const DocumentCard = ({ doc, onDownload }) => (
         {doc.title}
       </div>
       <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>
-        <FiFileType size={12} style={{ marginRight: "4px" }} />
+        <FiInfo size={12} style={{ marginRight: "4px" }} />
         {doc.referenceNumber}
       </div>
       <div
