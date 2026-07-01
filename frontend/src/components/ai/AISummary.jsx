@@ -43,6 +43,7 @@ export default function AISummary({
         borderRadius: "12px",
         padding: "16px 20px",
         marginTop: "16px",
+        marginBottom: "24px",
       }}
     >
       <div
