@@ -8,7 +8,7 @@ import DocumentUpload from "./DocumentUpload";
 import { useAuth } from "../../hooks/useAuth";
 import { AISmartSearch } from "../../components/ai";
 
-// ✅ Import react-icons - replacing emojis
+// ✅ Import react-icons
 import {
   FiFolder,
   FiFile,
@@ -17,10 +17,8 @@ import {
   FiDownload,
   FiChevronLeft,
   FiChevronRight,
-  FiSearch,
   FiFilter,
   FiLayers,
-  // FiClock,
   FiUser,
   FiHardDrive,
   FiUpload,
@@ -216,7 +214,6 @@ const DocumentCard = ({ doc, onDownload }) => (
 export default function DocumentVault() {
   const [documents, setDocuments] = useState([]);
   const [pagination, setPagination] = useState({});
-  const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
@@ -241,7 +238,6 @@ export default function DocumentVault() {
     setIsLoading(true);
     try {
       const params = { page, limit: 12 };
-      if (search.trim()) params.search = search.trim();
       if (typeFilter) params.type = typeFilter;
 
       const res = await fetchDocuments(params);
@@ -257,7 +253,7 @@ export default function DocumentVault() {
         setIsLoading(false);
       }
     }
-  }, [page, search, typeFilter]);
+  }, [page, typeFilter]);
 
   // ✅ Load documents when dependencies change
   useEffect(() => {
@@ -269,7 +265,6 @@ export default function DocumentVault() {
       setIsLoading(true);
       try {
         const params = { page, limit: 12 };
-        if (search.trim()) params.search = search.trim();
         if (typeFilter) params.type = typeFilter;
 
         const res = await fetchDocuments(params);
@@ -292,14 +287,9 @@ export default function DocumentVault() {
     return () => {
       isEffectActive = false;
     };
-  }, [page, search, typeFilter]);
+  }, [page, typeFilter]);
 
-  // ✅ Reset to page 1 when search or filter changes
-  const handleSearchChange = (value) => {
-    setSearch(value);
-    setPage(1);
-  };
-
+  // ✅ Reset to page 1 when filter changes
   const handleTypeFilterChange = (value) => {
     setTypeFilter(value);
     setPage(1);
@@ -321,8 +311,6 @@ export default function DocumentVault() {
 
   // ✅ Handle AI smart search selection
   const handleSmartSelect = (doc) => {
-    // Update search state with selected document title
-    setSearch(doc.title);
     handleDownload(doc._id);
   };
 
@@ -415,7 +403,7 @@ export default function DocumentVault() {
           document.body,
         )}
 
-      {/* ✅ AI Smart Search */}
+      {/* ✅ AI Smart Search - Primary search (only one!) */}
       <div style={{ marginBottom: "16px" }}>
         <AISmartSearch
           onSelect={handleSmartSelect}
@@ -423,49 +411,16 @@ export default function DocumentVault() {
         />
       </div>
 
-      {/* Filters - with Search and Type Filter */}
+      {/* ✅ Type Filter Only */}
       <div
         style={{
           display: "flex",
           gap: "12px",
           marginBottom: "20px",
           flexWrap: "wrap",
+          justifyContent: "flex-end",
         }}
       >
-        <div style={{ flex: 1, minWidth: "220px", position: "relative" }}>
-          <FiSearch
-            size={18}
-            style={{
-              position: "absolute",
-              left: "12px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "#94A3B8",
-            }}
-          />
-          <input
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search by name, reference no., or keyword..."
-            style={{
-              width: "100%",
-              border: "1px solid #CBD5E1",
-              borderRadius: "10px",
-              padding: "10px 14px 10px 38px",
-              fontSize: "13px",
-              outline: "none",
-              transition: "border-color 0.2s",
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = "#2563EB";
-              e.currentTarget.style.boxShadow = "0 0 0 3px rgba(37,99,235,0.1)";
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = "#CBD5E1";
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          />
-        </div>
         <div style={{ position: "relative" }}>
           <FiFilter
             size={16}
@@ -489,7 +444,7 @@ export default function DocumentVault() {
               background: "#fff",
               outline: "none",
               appearance: "none",
-              minWidth: "180px",
+              minWidth: "200px",
               cursor: "pointer",
               transition: "border-color 0.2s",
             }}
@@ -526,7 +481,6 @@ export default function DocumentVault() {
         >
           <FiDatabase size={14} />
           {pagination.total} document{pagination.total !== 1 ? "s" : ""} found
-          {search ? ` for "${search}"` : ""}
         </p>
       )}
 
@@ -570,9 +524,7 @@ export default function DocumentVault() {
             No documents found
           </p>
           <p style={{ fontSize: "13px" }}>
-            {search
-              ? "Try different search terms"
-              : "Upload the first CRRSA document"}
+            Upload the first CRRSA document to get started
           </p>
         </div>
       ) : (
