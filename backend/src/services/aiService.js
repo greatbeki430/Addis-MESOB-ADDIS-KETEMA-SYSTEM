@@ -336,29 +336,51 @@ const analyzeDocumentImage = async (base64File, mimeType) => {
     ? base64File.split(",")[1]
     : base64File;
 
-  const prompt = `You are looking at a scanned government document (likely Ethiopian CRRSA — Civil
-Registration and Residency Service Agency — paperwork, possibly in Amharic, English, or both).
+  const prompt = `You are an AI assistant for the Ethiopian CRRSA (Civil Registration and Residency Service Agency) document management system.
 
-Carefully read the document and extract the following fields. Use your best judgement based on
-what's visually present — headers, stamps, handwriting, printed text, logos, etc.
+Analyze this document image carefully. It is likely an Ethiopian government document (CRRSA document) such as:
+- Birth Certificate (የልደት ምስክር ወረቀት)
+- Death Certificate (የሞት ምስክር ወረቀት)
+- Marriage Certificate (የጋብቻ ምስክር ወረቀት)
+- Divorce Certificate (የፍቺ ምስክር ወረቀት)
+- Residence ID (የኑሮ መታወቂያ)
+- Name Change Certificate (የስም ለውጥ ምስክር ወረቀት)
+- Registration Book (የምዝገባ መዝገብ)
+- Circular (ክብ ደብዳቤ)
+- Directive (መመሪያ)
+- Correspondence (ደብዳቤ)
+- Application Form (ማመልከቻ ቅጽ)
+
+IMPORTANT RULES:
+1. If this document is NOT a government/CRRSA document (e.g., business card, promotional material, personal photo, receipt, or any non-official document), you MUST:
+   - Set documentType to "other"
+   - Set confidence to "low"
+   - Add a note explaining what the document appears to be (e.g., "This appears to be a business card for a digital solutions provider")
+
+2. If this IS a CRRSA document, extract the following fields carefully from the text visible in the image:
+   - Look for official stamps, seals, or government headers
+   - Look for document numbers or reference numbers
+   - Look for citizen names (both English and Amharic)
+   - Look for dates (look for ዓ.ም. for Ethiopian calendar or Gregorian dates)
+   - Look for issuing officer names and departments
 
 Return ONLY a valid JSON object, no other text, no markdown fences, in exactly this shape:
 {
-  "documentType": one of ["birth_certificate","death_certificate","marriage_certificate","divorce_certificate","residence_id","name_change","registration_book","circular","directive","correspondence","application_form","other"],
-  "title": "a short descriptive title, e.g. 'Birth Certificate – Abebe Kebede'",
-  "citizenName": "full name in English/Latin script if present, else null",
-  "citizenNameAmharic": "full name in Amharic script if present, else null",
+  "documentType": "one of the document types listed above, or 'other'",
+  "title": "a short descriptive title based on document content",
+  "citizenName": "full name in English/Latin script if visible, else null",
+  "citizenNameAmharic": "full name in Amharic/Ge'ez script if visible, else null",
   "issueDate": "date in YYYY-MM-DD format if found, else null",
-  "issuingOfficer": "name or title of the issuing official if present, else null",
-  "issuingDepartment": "the department or office name if present, else 'Civil Registry'",
-  "nationalId": "any ID number visible, else null",
-  "tags": ["short", "relevant", "keywords"],
-  "notes": "one sentence describing the document's purpose or content",
+  "issuingOfficer": "name or title of the issuing official if visible, else null",
+  "issuingDepartment": "the department or office name if visible, else 'Civil Registry'",
+  "nationalId": "any ID number or reference number visible, else null",
+  "tags": ["relevant", "keywords", "from", "the", "document"],
+  "notes": "one sentence describing what the document is, or why it's not recognized",
   "confidence": "high" | "medium" | "low"
 }
 
-If the image is unclear, blank, or not a recognizable document, set documentType to "other",
-leave uncertain fields as null, and set confidence to "low".`;
+BE HONEST about what you can see. If you're unsure, set confidence to "low".
+Do not invent information that is not visible in the image.`;
 
   try {
     const response = await client.models.generateContent({
@@ -379,10 +401,36 @@ leave uncertain fields as null, and set confidence to "low".`;
 
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) return { confidence: "low", notes: text };
-      return JSON.parse(jsonMatch[0]);
-    } catch {
-      return { confidence: "low", notes: "AI returned unparseable output." };
+      if (!jsonMatch) {
+        return {
+          confidence: "low",
+          notes: "Could not parse AI response. Please fill in manually.",
+          documentType: "other",
+        };
+      }
+      const result = JSON.parse(jsonMatch[0]);
+
+      // ✅ Ensure we always have a notes field
+      if (!result.notes) {
+        result.notes =
+          result.documentType === "other"
+            ? "Document type not recognized. Please verify."
+            : "CRRSA document detected. Please review extracted fields.";
+      }
+
+      // ✅ Ensure confidence is set
+      if (!result.confidence) {
+        result.confidence = "low";
+      }
+
+      return result;
+    } catch (parseError) {
+      console.error("❌ Failed to parse AI response:", parseError);
+      return {
+        confidence: "low",
+        notes: "AI returned unparseable output. Please fill in manually.",
+        documentType: "other",
+      };
     }
   } catch (error) {
     console.error("❌ Document analysis error:", error);
