@@ -14,6 +14,7 @@ const PROVIDERS = {
   GEMINI: "gemini",
   GROQ: "groq",
   COHERE: "cohere",
+  DEEPSEEK: "deepseek",
 };
 
 // ============================================================
@@ -91,6 +92,29 @@ if (!COHERE_KEY) {
 // command-r-08-2024 is the lightweight free-tier-friendly option.
 const COHERE_MODEL = "command-r-08-2024";
 
+// ─── DeepSeek ──────────────────────────────────────────────────
+// DeepSeek's API is OpenAI-compatible, so we call it with plain fetch
+// (Node 18+ has fetch built in) instead of pulling in another SDK.
+// NOTE: DeepSeek is NOT free — new accounts get a small trial credit,
+// after that it's pay-as-you-go (though it's very cheap: roughly
+// $0.27 / million input tokens as of early 2026). Check current pricing
+// at https://platform.deepseek.com before relying on it in production.
+let deepseekInitialized = false;
+const DEEPSEEK_KEY = (process.env.DEEPSEEK_API_KEY || "").trim();
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com/chat/completions";
+
+if (!DEEPSEEK_KEY) {
+  console.warn(
+    "[aiService] ⚠️ DEEPSEEK_API_KEY is not set. DeepSeek fallback disabled.",
+  );
+} else {
+  deepseekInitialized = true;
+  console.log(
+    `[aiService] ✅ DeepSeek configured (${DEEPSEEK_KEY.slice(0, 6)}...)`,
+  );
+}
+const DEEPSEEK_MODEL = "deepseek-chat";
+
 // ============================================================
 // ERROR NORMALIZER
 // ============================================================
@@ -136,16 +160,25 @@ const normalizeAIError = (err, provider = "unknown") => {
 // ============================================================
 // SYSTEM CONTEXT
 // ============================================================
-const SYSTEM_CONTEXT = `You are an AI assistant embedded in the Addis MESOB Digital Management System,
-a government service management platform for Addis Ketema Sub-City administration in Addis Ababa, Ethiopia.
+const SYSTEM_CONTEXT = `You are an AI assistant embedded in an internal staff management tool used by
+Addis MESOB -- the one-stop citizen service center for Addis Ketema Sub-City administration
+in Addis Ababa, Ethiopia. Addis MESOB itself is the physical government service center (the
+organization); the software you live inside is a separate internal tool its staff use to log
+and manage that work. Do not describe the software itself as "Addis MESOB" -- refer to it as
+"this system" / "the platform" unless the user has told you its actual product name.
 
-The system manages these CRRSA (Civil Registration and Residency Service Agency) departments:
+If someone asks what Addis MESOB is, answer about the organization/service center itself
+(a consolidated one-stop-shop where citizens handle multiple government services in one place),
+not about this internal software. If someone asks what this system/platform/tool is, answer
+about the software: an internal staff tool for logging daily service reports, team evaluations,
+peer forum meetings, and civil registration documents. Keep the two answers clearly separate.
+
+The tool manages these CRRSA (Civil Registration and Residency Service Agency) departments:
 Revenue (ገቢዎች), Civil Registry (ሲቪል ምዝገባ), Labor & Skills (ስራና ክህሎት),
 Housing (ቤቶች), Traffic (ትራፊክ), Transport (አሽ/ተሽ), Investment (ኢንቨስትመንት),
 Construction (ግንባታ), Land (መሬት), Planning (ፕላን).
 
 Users include: employees, team leaders, admins, and superadmins.
-The system tracks daily service reports, team evaluations, peer forum meetings, and civil registration documents.
 Always respond in the same language the user writes in (Amharic or English).
 Be concise, professional, and helpful. For Amharic, use proper Ethiopic script.`;
 
@@ -247,6 +280,55 @@ const callCohere = async (
   }
 };
 
+// ─── DeepSeek Caller (OpenAI-compatible REST) ──────────────────
+const callDeepSeek = async (
+  prompt,
+  systemInstruction = SYSTEM_CONTEXT,
+  history = [],
+) => {
+  if (!deepseekInitialized) {
+    throw new Error("DeepSeek client not initialized");
+  }
+
+  try {
+    const res = await fetch(DEEPSEEK_BASE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DEEPSEEK_KEY}`,
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages: [
+          { role: "system", content: systemInstruction },
+          ...history.map((m) => ({
+            role: m.role === "assistant" ? "assistant" : "user",
+            content: m.content,
+          })),
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      const err = new Error(
+        `DeepSeek API error ${res.status}: ${errBody.slice(0, 300)}`,
+      );
+      err.status = res.status;
+      throw err;
+    }
+
+    const data = await res.json();
+    const text = data?.choices?.[0]?.message?.content || "";
+    return { text, provider: PROVIDERS.DEEPSEEK };
+  } catch (err) {
+    throw normalizeAIError(err, PROVIDERS.DEEPSEEK);
+  }
+};
+
 // ============================================================
 // MAIN GENERATE TEXT — Auto-fallback chain
 // Any error from a non-final provider falls through to the next one;
@@ -272,6 +354,11 @@ const generateText = async (
       name: PROVIDERS.COHERE,
       ready: cohereInitialized && cohereClient,
       fn: callCohere,
+    },
+    {
+      name: PROVIDERS.DEEPSEEK,
+      ready: deepseekInitialized,
+      fn: callDeepSeek,
     },
   ];
 

@@ -1,4 +1,5 @@
 // backend/src/scripts/seedServices.js
+// ✅ SAFE SEED - Uses upsert, never deletes existing services
 const mongoose = require("mongoose");
 const path = require("path");
 const Service = require("../models/Service");
@@ -9,7 +10,6 @@ require("dotenv").config({ path: path.join(__dirname, "../../.env") });
 
 const seedDatabase = async () => {
   try {
-    // ✅ Use MONGO_URI (your .env variable name)
     const mongoURI = process.env.MONGO_URI;
 
     if (!mongoURI) {
@@ -25,13 +25,46 @@ const seedDatabase = async () => {
     await mongoose.connect(mongoURI);
     console.log("✅ Connected to MongoDB");
 
-    // Clear existing services
-    const deleted = await Service.deleteMany({});
-    console.log(`🗑️ Cleared ${deleted.deletedCount} existing services`);
+    // ✅ Check existing services
+    const existingCount = await Service.countDocuments();
+    console.log(`📊 Found ${existingCount} existing services`);
 
-    // Insert services from shared constants
-    const result = await Service.insertMany(SERVICES);
-    console.log(`✅ ${result.length} services seeded successfully!`);
+    // ✅ Use bulkWrite with upsert - SAFE, never deletes
+    const operations = SERVICES.map((service) => ({
+      updateOne: {
+        filter: {
+          name: service.name,
+          dept: service.dept,
+        },
+        update: {
+          $set: {
+            nameEn: service.nameEn || service.name,
+            deptEn: service.deptEn || service.dept,
+            active: service.active !== undefined ? service.active : true,
+            stdTime: service.stdTime || "",
+            updatedAt: new Date(),
+          },
+          $setOnInsert: {
+            createdAt: new Date(),
+          },
+        },
+        upsert: true,
+      },
+    }));
+
+    const result = await Service.bulkWrite(operations, { ordered: false });
+
+    const added = result.upsertedCount || 0;
+    const updated = result.modifiedCount || 0;
+    const total = SERVICES.length;
+
+    console.log("📊 Seed Results:");
+    console.log(`   ✅ Added: ${added}`);
+    console.log(`   ✅ Updated: ${updated}`);
+    console.log(`   ⏭️  Skipped (no changes): ${total - added - updated}`);
+    console.log(
+      `   📦 Total services in database: ${await Service.countDocuments()}`,
+    );
 
     process.exit(0);
   } catch (error) {

@@ -125,30 +125,35 @@ const sendMessage = async (req, res) => {
 
 // ============================================================
 // GET /api/chatbot/history
-// Returns last 30 messages for the current user's active session
+// Returns messages ONLY from the active session
 // Auth: any authenticated user
 // ============================================================
 const getChatHistory = async (req, res) => {
   try {
+    // ✅ Only find ACTIVE sessions - this is the fix!
+    // When a session is cleared, isActive becomes false, so it won't show old messages
     const session = await ChatSession.findOne({
       user: req.user._id,
       isActive: true,
     });
 
     if (!session) {
+      // ✅ Return empty messages array for new sessions
       return res.json({
         messages: [],
         sessionId: null,
         messageCount: 0,
+        isNewSession: true,
       });
     }
 
-    // ✅ Return last 30 messages
+    // ✅ Return messages from active session only
     const messages = session.messages.slice(-30);
     res.json({
       messages,
       sessionId: session._id,
       messageCount: session.messages.length,
+      isNewSession: false,
     });
   } catch (error) {
     console.error("❌ Get chat history error:", error);
@@ -161,28 +166,37 @@ const getChatHistory = async (req, res) => {
 
 // ============================================================
 // DELETE /api/chatbot/clear
-// Clears the user's current chat session (starts fresh)
+// Completely clears the user's chat session
 // Auth: any authenticated user
 // ============================================================
 const clearChatSession = async (req, res) => {
   try {
-    const session = await ChatSession.findOneAndUpdate(
+    // ✅ Mark the old session as inactive
+    const oldSession = await ChatSession.findOneAndUpdate(
       { user: req.user._id, isActive: true },
-      { isActive: false },
+      {
+        isActive: false,
+        // ✅ Keep messages for audit but mark as inactive
+      },
       { new: true },
     );
 
-    // ✅ Create a new session for future messages
+    // ✅ Create a brand new active session with no messages
     const newSession = new ChatSession({
       user: req.user._id,
-      messages: [],
+      messages: [], // ✅ Empty messages array
       isActive: true,
     });
     await newSession.save();
 
+    console.log(
+      `🧹 Chat cleared for user ${req.user._id}: old session ${oldSession?._id} closed, new session ${newSession._id} created`,
+    );
+
     res.json({
       message: "Chat session cleared successfully",
       sessionId: newSession._id,
+      isNewSession: true,
     });
   } catch (error) {
     console.error("❌ Clear chat session error:", error);
