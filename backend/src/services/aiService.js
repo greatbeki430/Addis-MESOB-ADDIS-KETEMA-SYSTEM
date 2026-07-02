@@ -14,7 +14,6 @@ const PROVIDERS = {
   GEMINI: "gemini",
   GROQ: "groq",
   COHERE: "cohere",
-  DEEPSEEK: "deepseek",
 };
 
 // ============================================================
@@ -61,10 +60,10 @@ if (!GROQ_KEY) {
     console.error("[aiService] ❌ Groq init failed:", e.message);
   }
 }
-// NOTE: Groq periodically retires model IDs. Verify current model list at
-// https://console.groq.com/docs/models before deploying — if this model 404s,
-// swap it here.
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+// Updated to use the current stable Groq model
+// llama-3.3-70b-versatile is DEPRECATED as of July 2026
+// Use llama-3.1-70b-versatile or openai/gpt-oss-120b instead
+const GROQ_MODEL = "llama-3.1-70b-versatile";
 
 // ─── Cohere ────────────────────────────────────────────────────
 // Cohere's Generate API (co.generate()) was retired Aug 26, 2025.
@@ -91,29 +90,6 @@ if (!COHERE_KEY) {
 // Use a versioned model ID — unversioned aliases like "command-r" are deprecated.
 // command-r-08-2024 is the lightweight free-tier-friendly option.
 const COHERE_MODEL = "command-r-08-2024";
-
-// ─── DeepSeek ──────────────────────────────────────────────────
-// DeepSeek's API is OpenAI-compatible, so we call it with plain fetch
-// (Node 18+ has fetch built in) instead of pulling in another SDK.
-// NOTE: DeepSeek is NOT free — new accounts get a small trial credit,
-// after that it's pay-as-you-go (though it's very cheap: roughly
-// $0.27 / million input tokens as of early 2026). Check current pricing
-// at https://platform.deepseek.com before relying on it in production.
-let deepseekInitialized = false;
-const DEEPSEEK_KEY = (process.env.DEEPSEEK_API_KEY || "").trim();
-const DEEPSEEK_BASE_URL = "https://api.deepseek.com/chat/completions";
-
-if (!DEEPSEEK_KEY) {
-  console.warn(
-    "[aiService] ⚠️ DEEPSEEK_API_KEY is not set. DeepSeek fallback disabled.",
-  );
-} else {
-  deepseekInitialized = true;
-  console.log(
-    `[aiService] ✅ DeepSeek configured (${DEEPSEEK_KEY.slice(0, 6)}...)`,
-  );
-}
-const DEEPSEEK_MODEL = "deepseek-chat";
 
 // ============================================================
 // ERROR NORMALIZER
@@ -280,55 +256,6 @@ const callCohere = async (
   }
 };
 
-// ─── DeepSeek Caller (OpenAI-compatible REST) ──────────────────
-const callDeepSeek = async (
-  prompt,
-  systemInstruction = SYSTEM_CONTEXT,
-  history = [],
-) => {
-  if (!deepseekInitialized) {
-    throw new Error("DeepSeek client not initialized");
-  }
-
-  try {
-    const res = await fetch(DEEPSEEK_BASE_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${DEEPSEEK_KEY}`,
-      },
-      body: JSON.stringify({
-        model: DEEPSEEK_MODEL,
-        messages: [
-          { role: "system", content: systemInstruction },
-          ...history.map((m) => ({
-            role: m.role === "assistant" ? "assistant" : "user",
-            content: m.content,
-          })),
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 1024,
-      }),
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text().catch(() => "");
-      const err = new Error(
-        `DeepSeek API error ${res.status}: ${errBody.slice(0, 300)}`,
-      );
-      err.status = res.status;
-      throw err;
-    }
-
-    const data = await res.json();
-    const text = data?.choices?.[0]?.message?.content || "";
-    return { text, provider: PROVIDERS.DEEPSEEK };
-  } catch (err) {
-    throw normalizeAIError(err, PROVIDERS.DEEPSEEK);
-  }
-};
-
 // ============================================================
 // MAIN GENERATE TEXT — Auto-fallback chain
 // Any error from a non-final provider falls through to the next one;
@@ -354,11 +281,6 @@ const generateText = async (
       name: PROVIDERS.COHERE,
       ready: cohereInitialized && cohereClient,
       fn: callCohere,
-    },
-    {
-      name: PROVIDERS.DEEPSEEK,
-      ready: deepseekInitialized,
-      fn: callDeepSeek,
     },
   ];
 

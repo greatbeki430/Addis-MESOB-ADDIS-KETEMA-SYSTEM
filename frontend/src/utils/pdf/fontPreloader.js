@@ -43,3 +43,12 @@ export const getPDFFontsStatus = () => {
     loading: !!preloadPromise,
   };
 };
+
+/**
+ * ✅ Force reload fonts (useful after font files update)
+ */
+export const reloadPDFFonts = async () => {
+  preloaded = false;
+  preloadPromise = null;
+  return initPDFFonts();
+};
