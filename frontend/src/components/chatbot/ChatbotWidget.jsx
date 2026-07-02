@@ -7,6 +7,66 @@ import { useAuth } from "../../hooks/useAuth";
 import { chatbotAPI, aiAPI } from "../../services/api";
 import { C } from "../../styles/theme";
 
+// ✅ Import react-icons
+import {
+  FiMessageSquare,
+  FiTool,
+  FiHelpCircle,
+  FiX,
+  FiHome,
+  FiFileText,
+  FiStar,
+  FiUsers,
+  FiFolder,
+  FiKey,
+  FiCopy,
+  FiAlertCircle,
+  FiCheckCircle,
+  FiInfo,
+  FiBook,
+  // FiCalendar,
+  FiBriefcase,
+  FiUser,
+  FiGlobe,
+  FiSend,
+  // FiPlus,
+  // FiMinus,
+  // FiChevronDown,
+  // FiChevronRight,
+  // FiChevronLeft,
+  // FiChevronUp,
+  // FiMenu,
+  // FiMoreHorizontal,
+  // FiRefreshCw,
+  FiLoader,
+  // FiTrash2,
+  // FiEdit2,
+  // FiSave,
+  FiSearch,
+  // FiFilter,
+  // FiSettings,
+  // FiBell,
+  FiClock,
+  // FiMapPin,
+  // FiPhone,
+  // FiMail,
+  // FiLink,
+  // FiExternalLink,
+  // FiDownload,
+  // FiUpload,
+  // FiPrinter,
+  // FiEye,
+  // FiEyeOff,
+  // FiLock,
+  // FiUnlock,
+  // FiShield,
+  FiUserCheck,
+  // FiUserX,
+  // FiUserPlus,
+  FiBarChart2,
+  FiUsers as FiUsersIcon,
+} from "react-icons/fi";
+
 // ─── Message bubble ──────────────────────────────────────────
 const ChatMessage = ({ msg }) => {
   const isUser = msg.role === "user";
@@ -52,9 +112,10 @@ const ChatMessage = ({ msg }) => {
             justifyContent: "center",
             fontSize: 13,
             flexShrink: 0,
+            color: "#fff",
           }}
         >
-          🤖
+          <FiMessageSquare size={14} />
         </div>
       )}
       <div
@@ -80,6 +141,7 @@ const ChatMessage = ({ msg }) => {
               textAlign: isUser ? "right" : "left",
             }}
           >
+            <FiClock size={10} style={{ marginRight: "2px" }} />
             {new Date(msg.timestamp).toLocaleTimeString([], {
               hour: "2-digit",
               minute: "2-digit",
@@ -92,7 +154,7 @@ const ChatMessage = ({ msg }) => {
 };
 
 // ─── Quick action chip ────────────────────────────────────────
-const QuickChip = ({ label, onClick, emoji }) => (
+const QuickChip = ({ label, onClick, icon }) => (
   <button
     onClick={onClick}
     style={{
@@ -116,13 +178,13 @@ const QuickChip = ({ label, onClick, emoji }) => (
       e.currentTarget.style.background = "#EFF6FF";
     }}
   >
-    {emoji && <span>{emoji}</span>}
+    {icon && <span style={{ fontSize: "14px" }}>{icon}</span>}
     {label}
   </button>
 );
 
 // ─── Tab button ───────────────────────────────────────────────
-const TabBtn = ({ label, active, onClick, emoji }) => (
+const TabBtn = ({ label, active, onClick, icon }) => (
   <button
     onClick={onClick}
     style={{
@@ -142,14 +204,39 @@ const TabBtn = ({ label, active, onClick, emoji }) => (
       gap: "3px",
     }}
   >
-    <span>{emoji}</span> {label}
+    <span style={{ fontSize: "14px" }}>{icon}</span> {label}
+  </button>
+);
+
+// ─── Tool button ──────────────────────────────────────────────
+const ToolBtn = ({ label, active, onClick, icon }) => (
+  <button
+    onClick={onClick}
+    style={{
+      flex: 1,
+      padding: "8px 4px",
+      background: active ? "#2563EB" : "#F1F5F9",
+      color: active ? "#fff" : "#475569",
+      border: "none",
+      borderRadius: "8px",
+      fontSize: "12px",
+      fontWeight: 600,
+      cursor: "pointer",
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      gap: "2px",
+    }}
+  >
+    <span style={{ fontSize: "16px" }}>{icon}</span>
+    {label}
   </button>
 );
 
 // ─── Main component ───────────────────────────────────────────
 export default function ChatbotWidget() {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("chat"); // chat | tools | help
+  const [activeTab, setActiveTab] = useState("chat");
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -157,7 +244,7 @@ export default function ChatbotWidget() {
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Tools tab state
-  const [toolMode, setToolMode] = useState(null); // "complaint" | "translate" | "services"
+  const [toolMode, setToolMode] = useState(null);
   const [toolInput, setToolInput] = useState("");
   const [toolResult, setToolResult] = useState(null);
   const [toolLoading, setToolLoading] = useState(false);
@@ -210,11 +297,6 @@ export default function ChatbotWidget() {
   }, [messages]);
 
   // Reset unread on open
-  // useEffect(() => {
-  //   if (isOpen) setUnreadCount(0);
-  // }, [isOpen]);
-  // Reset unread on open - using useLayoutEffect to avoid React warning
-  // Reset unread on open
   useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => {
@@ -223,6 +305,7 @@ export default function ChatbotWidget() {
       return () => clearTimeout(timer);
     }
   }, [isOpen]);
+
   // Focus input on open
   useEffect(() => {
     if (isOpen && activeTab === "chat") {
@@ -292,32 +375,32 @@ export default function ChatbotWidget() {
   const quickActions = [
     {
       label: "System overview",
-      emoji: "🏠",
+      icon: <FiHome size={14} />,
       msg: "Give me an overview of the Addis MESOB system and its main features",
     },
     {
       label: "Daily Report help",
-      emoji: "📋",
+      icon: <FiFileText size={14} />,
       msg: "How do I fill out a Daily Report? Walk me through step by step.",
     },
     {
       label: "Evaluation guide",
-      emoji: "⭐",
+      icon: <FiStar size={14} />,
       msg: "Explain the 5 evaluation criteria and how scoring works",
     },
     {
       label: "Forum Report",
-      emoji: "🤝",
+      icon: <FiUsers size={14} />,
       msg: "What is a Peer Forum Report and how do I create one?",
     },
     {
       label: "Document Vault",
-      emoji: "📁",
+      icon: <FiFolder size={14} />,
       msg: "How do I use the CRRSA Document Vault to upload and find documents?",
     },
     {
       label: "My role access",
-      emoji: "🔑",
+      icon: <FiKey size={14} />,
       msg: `What features can I access as a ${user?.role || "user"}?`,
     },
   ];
@@ -414,9 +497,16 @@ export default function ChatbotWidget() {
             padding: "12px",
             fontSize: "13px",
             color: "#B91C1C",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "8px",
           }}
         >
-          ⚠ {data}
+          <FiAlertCircle
+            size={16}
+            style={{ flexShrink: 0, marginTop: "1px" }}
+          />
+          <span>{data}</span>
         </div>
       );
 
@@ -436,9 +526,13 @@ export default function ChatbotWidget() {
               fontWeight: 600,
               color: "#15803D",
               marginBottom: "6px",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
             }}
           >
-            ✅ Translation
+            <FiCheckCircle size={14} />
+            Translation
           </div>
           <p
             style={{
@@ -461,9 +555,13 @@ export default function ChatbotWidget() {
               fontSize: "11px",
               color: "#15803D",
               cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
             }}
           >
-            📋 Copy
+            <FiCopy size={12} />
+            Copy
           </button>
         </div>
       );
@@ -505,8 +603,12 @@ export default function ChatbotWidget() {
                 borderRadius: "99px",
                 fontSize: "11px",
                 fontWeight: 600,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
               }}
             >
+              <FiAlertCircle size={12} />
               {data.severity?.toUpperCase()} SEVERITY
             </span>
             <span
@@ -516,8 +618,12 @@ export default function ChatbotWidget() {
                 padding: "2px 10px",
                 borderRadius: "99px",
                 fontSize: "11px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
               }}
             >
+              <FiInfo size={12} />
               {data.category?.replace(/_/g, " ")}
             </span>
             {data.department && (
@@ -528,8 +634,12 @@ export default function ChatbotWidget() {
                   padding: "2px 10px",
                   borderRadius: "99px",
                   fontSize: "11px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "4px",
                 }}
               >
+                <FiBriefcase size={12} />
                 {data.department}
               </span>
             )}
@@ -541,9 +651,13 @@ export default function ChatbotWidget() {
                 color: "#0F172A",
                 marginBottom: "3px",
                 fontSize: "12px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
               }}
             >
-              📝 Suggested Response:
+              <FiMessageSquare size={14} />
+              Suggested Response:
             </div>
             <p style={{ margin: 0, color: "#475569", lineHeight: 1.5 }}>
               {data.suggestedResponse}
@@ -556,13 +670,26 @@ export default function ChatbotWidget() {
                 color: "#0F172A",
                 marginBottom: "3px",
                 fontSize: "12px",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
               }}
             >
-              ✅ Action Required:
+              <FiCheckCircle size={14} />
+              Action Required:
             </div>
             <p style={{ margin: 0, color: "#475569" }}>{data.actionRequired}</p>
           </div>
-          <div style={{ fontSize: "11px", color: "#94A3B8" }}>
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#94A3B8",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <FiClock size={12} />
             Est. resolution: {data.estimatedResolutionDays} day(s)
           </div>
           <button
@@ -578,9 +705,13 @@ export default function ChatbotWidget() {
               fontSize: "11px",
               color: "#475569",
               cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
             }}
           >
-            📋 Copy Response
+            <FiCopy size={12} />
+            Copy Response
           </button>
         </div>
       );
@@ -595,8 +726,12 @@ export default function ChatbotWidget() {
                 color: "#475569",
                 margin: 0,
                 fontStyle: "italic",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: "6px",
               }}
             >
+              <FiInfo size={14} style={{ flexShrink: 0, marginTop: "1px" }} />
               {data.summary}
             </p>
           )}
@@ -611,13 +746,22 @@ export default function ChatbotWidget() {
               }}
             >
               <div
-                style={{ fontWeight: 600, fontSize: "13px", color: "#0F172A" }}
+                style={{
+                  fontWeight: 600,
+                  fontSize: "13px",
+                  color: "#0F172A",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                }}
               >
+                <FiBriefcase size={14} color="#2563EB" />
                 {rec.serviceName}
               </div>
               <div
                 style={{ fontSize: "11px", color: "#64748B", margin: "2px 0" }}
               >
+                <FiUser size={12} style={{ marginRight: "4px" }} />
                 {rec.department}
               </div>
               <div style={{ fontSize: "12px", color: "#475569" }}>
@@ -663,7 +807,7 @@ export default function ChatbotWidget() {
           e.currentTarget.style.boxShadow = "0 4px 20px rgba(37,99,235,0.45)";
         }}
       >
-        {isOpen ? "✕" : "🤖"}
+        {isOpen ? <FiX size={22} /> : <FiMessageSquare size={22} />}
         {unreadCount > 0 && !isOpen && (
           <div
             style={{
@@ -736,15 +880,17 @@ export default function ChatbotWidget() {
                     alignItems: "center",
                     justifyContent: "center",
                     fontSize: 18,
+                    color: "#fff",
                   }}
                 >
-                  🤖
+                  <FiMessageSquare size={18} />
                 </div>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: "14px" }}>
                     MESOB Assistant
                   </div>
                   <div style={{ fontSize: "11px", opacity: 0.8 }}>
+                    <FiGlobe size={11} style={{ marginRight: "4px" }} />
                     AI-powered · Amharic & English
                   </div>
                 </div>
@@ -781,19 +927,19 @@ export default function ChatbotWidget() {
             >
               <TabBtn
                 label="Chat"
-                emoji="💬"
+                icon={<FiMessageSquare size={14} />}
                 active={activeTab === "chat"}
                 onClick={() => setActiveTab("chat")}
               />
               <TabBtn
                 label="Tools"
-                emoji="🛠"
+                icon={<FiTool size={14} />}
                 active={activeTab === "tools"}
                 onClick={() => setActiveTab("tools")}
               />
               <TabBtn
                 label="Help"
-                emoji="❓"
+                icon={<FiHelpCircle size={14} />}
                 active={activeTab === "help"}
                 onClick={() => setActiveTab("help")}
               />
@@ -833,9 +979,10 @@ export default function ChatbotWidget() {
                         alignItems: "center",
                         justifyContent: "center",
                         fontSize: 13,
+                        color: "#fff",
                       }}
                     >
-                      🤖
+                      <FiMessageSquare size={14} />
                     </div>
                     <div
                       style={{
@@ -886,7 +1033,7 @@ export default function ChatbotWidget() {
                     <QuickChip
                       key={i}
                       label={a.label}
-                      emoji={a.emoji}
+                      icon={a.icon}
                       onClick={() => sendMessage(a.msg)}
                     />
                   ))}
@@ -938,9 +1085,12 @@ export default function ChatbotWidget() {
                     fontSize: "18px",
                     transition: "background 0.2s",
                     flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  ➤
+                  <FiSend size={18} />
                 </button>
               </div>
             </>
@@ -961,36 +1111,33 @@ export default function ChatbotWidget() {
               {/* Tool selector */}
               <div style={{ display: "flex", gap: "6px" }}>
                 {[
-                  { key: "complaint", emoji: "📨", label: "Complaint" },
-                  { key: "translate", emoji: "🌐", label: "Translate" },
-                  { key: "services", emoji: "🔍", label: "Find Service" },
+                  {
+                    key: "complaint",
+                    icon: <FiAlertCircle size={16} />,
+                    label: "Complaint",
+                  },
+                  {
+                    key: "translate",
+                    icon: <FiGlobe size={16} />,
+                    label: "Translate",
+                  },
+                  {
+                    key: "services",
+                    icon: <FiSearch size={16} />,
+                    label: "Find Service",
+                  },
                 ].map((t) => (
-                  <button
+                  <ToolBtn
                     key={t.key}
+                    label={t.label}
+                    icon={t.icon}
+                    active={toolMode === t.key}
                     onClick={() => {
                       setToolMode(t.key);
                       setToolInput("");
                       setToolResult(null);
                     }}
-                    style={{
-                      flex: 1,
-                      padding: "8px 4px",
-                      background: toolMode === t.key ? "#2563EB" : "#F1F5F9",
-                      color: toolMode === t.key ? "#fff" : "#475569",
-                      border: "none",
-                      borderRadius: "8px",
-                      fontSize: "12px",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: "2px",
-                    }}
-                  >
-                    <span style={{ fontSize: "16px" }}>{t.emoji}</span>
-                    {t.label}
-                  </button>
+                  />
                 ))}
               </div>
 
@@ -1003,7 +1150,11 @@ export default function ChatbotWidget() {
                   }}
                 >
                   <div style={{ fontSize: "32px", marginBottom: "8px" }}>
-                    🛠
+                    <FiTool
+                      size={32}
+                      color="#94A3B8"
+                      style={{ display: "block", margin: "0 auto" }}
+                    />
                   </div>
                   <p style={{ fontSize: "13px", margin: 0 }}>
                     Select a tool above
@@ -1026,9 +1177,13 @@ export default function ChatbotWidget() {
                       fontSize: "12px",
                       cursor: "pointer",
                       fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
-                    → Amharic
+                    <FiGlobe size={14} style={{ marginRight: "4px" }} />→
+                    Amharic
                   </button>
                   <button
                     onClick={() => setTranslateTarget("en")}
@@ -1043,9 +1198,13 @@ export default function ChatbotWidget() {
                       fontSize: "12px",
                       cursor: "pointer",
                       fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
-                    → English
+                    <FiGlobe size={14} style={{ marginRight: "4px" }} />→
+                    English
                   </button>
                 </div>
               )}
@@ -1098,15 +1257,36 @@ export default function ChatbotWidget() {
                         toolLoading || !toolInput.trim()
                           ? "default"
                           : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
                     }}
                   >
-                    {toolLoading
-                      ? "Processing…"
-                      : toolMode === "complaint"
-                        ? "📨 Analyze Complaint"
-                        : toolMode === "translate"
-                          ? "🌐 Translate"
-                          : "🔍 Find Services"}
+                    {toolLoading ? (
+                      <>
+                        <FiLoader
+                          size={16}
+                          style={{ animation: "spin 1s linear infinite" }}
+                        />
+                        Processing…
+                      </>
+                    ) : toolMode === "complaint" ? (
+                      <>
+                        <FiAlertCircle size={16} />
+                        Analyze Complaint
+                      </>
+                    ) : toolMode === "translate" ? (
+                      <>
+                        <FiGlobe size={16} />
+                        Translate
+                      </>
+                    ) : (
+                      <>
+                        <FiSearch size={16} />
+                        Find Services
+                      </>
+                    )}
                   </button>
                   {toolResult && renderToolResult()}
                 </>
@@ -1122,53 +1302,57 @@ export default function ChatbotWidget() {
                   margin: "0 0 12px",
                   fontSize: "14px",
                   color: "#0F172A",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
                 }}
               >
-                📚 Quick Reference
+                <FiBook size={18} />
+                Quick Reference
               </h4>
               {[
                 {
-                  emoji: "🏠",
+                  icon: <FiHome size={16} />,
                   title: "Dashboard",
                   desc: "View stats, AI digest, department performance charts",
                 },
                 {
-                  emoji: "📋",
+                  icon: <FiFileText size={16} />,
                   title: "Daily Report (/report)",
                   desc: "Log daily services. Select dept → service → enter M/F counts. Leaders and above only.",
                 },
                 {
-                  emoji: "⭐",
+                  icon: <FiStar size={16} />,
                   title: "Evaluation (/evaluation)",
                   desc: "Score team members on 5 criteria (100 pts total). Export signed PDF.",
                 },
                 {
-                  emoji: "🤝",
+                  icon: <FiUsers size={16} />,
                   title: "Peer Forum (/forum)",
                   desc: "Fill attendance, discussion topics, gaps, agreements. AI generates minutes.",
                 },
                 {
-                  emoji: "📊",
+                  icon: <FiBarChart2 size={16} />,
                   title: "Analytics (/analytics)",
                   desc: "Generate reports by period. Export Excel/PDF/Word.",
                 },
                 {
-                  emoji: "🔧",
+                  icon: <FiTool size={16} />,
                   title: "Services (/services)",
                   desc: "Browse all CRRSA service catalogue by department. Admin only.",
                 },
                 {
-                  emoji: "📁",
+                  icon: <FiFolder size={16} />,
                   title: "Document Vault (/documents)",
                   desc: "Upload CRRSA documents. AI auto-fills metadata. Lifetime storage.",
                 },
                 {
-                  emoji: "👥",
+                  icon: <FiUsersIcon size={16} />,
                   title: "Users (/users)",
                   desc: "Manage users. Assign roles and teams. Admin only.",
                 },
                 {
-                  emoji: "🏢",
+                  icon: <FiUserCheck size={16} />,
                   title: "Teams (/teams)",
                   desc: "Create and manage teams. Superadmin only.",
                 },
@@ -1187,9 +1371,10 @@ export default function ChatbotWidget() {
                       fontSize: "18px",
                       flexShrink: 0,
                       marginTop: "1px",
+                      color: "#2563EB",
                     }}
                   >
-                    {item.emoji}
+                    {item.icon}
                   </span>
                   <div>
                     <div
@@ -1227,9 +1412,13 @@ export default function ChatbotWidget() {
                     fontWeight: 600,
                     color: "#1D4ED8",
                     marginBottom: "4px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
                   }}
                 >
-                  💡 Tips
+                  <FiInfo size={14} />
+                  Tips
                 </div>
                 <div
                   style={{
@@ -1253,6 +1442,10 @@ export default function ChatbotWidget() {
         @keyframes bounce {
           0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
           40% { transform: translateY(-6px); opacity: 1; }
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </>
