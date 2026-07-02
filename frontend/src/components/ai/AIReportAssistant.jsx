@@ -5,7 +5,12 @@ import { useState } from "react";
 import { aiAPI } from "../../services/api";
 import { C } from "../../styles/theme";
 
-const AIReportAssistant = ({ reportContext, onApply, className = "" }) => {
+const AIReportAssistant = ({
+  reportContext,
+  onApply,
+  type = "daily", // "daily" | "forum" | "evaluation"
+  className = "",
+}) => {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -13,25 +18,87 @@ const AIReportAssistant = ({ reportContext, onApply, className = "" }) => {
   const generateSuggestions = async () => {
     setLoading(true);
     try {
-      const response = await aiAPI.getDailyInsight(null, {
-        ...reportContext,
-      });
+      let response;
+      let content = "";
 
-      const insight = response.data.insight || "";
-      const lines = insight.split("\n").filter(Boolean);
+      // ✅ Handle different report types
+      if (type === "forum") {
+        // For forum reports, use meeting minutes
+        response = await aiAPI.getMeetingMinutes({
+          title: reportContext.title || "Peer Forum Report",
+          date: reportContext.date || new Date().toISOString().split("T")[0],
+          attendees: reportContext.attendees || [],
+          agenda: reportContext.topics?.join("; ") || "",
+          notes: [
+            `Topics: ${reportContext.topics?.join("; ") || ""}`,
+            `Explanation: ${reportContext.explanation || ""}`,
+            `Gaps: ${reportContext.gaps?.join("; ") || ""}`,
+            `Agreements: ${reportContext.agreements?.join("; ") || ""}`,
+          ].join("\n"),
+        });
+        content = response.data?.minutes || response.data?.insight || "";
+      } else if (type === "evaluation") {
+        // For evaluation reports
+        response = await aiAPI.getEvaluationSummary({
+          evaluationData: reportContext,
+        });
+        content = response.data?.summary || "";
+      } else {
+        // Default: daily report insight
+        response = await aiAPI.getDailyInsight(null, reportContext);
+        content = response.data?.insight || "";
+      }
+
+      const lines = content.split("\n").filter(Boolean);
 
       setSuggestions({
         summary: lines[0] || "",
         keyPoints: lines.slice(1, 4).filter((l) => l.length > 10) || [],
         recommendation: lines[lines.length - 1] || "",
-        fullText: insight,
+        fullText: content,
       });
       setShowSuggestions(true);
     } catch (error) {
       console.error("Failed to generate suggestions:", error);
+
+      // ✅ Fallback suggestions when AI fails
+      const fallbackSuggestions = getFallbackSuggestions(type, reportContext);
+      setSuggestions(fallbackSuggestions);
+      setShowSuggestions(true);
     } finally {
       setLoading(false);
     }
+  };
+
+  // ✅ Fallback suggestions based on report type
+  // eslint-disable-next-line no-unused-vars
+  const getFallbackSuggestions = (type, context) => {
+    if (type === "forum") {
+      return {
+        summary:
+          "AI service is temporarily unavailable. Here are some manual suggestions for your forum report:",
+        keyPoints: [
+          "Document the main discussion points from the meeting",
+          "List any decisions made during the forum",
+          "Identify action items and assign responsibilities",
+          "Note any follow-up meetings or deadlines",
+        ],
+        recommendation:
+          "Try the AI Assistant again when the service is available.",
+        fullText:
+          "AI service is temporarily unavailable. Please check back later.",
+      };
+    }
+    return {
+      summary: "AI service is temporarily unavailable. Please try again later.",
+      keyPoints: [
+        "Review your report content",
+        "Check for completeness",
+        "Verify all sections are filled",
+      ],
+      recommendation: "Try again in a few minutes.",
+      fullText: "AI service is temporarily unavailable.",
+    };
   };
 
   const applySuggestion = (text) => {
