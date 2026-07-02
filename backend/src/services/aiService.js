@@ -1,7 +1,7 @@
 // backend/src/services/aiService.js
-// Core AI Service — Addis MESOB Digital Management System
-// Supports: Gemini (primary) → Groq (fallback 1) → Cohere (fallback 2)
-// SDK: @google/genai, groq-sdk, cohere-ai (v2 chat API)
+// Core AI Service — internal staff tool for Addis MESOB
+// Supports: Gemini (primary) → Groq (fallback 1) → Cohere (fallback 2) → DeepSeek (fallback 3)
+// SDK: @google/genai, groq-sdk, cohere-ai (v2 chat API), DeepSeek via plain fetch (OpenAI-compatible)
 
 const { GoogleGenAI } = require("@google/genai");
 const { Groq } = require("groq-sdk");
@@ -14,6 +14,28 @@ const PROVIDERS = {
   GEMINI: "gemini",
   GROQ: "groq",
   COHERE: "cohere",
+  DEEPSEEK: "deepseek",
+};
+
+// ============================================================
+// SMALL UTILITY — hard timeout wrapper
+// Used so a slow/hanging provider call fails fast with a proper
+// JSON error response instead of hanging until the platform's own
+// proxy kills the connection with zero response bytes (which shows
+// up in the browser as a misleading "CORS blocked" error).
+// ============================================================
+const withTimeout = (promise, ms, label = "AI request") => {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      const err = new Error(`${label} timed out after ${ms}ms`);
+      err.code = "AI_TIMEOUT";
+      reject(err);
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() =>
+    clearTimeout(timeoutId),
+  );
 };
 
 // ============================================================
@@ -60,9 +82,11 @@ if (!GROQ_KEY) {
     console.error("[aiService] ❌ Groq init failed:", e.message);
   }
 }
-// Updated to use the current stable Groq model
-// llama-3.3-70b-versatile is DEPRECATED as of July 2026
-const GROQ_MODEL = "llama-3.1-70b-versatile";
+// llama-3.1-70b-versatile was decommissioned Jan 2025.
+// llama-3.3-70b-versatile (its replacement) was ALSO deprecated by
+// Groq on June 17, 2026. openai/gpt-oss-120b is Groq's official
+// recommended replacement for both — see console.groq.com/docs/deprecations
+const GROQ_MODEL = "openai/gpt-oss-120b";
 
 // ─── Cohere ────────────────────────────────────────────────────
 // Cohere's Generate API (co.generate()) was retired Aug 26, 2025.
@@ -88,6 +112,28 @@ if (!COHERE_KEY) {
 }
 const COHERE_MODEL = "command-r-08-2024";
 
+// ─── DeepSeek ──────────────────────────────────────────────────
+// DeepSeek's API is OpenAI-compatible, so we call it with plain fetch
+// (Node 18+ has fetch built in) instead of pulling in another SDK.
+// NOTE: DeepSeek is NOT free — it's pay-as-you-go, though very cheap.
+// Check current pricing at https://platform.deepseek.com before relying
+// on it heavily in production.
+let deepseekInitialized = false;
+const DEEPSEEK_KEY = (process.env.DEEPSEEK_API_KEY || "").trim();
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com/chat/completions";
+const DEEPSEEK_MODEL = "deepseek-chat";
+
+if (!DEEPSEEK_KEY) {
+  console.warn(
+    "[aiService] ⚠️ DEEPSEEK_API_KEY is not set. DeepSeek fallback disabled.",
+  );
+} else {
+  deepseekInitialized = true;
+  console.log(
+    `[aiService] ✅ DeepSeek configured (${DEEPSEEK_KEY.slice(0, 6)}...)`,
+  );
+}
+
 // ============================================================
 // ERROR NORMALIZER
 // ============================================================
@@ -99,7 +145,10 @@ const normalizeAIError = (err, provider = "unknown") => {
   let code = "AI_UNKNOWN_ERROR";
   let message = raw;
 
-  if (
+  if (err?.code === "AI_TIMEOUT") {
+    code = "AI_TIMEOUT";
+    message = raw;
+  } else if (
     status === 401 ||
     status === 403 ||
     /API_KEY_INVALID|unauthe|invalid.*key|api.?key.*invalid|access.*denied/i.test(
@@ -250,8 +299,58 @@ const callCohere = async (
   }
 };
 
+// ─── DeepSeek Caller (OpenAI-compatible REST) ──────────────────
+const callDeepSeek = async (
+  prompt,
+  systemInstruction = SYSTEM_CONTEXT,
+  history = [],
+) => {
+  if (!deepseekInitialized) {
+    throw new Error("DeepSeek client not initialized");
+  }
+
+  try {
+    const res = await fetch(DEEPSEEK_BASE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${DEEPSEEK_KEY}`,
+      },
+      body: JSON.stringify({
+        model: DEEPSEEK_MODEL,
+        messages: [
+          { role: "system", content: systemInstruction },
+          ...history.map((m) => ({
+            role: m.role === "assistant" ? "assistant" : "user",
+            content: m.content,
+          })),
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 1024,
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      const err = new Error(
+        `DeepSeek API error ${res.status}: ${errBody.slice(0, 300)}`,
+      );
+      err.status = res.status;
+      throw err;
+    }
+
+    const data = await res.json();
+    const text = data?.choices?.[0]?.message?.content || "";
+    return { text, provider: PROVIDERS.DEEPSEEK };
+  } catch (err) {
+    throw normalizeAIError(err, PROVIDERS.DEEPSEEK);
+  }
+};
+
 // ============================================================
 // MAIN GENERATE TEXT — Auto-fallback chain
+// Order: Gemini -> Groq -> Cohere -> DeepSeek
 // ============================================================
 const generateText = async (
   prompt,
@@ -273,6 +372,11 @@ const generateText = async (
       name: PROVIDERS.COHERE,
       ready: cohereInitialized && cohereClient,
       fn: callCohere,
+    },
+    {
+      name: PROVIDERS.DEEPSEEK,
+      ready: deepseekInitialized,
+      fn: callDeepSeek,
     },
   ];
 
@@ -377,8 +481,31 @@ Under 200 words. Professional government report tone.`;
 
 // ============================================================
 // 3. DASHBOARD DIGEST
+// Cached for DIGEST_CACHE_TTL_MS so a burst of dashboard loads
+// (or a frontend polling loop) doesn't re-trigger a fresh AI call
+// -- and burn through free-tier quota -- on every single request.
+// The digest text only needs to change when the underlying stats
+// actually change, not every few seconds.
 // ============================================================
+const digestCache = { key: null, text: null, expiresAt: 0 };
+const DIGEST_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 const generateDashboardDigest = async (stats) => {
+  const cacheKey = JSON.stringify({
+    u: stats.totalUsers || 0,
+    t: stats.activeTeams || 0,
+    s: stats.totalServicesLogged || 0,
+    e: stats.evaluationsCompleted || 0,
+    d: stats.topDepartment || "N/A",
+    p: stats.period || "this week",
+  });
+
+  const now = Date.now();
+  if (digestCache.key === cacheKey && digestCache.expiresAt > now) {
+    console.log("[aiService] 🗂️ Dashboard digest served from cache");
+    return digestCache.text;
+  }
+
   const prompt = `Generate a concise executive digest for Addis MESOB system dashboard.
 
 Stats:
@@ -392,7 +519,13 @@ Stats:
 Write 2-3 sentences (under 80 words) as a digest paragraph.
 Sound like a city government performance update. Plain text only.`;
 
-  return generateText(prompt);
+  const text = await generateText(prompt);
+
+  digestCache.key = cacheKey;
+  digestCache.text = text;
+  digestCache.expiresAt = now + DIGEST_CACHE_TTL_MS;
+
+  return text;
 };
 
 // ============================================================
@@ -435,7 +568,12 @@ const handleChatMessage = async (
   userMessage,
   userContext,
 ) => {
-  if (!geminiInitialized && !groqInitialized && !cohereInitialized) {
+  if (
+    !geminiInitialized &&
+    !groqInitialized &&
+    !cohereInitialized &&
+    !deepseekInitialized
+  ) {
     return "I'm currently unable to connect to any AI service. Please try again later or contact your system administrator.";
   }
 
@@ -496,7 +634,12 @@ If asked about live data, guide them to the correct page. Keep responses under 2
 // 6. DOCUMENT OCR SUMMARY
 // ============================================================
 const summarizeDocumentContent = async (documentText, documentType) => {
-  if (!geminiInitialized && !groqInitialized && !cohereInitialized) {
+  if (
+    !geminiInitialized &&
+    !groqInitialized &&
+    !cohereInitialized &&
+    !deepseekInitialized
+  ) {
     return {
       summary: "Document uploaded. No AI service available.",
       extractedAt: new Date(),
@@ -531,7 +674,14 @@ Use null for missing fields.`;
 
 // ============================================================
 // 7. DOCUMENT VISION ANALYSIS (FIXED FOR ETHIOPIAN DOCUMENTS)
+// Wrapped with a 25s hard timeout so a hanging Gemini call fails
+// fast with a real JSON response (carries CORS headers, since the
+// cors() middleware already ran) instead of hanging until the
+// platform's own proxy kills the connection with zero response
+// bytes -- which the browser then misreports as a CORS error.
 // ============================================================
+const GEMINI_VISION_TIMEOUT_MS = 25000;
+
 const analyzeDocumentImage = async (base64File, mimeType) => {
   if (!geminiInitialized) {
     return {
@@ -593,19 +743,23 @@ If you see "የልደት ምስክር ወረቀት" or "Birth Certificate" in th
 If not recognizable, set documentType to "other", uncertain fields to null, confidence to "low".`;
 
   try {
-    const response = await geminiClient.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: prompt },
-            { inlineData: { mimeType, data: base64Data } },
-          ],
-        },
-      ],
-      config: { systemInstruction: SYSTEM_CONTEXT },
-    });
+    const response = await withTimeout(
+      geminiClient.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType, data: base64Data } },
+            ],
+          },
+        ],
+        config: { systemInstruction: SYSTEM_CONTEXT },
+      }),
+      GEMINI_VISION_TIMEOUT_MS,
+      "Gemini vision analysis",
+    );
 
     const text = response.text;
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -644,7 +798,10 @@ If not recognizable, set documentType to "other", uncertain fields to null, conf
     );
     return {
       confidence: "low",
-      notes: "AI analysis failed. Please fill fields manually.",
+      notes:
+        normalized.code === "AI_TIMEOUT"
+          ? "AI analysis timed out. Please fill fields manually."
+          : "AI analysis failed. Please fill fields manually.",
       documentType: "other",
     };
   }

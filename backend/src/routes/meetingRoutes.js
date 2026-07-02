@@ -1,3 +1,4 @@
+// backend/src/routes/meetingRoutes.js
 const express = require("express");
 const {
   createMeeting,
@@ -8,19 +9,29 @@ const {
 } = require("../controllers/meetingController");
 const {
   protect,
+  anyRole,
   leaderOrAdmin,
   adminOrSuperAdmin,
-} = require("../middleware/auth"); // ✅ Add leaderOrAdmin and adminOrSuperAdmin here
+} = require("../middleware/auth");
 
 const router = express.Router();
 
-// router.post("/", protect, createMeeting);
-router.post("/", protect, leaderOrAdmin, createMeeting); // only leaders/admins can create
-// router.get("/team/:teamId", protect, getMeetings);
-router.get("/team/:teamId", protect, getMeetings); // all can view
-router.get("/:id", protect, getMeetingById);
-router.put("/:id", protect, updateMeeting);
-// router.delete("/:id", protect, deleteMeeting);
-router.delete("/:id", protect, adminOrSuperAdmin, deleteMeeting); // only admin can delete
+// ✅ All routes require authentication
+router.use(protect, anyRole);
+
+// POST /api/meetings - Create new meeting report (leaders and above)
+router.post("/", leaderOrAdmin, createMeeting);
+
+// GET /api/meetings/team/:teamId - Get meetings by team
+router.get("/team/:teamId", getMeetings);
+
+// GET /api/meetings/:id - Get single meeting
+router.get("/:id", getMeetingById);
+
+// PUT /api/meetings/:id - Update meeting
+router.put("/:id", updateMeeting);
+
+// DELETE /api/meetings/:id - Delete meeting (admin only)
+router.delete("/:id", adminOrSuperAdmin, deleteMeeting);
 
 module.exports = router;

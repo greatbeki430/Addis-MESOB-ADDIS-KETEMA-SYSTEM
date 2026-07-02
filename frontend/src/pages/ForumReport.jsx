@@ -5,7 +5,8 @@ import Section from "../components/ui/Section";
 import { exportForumReportToPDF } from "../utils/pdfExport";
 import { meetingAPI } from "../services/api";
 import { aiAPI } from "../services/api";
-import { AISummary, AIReportAssistant } from "../components/ai"; // ✅ Updated import
+import { AISummary, AIReportAssistant } from "../components/ai";
+import { useToast } from "../hooks/useToast"; // ✅ Import useToast
 import {
   FiPlus,
   FiX,
@@ -262,6 +263,9 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
   const tf = safeT.forum || {};
   const safeYear = safeT.year || "2018 E.C.";
 
+  // ✅ Get toast function
+  const { showToast } = useToast();
+
   const [form, setForm] = useState({
     date: new Date().toISOString().split("T")[0],
     timeStart: "",
@@ -316,18 +320,48 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
   const handleSaveReport = async () => {
     try {
       setSaving(true);
+
+      // ✅ Validate required fields
+      if (!form.date) {
+        showToast("Please select a date", "warning");
+        setSaving(false);
+        return;
+      }
+
+      // ✅ Prepare data for API - match the backend expectations
       const reportData = {
-        ...form,
-        teamId: selectedTeam?.id,
-        teamName: selectedTeam?.name,
+        date: form.date,
+        timeStart: form.timeStart,
+        timeEnd: form.timeEnd,
+        present: form.present.filter((p) => p.trim() !== ""),
+        absent: form.absent.filter((a) => a.name.trim() !== ""),
+        prevResults: form.prevResults.filter((p) => p.trim() !== ""),
+        topics: form.topics.filter((t) => t.trim() !== ""),
+        explanation: form.explanation || "",
+        gaps: form.gaps.filter((g) => g.trim() !== ""),
+        agreements: form.agreements.filter((a) => a.trim() !== ""),
+        signatures: form.signatures.filter((s) => s.trim() !== ""),
+        teamId: selectedTeam?.id || selectedTeam?._id,
+        teamName: selectedTeam?.name || "Unknown Team",
       };
+
+      console.log("📤 Sending report data:", reportData);
+
+      // ✅ Use await without assigning to unused variable, or use it if needed
       await meetingAPI.create(reportData);
+
       if (onReportSaved) {
         onReportSaved(selectedTeam.id, form);
       }
       setSubmitted(true);
+      showToast("✅ Report saved successfully!", "success");
     } catch (error) {
       console.error("Failed to save report:", error);
+      showToast(
+        error.response?.data?.message ||
+          "Failed to save report. Please try again.",
+        "error",
+      );
     } finally {
       setSaving(false);
     }
