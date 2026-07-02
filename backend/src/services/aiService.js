@@ -680,69 +680,74 @@ Use null for missing fields.`;
 // platform's own proxy kills the connection with zero response
 // bytes -- which the browser then misreports as a CORS error.
 // ============================================================
-const GEMINI_VISION_TIMEOUT_MS = 25000;
+const GEMINI_VISION_TIMEOUT_MS = 15000;
 
 const analyzeDocumentImage = async (base64File, mimeType) => {
   if (!geminiInitialized) {
+    console.error("[aiService] ❌ Gemini not initialized for vision analysis");
     return {
       confidence: "low",
-      notes: "AI vision analysis unavailable. Fill fields manually.",
+      notes:
+        "AI vision service is not available. Please fill in the fields manually.",
       documentType: "other",
     };
   }
 
-  const base64Data = base64File.includes(",")
-    ? base64File.split(",")[1]
-    : base64File;
+  try {
+    const base64Data = base64File.includes(",")
+      ? base64File.split(",")[1]
+      : base64File;
 
-  const prompt = `You are an AI assistant for the Ethiopian CRRSA (Civil Registration and Residency Service Agency) document management system.
+    // ✅ Check if we have valid data
+    if (!base64Data || base64Data.length < 100) {
+      console.error("[aiService] ❌ Invalid or empty image data");
+      return {
+        confidence: "low",
+        notes:
+          "The image appears to be empty or invalid. Please try again with a different file.",
+        documentType: "other",
+      };
+    }
 
-You are analyzing an Ethiopian government document. This is likely a Vital Event Registration document from Ethiopia.
+    // ✅ Log file size for debugging
+    const fileSizeKB = Math.round((base64Data.length * 0.75) / 1024);
+    console.log(
+      `[aiService] 📄 Analyzing document (${fileSizeKB}KB, ${mimeType})`,
+    );
 
-IMPORTANT: These are the types of documents you may see:
-- Birth Certificate (የልደት ምስክር ወረቀት) — Look for "የልደት ምስክር ወረቀት" or "Birth Certificate"
-- Death Certificate (የሞት ምስክር ወረቀት) — Look for "የሞት ምስክር ወረቀት" or "Death Certificate"
-- Marriage Certificate (የጋብቻ ምስክር ወረቀት) — Look for "የጋብቻ ምስክር ወረቀት" or "Marriage Certificate"
-- Residence ID (የኑሮ መታወቂያ) — Look for "የኑሮ መታወቂያ" or "Residence ID"
+    // ✅ Simplified, faster prompt
+    const prompt = `Analyze this document image for Ethiopian CRRSA government document detection.
 
-Look for these Ethiopian government document markers:
+IMPORTANT: This is an ETHIOPIAN government document.
+Look for these Ethiopian government markers:
 - "በኢትዮጵያ ፌዴራላዊ ዲሞክራሲያዊ ሪፐብሊክ" (Federal Democratic Republic of Ethiopia)
 - "የልደት ምስክር ወረቀት" (Birth Certificate)
-- "የሞት ምስክር ወረቀት" (Death Certificate)
-- "የጋብቻ ምስክር ወረቀት" (Marriage Certificate)
-- "የኑሮ መታወቂያ" (Residence ID)
-- Official stamps, seals, or government headers
-- "AABI No" or "ተ.ቁ" (document number)
 
-For Ethiopian Birth Certificates specifically, look for:
+For Birth Certificates, look for:
 - Child's name (የህፃኑ ስም / Child's Name)
-- Father's name (የአባት ስም / Father's Name)
+- Father's name (የአባት ስም / Father's Name)  
 - Mother's name (የእናት ስም / Mother's Name)
-- Date of Birth (የትውልድ ቀን / Date of Birth)
-- Place of Birth (የትውልድ ቦታ / Place of Birth)
+- Date of Birth (የትውልድ ቀን)
 - Registration number (AABI No / ተ.ቁ)
 
-Extract all visible information and return ONLY valid JSON (no markdown fences):
-
+Return ONLY this JSON (no other text):
 {
-  "documentType": "birth_certificate|death_certificate|marriage_certificate|divorce_certificate|residence_id|name_change|registration_book|circular|directive|correspondence|application_form|other",
+  "documentType": "birth_certificate|death_certificate|marriage_certificate|divorce_certificate|residence_id|name_change|other",
   "title": "descriptive title",
-  "citizenName": "Name of the person (look for Child's Name or Citizen Name in English)",
-  "citizenNameAmharic": "Name in Amharic script if visible",
-  "issueDate": "Date in YYYY-MM-DD format (look for Certificate issued date / የምስክር ወረቀት የተሰጠበት)",
-  "issuingOfficer": "Name of issuing officer (look for Full Name of the Officer of Civil Status / የክብር መዝገብ ሽም መሉ ስም)",
-  "issuingDepartment": "Civil Registry (ሲቪል ምዝገባ)",
-  "nationalId": "Document number (look for AABI No / ተ.ቁ)",
-  "tags": ["ethiopian", "vital", "registration", "crrsa", "document"],
-  "notes": "one sentence describing the document",
+  "citizenName": "person's name in English or null",
+  "citizenNameAmharic": "name in Amharic or null",
+  "issueDate": "YYYY-MM-DD or null",
+  "issuingOfficer": "officer name or null",
+  "issuingDepartment": "Civil Registry",
+  "nationalId": "document number or null",
+  "tags": ["ethiopian", "document"],
+  "notes": "brief description",
   "confidence": "high|medium|low"
-}
+}`;
 
-If this is clearly a birth certificate with the Ethiopian government header, set documentType to "birth_certificate" and confidence to "high" even if some fields are missing.
-If you see "የልደት ምስክር ወረቀት" or "Birth Certificate" in the document, it's a birth certificate.
-If not recognizable, set documentType to "other", uncertain fields to null, confidence to "low".`;
+    console.log("[aiService] 🤖 Sending vision request to Gemini...");
 
-  try {
+    // ✅ Use withTimeout with shorter timeout
     const response = await withTimeout(
       geminiClient.models.generateContent({
         model: GEMINI_MODEL,
@@ -758,50 +763,77 @@ If not recognizable, set documentType to "other", uncertain fields to null, conf
         config: { systemInstruction: SYSTEM_CONTEXT },
       }),
       GEMINI_VISION_TIMEOUT_MS,
-      "Gemini vision analysis",
+      "Gemini vision",
     );
 
+    console.log("[aiService] ✅ Gemini vision response received");
+
     const text = response.text;
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch)
+    console.log(`[aiService] 📝 Response length: ${text.length} chars`);
+
+    // ✅ Try to extract JSON
+    let jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      console.warn(
+        "[aiService] ⚠️ No JSON found in response:",
+        text.substring(0, 200),
+      );
       return {
         confidence: "low",
-        notes: "Could not parse AI response.",
+        notes:
+          "AI could not parse the document. Please fill in the fields manually.",
         documentType: "other",
       };
-
-    const result = JSON.parse(jsonMatch[0]);
-
-    // ✅ Ensure confidence is set
-    if (!result.confidence) result.confidence = "low";
-
-    // ✅ If it's a birth certificate, set confidence higher
-    if (result.documentType === "birth_certificate") {
-      result.confidence = "high";
-      if (!result.notes) {
-        result.notes = "Ethiopian Birth Certificate detected.";
-      }
     }
 
-    if (!result.notes)
-      result.notes =
-        result.documentType === "other"
-          ? "Document type not recognized."
-          : "CRRSA document detected.";
+    let result;
+    try {
+      result = JSON.parse(jsonMatch[0]);
+    } catch (parseError) {
+      console.error("[aiService] ❌ JSON parse error:", parseError.message);
+      return {
+        confidence: "low",
+        notes:
+          "AI returned unparseable data. Please fill in the fields manually.",
+        documentType: "other",
+      };
+    }
 
+    // ✅ Ensure all fields exist
+    result.documentType = result.documentType || "other";
+    result.confidence = result.confidence || "low";
+    result.notes = result.notes || "Document analyzed.";
+    result.tags = result.tags || ["ethiopian", "document"];
+
+    // ✅ If it's a birth certificate, set high confidence
+    if (result.documentType === "birth_certificate") {
+      result.confidence = "high";
+    }
+
+    console.log(
+      `[aiService] ✅ Analysis complete: ${result.documentType} (${result.confidence} confidence)`,
+    );
     return result;
   } catch (err) {
     const normalized = normalizeAIError(err, PROVIDERS.GEMINI);
     console.error(
-      `[aiService] analyzeDocumentImage failed [${normalized.code}]:`,
+      `[aiService] ❌ Vision analysis error [${normalized.code}]:`,
       normalized.message,
     );
+
+    // ✅ Return user-friendly error messages
+    let notes = "AI analysis failed. Please fill in the fields manually.";
+    if (normalized.code === "AI_TIMEOUT") {
+      notes =
+        "AI analysis is taking too long. Please fill in the fields manually.";
+    } else if (normalized.code === "AI_RATE_LIMIT") {
+      notes =
+        "AI service is currently busy. Please fill in the fields manually and try again later.";
+    }
+
     return {
       confidence: "low",
-      notes:
-        normalized.code === "AI_TIMEOUT"
-          ? "AI analysis timed out. Please fill fields manually."
-          : "AI analysis failed. Please fill fields manually.",
+      notes: notes,
       documentType: "other",
     };
   }
