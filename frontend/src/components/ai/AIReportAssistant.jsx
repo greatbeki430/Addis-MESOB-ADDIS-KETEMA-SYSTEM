@@ -71,8 +71,7 @@ const AIReportAssistant = ({
   };
 
   // ✅ Fallback suggestions based on report type
-  // eslint-disable-next-line no-unused-vars
-  const getFallbackSuggestions = (type, context) => {
+  const getFallbackSuggestions = (type) => {
     if (type === "forum") {
       return {
         summary:
