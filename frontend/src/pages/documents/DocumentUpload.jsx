@@ -147,6 +147,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
       if (a.documentType) setDetectedDocumentType(a.documentType);
 
       // ✅ Check if AI detected this is NOT a CRRSA document
+      // Improved detection: Don't treat birth certificates as non-CRRSA
       const isNotCRRSA =
         a.documentType === "other" ||
         a.notes?.toLowerCase().includes("not a government document") ||
@@ -155,7 +156,13 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         a.notes?.toLowerCase().includes("promotional") ||
         a.notes?.toLowerCase().includes("digital solutions") ||
         a.notes?.toLowerCase().includes("not a crrsa") ||
-        (a.confidence === "low" && !a.citizenName && !a.issueDate && !a.title);
+        a.notes?.toLowerCase().includes("not a civil registration") ||
+        // ✅ Don't treat as non-CRRSA if it's a birth certificate
+        (a.confidence === "low" &&
+          !a.citizenName &&
+          !a.issueDate &&
+          !a.title &&
+          a.documentType !== "birth_certificate");
 
       if (isNotCRRSA) {
         setIsNotCRRSADocument(true);

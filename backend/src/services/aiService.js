@@ -62,7 +62,6 @@ if (!GROQ_KEY) {
 }
 // Updated to use the current stable Groq model
 // llama-3.3-70b-versatile is DEPRECATED as of July 2026
-// Use llama-3.1-70b-versatile or openai/gpt-oss-120b instead
 const GROQ_MODEL = "llama-3.1-70b-versatile";
 
 // ─── Cohere ────────────────────────────────────────────────────
@@ -87,8 +86,6 @@ if (!COHERE_KEY) {
     console.error("[aiService] ❌ Cohere init failed:", e.message);
   }
 }
-// Use a versioned model ID — unversioned aliases like "command-r" are deprecated.
-// command-r-08-2024 is the lightweight free-tier-friendly option.
 const COHERE_MODEL = "command-r-08-2024";
 
 // ============================================================
@@ -160,9 +157,6 @@ Be concise, professional, and helpful. For Amharic, use proper Ethiopic script.`
 
 // ============================================================
 // PROVIDER CALLERS
-// Each caller accepts an optional `history` array of
-// { role: "user" | "assistant", content: string } turns, in chronological
-// order, so multi-turn context survives a mid-conversation provider switch.
 // ============================================================
 
 // ─── Gemini Caller ────────────────────────────────────────────
@@ -258,8 +252,6 @@ const callCohere = async (
 
 // ============================================================
 // MAIN GENERATE TEXT — Auto-fallback chain
-// Any error from a non-final provider falls through to the next one;
-// we only give up once every configured provider has failed.
 // ============================================================
 const generateText = async (
   prompt,
@@ -306,9 +298,6 @@ const generateText = async (
       );
       errors.push({ provider: provider.name, error: err });
       lastError = err;
-      // Fall through to the next provider regardless of error type —
-      // an auth typo or model-name change on one provider shouldn't
-      // sink the whole request when another provider is still available.
     }
   }
 
@@ -480,8 +469,6 @@ System pages:
 If asked about live data, guide them to the correct page. Keep responses under 200 words.`;
 
   try {
-    // Normalize incoming history into the { role, content } shape every
-    // provider caller expects, and cap it so prompts don't grow unbounded.
     const history = (conversationHistory || []).slice(-10).map((m) => ({
       role: m.role === "assistant" ? "assistant" : "user",
       content: m.content,
@@ -543,9 +530,7 @@ Use null for missing fields.`;
 };
 
 // ============================================================
-// 7. DOCUMENT VISION ANALYSIS
-// Only Gemini supports vision here — Groq/Cohere text models can't
-// process images, so there is no fallback for this one call.
+// 7. DOCUMENT VISION ANALYSIS (FIXED FOR ETHIOPIAN DOCUMENTS)
 // ============================================================
 const analyzeDocumentImage = async (base64File, mimeType) => {
   if (!geminiInitialized) {
@@ -560,29 +545,52 @@ const analyzeDocumentImage = async (base64File, mimeType) => {
     ? base64File.split(",")[1]
     : base64File;
 
-  const prompt = `You are analyzing an Ethiopian CRRSA government document.
+  const prompt = `You are an AI assistant for the Ethiopian CRRSA (Civil Registration and Residency Service Agency) document management system.
 
-Look at this document image carefully. It may be:
-- Birth/Death/Marriage/Divorce Certificate
-- Residence ID, Name Change, Registration Book
-- Circular, Directive, Correspondence, Application Form
+You are analyzing an Ethiopian government document. This is likely a Vital Event Registration document from Ethiopia.
+
+IMPORTANT: These are the types of documents you may see:
+- Birth Certificate (የልደት ምስክር ወረቀት) — Look for "የልደት ምስክር ወረቀት" or "Birth Certificate"
+- Death Certificate (የሞት ምስክር ወረቀት) — Look for "የሞት ምስክር ወረቀት" or "Death Certificate"
+- Marriage Certificate (የጋብቻ ምስክር ወረቀት) — Look for "የጋብቻ ምስክር ወረቀት" or "Marriage Certificate"
+- Residence ID (የኑሮ መታወቂያ) — Look for "የኑሮ መታወቂያ" or "Residence ID"
+
+Look for these Ethiopian government document markers:
+- "በኢትዮጵያ ፌዴራላዊ ዲሞክራሲያዊ ሪፐብሊክ" (Federal Democratic Republic of Ethiopia)
+- "የልደት ምስክር ወረቀት" (Birth Certificate)
+- "የሞት ምስክር ወረቀት" (Death Certificate)
+- "የጋብቻ ምስክር ወረቀት" (Marriage Certificate)
+- "የኑሮ መታወቂያ" (Residence ID)
+- Official stamps, seals, or government headers
+- "AABI No" or "ተ.ቁ" (document number)
+
+For Ethiopian Birth Certificates specifically, look for:
+- Child's name (የህፃኑ ስም / Child's Name)
+- Father's name (የአባት ስም / Father's Name)
+- Mother's name (የእናት ስም / Mother's Name)
+- Date of Birth (የትውልድ ቀን / Date of Birth)
+- Place of Birth (የትውልድ ቦታ / Place of Birth)
+- Registration number (AABI No / ተ.ቁ)
 
 Extract all visible information and return ONLY valid JSON (no markdown fences):
+
 {
   "documentType": "birth_certificate|death_certificate|marriage_certificate|divorce_certificate|residence_id|name_change|registration_book|circular|directive|correspondence|application_form|other",
   "title": "descriptive title",
-  "citizenName": "English name or null",
-  "citizenNameAmharic": "Amharic name or null",
-  "issueDate": "YYYY-MM-DD or null",
-  "issuingOfficer": "officer name or null",
-  "issuingDepartment": "department name or Civil Registry",
-  "nationalId": "ID number or null",
-  "tags": ["keyword1", "keyword2"],
+  "citizenName": "Name of the person (look for Child's Name or Citizen Name in English)",
+  "citizenNameAmharic": "Name in Amharic script if visible",
+  "issueDate": "Date in YYYY-MM-DD format (look for Certificate issued date / የምስክር ወረቀት የተሰጠበት)",
+  "issuingOfficer": "Name of issuing officer (look for Full Name of the Officer of Civil Status / የክብር መዝገብ ሽም መሉ ስም)",
+  "issuingDepartment": "Civil Registry (ሲቪል ምዝገባ)",
+  "nationalId": "Document number (look for AABI No / ተ.ቁ)",
+  "tags": ["ethiopian", "vital", "registration", "crrsa", "document"],
   "notes": "one sentence describing the document",
   "confidence": "high|medium|low"
 }
 
-If not recognizable: set documentType to "other", uncertain fields to null, confidence to "low".`;
+If this is clearly a birth certificate with the Ethiopian government header, set documentType to "birth_certificate" and confidence to "high" even if some fields are missing.
+If you see "የልደት ምስክር ወረቀት" or "Birth Certificate" in the document, it's a birth certificate.
+If not recognizable, set documentType to "other", uncertain fields to null, confidence to "low".`;
 
   try {
     const response = await geminiClient.models.generateContent({
@@ -609,12 +617,24 @@ If not recognizable: set documentType to "other", uncertain fields to null, conf
       };
 
     const result = JSON.parse(jsonMatch[0]);
+
+    // ✅ Ensure confidence is set
+    if (!result.confidence) result.confidence = "low";
+
+    // ✅ If it's a birth certificate, set confidence higher
+    if (result.documentType === "birth_certificate") {
+      result.confidence = "high";
+      if (!result.notes) {
+        result.notes = "Ethiopian Birth Certificate detected.";
+      }
+    }
+
     if (!result.notes)
       result.notes =
         result.documentType === "other"
           ? "Document type not recognized."
           : "CRRSA document detected.";
-    if (!result.confidence) result.confidence = "low";
+
     return result;
   } catch (err) {
     const normalized = normalizeAIError(err, PROVIDERS.GEMINI);
