@@ -87,6 +87,12 @@ if (!GROQ_KEY) {
 // Groq on June 17, 2026. openai/gpt-oss-120b is Groq's official
 // recommended replacement for both — see console.groq.com/docs/deprecations
 const GROQ_MODEL = "openai/gpt-oss-120b";
+// Vision-capable Groq model, used ONLY as a fallback for document image
+// analysis (analyzeDocumentImage). GROQ_MODEL above is text-only and
+// cannot be used for image input.
+// NOTE: verify this model ID is still current at console.groq.com/docs/models
+// before relying on it — Groq deprecates model IDs over time (see note above).
+const GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
 
 // ─── Cohere ────────────────────────────────────────────────────
 // Cohere's Generate API (co.generate()) was retired Aug 26, 2025.
@@ -261,6 +267,71 @@ const callGroq = async (
       temperature: 0.7,
       max_tokens: 1024,
     });
+    return {
+      text: response.choices[0]?.message?.content || "",
+      provider: PROVIDERS.GROQ,
+    };
+  } catch (err) {
+    throw normalizeAIError(err, PROVIDERS.GROQ);
+  }
+};
+
+// ─── Gemini Vision Caller (extracted so it can be one link in a chain) ─
+const callGeminiVision = async (base64Data, mimeType, prompt) => {
+  if (!geminiInitialized || !geminiClient) {
+    throw new Error("Gemini client not initialized");
+  }
+  try {
+    const response = await withTimeout(
+      geminiClient.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType, data: base64Data } },
+            ],
+          },
+        ],
+        config: { systemInstruction: SYSTEM_CONTEXT },
+      }),
+      GEMINI_VISION_TIMEOUT_MS,
+      "Gemini vision",
+    );
+    return { text: response.text, provider: PROVIDERS.GEMINI };
+  } catch (err) {
+    throw normalizeAIError(err, PROVIDERS.GEMINI);
+  }
+};
+
+// ─── Groq Vision Caller (fallback for document image analysis) ────────
+const callGroqVision = async (base64Data, mimeType, prompt) => {
+  if (!groqInitialized || !groqClient) {
+    throw new Error("Groq client not initialized");
+  }
+  try {
+    const response = await withTimeout(
+      groqClient.chat.completions.create({
+        model: GROQ_VISION_MODEL,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              {
+                type: "image_url",
+                image_url: { url: `data:${mimeType};base64,${base64Data}` },
+              },
+            ],
+          },
+        ],
+        temperature: 0.2,
+        max_tokens: 1024,
+      }),
+      GEMINI_VISION_TIMEOUT_MS,
+      "Groq vision",
+    );
     return {
       text: response.choices[0]?.message?.content || "",
       provider: PROVIDERS.GROQ,
@@ -679,12 +750,18 @@ Use null for missing fields.`;
 // cors() middleware already ran) instead of hanging until the
 // platform's own proxy kills the connection with zero response
 // bytes -- which the browser then misreports as a CORS error.
+//
+// Vision fallback chain: Gemini first, Groq vision (Llama 4 Scout)
+// if Gemini fails for any reason (quota, rate limit, timeout, etc).
+// Cohere/DeepSeek are text-only and are NOT part of this chain.
 // ============================================================
 const GEMINI_VISION_TIMEOUT_MS = 15000;
 
 const analyzeDocumentImage = async (base64File, mimeType) => {
-  if (!geminiInitialized) {
-    console.error("[aiService] ❌ Gemini not initialized for vision analysis");
+  if (!geminiInitialized && !groqInitialized) {
+    console.error(
+      "[aiService] ❌ No vision-capable provider initialized (Gemini and Groq both unavailable)",
+    );
     return {
       confidence: "low",
       notes:
@@ -745,30 +822,56 @@ Return ONLY this JSON (no other text):
   "confidence": "high|medium|low"
 }`;
 
-    console.log("[aiService] 🤖 Sending vision request to Gemini...");
+    // ✅ Vision fallback chain: Gemini first, Groq vision if Gemini fails.
+    // Unlike generateText()'s 4-provider chain, only 2 providers here can
+    // actually accept image input — Cohere/DeepSeek are text-only and are
+    // deliberately excluded from this chain.
+    const visionCallers = [
+      {
+        name: PROVIDERS.GEMINI,
+        ready: geminiInitialized && geminiClient,
+        fn: callGeminiVision,
+      },
+      {
+        name: PROVIDERS.GROQ,
+        ready: groqInitialized && groqClient,
+        fn: callGroqVision,
+      },
+    ];
 
-    // ✅ Use withTimeout with shorter timeout
-    const response = await withTimeout(
-      geminiClient.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: [
-          {
-            role: "user",
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType, data: base64Data } },
-            ],
-          },
-        ],
-        config: { systemInstruction: SYSTEM_CONTEXT },
-      }),
-      GEMINI_VISION_TIMEOUT_MS,
-      "Gemini vision",
-    );
+    let text = null;
+    let usedProvider = null;
+    const visionErrors = [];
 
-    console.log("[aiService] ✅ Gemini vision response received");
+    for (const provider of visionCallers) {
+      if (!provider.ready) continue;
+      try {
+        console.log(
+          `[aiService] 🤖 Sending vision request to ${provider.name}...`,
+        );
+        const result = await provider.fn(base64Data, mimeType, prompt);
+        text = result.text;
+        usedProvider = result.provider;
+        console.log(
+          `[aiService] ✅ Vision response received from ${usedProvider}`,
+        );
+        break;
+      } catch (err) {
+        console.warn(
+          `[aiService] ⚠️ ${provider.name} vision failed: ${err.code || "unknown"} - ${err.message}`,
+        );
+        visionErrors.push({ provider: provider.name, error: err });
+      }
+    }
 
-    const text = response.text;
+    if (text === null) {
+      const lastErr = visionErrors[visionErrors.length - 1]?.error;
+      const normalized = lastErr || new Error("All vision providers failed");
+      normalized.code = normalized.code || "ALL_VISION_PROVIDERS_FAILED";
+      normalized.provider = normalized.provider || "vision-chain";
+      throw normalized;
+    }
+
     console.log(`[aiService] 📝 Response length: ${text.length} chars`);
 
     // ✅ Try to extract JSON
@@ -811,11 +914,12 @@ Return ONLY this JSON (no other text):
     }
 
     console.log(
-      `[aiService] ✅ Analysis complete: ${result.documentType} (${result.confidence} confidence)`,
+      `[aiService] ✅ Analysis complete: ${result.documentType} (${result.confidence} confidence, via ${usedProvider})`,
     );
     return result;
   } catch (err) {
-    const normalized = normalizeAIError(err, PROVIDERS.GEMINI);
+    const normalized =
+      err.code && err.provider ? err : normalizeAIError(err, PROVIDERS.GEMINI);
     console.error(
       `[aiService] ❌ Vision analysis error [${normalized.code}]:`,
       normalized.message,
@@ -829,6 +933,9 @@ Return ONLY this JSON (no other text):
     } else if (normalized.code === "AI_RATE_LIMIT") {
       notes =
         "AI service is currently busy. Please fill in the fields manually and try again later.";
+    } else if (normalized.code === "ALL_VISION_PROVIDERS_FAILED") {
+      notes =
+        "AI vision services are currently unavailable. Please fill in the fields manually.";
     }
 
     return {
