@@ -45,6 +45,8 @@ const logAudit = async (
 // ============================================================
 const uploadDocument = async (req, res) => {
   try {
+    console.log("📝 Upload request received");
+
     const {
       file,
       documentType,
@@ -59,82 +61,191 @@ const uploadDocument = async (req, res) => {
       tags,
       notes,
       accessLevel,
-      textContent, // Optional: text content for AI extraction
+      textContent,
       retentionPolicy,
     } = req.body;
 
-    if (!file) return res.status(400).json({ message: "File is required" });
-    if (!documentType)
-      return res.status(400).json({ message: "Document type is required" });
-    if (!title)
-      return res.status(400).json({ message: "Document title is required" });
+    // ✅ Log the incoming data (without the large file)
+    console.log(`   Document Type: ${documentType}`);
+    console.log(`   Title: ${title}`);
+    console.log(`   File present: ${!!file}`);
+    console.log(`   File size: ${file ? Math.round(file.length / 1024) : 0}KB`);
 
-    // Generate reference number
-    const referenceNumber =
-      req.body.referenceNumber || generateReferenceNumber(documentType);
-
-    // Check for duplicate reference number
-    const existing = await CRRSADocument.findOne({ referenceNumber });
-    if (existing) {
-      return res.status(409).json({
-        message: `Reference number ${referenceNumber} already exists`,
-        existingDocumentId: existing._id,
+    // ✅ Validate required fields
+    if (!file) {
+      console.error("❌ File is missing");
+      return res.status(400).json({
+        success: false,
+        message: "File is required",
+        code: "FILE_REQUIRED",
       });
     }
 
-    // Upload to Cloudinary
-    const uploadResult = await uploadDocumentToCloud(file, {
-      documentType,
-      referenceNumber,
-    });
-
-    // AI extraction (if text content is provided)
-    let aiExtractedData = null;
-    if (textContent && textContent.trim()) {
-      aiExtractedData = await extractDocumentMetadataWithAI(
-        textContent,
-        documentType,
-      );
+    if (!documentType) {
+      console.error("❌ Document type is missing");
+      return res.status(400).json({
+        success: false,
+        message: "Document type is required",
+        code: "DOCUMENT_TYPE_REQUIRED",
+      });
     }
 
-    // Create document record
-    const document = await CRRSADocument.create({
-      referenceNumber,
-      documentType,
-      title,
-      citizenName: citizenName?.trim(),
-      citizenNameAmharic: citizenNameAmharic?.trim(),
-      nationalId,
-      dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
-      issueDate: issueDate ? new Date(issueDate) : undefined,
-      issuingOfficer,
-      issuingDepartment: issuingDepartment || "Civil Registry",
-      fileUrl: uploadResult.url,
-      filePublicId: uploadResult.publicId,
-      fileType: uploadResult.fileType,
-      fileSize: uploadResult.fileSize,
-      thumbnailUrl: uploadResult.thumbnailUrl,
-      tags: Array.isArray(tags)
-        ? tags
-        : tags?.split(",").map((t) => t.trim()) || [],
-      notes,
-      accessLevel: accessLevel || "admin",
-      retentionPolicy: retentionPolicy || "lifetime",
-      uploadedBy: req.user._id,
-      uploadedByName: req.user.name,
-      aiExtractedData,
-    });
+    if (!title || !title.trim()) {
+      console.error("❌ Title is missing");
+      return res.status(400).json({
+        success: false,
+        message: "Document title is required",
+        code: "TITLE_REQUIRED",
+      });
+    }
 
-    await logAudit(
-      document._id,
-      referenceNumber,
-      "upload",
-      req.user,
-      req,
-      `Uploaded ${documentType}: ${title}`,
-    );
+    // ✅ Extract base64 data for size check
+    const base64Data = file.includes(",") ? file.split(",")[1] : file;
+    const fileSizeBytes = Math.round((base64Data.length * 3) / 4);
+    const fileSizeMB = fileSizeBytes / (1024 * 1024);
 
+    console.log(`📄 File size: ${fileSizeMB.toFixed(2)}MB`);
+
+    if (fileSizeMB > 20) {
+      console.error(`❌ File too large: ${fileSizeMB.toFixed(2)}MB`);
+      return res.status(400).json({
+        success: false,
+        message: `File size (${fileSizeMB.toFixed(2)}MB) exceeds 20MB limit`,
+        code: "FILE_TOO_LARGE",
+      });
+    }
+
+    // ✅ Generate reference number
+    const referenceNumber =
+      req.body.referenceNumber || generateReferenceNumber(documentType);
+    console.log(`📋 Reference number: ${referenceNumber}`);
+
+    // ✅ Check for duplicate reference number
+    let existing = null;
+    try {
+      existing = await CRRSADocument.findOne({ referenceNumber });
+      if (existing) {
+        console.warn(`⚠️ Duplicate reference: ${referenceNumber}`);
+        return res.status(409).json({
+          success: false,
+          message: `Reference number ${referenceNumber} already exists`,
+          existingDocumentId: existing._id,
+          code: "DUPLICATE_REFERENCE",
+        });
+      }
+    } catch (dbError) {
+      console.warn("⚠️ Database check warning:", dbError.message);
+      // Continue - this is not fatal
+    }
+
+    // ✅ Upload to Cloudinary
+    console.log("☁️ Uploading to Cloudinary...");
+    let uploadResult;
+    try {
+      uploadResult = await uploadDocumentToCloud(file, {
+        documentType,
+        referenceNumber,
+      });
+      console.log("✅ Cloudinary upload successful:", uploadResult.publicId);
+      console.log("   URL:", uploadResult.url);
+    } catch (uploadError) {
+      console.error("❌ Cloudinary upload failed:", uploadError.message);
+      return res.status(500).json({
+        success: false,
+        message: `Cloudinary upload failed: ${uploadError.message}`,
+        code: "CLOUDINARY_UPLOAD_FAILED",
+      });
+    }
+
+    // ✅ AI extraction (if text content is provided)
+    let aiExtractedData = null;
+    if (textContent && textContent.trim()) {
+      try {
+        aiExtractedData = await extractDocumentMetadataWithAI(
+          textContent,
+          documentType,
+        );
+        console.log("✅ AI extraction complete");
+      } catch (aiError) {
+        console.warn("⚠️ AI extraction failed:", aiError.message);
+        // Continue without AI data
+      }
+    }
+
+    // ✅ Create document record in database
+    console.log("💾 Saving to database...");
+    let document;
+    try {
+      document = await CRRSADocument.create({
+        referenceNumber,
+        documentType,
+        title: title.trim(),
+        citizenName: citizenName?.trim(),
+        citizenNameAmharic: citizenNameAmharic?.trim(),
+        nationalId: nationalId?.trim(),
+        dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+        issueDate: issueDate ? new Date(issueDate) : undefined,
+        issuingOfficer: issuingOfficer?.trim(),
+        issuingDepartment: issuingDepartment || "Civil Registry",
+        fileUrl: uploadResult.url,
+        filePublicId: uploadResult.publicId,
+        fileType: uploadResult.fileType,
+        fileSize: uploadResult.fileSize,
+        thumbnailUrl: uploadResult.thumbnailUrl,
+        tags: Array.isArray(tags)
+          ? tags
+          : tags?.split(",").map((t) => t.trim()) || [],
+        notes: notes?.trim(),
+        accessLevel: accessLevel || "admin",
+        retentionPolicy: retentionPolicy || "lifetime",
+        uploadedBy: req.user._id,
+        uploadedByName: req.user.name,
+        aiExtractedData,
+      });
+      console.log(`✅ Document saved: ${document._id}`);
+    } catch (dbError) {
+      console.error("❌ Database save error:", dbError.message);
+      console.error("❌ Error details:", dbError);
+
+      // ✅ If database save fails, try to delete the uploaded file from Cloudinary
+      try {
+        if (uploadResult && uploadResult.publicId) {
+          await deleteDocumentFromCloud(uploadResult.publicId);
+          console.log("🗑️ Rolled back Cloudinary upload");
+        }
+      } catch (rollbackError) {
+        console.error("❌ Rollback failed:", rollbackError.message);
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: `Database save failed: ${dbError.message}`,
+        code: "DATABASE_SAVE_FAILED",
+        details:
+          process.env.NODE_ENV === "development" ? dbError.stack : undefined,
+      });
+    }
+
+    // ✅ Log audit
+    try {
+      await logAudit(
+        document._id,
+        referenceNumber,
+        "upload",
+        req.user,
+        req,
+        `Uploaded ${documentType}: ${title}`,
+      );
+      console.log("✅ Audit log saved");
+    } catch (auditError) {
+      console.warn("⚠️ Audit log failed:", auditError.message);
+      // Don't fail the request for audit failure
+    }
+
+    // ✅ Return success response
+    console.log("✅ Upload completed successfully");
     res.status(201).json({
+      success: true,
       message: "Document uploaded successfully",
       document: {
         _id: document._id,
@@ -148,8 +259,16 @@ const uploadDocument = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Document upload error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Document upload error:", error);
+    console.error("❌ Error stack:", error.stack);
+
+    // ✅ Return detailed error for debugging
+    res.status(500).json({
+      success: false,
+      message: error.message || "Document upload failed",
+      code: "UPLOAD_ERROR",
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
   }
 };
 

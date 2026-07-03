@@ -15,8 +15,22 @@ const DOCUMENT_FOLDER =
 const uploadDocumentToCloud = async (base64File, options = {}) => {
   const { documentType = "other", referenceNumber = "unknown" } = options;
 
-  // Detect file type from base64 prefix
-  let resourceType = "raw"; // Cloudinary resource type
+  // ✅ Validate input
+  if (!base64File || typeof base64File !== "string") {
+    throw new Error("Invalid file data: base64 string is required");
+  }
+
+  // ✅ Extract base64 data
+  const base64Data = base64File.includes(",")
+    ? base64File.split(",")[1]
+    : base64File;
+
+  if (!base64Data || base64Data.length < 100) {
+    throw new Error("File appears to be empty or invalid");
+  }
+
+  // ✅ Detect file type from base64 prefix
+  let resourceType = "auto";
   let fileType = "other";
 
   if (base64File.startsWith("data:application/pdf")) {
@@ -34,13 +48,30 @@ const uploadDocumentToCloud = async (base64File, options = {}) => {
   } else if (base64File.startsWith("data:image/tiff")) {
     resourceType = "image";
     fileType = "tiff";
+  } else {
+    // ✅ Fallback detection
+    if (base64File.includes("application/pdf")) {
+      resourceType = "raw";
+      fileType = "pdf";
+    } else if (base64File.includes("image")) {
+      resourceType = "image";
+      fileType = "other";
+    } else {
+      resourceType = "raw";
+      fileType = "other";
+    }
   }
+
+  console.log(
+    `📄 Uploading: ${referenceNumber} (${fileType}, ${resourceType})`,
+  );
 
   const uploadOptions = {
     folder: `${DOCUMENT_FOLDER}/${documentType}`,
     resource_type: resourceType,
     public_id: `${referenceNumber}_${Date.now()}`,
     overwrite: false,
+    timeout: 60000, // 60 seconds timeout
     // PDF transformation: generate preview image
     ...(fileType === "pdf" && {
       format: "jpg",
@@ -48,37 +79,43 @@ const uploadDocumentToCloud = async (base64File, options = {}) => {
     }),
   };
 
-  const result = await cloudinary.uploader.upload(base64File, uploadOptions);
+  try {
+    console.log("☁️ Uploading to Cloudinary...");
+    const result = await cloudinary.uploader.upload(base64File, uploadOptions);
+    console.log(`✅ Cloudinary upload successful: ${result.public_id}`);
 
-  // Generate thumbnail URL for PDFs (first page as image)
-  let thumbnailUrl = null;
-  if (fileType === "pdf" && result.pages > 0) {
-    thumbnailUrl = cloudinary.url(result.public_id, {
-      resource_type: "image",
-      format: "jpg",
-      page: 1,
-      width: 200,
-      crop: "limit",
-    });
-  } else if (resourceType === "image") {
-    thumbnailUrl = cloudinary.url(result.public_id, {
-      width: 200,
-      crop: "limit",
-      quality: "auto",
-    });
+    // Generate thumbnail URL for PDFs (first page as image)
+    let thumbnailUrl = null;
+    if (fileType === "pdf" && result.pages > 0) {
+      thumbnailUrl = cloudinary.url(result.public_id, {
+        resource_type: "image",
+        format: "jpg",
+        page: 1,
+        width: 200,
+        crop: "limit",
+      });
+    } else if (resourceType === "image") {
+      thumbnailUrl = cloudinary.url(result.public_id, {
+        width: 200,
+        crop: "limit",
+        quality: "auto",
+      });
+    }
+
+    // Get approximate file size from base64 string (base64 is ~4/3 of binary size)
+    const fileSizeBytes = Math.round((base64Data.length * 3) / 4);
+
+    return {
+      url: result.secure_url,
+      publicId: result.public_id,
+      thumbnailUrl,
+      fileType,
+      fileSize: fileSizeBytes,
+    };
+  } catch (error) {
+    console.error("❌ Cloudinary upload error:", error.message);
+    throw new Error(`Cloudinary upload failed: ${error.message}`);
   }
-
-  // Get approximate file size from base64 string (base64 is ~4/3 of binary size)
-  const base64Data = base64File.split(",")[1] || base64File;
-  const fileSizeBytes = Math.round((base64Data.length * 3) / 4);
-
-  return {
-    url: result.secure_url,
-    publicId: result.public_id,
-    thumbnailUrl,
-    fileType,
-    fileSize: fileSizeBytes,
-  };
 };
 
 // ============================================================
@@ -91,9 +128,11 @@ const deleteDocumentFromCloud = async (publicId, resourceType = "raw") => {
       await cloudinary.uploader.destroy(publicId, {
         resource_type: resourceType,
       });
+      console.log(`🗑️ Deleted Cloudinary file: ${publicId}`);
     }
   } catch (error) {
     console.error("Cloudinary delete error:", error);
+    throw error;
   }
 };
 
