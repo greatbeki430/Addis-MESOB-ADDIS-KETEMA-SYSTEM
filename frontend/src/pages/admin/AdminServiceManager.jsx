@@ -36,9 +36,13 @@ export default function AdminServiceManager({ t }) {
   const isExpandedInitializedRef = useRef(false);
 
   const groupServicesByDept = useCallback((services) => {
+    if (!services || !Array.isArray(services)) {
+      return {};
+    }
+
     const grouped = {};
     services.forEach((service) => {
-      const dept = service.dept || "Uncategorized";
+      const dept = service?.dept || "Uncategorized";
       if (!grouped[dept]) {
         grouped[dept] = [];
       }
@@ -51,10 +55,40 @@ export default function AdminServiceManager({ t }) {
     try {
       setLoading(true);
       const response = await serviceAPI.getAll();
-      setServices(response.data);
+
+      let servicesData = [];
+
+      if (response && response.data) {
+        // ✅ Handle paginated response: { services: [...], pagination: {...}, departments: [...] }
+        if (response.data.services && Array.isArray(response.data.services)) {
+          servicesData = response.data.services;
+        }
+        // ✅ Handle direct array response (legacy)
+        else if (Array.isArray(response.data)) {
+          servicesData = response.data;
+        }
+        // ✅ Handle nested data property
+        else if (response.data.data && Array.isArray(response.data.data)) {
+          servicesData = response.data.data;
+        }
+        // ✅ Fallback: find any array in the response
+        else {
+          const possibleArray = Object.values(response.data).find(
+            (val) => Array.isArray(val) && val.length > 0,
+          );
+          if (possibleArray) {
+            servicesData = possibleArray;
+          } else {
+            console.warn("Unexpected response format:", response.data);
+          }
+        }
+      }
+
+      setServices(servicesData);
     } catch (err) {
       console.error("Failed to load services:", err);
       showToast("Failed to load services", "error");
+      setServices([]);
     } finally {
       setLoading(false);
     }
@@ -68,7 +102,11 @@ export default function AdminServiceManager({ t }) {
   }, [loadServices]);
 
   useEffect(() => {
-    if (services.length > 0 && !isExpandedInitializedRef.current) {
+    if (
+      Array.isArray(services) &&
+      services.length > 0 &&
+      !isExpandedInitializedRef.current
+    ) {
       const grouped = groupServicesByDept(services);
       const allExpanded = {};
       Object.keys(grouped).forEach((dept) => {
@@ -84,7 +122,10 @@ export default function AdminServiceManager({ t }) {
       return;
     try {
       const response = await serviceAPI.seed();
-      showToast(response.data.message, "success");
+      showToast(
+        response.data?.message || "Services seeded successfully!",
+        "success",
+      );
       isExpandedInitializedRef.current = false;
       await loadServices();
     } catch (err) {
@@ -92,16 +133,13 @@ export default function AdminServiceManager({ t }) {
     }
   };
 
-  // Handle image upload - convert to Base64 for sending to backend
   const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         showToast("Please upload an image file", "error");
         return;
       }
-      // Validate file size (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
         showToast("Image size should be less than 5MB", "error");
         return;
@@ -127,7 +165,6 @@ export default function AdminServiceManager({ t }) {
 
       const submitData = { ...formData };
 
-      // If image is empty string and editing, it means user wants to remove image
       if (submitData.image === "" && editingService && editingService.image) {
         submitData.image = "";
       }
@@ -176,11 +213,11 @@ export default function AdminServiceManager({ t }) {
   const handleEdit = (service) => {
     setEditingService(service);
     setFormData({
-      dept: service.dept,
+      dept: service.dept || "",
       deptEn: service.deptEn || "",
-      name: service.name,
+      name: service.name || "",
       nameEn: service.nameEn || "",
-      active: service.active,
+      active: service.active !== undefined ? service.active : true,
       stdTime: service.stdTime || "",
       image: service.image || "",
     });
@@ -197,7 +234,9 @@ export default function AdminServiceManager({ t }) {
 
   const safeT = t || {};
   const ts = safeT.services || {};
-  const groupedServices = groupServicesByDept(services);
+
+  const servicesArray = Array.isArray(services) ? services : [];
+  const groupedServices = groupServicesByDept(servicesArray);
   const deptKeys = Object.keys(groupedServices);
 
   return (
@@ -309,7 +348,6 @@ export default function AdminServiceManager({ t }) {
         }
       `}</style>
 
-      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -331,7 +369,7 @@ export default function AdminServiceManager({ t }) {
             🔧 {ts.manageTitle || "Service Management"}
           </h1>
           <p style={{ color: C.muted, fontSize: "clamp(12px, 3vw, 14px)" }}>
-            {services.length} {ts.totalServices || "services"} •{" "}
+            {servicesArray.length} {ts.totalServices || "services"} •{" "}
             {deptKeys.length} {ts.departments || "departments"} •{" "}
             {ts.manageSubtitle || "Add, edit, or remove services"}
           </p>
@@ -371,17 +409,24 @@ export default function AdminServiceManager({ t }) {
         </div>
       </div>
 
-      {/* Loading State */}
       {loading ? (
         <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
           <FiLoader
             size={24}
             style={{ animation: "spin 1s linear infinite" }}
           />
-          <div style={{ marginTop: 12 }}>Loading...</div>
+          <div style={{ marginTop: 12 }}>Loading services...</div>
+        </div>
+      ) : servicesArray.length === 0 ? (
+        <div style={{ textAlign: "center", padding: 60, color: C.muted }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>📂</div>
+          <h3 style={{ color: C.dark, marginBottom: 8 }}>No services found</h3>
+          <p style={{ fontSize: 14 }}>
+            Click "Add Service" to create your first service or "Bulk Import" to
+            seed default services.
+          </p>
         </div>
       ) : (
-        /* Services Table */
         <div style={{ overflowX: "auto" }}>
           <table
             style={{
@@ -450,15 +495,16 @@ export default function AdminServiceManager({ t }) {
             </thead>
             <tbody>
               {deptKeys.map((dept) => {
-                const deptServices = groupedServices[dept];
+                const deptServices = groupedServices[dept] || [];
                 const isExpanded = expandedDepts[dept] !== false;
                 const totalCount = deptServices.length;
-                const activeCount = deptServices.filter((s) => s.active).length;
+                const activeCount = deptServices.filter(
+                  (s) => s?.active,
+                ).length;
                 const isHovered = hoveredDept === dept;
 
                 return (
                   <React.Fragment key={`dept-${dept}`}>
-                    {/* Department Header Row */}
                     <tr
                       className="dept-header"
                       style={{
@@ -571,13 +617,12 @@ export default function AdminServiceManager({ t }) {
                       </td>
                     </tr>
 
-                    {/* Service Rows - shown only if expanded */}
                     {isExpanded &&
                       deptServices.map((s, idx) => {
-                        const globalIndex = services.indexOf(s) + 1;
+                        const globalIndex = servicesArray.indexOf(s) + 1;
                         return (
                           <tr
-                            key={s._id}
+                            key={s._id || idx}
                             className="service-row-enter"
                             style={{
                               borderBottom: `1px solid ${C.border}`,
@@ -625,12 +670,12 @@ export default function AdminServiceManager({ t }) {
                               }}
                             >
                               <span style={{ fontSize: 14 }}>📄</span>
-                              {s.name}
+                              {s.name || "Unnamed"}
                             </td>
                             <td
                               style={{ padding: "10px 16px", color: C.muted }}
                             >
-                              {s.nameEn}
+                              {s.nameEn || "—"}
                             </td>
                             <td
                               style={{
@@ -641,7 +686,7 @@ export default function AdminServiceManager({ t }) {
                               {s.image ? (
                                 <img
                                   src={s.image}
-                                  alt={s.name}
+                                  alt={s.name || "Service"}
                                   style={{
                                     width: 40,
                                     height: 40,
@@ -754,7 +799,6 @@ export default function AdminServiceManager({ t }) {
         </div>
       )}
 
-      {/* Add/Edit Modal with Image Upload */}
       {showAddModal && (
         <div
           style={{
@@ -808,7 +852,6 @@ export default function AdminServiceManager({ t }) {
             </h2>
             <form onSubmit={handleSubmit}>
               <div style={{ display: "grid", gap: 12 }}>
-                {/* Department (Amharic) */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -827,7 +870,6 @@ export default function AdminServiceManager({ t }) {
                   />
                 </div>
 
-                {/* Department (English) */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -845,7 +887,6 @@ export default function AdminServiceManager({ t }) {
                   />
                 </div>
 
-                {/* Service Name (Amharic) */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -864,7 +905,6 @@ export default function AdminServiceManager({ t }) {
                   />
                 </div>
 
-                {/* Service Name (English) */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -882,7 +922,6 @@ export default function AdminServiceManager({ t }) {
                   />
                 </div>
 
-                {/* Standard Time */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -900,7 +939,6 @@ export default function AdminServiceManager({ t }) {
                   />
                 </div>
 
-                {/* Image Upload */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -944,7 +982,6 @@ export default function AdminServiceManager({ t }) {
                       />
                     </label>
 
-                    {/* Image Preview */}
                     {imagePreview && (
                       <div className="image-preview-container">
                         <img src={imagePreview} alt="Preview" />
@@ -970,7 +1007,6 @@ export default function AdminServiceManager({ t }) {
                   </div>
                 </div>
 
-                {/* Status */}
                 <div>
                   <label
                     style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
@@ -993,7 +1029,6 @@ export default function AdminServiceManager({ t }) {
                 </div>
               </div>
 
-              {/* Modal Actions */}
               <div
                 style={{
                   display: "flex",
