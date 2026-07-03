@@ -776,7 +776,41 @@ const SERVICES = [
     active: true,
   },
 
-  // ─── 13. ኢትዮ ፖስት / Ethio Post ────────────────────────────
+  // ─── 13. የመሬት ልማትና ማኔጅመንት ቢሮ / Land Development & Management Bureau ──
+  // ✅ NEW - Added from Excel file
+  {
+    dept: "የመሬት ልማትና ማኔጅመንት ቢሮ",
+    deptEn: "Land Development & Management Bureau",
+    name: "የመሬት ይዞታ ምዝገባ",
+    nameEn: "Land Holding Registration",
+    active: true,
+  },
+  {
+    dept: "የመሬት ልማትና ማኔጅመንት ቢሮ",
+    deptEn: "Land Development & Management Bureau",
+    name: "የካርታ አገልግሎት",
+    nameEn: "Land Map/Carta Service",
+    active: true,
+  },
+
+  // ─── 14. የመሬት ይዞታ ምዝገባና መረጃ ኤጀንሲ / Land Holding Registration & Information Agency ──
+  // ✅ NEW - Added from Excel file
+  {
+    dept: "የመሬት ይዞታ ምዝገባና መረጃ ኤጀንሲ",
+    deptEn: "Land Holding Registration & Information Agency",
+    name: "የመሬት ይዞታ ምዝገባ",
+    nameEn: "Land Holding Registration",
+    active: true,
+  },
+  {
+    dept: "የመሬት ይዞታ ምዝገባና መረጃ ኤጀንሲ",
+    deptEn: "Land Holding Registration & Information Agency",
+    name: "የካርታ አገልግሎት",
+    nameEn: "Land Map/Carta Service",
+    active: true,
+  },
+
+  // ─── 15. ኢትዮ ፖስት / Ethio Post ────────────────────────────
   {
     dept: "ኢትዮ ፖስት",
     deptEn: "Ethio Post",
@@ -827,7 +861,7 @@ const SERVICES = [
     active: true,
   },
 
-  // ─── 14. ፌዴራል ሰነድ ማረጋገጫ / Federal Document Authentication ──
+  // ─── 16. ፌዴራል ሰነድ ማረጋገጫ / Federal Document Authentication ──
   {
     dept: "ፌዴራል ሰነድ",
     deptEn: "Federal Document",
@@ -934,7 +968,7 @@ const SERVICES = [
     active: true,
   },
 
-  // ─── 15. መብራት ሃይል / Light & Power ──────────────────────
+  // ─── 17. መብራት ሃይል / Light & Power ──────────────────────
   {
     dept: "መብራት ሃይል",
     deptEn: "Light & Power",
@@ -943,7 +977,7 @@ const SERVICES = [
     active: true,
   },
 
-  // ─── 16. መሶብ ፋይዳ / Mesob Faida ──────────────────────────
+  // ─── 18. መሶብ ፋይዳ / Mesob Faida ──────────────────────────
   {
     dept: "መሶብ ፋይዳ",
     deptEn: "Mesob Faida",
@@ -959,7 +993,17 @@ const SERVICES = [
     active: true,
   },
 
-  // ─── 17. ምግብና መድሃኒት / Food & Drug Control ──────────────
+  // ─── 19. ዩኒቨርሳል / Universal ─────────────────────────────
+  // ✅ NEW - Added from Excel file
+  {
+    dept: "ዩኒቨርሳል",
+    deptEn: "Universal",
+    name: "ዩኒቨርሳል አገልግሎት",
+    nameEn: "Universal Service",
+    active: true,
+  },
+
+  // ─── 20. ምግብና መድሃኒት / Food & Drug Control ──────────────
   {
     dept: "ምግብና መድሃኒት",
     deptEn: "Food & Drug",
@@ -982,7 +1026,7 @@ const SERVICES = [
     active: true,
   },
 
-  // ─── 18. ጤና / Health Services ──────────────────────────────
+  // ─── 21. ጤና / Health Services ──────────────────────────────
   {
     dept: "ጤና",
     deptEn: "Health",
@@ -991,7 +1035,7 @@ const SERVICES = [
     active: true,
   },
 
-  // ─── 19. Banks ──────────────────────────────────────────────
+  // ─── 22. Banks ──────────────────────────────────────────────
   {
     dept: "ንግድ ባንክ",
     deptEn: "Commercial Bank",
@@ -1021,7 +1065,7 @@ const SERVICES = [
     active: true,
   },
 
-  // ─── 20. Ethiotelecom ──────────────────────────────────────
+  // ─── 23. Ethiotelecom ──────────────────────────────────────
   {
     dept: "Ethiotelecom",
     deptEn: "Ethiotelecom",
