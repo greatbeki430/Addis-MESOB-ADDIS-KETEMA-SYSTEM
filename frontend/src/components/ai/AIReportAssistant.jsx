@@ -5,7 +5,7 @@ import { useState } from "react";
 import { aiAPI } from "../../services/api";
 import { C, F, btn, radius, shadows } from "../../styles/theme";
 import {
-  FiSparkles,
+  FiZap,
   FiLoader,
   FiX,
   FiInfo,
@@ -23,8 +23,6 @@ const AIReportAssistant = ({
   type = "daily",
   className = "",
   buttonText = "AI Writing Assistant",
-  // eslint-disable-next-line no-unused-vars
-  placeholder = "Generate AI suggestions for your report...",
 }) => {
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState(null);
@@ -173,7 +171,7 @@ const AIReportAssistant = ({
           </>
         ) : (
           <>
-            <FiSparkles size={16} />
+            <FiZap size={16} />
             {buttonText}
           </>
         )}
@@ -228,7 +226,7 @@ const AIReportAssistant = ({
                     color: "#fff",
                   }}
                 >
-                  <FiSparkles size={16} />
+                  <FiZap size={16} />
                 </div>
                 <div>
                   <h4
