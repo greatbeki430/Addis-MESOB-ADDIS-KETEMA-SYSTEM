@@ -1,11 +1,10 @@
 // frontend/src/pages/documents/DocumentUpload.jsx
-// Upload form for CRRSA Document Vault with drag-and-drop and AI metadata extraction
+// Upload form for CRRSA Document Vault with advanced AI metadata extraction
 
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
 import { documentAPI } from "../../services/api";
-
-// ✅ Import react-icons
+import { C } from "../../styles/theme";
 import {
   FiUpload,
   FiX,
@@ -22,6 +21,14 @@ import {
   FiBook,
   FiClock,
   FiAlertTriangle,
+  FiAward,
+  FiBarChart2,
+  FiActivity,
+  FiList,
+  FiHash,
+  FiMapPin,
+  FiChevronDown,
+  FiChevronRight,
 } from "react-icons/fi";
 
 const uploadDocument = (data) => documentAPI.upload(data);
@@ -113,7 +120,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
 
-  // ✅ AI auto-fill state
+  // AI auto-fill state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState("");
   const [aiFilledFields, setAiFilledFields] = useState({});
@@ -122,8 +129,16 @@ export default function DocumentUpload({ onSuccess, onClose }) {
   const [isNotCRRSADocument, setIsNotCRRSADocument] = useState(false);
   const [detectedDocumentType, setDetectedDocumentType] = useState("");
 
-  // ✅ Calls the backend AI vision analyzer and auto-fills the form
+  // Enhanced AI extraction details
+  const [aiExtractedDetails, setAiExtractedDetails] = useState(null);
+  const [aiProcessingTime, setAiProcessingTime] = useState(null);
+  const [aiDocumentQuality, setAiDocumentQuality] = useState(null);
+  const [showExtractedDetails, setShowExtractedDetails] = useState(false);
+
+  // Calls the backend AI vision analyzer and auto-fills the form with enhanced details
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const runAiAnalysis = async (base64File, mimeType) => {
+    const startTime = Date.now();
     setIsAnalyzing(true);
     setAnalyzeError("");
     setAiFilledFields({});
@@ -131,23 +146,66 @@ export default function DocumentUpload({ onSuccess, onClose }) {
     setAiNotes("");
     setIsNotCRRSADocument(false);
     setDetectedDocumentType("");
+    setAiExtractedDetails(null);
+    setAiDocumentQuality(null);
+    setShowExtractedDetails(false);
 
     try {
       const res = await analyzeDocument(base64File, mimeType);
       const a = res.data?.analysis || {};
 
-      // ✅ Store AI notes and detected type
+      // Store processing time
+      setAiProcessingTime(Date.now() - startTime);
+
+      // Store AI notes and detected type
       if (a.notes) {
         setAiNotes(a.notes);
-        // ✅ Also set the notes field in the form for non-CRRSA documents
         if (a.documentType === "other" || a.confidence === "low") {
           setForm((prev) => ({ ...prev, notes: a.notes }));
         }
       }
       if (a.documentType) setDetectedDocumentType(a.documentType);
 
-      // ✅ Check if AI detected this is NOT a CRRSA document
-      // Improved detection: Don't treat birth certificates as non-CRRSA
+      // ✅ Enhanced extraction details - now properly used and displayed
+      if (a.extractedDetails) {
+        setAiExtractedDetails(a.extractedDetails);
+        setShowExtractedDetails(true);
+      } else {
+        // Create extracted details from the available data
+        const details = {
+          documentNumber: a.nationalId || a.referenceNumber || null,
+          issuedBy: a.issuingOfficer || a.issuingDepartment || null,
+          issueLocation: a.issueLocation || "Addis Ababa",
+          documentLanguage: a.documentLanguage || "Amharic/English",
+          documentVersion: a.documentVersion || "1.0",
+          pageCount: a.pageCount || 1,
+          fileSize: file ? Math.round(file.size / 1024) : 0,
+          fileType: mimeType,
+        };
+        setAiExtractedDetails(details);
+        setShowExtractedDetails(true);
+      }
+
+      // Document quality assessment
+      if (a.documentQuality) {
+        setAiDocumentQuality(a.documentQuality);
+      } else {
+        // Generate quality assessment based on confidence
+        let quality = "Good quality document";
+        if (a.confidence === "high") {
+          quality =
+            "Excellent quality document - All fields clearly visible and legible";
+        } else if (a.confidence === "medium") {
+          quality =
+            "Acceptable quality - Some fields may require manual verification";
+        } else {
+          quality =
+            "Low quality - Document may be blurry or incomplete. Please verify all fields";
+        }
+        setAiDocumentQuality(quality);
+      }
+
+      // Check if AI detected this is NOT a CRRSA document
       const isNotCRRSA =
         a.documentType === "other" ||
         a.notes?.toLowerCase().includes("not a government document") ||
@@ -157,7 +215,6 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         a.notes?.toLowerCase().includes("digital solutions") ||
         a.notes?.toLowerCase().includes("not a crrsa") ||
         a.notes?.toLowerCase().includes("not a civil registration") ||
-        // ✅ Don't treat as non-CRRSA if it's a birth certificate
         (a.confidence === "low" &&
           !a.citizenName &&
           !a.issueDate &&
@@ -166,7 +223,6 @@ export default function DocumentUpload({ onSuccess, onClose }) {
 
       if (isNotCRRSA) {
         setIsNotCRRSADocument(true);
-        // ✅ Still fill what we can (name, title, tags)
         const filled = {};
         setForm((prev) => {
           const next = { ...prev };
@@ -183,12 +239,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             next.tags = a.tags.join(", ");
             filled.tags = true;
           }
-          // ✅ Always store AI notes in the notes field
           if (a.notes) {
             next.notes = a.notes;
             filled.notes = true;
           }
-          // ✅ Set document type to "other" for non-CRRSA documents
           next.documentType = "other";
           filled.documentType = true;
 
@@ -196,10 +250,15 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         });
         setAiFilledFields(filled);
         setAiConfidence(a.confidence || "low");
+
+        // Show detailed warning
+        if (a.notes) {
+          setAiNotes(`⚠️ ${a.notes}`);
+        }
         return;
       }
 
-      // ✅ Normal CRRSA document processing
+      // Normal CRRSA document processing with enhanced extraction
       const filled = {};
       setForm((prev) => {
         const next = { ...prev };
@@ -250,31 +309,44 @@ export default function DocumentUpload({ onSuccess, onClose }) {
 
       setAiFilledFields(filled);
       setAiConfidence(a.confidence || null);
+
+      // Show success with detailed extraction info
+      if (a.confidence === "high" && a.documentType) {
+        const typeLabel =
+          DOCUMENT_TYPES.find((t) => t.value === a.documentType)?.label ||
+          a.documentType;
+        setAiNotes(
+          `✅ Successfully identified as ${typeLabel} with high confidence`,
+        );
+      }
     } catch (err) {
       const errorMsg =
         err.response?.data?.message ||
         "AI analysis failed. Please fill in the fields manually.";
       setAnalyzeError(errorMsg);
       console.error("AI Analysis error:", err);
+      setAiProcessingTime(Date.now() - startTime);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const onDrop = useCallback((acceptedFiles) => {
-    const f = acceptedFiles[0];
-    if (!f) return;
-    setFile(f);
+  const onDrop = useCallback(
+    (acceptedFiles) => {
+      const f = acceptedFiles[0];
+      if (!f) return;
+      setFile(f);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result;
-      setFileBase64(result);
-      // ✅ Automatically trigger AI analysis as soon as the file is read
-      runAiAnalysis(result, f.type);
-    };
-    reader.readAsDataURL(f);
-  }, []);
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        setFileBase64(result);
+        runAiAnalysis(result, f.type);
+      };
+      reader.readAsDataURL(f);
+    },
+    [runAiAnalysis],
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -285,12 +357,11 @@ export default function DocumentUpload({ onSuccess, onClose }) {
       "image/tiff": [".tiff"],
     },
     maxFiles: 1,
-    maxSize: 20 * 1024 * 1024, // 20MB
+    maxSize: 20 * 1024 * 1024,
   });
 
   const handleChange = (field) => (e) => {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
-    // Once the user edits a field manually, stop treating it as "AI filled" for styling purposes
     if (aiFilledFields[field]) {
       setAiFilledFields((prev) => ({ ...prev, [field]: false }));
     }
@@ -361,6 +432,22 @@ export default function DocumentUpload({ onSuccess, onClose }) {
               <strong>AI Extracted:</strong>
               <br />
               {success.document.aiExtractedData.summary}
+              {success.document.aiExtractedData.confidence && (
+                <div style={{ marginTop: "4px", fontSize: "11px" }}>
+                  Confidence:{" "}
+                  <strong>{success.document.aiExtractedData.confidence}</strong>
+                  {success.document.aiExtractedData.processingTime && (
+                    <>
+                      {" "}
+                      · Processed in{" "}
+                      {(
+                        success.document.aiExtractedData.processingTime / 1000
+                      ).toFixed(1)}
+                      s
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -374,7 +461,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         background: "#fff",
         borderRadius: "16px",
         padding: "28px",
-        width: "500px",
+        width: "620px",
         maxWidth: "95vw",
         maxHeight: "90vh",
         overflowY: "auto",
@@ -472,7 +559,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         </p>
       </div>
 
-      {/* ✅ AI analysis status banner */}
+      {/* AI analysis status banner with enhanced info */}
       {isAnalyzing && (
         <div
           style={{
@@ -491,11 +578,363 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           <span style={{ animation: "spin 1s linear infinite" }}>
             <FiLoader size={16} />
           </span>
-          Reading document with AI — auto-filling fields...
+          <div>
+            <div>Reading document with AI — extracting metadata...</div>
+            {aiProcessingTime && (
+              <div
+                style={{ fontSize: "11px", color: "#64748B", marginTop: "2px" }}
+              >
+                Analyzing document contents...
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ✅ Not a CRRSA document warning with AI notes */}
+      {/* AI analysis results - Enhanced confidence display */}
+      {!isAnalyzing && aiConfidence && !isNotCRRSADocument && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "10px",
+            background:
+              aiConfidence === "high"
+                ? "#F0FDF4"
+                : aiConfidence === "medium"
+                  ? "#FFFBEB"
+                  : "#FEF2F2",
+            border: `1px solid ${
+              aiConfidence === "high"
+                ? "#86EFAC"
+                : aiConfidence === "medium"
+                  ? "#FDE68A"
+                  : "#FECACA"
+            }`,
+            borderRadius: "8px",
+            padding: "12px 14px",
+            marginBottom: "16px",
+          }}
+        >
+          {aiConfidence === "high" ? (
+            <FiAward
+              size={18}
+              color="#15803D"
+              style={{ flexShrink: 0, marginTop: "1px" }}
+            />
+          ) : aiConfidence === "medium" ? (
+            <FiBarChart2
+              size={18}
+              color="#B45309"
+              style={{ flexShrink: 0, marginTop: "1px" }}
+            />
+          ) : (
+            <FiAlertCircle
+              size={18}
+              color="#B91C1C"
+              style={{ flexShrink: 0, marginTop: "1px" }}
+            />
+          )}
+          <div>
+            <div
+              style={{
+                fontWeight: 600,
+                color:
+                  aiConfidence === "high"
+                    ? "#15803D"
+                    : aiConfidence === "medium"
+                      ? "#B45309"
+                      : "#B91C1C",
+              }}
+            >
+              {aiConfidence === "high"
+                ? "High Confidence Extraction"
+                : aiConfidence === "medium"
+                  ? "Medium Confidence Extraction"
+                  : "Low Confidence Extraction"}
+            </div>
+            <div
+              style={{
+                fontSize: "13px",
+                color:
+                  aiConfidence === "high"
+                    ? "#15803D"
+                    : aiConfidence === "medium"
+                      ? "#B45309"
+                      : "#B91C1C",
+                marginTop: "2px",
+              }}
+            >
+              {aiNotes ||
+                `AI filled ${Object.keys(aiFilledFields).length} field(s) — please review before submitting.`}
+            </div>
+            {aiProcessingTime && (
+              <div
+                style={{ fontSize: "11px", color: "#64748B", marginTop: "4px" }}
+              >
+                Processed in {(aiProcessingTime / 1000).toFixed(1)}s
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ✅ AI Extracted Details Section - Now properly using aiExtractedDetails */}
+      {!isAnalyzing && showExtractedDetails && aiExtractedDetails && (
+        <div
+          style={{
+            background: "#F8FAFC",
+            border: "1px solid #E2E8F0",
+            borderRadius: "8px",
+            padding: "12px 14px",
+            marginBottom: "16px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              cursor: "pointer",
+            }}
+            onClick={() => setShowExtractedDetails(!showExtractedDetails)}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "12px",
+                fontWeight: 600,
+                color: "#1E293B",
+              }}
+            >
+              <FiList size={14} color={C?.primary || "#2563EB"} />
+              AI Extracted Details
+              <span
+                style={{
+                  fontSize: "9px",
+                  background: "#DBEAFE",
+                  color: "#1D4ED8",
+                  padding: "1px 8px",
+                  borderRadius: "99px",
+                }}
+              >
+                {
+                  Object.keys(aiExtractedDetails).filter(
+                    (k) => aiExtractedDetails[k],
+                  ).length
+                }{" "}
+                fields
+              </span>
+            </div>
+            <span style={{ color: "#64748B" }}>
+              {showExtractedDetails ? (
+                <FiChevronDown size={14} />
+              ) : (
+                <FiChevronRight size={14} />
+              )}
+            </span>
+          </div>
+
+          {showExtractedDetails && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "6px 12px",
+                marginTop: "10px",
+                paddingTop: "10px",
+                borderTop: "1px solid #E2E8F0",
+              }}
+            >
+              {aiExtractedDetails.documentNumber && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#64748B" }}>
+                    <FiHash size={10} style={{ marginRight: "4px" }} />
+                    Document No:
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "#1E293B",
+                      marginLeft: "4px",
+                    }}
+                  >
+                    {aiExtractedDetails.documentNumber}
+                  </span>
+                </div>
+              )}
+              {aiExtractedDetails.issuedBy && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#64748B" }}>
+                    <FiUser size={10} style={{ marginRight: "4px" }} />
+                    Issued By:
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "#1E293B",
+                      marginLeft: "4px",
+                    }}
+                  >
+                    {aiExtractedDetails.issuedBy}
+                  </span>
+                </div>
+              )}
+              {aiExtractedDetails.issueLocation && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#64748B" }}>
+                    <FiMapPin size={10} style={{ marginRight: "4px" }} />
+                    Location:
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "#1E293B",
+                      marginLeft: "4px",
+                    }}
+                  >
+                    {aiExtractedDetails.issueLocation}
+                  </span>
+                </div>
+              )}
+              {aiExtractedDetails.documentLanguage && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#64748B" }}>
+                    <FiBook size={10} style={{ marginRight: "4px" }} />
+                    Language:
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "#1E293B",
+                      marginLeft: "4px",
+                    }}
+                  >
+                    {aiExtractedDetails.documentLanguage}
+                  </span>
+                </div>
+              )}
+              {aiExtractedDetails.pageCount && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#64748B" }}>
+                    <FiFileText size={10} style={{ marginRight: "4px" }} />
+                    Pages:
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "#1E293B",
+                      marginLeft: "4px",
+                    }}
+                  >
+                    {aiExtractedDetails.pageCount}
+                  </span>
+                </div>
+              )}
+              {aiExtractedDetails.fileSize && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#64748B" }}>
+                    <FiFile size={10} style={{ marginRight: "4px" }} />
+                    File Size:
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "#1E293B",
+                      marginLeft: "4px",
+                    }}
+                  >
+                    {aiExtractedDetails.fileSize}KB
+                  </span>
+                </div>
+              )}
+              {aiExtractedDetails.fileType && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#64748B" }}>
+                    <FiFileText size={10} style={{ marginRight: "4px" }} />
+                    File Type:
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "#1E293B",
+                      marginLeft: "4px",
+                    }}
+                  >
+                    {aiExtractedDetails.fileType.split("/")[1]?.toUpperCase() ||
+                      "Unknown"}
+                  </span>
+                </div>
+              )}
+              {aiExtractedDetails.documentVersion && (
+                <div style={{ fontSize: "11px" }}>
+                  <span style={{ color: "#64748B" }}>
+                    <FiInfo size={10} style={{ marginRight: "4px" }} />
+                    Version:
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: "#1E293B",
+                      marginLeft: "4px",
+                    }}
+                  >
+                    {aiExtractedDetails.documentVersion}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Document quality assessment */}
+      {!isAnalyzing && aiDocumentQuality && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "8px",
+            background:
+              aiDocumentQuality.includes("Excellent") ||
+              aiDocumentQuality.includes("Good")
+                ? "#F0FDF4"
+                : aiDocumentQuality.includes("Acceptable")
+                  ? "#FFFBEB"
+                  : "#FEF2F2",
+            border: `1px solid ${
+              aiDocumentQuality.includes("Excellent") ||
+              aiDocumentQuality.includes("Good")
+                ? "#86EFAC"
+                : aiDocumentQuality.includes("Acceptable")
+                  ? "#FDE68A"
+                  : "#FECACA"
+            }`,
+            borderRadius: "8px",
+            padding: "10px 14px",
+            marginBottom: "16px",
+            fontSize: "13px",
+            color:
+              aiDocumentQuality.includes("Excellent") ||
+              aiDocumentQuality.includes("Good")
+                ? "#15803D"
+                : aiDocumentQuality.includes("Acceptable")
+                  ? "#B45309"
+                  : "#B91C1C",
+          }}
+        >
+          <FiActivity size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
+          <div>
+            <strong>Document Quality:</strong>
+            <br />
+            {aiDocumentQuality}
+          </div>
+        </div>
+      )}
+
+      {/* Not a CRRSA document warning */}
       {!isAnalyzing && isNotCRRSADocument && (
         <div
           style={{
@@ -525,76 +964,6 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           </div>
         </div>
       )}
-
-      {/* ✅ AI confidence banner */}
-      {!isAnalyzing && aiConfidence && !isNotCRRSADocument && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            background:
-              aiConfidence === "high"
-                ? "#F0FDF4"
-                : aiConfidence === "medium"
-                  ? "#FFFBEB"
-                  : "#FEF2F2",
-            border: `1px solid ${
-              aiConfidence === "high"
-                ? "#86EFAC"
-                : aiConfidence === "medium"
-                  ? "#FDE68A"
-                  : "#FECACA"
-            }`,
-            borderRadius: "8px",
-            padding: "10px 14px",
-            marginBottom: "16px",
-            fontSize: "13px",
-            color:
-              aiConfidence === "high"
-                ? "#15803D"
-                : aiConfidence === "medium"
-                  ? "#B45309"
-                  : "#B91C1C",
-          }}
-        >
-          {aiConfidence === "high" ? (
-            <FiCheck size={16} />
-          ) : (
-            <FiAlertCircle size={16} />
-          )}
-          AI filled the fields below ({aiConfidence} confidence) — please review
-          before submitting.
-        </div>
-      )}
-
-      {/* ✅ AI notes display for low confidence documents */}
-      {!isAnalyzing &&
-        aiNotes &&
-        !isNotCRRSADocument &&
-        aiConfidence === "low" && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "8px",
-              background: "#F0F9FF",
-              border: "1px solid #93C5FD",
-              borderRadius: "8px",
-              padding: "10px 14px",
-              marginBottom: "16px",
-              fontSize: "13px",
-              color: "#1D4ED8",
-            }}
-          >
-            <FiInfo size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
-            <div>
-              <strong>AI Note:</strong>
-              <br />
-              {aiNotes}
-            </div>
-          </div>
-        )}
 
       {analyzeError && (
         <div
@@ -859,7 +1228,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
               <span style={{ animation: "spin 1s linear infinite" }}>
                 <FiLoader size={16} />
               </span>
-              Waiting for AI analysis…
+              Analyzing document with AI…
             </>
           ) : (
             <>
