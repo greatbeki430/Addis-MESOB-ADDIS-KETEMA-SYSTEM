@@ -36,6 +36,7 @@ export default function AdminServiceManager({ t }) {
   const isExpandedInitializedRef = useRef(false);
 
   const groupServicesByDept = useCallback((services) => {
+    // ✅ Ensure services is an array
     if (!services || !Array.isArray(services)) {
       return {};
     }
@@ -58,18 +59,30 @@ export default function AdminServiceManager({ t }) {
 
       let servicesData = [];
 
+      // ✅ Log the response to debug
+      console.log("🔍 Service API Response:", response);
+
       if (response && response.data) {
         // ✅ Handle paginated response: { services: [...], pagination: {...}, departments: [...] }
         if (response.data.services && Array.isArray(response.data.services)) {
           servicesData = response.data.services;
+          console.log(
+            "✅ Extracted services from response.data.services:",
+            servicesData.length,
+          );
         }
         // ✅ Handle direct array response (legacy)
         else if (Array.isArray(response.data)) {
           servicesData = response.data;
+          console.log("✅ Response.data is direct array:", servicesData.length);
         }
         // ✅ Handle nested data property
         else if (response.data.data && Array.isArray(response.data.data)) {
           servicesData = response.data.data;
+          console.log(
+            "✅ Extracted services from response.data.data:",
+            servicesData.length,
+          );
         }
         // ✅ Fallback: find any array in the response
         else {
@@ -78,15 +91,19 @@ export default function AdminServiceManager({ t }) {
           );
           if (possibleArray) {
             servicesData = possibleArray;
+            console.log(
+              "✅ Found services array in response:",
+              servicesData.length,
+            );
           } else {
-            console.warn("Unexpected response format:", response.data);
+            console.warn("⚠️ Unexpected response format:", response.data);
           }
         }
       }
 
       setServices(servicesData);
     } catch (err) {
-      console.error("Failed to load services:", err);
+      console.error("❌ Failed to load services:", err);
       showToast("Failed to load services", "error");
       setServices([]);
     } finally {
@@ -235,6 +252,7 @@ export default function AdminServiceManager({ t }) {
   const safeT = t || {};
   const ts = safeT.services || {};
 
+  // ✅ Ensure services is an array before grouping
   const servicesArray = Array.isArray(services) ? services : [];
   const groupedServices = groupServicesByDept(servicesArray);
   const deptKeys = Object.keys(groupedServices);

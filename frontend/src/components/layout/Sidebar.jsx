@@ -10,13 +10,11 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiChevronDown,
-  // eslint-disable-next-line no-unused-vars
-  FiChevronUp,
+  // FiChevronUp,
   FiPlus,
   FiX,
   FiUsers,
-  // eslint-disable-next-line no-unused-vars
-  FiUser,
+  // FiUser,
   FiUserPlus,
   FiHome,
   FiMessageSquare,
@@ -27,8 +25,7 @@ import {
   FiUsers as FiUsersIcon,
   FiBarChart2,
   FiGlobe,
-  // eslint-disable-next-line no-unused-vars
-  FiFlag,
+  // FiFlag,
   FiCheck,
   FiLoader,
   FiMenu,
@@ -44,7 +41,6 @@ const AnimatedLogo = ({ collapsed }) => {
   const [showAmharic, setShowAmharic] = useState(false);
   const [isFlipping, setIsFlipping] = useState(false);
 
-  // ✅ Continuous rotation
   useEffect(() => {
     const interval = setInterval(() => {
       setRotation((prev) => (prev + 0.5) % 360);
@@ -52,7 +48,6 @@ const AnimatedLogo = ({ collapsed }) => {
     return () => clearInterval(interval);
   }, []);
 
-  // ✅ Pulse animation
   useEffect(() => {
     const pulseInterval = setInterval(() => {
       setScale((prev) => (prev === 1 ? 1.05 : 1));
@@ -60,7 +55,6 @@ const AnimatedLogo = ({ collapsed }) => {
     return () => clearInterval(pulseInterval);
   }, []);
 
-  // ✅ Alternating between "A" and "አ" with flip effect
   useEffect(() => {
     const flipInterval = setInterval(() => {
       setIsFlipping(true);
@@ -69,11 +63,9 @@ const AnimatedLogo = ({ collapsed }) => {
         setIsFlipping(false);
       }, 300);
     }, 2000);
-
     return () => clearInterval(flipInterval);
   }, []);
 
-  // ✅ Colors defined inside component to avoid ESLint errors
   const goldColor = "#f5c518";
   const primaryColor = "#1a3aad";
   const mutedTextColor = "#7a8fc8";
@@ -232,7 +224,6 @@ export default function Sidebar({
   const { user, isAdminOrSuperAdmin, isLeader, isEmployee } = useAuth();
   const filteredNavItems = getFilteredNavItems(user?.role || "employee");
 
-  // ✅ t is a function — call it with dot-path strings
   const safeT = (path, fallback = "") => {
     try {
       return t?.(path) || fallback;
@@ -241,7 +232,6 @@ export default function Sidebar({
     }
   };
 
-  // ✅ Define colors here
   const DARK_BG = "#0d1a5e";
   const BORDER_COLOR = "#1a3aad";
   const ACTIVE_BG = "#1a3aad33";
@@ -311,13 +301,11 @@ export default function Sidebar({
     loadTeams();
   }, [loadTeams]);
 
-  // ✅ Handle team click - navigate to forum with team context
   const handleTeamClick = (team) => {
     setSelectedTeam(team);
     navigate("/forum");
   };
 
-  // ✅ Handle navigation - uses React Router
   const handleNavClick = (tabId) => {
     setSelectedTeam(null);
     setForumExpanded(false);
@@ -363,21 +351,6 @@ export default function Sidebar({
     }
   };
 
-  // ✅ Nav item icon mapping
-  // const getNavIcon = (id) => {
-  //   const icons = {
-  //     dashboard: <FiHome size={20} />,
-  //     forum: <FiMessageSquare size={20} />,
-  //     evaluation: <FiStar size={20} />,
-  //     report: <FiFileText size={20} />,
-  //     services: <FiGrid size={20} />,
-  //     "admin/services": <FiSettings size={20} />,
-  //     users: <FiUsersIcon size={20} />,
-  //     teams: <FiUsers size={20} />,
-  //     analytics: <FiBarChart2 size={20} />,
-  //   };
-  //   return icons[id] || <FiMenu size={20} />;
-  // };
   const getNavIcon = (id) => {
     const icons = {
       dashboard: <FiHome size={20} />,
@@ -423,6 +396,10 @@ export default function Sidebar({
           0% { transform: rotateY(0deg); }
           50% { transform: rotateY(90deg); }
           100% { transform: rotateY(180deg); }
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
         }
       `}</style>
 
@@ -707,7 +684,7 @@ export default function Sidebar({
         })}
       </nav>
 
-      {/* Language Switcher */}
+      {/* ✅ FIXED: Language Switcher - No more duplication */}
       <div
         style={{
           borderTop: `1px solid ${BORDER_COLOR}33`,
@@ -760,20 +737,16 @@ export default function Sidebar({
                 transition: "all 0.15s",
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: 4,
               }}
             >
-              <span>{l.flag}</span>
-              {!collapsed && (
+              {!collapsed ? (
                 <span style={{ fontSize: 10, letterSpacing: "0.5px" }}>
-                  {l.label === "English"
-                    ? "EN"
-                    : l.label === "አማርኛ"
-                      ? "አማ"
-                      : l.label === "Afaan Oromo"
-                        ? "OR"
-                        : l.code.toUpperCase()}
+                  {l.flag}
                 </span>
+              ) : (
+                <span style={{ fontSize: 12 }}>{l.flag}</span>
               )}
             </button>
           ))}
@@ -951,13 +924,6 @@ export default function Sidebar({
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-      `}</style>
     </aside>
   );
 }

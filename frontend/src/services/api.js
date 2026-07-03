@@ -113,30 +113,25 @@ export const teamAPI = {
 };
 
 // ✅ Services API - UPDATED to handle paginated response
+// Services API
 export const serviceAPI = {
-  // ✅ Now accepts params for pagination, search, filtering
   getAll: (params = {}) => api.get("/services", { params }),
   seed: () => api.post("/services/seed"),
   create: (data) => api.post("/services", data),
   update: (id, data) => api.put(`/services/${id}`, data),
   delete: (id) => api.delete(`/services/${id}`),
-  // ✅ Additional methods for Excel import
   importExcel: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/services/import-excel", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      headers: { "Content-Type": "multipart/form-data" },
     });
   },
   previewImport: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return api.post("/services/preview-import", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
+      headers: { "Content-Type": "multipart/form-data" },
     });
   },
 };
