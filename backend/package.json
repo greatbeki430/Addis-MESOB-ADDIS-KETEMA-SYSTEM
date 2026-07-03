@@ -7,7 +7,10 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "generate-fonts": "node backend/scripts/generateFontBase64.js",
-    "prebuild": "npm run generate-fonts"
+    "prebuild": "npm run generate-fonts",
+    "seed": "node src/scripts/seedServices.js",
+    "import-excel": "node src/scripts/importServicesFromExcel.js",
+    "fix-index": "node src/scripts/fixTextIndex.js"
   },
   "dependencies": {
     "@google/genai": "^2.10.0",

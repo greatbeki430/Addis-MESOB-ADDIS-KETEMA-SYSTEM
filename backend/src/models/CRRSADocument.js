@@ -5,27 +5,27 @@
 const mongoose = require("mongoose");
 
 const DOCUMENT_TYPES = [
-  "birth_certificate", // የልደት ምስክር ወረቀት
-  "death_certificate", // የሞት ምስክር ወረቀት
-  "marriage_certificate", // የጋብቻ ምስክር ወረቀት
-  "divorce_certificate", // የፍቺ ምስክር ወረቀት
-  "residence_id", // የኑሮ መታወቂያ
-  "name_change", // የስም ለውጥ ምስክር ወረቀት
-  "registration_book", // የምዝገባ መዝገብ
-  "circular", // ደብዳቤ / ክብ ደብዳቤ
-  "directive", // መመሪያ
-  "correspondence", // ደብዳቤ
-  "application_form", // ማመልከቻ ቅጽ
-  "other", // ሌሎች
+  "birth_certificate",
+  "death_certificate",
+  "marriage_certificate",
+  "divorce_certificate",
+  "residence_id",
+  "name_change",
+  "registration_book",
+  "circular",
+  "directive",
+  "correspondence",
+  "application_form",
+  "other",
 ];
 
 const documentVersionSchema = new mongoose.Schema({
   fileUrl: { type: String, required: true },
-  filePublicId: { type: String }, // Cloudinary public ID
-  fileSize: { type: Number }, // bytes
+  filePublicId: { type: String },
+  fileSize: { type: Number },
   uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   uploadedAt: { type: Date, default: Date.now },
-  changeNote: { type: String }, // What changed in this version
+  changeNote: { type: String },
 });
 
 const crrSADocumentSchema = new mongoose.Schema(
@@ -46,14 +46,14 @@ const crrSADocumentSchema = new mongoose.Schema(
     },
     title: {
       type: String,
-      required: true, // e.g. "Birth Certificate – Abebe Kebede"
+      required: true,
     },
 
     // ─── Citizen/subject metadata ────────────────────────
     citizenName: {
       type: String,
       trim: true,
-      index: true, // searchable
+      index: true,
     },
     citizenNameAmharic: {
       type: String,
@@ -64,11 +64,11 @@ const crrSADocumentSchema = new mongoose.Schema(
 
     // ─── Document metadata ───────────────────────────────
     issueDate: { type: Date, index: true },
-    expiryDate: { type: Date }, // null = permanent (most CRRSA docs)
+    expiryDate: { type: Date },
     issuingOfficer: { type: String },
     issuingDepartment: {
       type: String,
-      default: "Civil Registry", // ሲቪል ምዝገባ
+      default: "Civil Registry",
     },
     language: {
       type: String,
@@ -77,18 +77,17 @@ const crrSADocumentSchema = new mongoose.Schema(
     },
 
     // ─── File storage ────────────────────────────────────
-    fileUrl: { type: String, required: true }, // Cloudinary secure URL
-    filePublicId: { type: String }, // For Cloudinary management
+    fileUrl: { type: String, required: true },
+    filePublicId: { type: String },
     fileType: {
       type: String,
       enum: ["pdf", "jpg", "png", "tiff", "other"],
       default: "pdf",
     },
-    fileSize: { type: Number }, // bytes
-    thumbnailUrl: { type: String }, // Preview image (for PDFs)
+    fileSize: { type: Number },
+    thumbnailUrl: { type: String },
 
     // ─── Version history ─────────────────────────────────
-    // Current file is always the latest; previous versions stored here
     versionHistory: [documentVersionSchema],
 
     // ─── AI-extracted metadata ───────────────────────────
@@ -114,18 +113,18 @@ const crrSADocumentSchema = new mongoose.Schema(
     accessLevel: {
       type: String,
       enum: ["employee", "leader", "admin"],
-      default: "admin", // Only admins can see documents by default
+      default: "admin",
     },
 
     // ─── Retention policy ────────────────────────────────
     retentionPolicy: {
       type: String,
       enum: ["lifetime", "10_years", "5_years"],
-      default: "lifetime", // CRRSA documents are kept forever
+      default: "lifetime",
     },
-    isArchived: { type: Boolean, default: false }, // Archived, but NEVER deleted
+    isArchived: { type: Boolean, default: false },
 
-    // Soft delete — documents can be flagged but the file remains in Cloudinary
+    // Soft delete
     isDeleted: { type: Boolean, default: false },
     deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     deletedAt: Date,
@@ -133,19 +132,26 @@ const crrSADocumentSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-    // Text index for full-text search across key fields
   },
 );
 
-// ─── Text index for search ───────────────────────────────────
-crrSADocumentSchema.index({
-  referenceNumber: "text",
-  citizenName: "text",
-  citizenNameAmharic: "text",
-  title: "text",
-  tags: "text",
-  notes: "text",
-});
+// ─── ✅ FIX: Text index with language_override ────────────────
+// This prevents MongoDB from using the "language" field for text search
+// language configuration. The default is "language" which conflicts
+// with our document's language field.
+crrSADocumentSchema.index(
+  {
+    referenceNumber: "text",
+    citizenName: "text",
+    citizenNameAmharic: "text",
+    title: "text",
+    tags: "text",
+    notes: "text",
+  },
+  {
+    language_override: "textSearchLang", // ✅ Point MongoDB elsewhere
+  },
+);
 
 // ─── Compound index for common queries ───────────────────────
 crrSADocumentSchema.index({ documentType: 1, issueDate: -1 });
