@@ -1,12 +1,28 @@
-import { useState } from "react";
-import { btn, C, F, inp } from "../styles/theme";
+/* eslint-disable react-hooks/set-state-in-effect */
+// frontend/src/pages/ForumReport.jsx
+// Enhanced Professional Forum Report Page with AI Integration
+
+import { useState, useRef, useEffect } from "react";
+import {
+  btn,
+  C,
+  F,
+  card,
+  inp,
+  shadows,
+  radius,
+  text,
+  SPACING,
+} from "../styles/theme";
 import Field from "../components/ui/Field";
 import Section from "../components/ui/Section";
 import { exportForumReportToPDF } from "../utils/pdfExport";
 import { meetingAPI } from "../services/api";
 import { aiAPI } from "../services/api";
 import { AISummary, AIReportAssistant } from "../components/ai";
-import { useToast } from "../hooks/useToast"; // ✅ Import useToast
+import { useToast } from "../hooks/useToast";
+
+// ✅ React Icons
 import {
   FiPlus,
   FiX,
@@ -26,10 +42,21 @@ import {
   FiChevronDown,
   FiChevronRight,
   FiCheck,
-  FiUserCheck,
+  FiInfo,
+  FiUserCheck as FiUserCheckIcon,
 } from "react-icons/fi";
 
-function DynamicFieldGroup({
+// ─── FONT SIZES ──────────────────────────────────────────────
+const FONT_SIZES = {
+  h1: "clamp(22px, 5vw, 28px)",
+  h2: "clamp(18px, 4vw, 24px)",
+  h3: "clamp(16px, 3.5vw, 20px)",
+  body: "clamp(12px, 3vw, 14px)",
+  small: "clamp(10px, 2.5vw, 12px)",
+};
+
+// ─── Enhanced Dynamic Field Group ────────────────────────────
+const DynamicFieldGroup = ({
   title,
   values,
   onAdd,
@@ -39,104 +66,108 @@ function DynamicFieldGroup({
   labelPrefix = "",
   placeholderPrefix = "",
   icon,
-}) {
+  maxItems = 20,
+  helperText = "",
+}) => {
+  const handleAdd = () => {
+    if (values.length < maxItems) {
+      onAdd();
+    }
+  };
+
   return (
     <Section title={title} icon={icon}>
-      {values.map((value, idx) => (
-        <div
-          key={idx}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            marginBottom: "12px",
-            flexWrap: "wrap",
-            animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
-          }}
-        >
-          <div style={{ flex: 1 }}>
-            {renderField ? (
-              renderField(value, idx)
-            ) : (
-              <Field
-                label={`${labelPrefix} ${idx + 1}`}
-                value={value}
-                onChange={(v) => onUpdate(idx, v)}
-                placeholder={`${placeholderPrefix} ${idx + 1}`}
-              />
+      <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+        {values.map((value, idx) => (
+          <div
+            key={idx}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              padding: "8px 12px",
+              background: C.cardBg,
+              borderRadius: radius.md,
+              border: `1px solid ${C.border}`,
+              transition: "all 0.2s ease",
+              animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = C.primary;
+              e.currentTarget.style.background = "#f0f3ff";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+              e.currentTarget.style.background = C.cardBg;
+            }}
+          >
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {renderField ? (
+                renderField(value, idx)
+              ) : (
+                <Field
+                  label={`${labelPrefix} ${idx + 1}`}
+                  value={value}
+                  onChange={(v) => onUpdate(idx, v)}
+                  placeholder={`${placeholderPrefix} ${idx + 1}`}
+                />
+              )}
+            </div>
+
+            {values.length > 1 && (
+              <button
+                onClick={() => onRemove(idx)}
+                aria-label="Remove item"
+                style={{
+                  ...btn.icon,
+                  color: "#dc2626",
+                  background: "#fee2e2",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "6px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#fecaca";
+                  e.currentTarget.style.transform = "scale(1.1)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "#fee2e2";
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+              >
+                <FiX size={16} />
+              </button>
             )}
           </div>
+        ))}
+      </div>
 
-          {values.length > 1 && (
-            <button
-              onClick={() => onRemove(idx)}
-              style={{
-                background: "#dc2626",
-                color: "white",
-                border: "none",
-                borderRadius: "6px",
-                width: "32px",
-                height: "32px",
-                fontSize: "18px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                transition: "all 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#b91c1c";
-                e.currentTarget.style.transform = "scale(1.1)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#dc2626";
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
-              <FiX size={16} />
-            </button>
-          )}
-        </div>
-      ))}
+      {values.length < maxItems && (
+        <button
+          onClick={handleAdd}
+          style={{
+            ...btn.secondary,
+            padding: "6px 14px",
+            fontSize: "12px",
+            marginTop: "8px",
+          }}
+        >
+          <FiPlus size={14} />
+          Add {values.length === 0 ? "First" : "Another"}
+        </button>
+      )}
 
-      <button
-        onClick={onAdd}
-        style={{
-          background: "#10b981",
-          color: "white",
-          border: "none",
-          borderRadius: "6px",
-          padding: "6px 14px",
-          fontSize: "13px",
-          fontWeight: "bold",
-          cursor: "pointer",
-          display: "inline-flex",
-          alignItems: "center",
-          gap: "6px",
-          marginTop: "8px",
-          transition: "all 0.2s",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "#059669";
-          e.currentTarget.style.transform = "translateY(-2px)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(16,185,129,0.3)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "#10b981";
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "none";
-        }}
-      >
-        <FiPlus size={16} />
-        Add
-      </button>
+      {helperText && (
+        <p style={{ ...text.muted, fontSize: "11px", marginTop: "4px" }}>
+          <FiInfo size={12} style={{ marginRight: "4px" }} />
+          {helperText}
+        </p>
+      )}
     </Section>
   );
-}
+};
 
-// ════════════════════════════════════════════════════════════
-// Standing Agendas Panel
-// ════════════════════════════════════════════════════════════
+// ─── Standing Agendas Panel ──────────────────────────────────
 const STANDING_AGENDAS_AM = [
   "በተቋሙ መልካም አስተዳደር ማስፈን በተመለከተ",
   "በተቋሙ ብልሹ አሰራር ከመታገል አንጻር",
@@ -147,7 +178,7 @@ const STANDING_AGENDAS_AM = [
   "የተፈታበት አግባብ",
 ];
 
-function StandingAgendasPanel({ t }) {
+const StandingAgendasPanel = ({ t }) => {
   const safeT = t || {};
   const agendas = safeT.agendas || STANDING_AGENDAS_AM;
   const tf = safeT.forum || {};
@@ -156,12 +187,13 @@ function StandingAgendasPanel({ t }) {
   return (
     <div
       style={{
-        background: "linear-gradient(135deg, #f0f3ff, #e8ecf8)",
-        border: "1.5px solid #c8d0ef",
-        borderLeft: "5px solid #1a3aad",
-        borderRadius: 12,
-        marginBottom: 20,
+        background: "linear-gradient(135deg, #eef2ff, #e0e7ff)",
+        border: `1px solid ${C.border}`,
+        borderLeft: `4px solid ${C.primary}`,
+        borderRadius: radius.lg,
+        marginBottom: SPACING.lg,
         overflow: "hidden",
+        boxShadow: shadows.sm,
       }}
     >
       <div
@@ -170,37 +202,44 @@ function StandingAgendasPanel({ t }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "12px 16px",
+          padding: "14px 18px",
           cursor: "pointer",
           userSelect: "none",
+          transition: "background 0.2s",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "rgba(26,58,173,0.04)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "transparent";
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <FiBookOpen size={18} color="#1a3aad" />
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <FiBookOpen size={18} color={C.primary} />
           <span
             style={{
-              fontWeight: 800,
-              fontSize: "clamp(12px, 3.5vw, 14px)",
-              color: "#0d1a5e",
-              fontFamily: "'Noto Sans Ethiopic', sans-serif",
+              fontWeight: 700,
+              fontSize: FONT_SIZES.h3,
+              color: C.dark,
+              fontFamily: F.sans,
             }}
           >
             {tf.standingAgendas || "ቋሚ የአቻ ፎረም አጀንዳዎች"}
           </span>
           <span
             style={{
-              background: "#1a3aad",
-              color: "#f5c518",
-              fontSize: 10,
+              background: C.primary,
+              color: "#fff",
+              fontSize: "10px",
               fontWeight: 700,
-              padding: "2px 8px",
-              borderRadius: 20,
+              padding: "2px 10px",
+              borderRadius: radius.pill,
             }}
           >
             {agendas.length}
           </span>
         </div>
-        <span style={{ color: "#1a3aad", fontSize: 14, fontWeight: 700 }}>
+        <span style={{ color: C.primary, fontSize: "14px" }}>
           {collapsed ? (
             <FiChevronRight size={16} />
           ) : (
@@ -209,31 +248,31 @@ function StandingAgendasPanel({ t }) {
         </span>
       </div>
       {!collapsed && (
-        <div style={{ padding: "0 16px 14px" }}>
+        <div style={{ padding: "4px 18px 14px" }}>
           {agendas.map((agenda, i) => (
             <div
               key={i}
               style={{
                 display: "flex",
                 alignItems: "flex-start",
-                gap: 10,
-                padding: "7px 0",
+                gap: "10px",
+                padding: "6px 0",
                 borderBottom:
-                  i < agendas.length - 1 ? "1px solid #dde3f5" : "none",
+                  i < agendas.length - 1 ? `1px solid ${C.border}` : "none",
               }}
             >
               <span
                 style={{
-                  minWidth: 22,
-                  height: 22,
-                  background: "#1a3aad",
-                  color: "#f5c518",
+                  minWidth: "24px",
+                  height: "24px",
+                  background: C.primary,
+                  color: "#fff",
                   borderRadius: "50%",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 10,
-                  fontWeight: 800,
+                  fontSize: "10px",
+                  fontWeight: 700,
                   flexShrink: 0,
                 }}
               >
@@ -241,9 +280,9 @@ function StandingAgendasPanel({ t }) {
               </span>
               <span
                 style={{
-                  fontSize: "clamp(11px, 3vw, 13px)",
-                  color: "#1a3060",
-                  fontFamily: "'Noto Sans Ethiopic', sans-serif",
+                  fontSize: FONT_SIZES.body,
+                  color: C.dark,
+                  fontFamily: F.sans,
                   lineHeight: 1.5,
                   flex: 1,
                 }}
@@ -256,15 +295,62 @@ function StandingAgendasPanel({ t }) {
       )}
     </div>
   );
-}
+};
 
+// ─── AI Insight Badge ─────────────────────────────────────────
+const AIInsightBadge = ({ type = "info", children }) => {
+  const styles = {
+    info: {
+      background: "#EFF6FF",
+      border: "1px solid #BFDBFE",
+      color: "#1D4ED8",
+      icon: <FiInfo size={14} />,
+    },
+    success: {
+      background: "#F0FDF4",
+      border: "1px solid #86EFAC",
+      color: "#15803D",
+      icon: <FiCheckCircle size={14} />,
+    },
+    warning: {
+      background: "#FFFBEB",
+      border: "1px solid #FDE68A",
+      color: "#92400E",
+      icon: <FiAlertCircle size={14} />,
+    },
+  };
+
+  const style = styles[type] || styles.info;
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: "8px",
+        padding: "10px 14px",
+        borderRadius: radius.md,
+        background: style.background,
+        border: style.border,
+        color: style.color,
+        fontSize: FONT_SIZES.body,
+        marginBottom: SPACING.md,
+      }}
+    >
+      <span style={{ flexShrink: 0, marginTop: "2px" }}>{style.icon}</span>
+      <div>{children}</div>
+    </div>
+  );
+};
+
+// ─── Main Component ──────────────────────────────────────────
 export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
   const safeT = t || {};
   const tf = safeT.forum || {};
   const safeYear = safeT.year || "2018 E.C.";
 
-  // ✅ Get toast function
   const { showToast } = useToast();
+  const formRef = useRef(null);
 
   const [form, setForm] = useState({
     date: new Date().toISOString().split("T")[0],
@@ -281,6 +367,24 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
   });
   const [submitted, setSubmitted] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [focusedField, setFocusedField] = useState(null);
+  const [formProgress, setFormProgress] = useState(0);
+
+  // ─── Calculate form progress ───────────────────────────────
+  useEffect(() => {
+    const totalFields = 9;
+    let filled = 0;
+    if (form.date) filled++;
+    if (form.present.some((p) => p.trim())) filled++;
+    if (form.topics.some((t) => t.trim())) filled++;
+    if (form.explanation.trim()) filled++;
+    if (form.gaps.some((g) => g.trim())) filled++;
+    if (form.agreements.some((a) => a.trim())) filled++;
+    if (form.prevResults.some((p) => p.trim())) filled++;
+    if (form.signatures.some((s) => s.trim())) filled++;
+    if (form.timeStart || form.timeEnd) filled++;
+    setFormProgress(Math.round((filled / totalFields) * 100));
+  }, [form]);
 
   const upd = (f, v) => setForm((p) => ({ ...p, [f]: v }));
 
@@ -321,14 +425,12 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
     try {
       setSaving(true);
 
-      // ✅ Validate required fields
       if (!form.date) {
         showToast("Please select a date", "warning");
         setSaving(false);
         return;
       }
 
-      // ✅ Prepare data for API - match the backend expectations
       const reportData = {
         date: form.date,
         timeStart: form.timeStart,
@@ -345,9 +447,6 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         teamName: selectedTeam?.name || "Unknown Team",
       };
 
-      console.log("📤 Sending report data:", reportData);
-
-      // ✅ Use await without assigning to unused variable, or use it if needed
       await meetingAPI.create(reportData);
 
       if (onReportSaved) {
@@ -367,31 +466,34 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
     }
   };
 
-  const g3Responsive = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
-    gap: "clamp(10px, 3vw, 16px)",
-  };
-
-  // ✅ Handle AI suggestion application
   const handleApplySuggestion = (text) => {
-    // Add the suggestion to the explanation or notes
     setForm((prev) => ({
       ...prev,
       explanation: prev.explanation ? `${prev.explanation}\n\n${text}` : text,
     }));
+    showToast("✅ AI suggestion applied to explanation!", "success");
   };
 
+  const g3Responsive = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
+    gap: "clamp(12px, 3vw, 16px)",
+  };
+
+  // ─── Submitted State ──────────────────────────────────────
   if (submitted) {
     return (
-      <div style={{ maxWidth: 600, margin: "60px auto", padding: "0 20px" }}>
+      <div
+        style={{ maxWidth: "600px", margin: "60px auto", padding: "0 20px" }}
+      >
         <div
           style={{
             textAlign: "center",
             padding: "clamp(40px, 8vw, 60px) clamp(20px, 5vw, 40px)",
             background: C.white,
-            borderRadius: 16,
-            boxShadow: "0 4px 24px #0002",
+            borderRadius: radius.xl,
+            boxShadow: shadows.xl,
+            border: `1px solid ${C.border}`,
             animation: "fadeInUp 0.5s ease",
           }}
         >
@@ -407,16 +509,16 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               fontSize: "clamp(32px, 8vw, 40px)",
               color: "#fff",
               margin: "0 auto 18px",
-              animation: "pulseGlow 2s ease-in-out infinite",
+              boxShadow: shadows.glow,
             }}
           >
             <FiCheck size={40} />
           </div>
           <h2
             style={{
-              fontSize: "clamp(20px, 5vw, 26px)",
-              fontWeight: 900,
-              color: C.primary,
+              fontSize: FONT_SIZES.h1,
+              fontWeight: 800,
+              color: C.dark,
               fontFamily: F.serif,
               marginBottom: 8,
             }}
@@ -428,30 +530,18 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               color: C.muted,
               marginBottom: 24,
               fontFamily: F.sans,
-              fontSize: "clamp(13px, 3.5vw, 15px)",
+              fontSize: FONT_SIZES.body,
             }}
           >
             {tf.savedSub || "Peer Forum report completed successfully."}
           </p>
-          <button
-            style={btn.primary}
-            onClick={() => setSubmitted(false)}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow =
-                "0 6px 20px rgba(26,107,74,0.3)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            <FiPlus size={16} style={{ marginRight: 6 }} />
+          <button style={btn.primary} onClick={() => setSubmitted(false)}>
+            <FiPlus size={18} />
             {tf.newReport || "New Report"}
           </button>
 
-          {/* ✅ AI Meeting Minutes */}
-          <div style={{ marginTop: 24, textAlign: "left" }}>
+          {/* AI Meeting Minutes */}
+          <div style={{ marginTop: "24px", textAlign: "left" }}>
             <AISummary
               fetchFn={() =>
                 aiAPI.getMeetingMinutes({
@@ -476,6 +566,7 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
     );
   }
 
+  // ─── No Team Selected ──────────────────────────────────────
   if (!selectedTeam) {
     return (
       <div
@@ -493,26 +584,30 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
       >
         <div>
           <div
-            style={{ fontSize: "clamp(48px, 12vw, 64px)", marginBottom: 16 }}
+            style={{
+              fontSize: "clamp(48px, 12vw, 64px)",
+              marginBottom: "16px",
+              color: C.border,
+            }}
           >
             <FiMessageSquare
               size={64}
-              color={C.muted}
               style={{ display: "block", margin: "0 auto" }}
             />
           </div>
           <p
             style={{
-              fontSize: "clamp(16px, 4vw, 20px)",
-              marginBottom: 12,
+              fontSize: "clamp(18px, 4vw, 22px)",
+              marginBottom: "12px",
               color: C.dark,
+              fontWeight: 600,
             }}
           >
             {tf.selectTeamPrompt ||
               "Select a team from the sidebar to start a report"}
           </p>
-          <p style={{ fontSize: "clamp(13px, 3vw, 15px)" }}>
-            <FiUsers size={16} style={{ marginRight: 8 }} />
+          <p style={{ fontSize: FONT_SIZES.body, color: C.muted }}>
+            <FiUsers size={18} style={{ marginRight: "8px" }} />
             Click on "Peer Forum" in the sidebar, then choose a team
           </p>
         </div>
@@ -520,15 +615,18 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
     );
   }
 
+  // ─── Main Form ─────────────────────────────────────────────
   return (
     <div
       style={{
-        maxWidth: 1000,
+        maxWidth: "1000px",
         margin: "0 auto",
         padding: "clamp(16px, 4vw, 28px) clamp(12px, 4vw, 20px)",
         animation: "fadeInUp 0.5s ease",
       }}
+      ref={formRef}
     >
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -537,84 +635,168 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           alignItems: "center",
           justifyContent: "space-between",
           gap: "clamp(8px, 3vw, 14px)",
-          marginBottom: "clamp(12px, 3vw, 20px)",
+          marginBottom: "clamp(20px, 4vw, 28px)",
+          paddingBottom: "clamp(12px, 3vw, 16px)",
+          borderBottom: `2px solid ${C.border}`,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <FiMessageSquare size={36} color={C.primary} />
+        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+          <div
+            style={{
+              width: "48px",
+              height: "48px",
+              background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+              borderRadius: radius.lg,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+              fontSize: "22px",
+              boxShadow: shadows.glow,
+            }}
+          >
+            <FiMessageSquare size={24} />
+          </div>
           <div>
             <h1
               style={{
-                fontSize: "clamp(18px, 5vw, 24px)",
-                fontWeight: 900,
+                fontSize: FONT_SIZES.h1,
+                fontWeight: 800,
                 color: C.dark,
                 fontFamily: F.serif,
                 margin: 0,
-                background: `linear-gradient(90deg, ${C.dark}, ${C.primary})`,
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
+                lineHeight: 1.2,
               }}
             >
-              {tf.title || "Peer Forum Report Form"} - {selectedTeam.name}
+              {tf.title || "Peer Forum Report"}
+              <span style={{ color: C.primary, fontSize: FONT_SIZES.h2 }}>
+                {" "}
+                — {selectedTeam.name}
+              </span>
             </h1>
             <p
               style={{
-                fontSize: "clamp(12px, 3vw, 13px)",
+                fontSize: FONT_SIZES.body,
                 color: C.muted,
                 margin: "2px 0 0",
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
               }}
             >
+              <FiCalendar size={14} />
               {tf.subtitle ||
                 "Addis Ababa City Admin · Addis Messob · Addis Ketema Center"}
             </p>
           </div>
         </div>
-        <span
+        <div
           style={{
-            background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-            color: "#fff",
-            padding: "clamp(4px, 1.5vw, 6px) clamp(12px, 3vw, 18px)",
-            borderRadius: 20,
-            fontSize: "clamp(11px, 3vw, 13px)",
-            fontWeight: 700,
-            whiteSpace: "nowrap",
-            boxShadow: `0 4px 15px ${C.primary}44`,
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            flexWrap: "wrap",
           }}
         >
-          {safeYear}
-        </span>
+          {/* Progress Bar */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              background: C.bg,
+              padding: "4px 12px",
+              borderRadius: radius.pill,
+            }}
+          >
+            <span style={{ fontSize: "11px", color: C.muted, fontWeight: 600 }}>
+              {formProgress}%
+            </span>
+            <div
+              style={{
+                width: "80px",
+                height: "4px",
+                background: C.border,
+                borderRadius: radius.pill,
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${formProgress}%`,
+                  height: "100%",
+                  background: `linear-gradient(90deg, ${C.primary}, ${C.gold})`,
+                  borderRadius: radius.pill,
+                  transition: "width 0.5s ease",
+                }}
+              />
+            </div>
+          </div>
+          <div
+            style={{
+              background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+              color: "#fff",
+              padding: "6px 16px",
+              borderRadius: radius.pill,
+              fontSize: FONT_SIZES.small,
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              boxShadow: shadows.glow,
+            }}
+          >
+            <FiCalendar size={14} />
+            {safeYear}
+          </div>
+        </div>
       </div>
+
+      {/* Progress Info */}
+      <AIInsightBadge type="info">
+        <strong>Progress: {formProgress}% complete</strong>
+        <span style={{ marginLeft: "8px", fontSize: "12px" }}>
+          {formProgress < 30 && "Start filling in the report details below"}
+          {formProgress >= 30 &&
+            formProgress < 70 &&
+            "You're making good progress! Keep going."}
+          {formProgress >= 70 && "Almost there! Review and save your report."}
+        </span>
+      </AIInsightBadge>
 
       <StandingAgendasPanel t={safeT} />
 
+      {/* Main Form Card */}
       <div
         style={{
+          ...card,
+          padding: "clamp(20px, 4vw, 32px)",
           background: C.white,
-          borderRadius: 12,
-          padding: "clamp(16px, 4vw, 28px)",
-          boxShadow: "0 2px 16px #0003",
+          borderRadius: radius.xl,
+          boxShadow: shadows.md,
+          border: `1px solid ${C.border}`,
         }}
       >
+        {/* Meeting Time */}
         <Section
-          title={tf.meetingTime || "📅 Meeting Time"}
+          title={tf.meetingTime || "Meeting Time"}
           icon={<FiCalendar size={18} />}
         >
           <div style={g3Responsive}>
             <Field
-              label={tf.date || "Date"}
+              label="Date"
               value={form.date}
               onChange={(v) => upd("date", v)}
               type="date"
             />
             <Field
-              label={tf.startTime || "Start Time"}
+              label="Start Time"
               value={form.timeStart}
               onChange={(v) => upd("timeStart", v)}
               type="time"
             />
             <Field
-              label={tf.endTime || "End Time"}
+              label="End Time"
               value={form.timeEnd}
               onChange={(v) => upd("timeEnd", v)}
               type="time"
@@ -622,9 +804,10 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
           </div>
         </Section>
 
+        {/* Present Members */}
         <DynamicFieldGroup
           title={tf.presentMembers || "Present Members"}
-          icon={<FiUserCheck size={18} />}
+          icon={<FiUserCheckIcon size={18} />}
           values={form.present}
           onAdd={() => addItem("present", "")}
           onRemove={(idx) => removeItem("present", idx)}
@@ -645,55 +828,66 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
               placeholder={`Member ${idx + 1} name`}
             />
           )}
+          helperText="Add all team members who attended the forum meeting"
         />
 
+        {/* Absent Members */}
         <Section
           title={tf.absentMembers || "Absent Members & Reasons"}
           icon={<FiUserX size={18} />}
         >
-          {form.absent.map((item, idx) => (
-            <div
-              key={idx}
-              style={{
-                marginBottom: "clamp(12px, 4vw, 16px)",
-                padding: "clamp(10px, 3vw, 14px)",
-                border: "1px solid #e5e7eb",
-                borderRadius: "8px",
-                backgroundColor: "#f9fafb",
-                animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
-                transition: "all 0.3s ease",
-              }}
-            >
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+          >
+            {form.absent.map((item, idx) => (
               <div
+                key={idx}
                 style={{
-                  fontSize: "clamp(11px, 3.5vw, 12px)",
-                  fontWeight: "bold",
-                  color: "#6b7280",
-                  marginBottom: "clamp(8px, 3vw, 12px)",
+                  padding: "14px 16px",
+                  background: C.cardBg,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: radius.lg,
+                  transition: "all 0.2s ease",
+                  animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = C.primary;
+                  e.currentTarget.style.background = "#f0f3ff";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = C.border;
+                  e.currentTarget.style.background = C.cardBg;
                 }}
               >
-                {tf.absentMemberLabel || "Absent Member"} #{idx + 1}
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  flexWrap: "wrap",
-                  gap: "clamp(10px, 3vw, 12px)",
-                  alignItems: "flex-start",
-                }}
-              >
-                <div style={{ flex: "2", minWidth: "120px" }}>
+                <div
+                  style={{
+                    fontSize: FONT_SIZES.small,
+                    fontWeight: 600,
+                    color: C.muted,
+                    marginBottom: "10px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <FiUserX size={14} />
+                  {tf.absentMemberLabel || "Absent Member"} #{idx + 1}
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "12px",
+                  }}
+                >
                   <Field
-                    label={`${idx + 1} ${tf.name || "Name"}`}
+                    label="Name"
                     value={item.name}
                     onChange={(v) => updateAbsent(idx, "name", v)}
-                    placeholder="Name"
+                    placeholder="Member name"
                   />
-                </div>
-                <div style={{ flex: "3", minWidth: "120px" }}>
                   <Field
-                    label={tf.reason || "Reason"}
+                    label="Reason"
                     value={item.reason}
                     onChange={(v) => updateAbsent(idx, "reason", v)}
                     placeholder="Reason for absence"
@@ -703,64 +897,43 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
                   <button
                     onClick={() => removeAbsent(idx)}
                     style={{
-                      background: "#dc2626",
-                      color: "white",
-                      border: "none",
-                      borderRadius: "6px",
-                      width: "32px",
-                      height: "32px",
-                      fontSize: "18px",
-                      cursor: "pointer",
-                      marginTop: "28px",
-                      flexShrink: 0,
-                      transition: "all 0.2s",
+                      ...btn.icon,
+                      marginTop: "8px",
+                      color: "#dc2626",
+                      fontSize: "12px",
+                      padding: "4px 8px",
+                      borderRadius: radius.md,
+                      background: "transparent",
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "#b91c1c";
-                      e.currentTarget.style.transform = "scale(1.1)";
+                      e.currentTarget.style.background = "#fee2e2";
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "#dc2626";
-                      e.currentTarget.style.transform = "scale(1)";
+                      e.currentTarget.style.background = "transparent";
                     }}
                   >
-                    <FiX size={16} />
+                    <FiX size={14} />
+                    Remove
                   </button>
                 )}
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
           <button
             onClick={addAbsent}
             style={{
-              background: "#10b981",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
+              ...btn.secondary,
               padding: "6px 14px",
-              fontSize: "13px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              marginTop: "clamp(8px, 3vw, 12px)",
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#059669";
-              e.currentTarget.style.transform = "translateY(-2px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#10b981";
-              e.currentTarget.style.transform = "translateY(0)";
+              fontSize: "12px",
+              marginTop: "8px",
             }}
           >
-            <FiPlus size={16} />
-            Add
+            <FiPlus size={14} />
+            Add Absent Member
           </button>
         </Section>
 
+        {/* Previous Results */}
         <DynamicFieldGroup
           title={tf.prevResults || "Results from Previous Meeting"}
           icon={<FiFileText size={18} />}
@@ -773,9 +946,11 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             setForm((prev) => ({ ...prev, prevResults: updated }));
           }}
           labelPrefix="Result"
-          placeholderPrefix="Result"
+          placeholderPrefix="Previous result"
+          helperText="List outcomes and action items from the previous meeting"
         />
 
+        {/* Today's Topics */}
         <DynamicFieldGroup
           title={tf.todayTopics || "Today's Discussion Topics"}
           icon={<FiMessageSquare size={18} />}
@@ -788,9 +963,11 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             setForm((prev) => ({ ...prev, topics: updated }));
           }}
           labelPrefix={tf.topic || "Topic"}
-          placeholderPrefix="Topic"
+          placeholderPrefix="Discussion topic"
+          helperText="Enter each discussion topic separately"
         />
 
+        {/* Explanation */}
         <Section
           title={tf.explanation || "Explanation Given (Brief)"}
           icon={<FiEdit3 size={18} />}
@@ -799,25 +976,45 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             style={{
               ...inp,
               resize: "vertical",
-              minHeight: "clamp(80px, 20vw, 100px)",
-              fontSize: "clamp(13px, 3.5vw, 14px)",
-              transition: "all 0.3s ease",
+              minHeight: "clamp(100px, 20vw, 120px)",
+              fontSize: FONT_SIZES.body,
+              padding: "12px 14px",
+              borderRadius: radius.md,
+              border: `1.5px solid ${focusedField === "explanation" ? C.primary : C.border}`,
+              boxShadow:
+                focusedField === "explanation"
+                  ? `0 0 0 3px ${C.primary}22`
+                  : "none",
+              transition: "all 0.2s ease",
+              width: "100%",
+              fontFamily: F.sans,
+              lineHeight: 1.6,
             }}
-            rows={3}
+            rows={4}
             value={form.explanation}
             onChange={(e) => upd("explanation", e.target.value)}
+            onFocus={() => setFocusedField("explanation")}
+            onBlur={() => setFocusedField(null)}
             placeholder={tf.explanationPlaceholder || "Write explanation..."}
-            onFocus={(e) => {
-              e.currentTarget.borderColor = C.primary;
-              e.currentTarget.boxShadow = `0 0 0 3px ${C.primary}22`;
-            }}
-            onBlur={(e) => {
-              e.currentTarget.borderColor = C.border;
-              e.currentTarget.boxShadow = "none";
-            }}
           />
+          <div style={{ marginTop: "12px" }}>
+            <AIReportAssistant
+              type="forum"
+              reportContext={{
+                title: `${tf.title || "Peer Forum Report"} - ${selectedTeam?.name || ""}`,
+                date: form.date,
+                attendees: form.present.filter((p) => p.trim() !== ""),
+                topics: form.topics.filter((t) => t.trim()),
+                explanation: form.explanation || "",
+                gaps: form.gaps.filter((g) => g.trim()),
+                agreements: form.agreements.filter((a) => a.trim()),
+              }}
+              onApply={handleApplySuggestion}
+            />
+          </div>
         </Section>
 
+        {/* Gaps */}
         <DynamicFieldGroup
           title={tf.gaps || "Identified Gaps"}
           icon={<FiAlertCircle size={18} />}
@@ -830,9 +1027,11 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             setForm((prev) => ({ ...prev, gaps: updated }));
           }}
           labelPrefix="Gap"
-          placeholderPrefix="Gap"
+          placeholderPrefix="Identified gap"
+          helperText="Identify gaps or challenges discussed in the forum"
         />
 
+        {/* Agreements */}
         <DynamicFieldGroup
           title={tf.agreements || "Agreed Points"}
           icon={<FiCheckCircle size={18} />}
@@ -845,143 +1044,105 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             setForm((prev) => ({ ...prev, agreements: updated }));
           }}
           labelPrefix="Agreement"
-          placeholderPrefix="Agreement"
+          placeholderPrefix="Agreed point"
+          helperText="Document all points of agreement reached"
         />
 
+        {/* Signatures */}
         <Section
           title={tf.signatures || "Signatures"}
           icon={<FiPenTool size={18} />}
         >
-          {form.signatures.map((sig, idx) => (
-            <div
-              key={idx}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                marginBottom: "12px",
-                flexWrap: "wrap",
-                animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <Field
-                  label={`${idx + 1}${tf.signatureN || " Signature"}`}
-                  value={sig}
-                  onChange={(v) => {
-                    const updated = [...form.signatures];
-                    updated[idx] = v;
-                    setForm((prev) => ({ ...prev, signatures: updated }));
-                  }}
-                  placeholder="Signature Line"
-                />
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+          >
+            {form.signatures.map((sig, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  padding: "8px 12px",
+                  background: C.cardBg,
+                  borderRadius: radius.md,
+                  border: `1px solid ${C.border}`,
+                  transition: "all 0.2s ease",
+                  animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = C.primary;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = C.border;
+                }}
+              >
+                <div style={{ flex: 1 }}>
+                  <Field
+                    label={`${idx + 1}${tf.signatureN || " Signature"}`}
+                    value={sig}
+                    onChange={(v) => {
+                      const updated = [...form.signatures];
+                      updated[idx] = v;
+                      setForm((prev) => ({ ...prev, signatures: updated }));
+                    }}
+                    placeholder="Signature line"
+                  />
+                </div>
+                {form.signatures.length > 1 && (
+                  <button
+                    onClick={() => removeItem("signatures", idx)}
+                    style={{
+                      ...btn.icon,
+                      color: "#dc2626",
+                      background: "#fee2e2",
+                      width: "32px",
+                      height: "32px",
+                      borderRadius: "6px",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#fecaca";
+                      e.currentTarget.style.transform = "scale(1.1)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#fee2e2";
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
+                  >
+                    <FiX size={16} />
+                  </button>
+                )}
               </div>
-              {form.signatures.length > 1 && (
-                <button
-                  onClick={() => removeItem("signatures", idx)}
-                  style={{
-                    background: "#dc2626",
-                    color: "white",
-                    border: "none",
-                    borderRadius: "6px",
-                    width: "32px",
-                    height: "32px",
-                    fontSize: "18px",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#b91c1c";
-                    e.currentTarget.style.transform = "scale(1.1)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#dc2626";
-                    e.currentTarget.style.transform = "scale(1)";
-                  }}
-                >
-                  <FiX size={16} />
-                </button>
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
           <button
             onClick={() => addItem("signatures", "")}
             style={{
-              background: "#10b981",
-              color: "white",
-              border: "none",
-              borderRadius: "6px",
+              ...btn.secondary,
               padding: "6px 14px",
-              fontSize: "13px",
-              fontWeight: "bold",
-              cursor: "pointer",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
+              fontSize: "12px",
               marginTop: "8px",
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#059669";
-              e.currentTarget.style.transform = "translateY(-2px)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#10b981";
-              e.currentTarget.style.transform = "translateY(0)";
             }}
           >
-            <FiPlus size={16} />
-            Add
+            <FiPlus size={14} />
+            Add Signature
           </button>
         </Section>
 
-        {/* ✅ AI Report Assistant */}
-        {form.topics.some((t) => t.trim()) && (
-          <div style={{ marginTop: "clamp(12px, 3vw, 16px)" }}>
-            <AIReportAssistant
-              reportContext={{
-                date: form.date,
-                entries: form.topics
-                  .filter((t) => t.trim())
-                  .map((topic) => ({
-                    dept: selectedTeam?.name || "Team",
-                    service: topic,
-                    total: 1,
-                  })),
-                grandTotal: form.topics.filter((t) => t.trim()).length,
-                teamName: selectedTeam?.name || "Team",
-              }}
-              onApply={handleApplySuggestion}
-            />
-          </div>
-        )}
-
+        {/* Action Buttons */}
         <div
           style={{
-            textAlign: "center",
-            marginTop: "clamp(20px, 5vw, 28px)",
             display: "flex",
             gap: "clamp(10px, 3vw, 16px)",
             justifyContent: "center",
+            marginTop: "clamp(24px, 5vw, 32px)",
             flexWrap: "wrap",
+            paddingTop: "clamp(16px, 4vw, 20px)",
+            borderTop: `2px solid ${C.border}`,
           }}
         >
           <button
-            style={{
-              background: "#dc2626",
-              color: "#fff",
-              border: "none",
-              padding: "clamp(10px, 2.5vw, 14px) clamp(20px, 5vw, 32px)",
-              borderRadius: 10,
-              fontSize: "clamp(13px, 3.5vw, 15px)",
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: F.sans,
-              transition: "all 0.3s ease",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-            }}
+            style={btn.danger}
             onClick={() =>
               exportForumReportToPDF(form, t, lang, selectedTeam?.name)
             }
@@ -1002,10 +1163,9 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
             style={{
               ...btn.primary,
               padding: "clamp(10px, 2.5vw, 14px) clamp(20px, 5vw, 32px)",
-              fontSize: "clamp(13px, 3.5vw, 15px)",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
+              fontSize: FONT_SIZES.body,
+              opacity: saving ? 0.7 : 1,
+              cursor: saving ? "not-allowed" : "pointer",
             }}
             onClick={handleSaveReport}
             disabled={saving}
@@ -1032,6 +1192,10 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
         @keyframes spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
