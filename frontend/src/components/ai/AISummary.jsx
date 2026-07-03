@@ -1,10 +1,10 @@
 // frontend/src/components/ai/AISummary.jsx
 // Enhanced AI summary component with professional styling
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { C, F, btn, radius, shadows } from "../../styles/theme";
 import {
-  FiSparkles,
+  FiZap,
   FiLoader,
   FiRefreshCw,
   FiAlertCircle,
@@ -17,7 +17,7 @@ const AISummary = ({
   fetchFn,
   args = [],
   label = "AI Analysis",
-  variant = "default", // "default" | "compact" | "highlight"
+  variant = "default",
   autoGenerate = false,
 }) => {
   const [insight, setInsight] = useState("");
@@ -26,25 +26,46 @@ const AISummary = ({
   const [generated, setGenerated] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const handleGenerate = async () => {
+  // ✅ Use ref to track if component is mounted
+  const isMounted = useRef(true);
+
+  // ✅ Cleanup on unmount
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const handleGenerate = useCallback(async () => {
+    // ✅ Don't set state if unmounted
+    if (!isMounted.current) return;
+
     setIsLoading(true);
     setError("");
     try {
       const res = await fetchFn(...args);
-      const content =
-        res.data.insight ||
-        res.data.summary ||
-        res.data.digest ||
-        res.data.minutes ||
-        "No content returned";
-      setInsight(content);
-      setGenerated(true);
+      // ✅ Only update state if component is still mounted
+      if (isMounted.current) {
+        const content =
+          res.data.insight ||
+          res.data.summary ||
+          res.data.digest ||
+          res.data.minutes ||
+          "No content returned";
+        setInsight(content);
+        setGenerated(true);
+      }
     } catch (err) {
-      setError(err.response?.data?.message || "AI service unavailable");
+      if (isMounted.current) {
+        setError(err.response?.data?.message || "AI service unavailable");
+      }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [fetchFn, args]);
 
   const handleCopy = () => {
     if (insight) {
@@ -60,18 +81,53 @@ const AISummary = ({
     handleGenerate();
   };
 
-  // Auto-generate on mount if enabled
-  useState(() => {
-    if (autoGenerate && !generated) {
-      handleGenerate();
-    }
-  }, []);
+  // ✅ Fixed useEffect with cleanup flag
+  useEffect(() => {
+    let isEffectActive = true;
+
+    const loadData = async () => {
+      if (!isEffectActive || !isMounted.current) return;
+
+      if (autoGenerate && !generated) {
+        setIsLoading(true);
+        setError("");
+        try {
+          const res = await fetchFn(...args);
+          if (isEffectActive && isMounted.current) {
+            const content =
+              res.data.insight ||
+              res.data.summary ||
+              res.data.digest ||
+              res.data.minutes ||
+              "No content returned";
+            setInsight(content);
+            setGenerated(true);
+          }
+        } catch (err) {
+          if (isEffectActive && isMounted.current) {
+            setError(err.response?.data?.message || "AI service unavailable");
+          }
+        } finally {
+          if (isEffectActive && isMounted.current) {
+            setIsLoading(false);
+          }
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isEffectActive = false;
+    };
+  }, [autoGenerate, generated, fetchFn, args]);
 
   const variantStyles = {
     default: {
       background: "linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%)",
       border: `1px solid #BFDBFE`,
       iconColor: "#1D4ED8",
+      padding: "16px 20px",
     },
     compact: {
       background: "#F8FAFC",
@@ -83,6 +139,7 @@ const AISummary = ({
       background: "linear-gradient(135deg, #EEF2FF 0%, #F0FDF4 100%)",
       border: `2px solid ${C.primary}`,
       iconColor: C.primary,
+      padding: "20px 24px",
       boxShadow: shadows.md,
     },
   };
@@ -166,7 +223,7 @@ const AISummary = ({
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <FiSparkles size={20} color={styles.iconColor} />
+          <FiZap size={20} color={styles.iconColor} />
           <span style={{ fontWeight: 600, fontSize: "14px", color: C.dark }}>
             {label}
           </span>
@@ -191,7 +248,7 @@ const AISummary = ({
             fontSize: "13px",
           }}
         >
-          <FiSparkles size={14} />
+          <FiZap size={14} />
           Generate
         </button>
       </div>
@@ -201,7 +258,7 @@ const AISummary = ({
   return (
     <div
       style={{
-        padding: variant === "compact" ? "12px 16px" : "16px 20px",
+        padding: styles.padding,
         background: styles.background,
         border: styles.border,
         borderRadius: radius.lg,
