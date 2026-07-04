@@ -19,6 +19,7 @@ const reportRoutes = require("./routes/reportRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const chatbotRoutes = require("./routes/chatbotRoutes");
 const documentRoutes = require("./routes/documentRoutes");
+const goldenMondayRoutes = require("./routes/goldenMondayRoutes");
 
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
@@ -45,7 +46,7 @@ app.use(
           "'self'",
           "https://akmesob.vercel.app",
           "http://localhost:5173",
-          "https://api.anthropic.com", // ✅ NEW: Allow Anthropic API
+          "https://api.anthropic.com", // ✅ Allow Anthropic API
         ],
         imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
         scriptSrc: ["'self'"],
@@ -81,6 +82,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/golden-monday", goldenMondayRoutes); // ✅ Added Golden Monday routes
 
 // =============================================
 // ✅ HEALTH CHECK
@@ -103,9 +105,10 @@ app.get("/", (req, res) => {
       teams: "/api/teams",
       services: "/api/services",
       reports: "/api/reports",
-      ai: "/api/ai", // ✅ NEW
-      chatbot: "/api/chatbot", // ✅ NEW
-      documents: "/api/documents", // ✅ NEW
+      ai: "/api/ai",
+      chatbot: "/api/chatbot",
+      documents: "/api/documents",
+      "golden-monday": "/api/golden-monday", // ✅ Added to endpoints list
     },
   });
 });
@@ -129,7 +132,9 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-      console.log(`🤖 AI routes: /api/ai, /api/chatbot, /api/documents`); // ✅ NEW
+      console.log(
+        `🤖 AI routes: /api/ai, /api/chatbot, /api/documents, /api/golden-monday`,
+      );
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);

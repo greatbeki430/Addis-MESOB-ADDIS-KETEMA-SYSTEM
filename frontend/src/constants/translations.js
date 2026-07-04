@@ -17,6 +17,7 @@ export const translations = {
       teams: "Team Management",
       "admin/services": "Service Manager",
       documents: "Document Vault",
+      "golden-monday": "Golden Monday",
     },
     sidebar: {
       main: "Main Menu",
@@ -226,6 +227,47 @@ export const translations = {
       leadingTeam: "Leading Team",
       teamLeaderAccess: "You have access to your team's analytics only",
     },
+    // ─────────────────────────────────────────────
+    // GOLDEN MONDAY TRANSLATIONS
+    // ─────────────────────────────────────────────
+    goldenMonday: {
+      eyebrow: "Every Monday · 2:00 – 2:50",
+      title: "Golden Monday",
+      subtitle:
+        "The city administration's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all.",
+      scroll: "Explore the story",
+      pillarsTitle: "Why a golden morning",
+      pillarsSub: "Three things every session comes back to.",
+      timelineTitle: "Recent sessions",
+      timelineSub: "A running record, not a one-off event.",
+      aiTitle: "AI session recap",
+      aiSub:
+        "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds.",
+      aiNewSession: "Log a new session",
+      aiFormTitle: "Session title",
+      aiFormOrg: "Organization",
+      aiFormSpeaker: "Speaker / facilitator",
+      aiFormDate: "Date",
+      aiFormNotes: "Raw notes — write it however you like, AI will clean it up",
+      aiGenerate: "Generate & save with AI",
+      aiGenerating: "Writing recap…",
+      aiCancel: "Cancel",
+      aiLive: "AI-generated",
+      aiTopicsTitle: "AI: suggest next topics",
+      aiTopicsBtn: "Suggest topics",
+      aiTopicsLoading: "Thinking of topics…",
+      aiTopicsEmpty:
+        "Log a couple of sessions first so AI has something to build on.",
+      aiError: "AI couldn't complete that — please try again in a moment.",
+      aiSaved: "Session saved with an AI-generated recap.",
+      mesobTitle: "The platform this mindset built",
+      mesobSub:
+        "MESOB is the city's one-stop digital service platform — the same drive for less friction, applied to how residents actually get things done.",
+      mesobCta: "Open Document Vault",
+      closingTitle: "Start your week here",
+      closingBody:
+        "Golden Monday is a standing fixture — check back weekly for the next session's write-up.",
+    },
   },
   am: {
     appName: "አዲስ መሶብ",
@@ -242,6 +284,7 @@ export const translations = {
       teams: "ቡድኖች",
       "admin/services": "የአገልግሎት አስተዳዳሪ",
       documents: "ሰነድ ቋት",
+      "golden-monday": "ወርቃማ ሰኞ",
     },
     sidebar: {
       main: "ዋና ምናሌ",
@@ -449,6 +492,45 @@ export const translations = {
       leadingTeam: "በመምራት ላይ ያለ ቡድን",
       teamLeaderAccess: "የቡድንዎን ትንታኔ ብቻ የማየት መብት አለዎት",
     },
+    // ─────────────────────────────────────────────
+    // GOLDEN MONDAY TRANSLATIONS - AMHARIC
+    // ─────────────────────────────────────────────
+    goldenMonday: {
+      eyebrow: "በየሳምንቱ ሰኞ · ከ2፡00 – 2፡50",
+      title: "ወርቃማ ሰኞ",
+      subtitle:
+        "የከተማ አስተዳደሩ ሳምንታዊ የጋራ ትምህርት ልማድ — እና አዲስ መሶብ ለምን እንደተቋቋመ የሚያሳይ አስተሳሰብ።",
+      scroll: "ታሪኩን ይመልከቱ",
+      pillarsTitle: "ወርቃማ ማለዳ ለምን አስፈለገ",
+      pillarsSub: "እያንዳንዱ መርሃ-ግብር የሚመለስባቸው ሶስት ነጥቦች።",
+      timelineTitle: "የቅርብ ጊዜ መርሃ-ግብሮች",
+      timelineSub: "ቀጣይነት ያለው ልማድ እንጂ የአንድ ጊዜ ዝግጅት አይደለም።",
+      aiTitle: "በAI የተዘጋጀ ማጠቃለያ",
+      aiSub:
+        "መርሃ-ግብሩን በቀላል ማስታወሻ ይመዝግቡ — AI በሰከንዶች ውስጥ ወደ ጥራት ያለው ሁለት-ቋንቋ ማጠቃለያ ይቀይረዋል።",
+      aiNewSession: "አዲስ መርሃ-ግብር ይመዝግቡ",
+      aiFormTitle: "የመርሃ-ግብር ርዕስ",
+      aiFormOrg: "ተቋም",
+      aiFormSpeaker: "አቅራቢ / አስተባባሪ",
+      aiFormDate: "ቀን",
+      aiFormNotes: "ጥሬ ማስታወሻ — በፈለጉት መልኩ ይጻፉ፣ AI ያስተካክለዋል",
+      aiGenerate: "በAI ይፍጠሩና ያስቀምጡ",
+      aiGenerating: "ማጠቃለያ በመጻፍ ላይ…",
+      aiCancel: "ይቅር",
+      aiLive: "በAI የተዘጋጀ",
+      aiTopicsTitle: "AI፦ ቀጣይ ርዕሶችን ይጠቁም",
+      aiTopicsBtn: "ርዕሶችን ጠቁም",
+      aiTopicsLoading: "ርዕሶችን በማሰብ ላይ…",
+      aiTopicsEmpty: "AI እንዲመሰረትበት መጀመሪያ ጥቂት መርሃ-ግብሮችን ይመዝግቡ።",
+      aiError: "AI ጥያቄውን ማጠናቀቅ አልቻለም — እባክዎ ትንሽ ቆይተው ይሞክሩ።",
+      aiSaved: "መርሃ-ግብሩ በAI ማጠቃለያ ተመዝግቧል።",
+      mesobTitle: "ይህ አስተሳሰብ የገነባው መድረክ",
+      mesobSub:
+        "መሶብ የከተማው የአንድ ማዕከል ዲጂታል አገልግሎት መድረክ ነው — ተመሳሳይ ውጣ ውረድን የመቀነስ ጥረት፣ ነዋሪዎች አገልግሎት እንዲያገኙ በሚያግዝ መልኩ የተተገበረ።",
+      mesobCta: "ሰነድ ቋት ይክፈቱ",
+      closingTitle: "ሳምንትዎን ከዚህ ይጀምሩ",
+      closingBody: "ወርቃማ ሰኞ ቋሚ መርሃ-ግብር ነው — ለቀጣዩ መርሃ-ግብር ማጠቃለያ በየሳምንቱ ይመልከቱ።",
+    },
   },
   om: {
     appName: "A-MESOB",
@@ -465,6 +547,7 @@ export const translations = {
       teams: "Bulchiinsa Garee",
       "admin/services": "Bulchiinsa Tajaajilaa",
       documents: "Kuusaa Dookumentiiwwani",
+      "golden-monday": "Wiixata Warqee",
     },
     sidebar: {
       main: "Mana Galmee",
@@ -675,6 +758,46 @@ export const translations = {
       myTeam: "Garee Koo",
       leadingTeam: "Garee Nan Bulchu",
       teamLeaderAccess: "Xiinxala garee keessanii qofa ilaaluu dandeessu",
+    },
+    // ─────────────────────────────────────────────
+    // GOLDEN MONDAY TRANSLATIONS - OROMO
+    // ─────────────────────────────────────────────
+    goldenMonday: {
+      eyebrow: "Wiixata hundaa · 2:00 – 2:50",
+      title: "Wiixata Warqee",
+      subtitle:
+        "Aadaa torbanii waliin barachuuf bulchiinsa magaalaa — fi filooftuu Addis MESOB maaliif akka jiraatu.",
+      scroll: "Akeekkachiisa ilaali",
+      pillarsTitle: "Wiixata warqee maaliif",
+      pillarsSub: "Waan walga'ii hundi itti deebi'u sadan.",
+      timelineTitle: "Walga'iiwwan Dhiyoo",
+      timelineSub: "Galmeen itti fufuu, utuu hin taane waan yeroo tokkoo.",
+      aiTitle: "Ibsa walga'ii AI",
+      aiSub:
+        "Walga'ii yaadannoo qabxii galchi — AI saniitiin ibsa lama afaan ta'e qopheessa.",
+      aiNewSession: "Walga'ii haaraa galchi",
+      aiFormTitle: "Mataduree walga'ii",
+      aiFormOrg: "Dhaabbata",
+      aiFormSpeaker: "Dubbisu / Qopheessituu",
+      aiFormDate: "Guyyaa",
+      aiFormNotes: "Yaadannoo — akka barbaaddu barreessi, AI ni fooyyessa",
+      aiGenerate: "AI qopheessi fi olkaayi",
+      aiGenerating: "Ibsa barreessaa jira…",
+      aiCancel: "Haqi",
+      aiLive: "AI-qopheessuu",
+      aiTopicsTitle: "AI: matadureewwan itti aanu",
+      aiTopicsBtn: "Matadureewwan",
+      aiTopicsLoading: "Mataduree irratti yaadaa jira…",
+      aiTopicsEmpty: "AI irratti hundaa'uuf walga'ii muraasa dura galchi.",
+      aiError: "AI xumuruu hin dandeenye — maaloo yeroo xinnoo booda yaali.",
+      aiSaved: "Walga'iin ibsa AI qopheessaan galmeeffame.",
+      mesobTitle: "Bu'uura gochima kanaan",
+      mesobSub:
+        "MESOB buufata tajaajila dijitaalaa bakka tokkoo kan magaalaa — yaada dadhabbii hir'isu, akka namoonni tajaajila argatan.",
+      mesobCta: "Kuusaa Dookumantii Bani",
+      closingTitle: "Torban keessan as eegaluu",
+      closingBody:
+        "Wiixata Warqee waan dhaabbataa — ibsa walga'ii itti aanuu torbaniin ilaalaa.",
     },
   },
 };

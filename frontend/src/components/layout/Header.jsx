@@ -14,7 +14,6 @@ import {
   FiCalendar,
   FiChevronRight,
   FiUser,
-  // FiFlag,
   FiGlobe,
 } from "react-icons/fi";
 
@@ -28,6 +27,7 @@ export default function Header({ tab, t, lang, setLang }) {
     users: <FiUsers size={18} />,
     teams: <FiUsers size={18} />,
     analytics: <FiBarChart2 size={18} />,
+    "golden-monday": <FiCalendar size={18} />,
   };
   const { logout, user } = useAuth();
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
@@ -39,12 +39,6 @@ export default function Header({ tab, t, lang, setLang }) {
     month: "short",
     day: "numeric",
   });
-
-  // eslint-disable-next-line no-unused-vars
-  const getUserInitial = () => {
-    if (!user?.name) return "U";
-    return user.name.charAt(0).toUpperCase();
-  };
 
   // ✅ FALLBACK: Safe access to translations
   const safeT = t || {};

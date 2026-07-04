@@ -27,6 +27,7 @@ import AdminServiceManager from "./pages/admin/AdminServiceManager";
 // AI Feature imports
 import ChatbotWidget from "./components/chatbot/ChatbotWidget";
 import DocumentVault from "./pages/documents/DocumentVault";
+import GoldenMonday from "./pages/GoldenMonday";
 
 // =============================================
 // ANIMATED A-MESOB TITLE COMPONENT
@@ -360,6 +361,12 @@ function AuthenticatedApp() {
               <Route
                 path="/dashboard"
                 element={<Dashboard t={t} lang={language} />}
+              />
+
+              {/* Golden Monday - Public landing page */}
+              <Route
+                path="/golden-monday"
+                element={<GoldenMonday lang={language} />}
               />
 
               {/* Forum Report */}

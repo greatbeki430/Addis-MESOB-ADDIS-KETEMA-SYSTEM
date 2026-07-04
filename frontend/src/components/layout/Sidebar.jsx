@@ -10,11 +10,9 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiChevronDown,
-  // FiChevronUp,
   FiPlus,
   FiX,
   FiUsers,
-  // FiUser,
   FiUserPlus,
   FiHome,
   FiMessageSquare,
@@ -25,10 +23,10 @@ import {
   FiUsers as FiUsersIcon,
   FiBarChart2,
   FiGlobe,
-  // FiFlag,
   FiCheck,
   FiLoader,
   FiMenu,
+  FiSunrise, // ✅ Added for Golden Monday
 } from "react-icons/fi";
 
 // =============================================
@@ -224,6 +222,23 @@ export default function Sidebar({
   const { user, isAdminOrSuperAdmin, isLeader, isEmployee } = useAuth();
   const filteredNavItems = getFilteredNavItems(user?.role || "employee");
 
+  // ✅ Add Golden Monday to nav items if user is leader or above
+  const navItemsWithGoldenMonday = [...filteredNavItems];
+  if (user && (isLeader || isAdminOrSuperAdmin)) {
+    // Check if golden-monday already exists
+    const hasGoldenMonday = navItemsWithGoldenMonday.some(
+      (item) => item.id === "golden-monday",
+    );
+    if (!hasGoldenMonday) {
+      navItemsWithGoldenMonday.push({
+        id: "golden-monday",
+        label: "Golden Monday",
+        icon: <FiSunrise size={18} />,
+        roles: ["leader", "admin", "superadmin"],
+      });
+    }
+  }
+
   const safeT = (path, fallback = "") => {
     try {
       return t?.(path) || fallback;
@@ -363,6 +378,7 @@ export default function Sidebar({
       teams: <FiUsers size={20} />,
       analytics: <FiBarChart2 size={20} />,
       documents: <FiFileText size={20} />,
+      "golden-monday": <FiSunrise size={20} />, // ✅ Added Golden Monday icon
     };
     return icons[id] || <FiMenu size={20} />;
   };
@@ -457,7 +473,7 @@ export default function Sidebar({
 
       {/* Nav Items */}
       <nav style={{ flex: 1, padding: "6px 0" }}>
-        {filteredNavItems.map((n) => {
+        {navItemsWithGoldenMonday.map((n) => {
           const isActive = location.pathname === `/${n.id}`;
           const isForum = n.id === "forum";
           const navLabel = safeT(`nav.${n.id}`, n.id);
@@ -684,7 +700,7 @@ export default function Sidebar({
         })}
       </nav>
 
-      {/* ✅ FIXED: Language Switcher - No more duplication */}
+      {/* Language Switcher */}
       <div
         style={{
           borderTop: `1px solid ${BORDER_COLOR}33`,
