@@ -1,3 +1,4 @@
+// src/services/api.js
 import axios from "axios";
 
 // Get base URL from environment or default to localhost
@@ -65,7 +66,9 @@ api.interceptors.response.use(
   },
 );
 
-// Auth API
+// ============================================================
+// AUTH API
+// ============================================================
 export const authAPI = {
   register: (userData) => api.post("/auth/register", userData),
   login: (credentials) => api.post("/auth/login", credentials),
@@ -76,7 +79,9 @@ export const authAPI = {
   deleteUser: (id) => api.delete(`/auth/users/${id}`),
 };
 
-// Meetings API (Forum Reports)
+// ============================================================
+// MEETINGS API (Forum Reports)
+// ============================================================
 export const meetingAPI = {
   create: (data) => api.post("/meetings", data),
   getAll: () => api.get("/meetings"),
@@ -85,7 +90,9 @@ export const meetingAPI = {
   delete: (id) => api.delete(`/meetings/${id}`),
 };
 
-// Evaluations API
+// ============================================================
+// EVALUATIONS API
+// ============================================================
 export const evaluationAPI = {
   create: (data) => api.post("/evaluations", data),
   getAll: () => api.get("/evaluations"),
@@ -95,7 +102,9 @@ export const evaluationAPI = {
   delete: (id) => api.delete(`/evaluations/${id}`),
 };
 
-// Daily Reports API
+// ============================================================
+// DAILY REPORTS API
+// ============================================================
 export const dailyReportAPI = {
   create: (data) => api.post("/daily-reports", data),
   getAll: (params) => api.get("/daily-reports", { params }),
@@ -103,7 +112,9 @@ export const dailyReportAPI = {
   deleteByDate: (date) => api.delete(`/daily-reports/date/${date}`),
 };
 
-// Teams API
+// ============================================================
+// TEAMS API
+// ============================================================
 export const teamAPI = {
   getAll: () => api.get("/teams"),
   getById: (id) => api.get(`/teams/${id}`),
@@ -112,8 +123,9 @@ export const teamAPI = {
   delete: (id) => api.delete(`/teams/${id}`),
 };
 
-// ✅ Services API - UPDATED to handle paginated response
-// Services API
+// ============================================================
+// SERVICES API - UPDATED to handle paginated response
+// ============================================================
 export const serviceAPI = {
   getAll: (params = {}) => api.get("/services", { params }),
   seed: () => api.post("/services/seed"),
@@ -136,7 +148,9 @@ export const serviceAPI = {
   },
 };
 
-// Reports API
+// ============================================================
+// REPORTS API
+// ============================================================
 export const reportAPI = {
   create: (data) => api.post("/reports", data),
   getAll: (params) => api.get("/reports", { params }),
@@ -146,7 +160,9 @@ export const reportAPI = {
   delete: (id) => api.delete(`/reports/${id}`),
 };
 
-// AI Intelligence API
+// ============================================================
+// AI INTELLIGENCE API
+// ============================================================
 export const aiAPI = {
   getDailyInsight: (reportId, reportData) =>
     api.post("/ai/daily-insight", { reportId, reportData }),
@@ -154,7 +170,6 @@ export const aiAPI = {
     api.post("/ai/evaluation-summary", { evaluationId, evaluationData }),
   getDashboardDigest: (stats) => api.post("/ai/dashboard-digest", { stats }),
   getMeetingMinutes: (data) => api.post("/ai/meeting-minutes", data),
-  // ✅ NEW
   getServiceRecommendations: (query) =>
     api.post("/ai/service-recommendations", { query }),
   getPerformanceTrend: (data) => api.post("/ai/performance-trend", data),
@@ -165,14 +180,18 @@ export const aiAPI = {
   generateReportTitle: (data) => api.post("/ai/generate-title", data),
 };
 
-// Chatbot API
+// ============================================================
+// CHATBOT API
+// ============================================================
 export const chatbotAPI = {
   sendMessage: (message) => api.post("/chatbot/message", { message }),
   getHistory: () => api.get("/chatbot/history"),
   clearSession: () => api.delete("/chatbot/clear"),
 };
 
-// CRRSA Document Vault API
+// ============================================================
+// CRRSA DOCUMENT VAULT API
+// ============================================================
 export const documentAPI = {
   upload: (data) => api.post("/documents/upload", data),
   analyze: (file, mimeType) =>
@@ -187,4 +206,17 @@ export const documentAPI = {
     api.delete(`/documents/${id}/flag`, { data: { reason } }),
 };
 
+// ============================================================
+// GOLDEN MONDAY API — sessions + AI recap/topic generation
+// ============================================================
+export const goldenMondayAPI = {
+  getAll: () => api.get("/golden-monday"),
+  create: (data) => api.post("/golden-monday", data),
+  previewRecap: (data) => api.post("/golden-monday/recap", data),
+  suggestTopics: () => api.get("/golden-monday/suggest-topics"),
+};
+
+// ============================================================
+// DEFAULT EXPORT
+// ============================================================
 export default api;

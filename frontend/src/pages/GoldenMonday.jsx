@@ -27,8 +27,8 @@ import {
   FiLoader,
   FiPlus,
   FiX,
-  FiLightbulb,
-  FiSparkles,
+  FiSun, // ✅ Replaces FiLightbulb
+  FiStar, // ✅ Replaces FiSparkles
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
@@ -850,7 +850,8 @@ export default function GoldenMonday() {
                     fontSize: 14,
                   }}
                 >
-                  <FiLightbulb size={16} color={C.gold} />
+                  <FiSun size={16} color={C.gold} />{" "}
+                  {/* ✅ Replaced FiLightbulb with FiSun */}
                   {copy.aiTopicsTitle || "AI: suggest next topics"}
                 </div>
                 <button
@@ -991,7 +992,7 @@ export default function GoldenMonday() {
                 }}
               >
                 {item.live ? (
-                  <FiSparkles size={14} />
+                  <FiStar size={14} /> /* ✅ Replaced FiSparkles with FiStar */
                 ) : (
                   combinedTimeline.length - i
                 )}
