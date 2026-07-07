@@ -4,6 +4,7 @@ const router = express.Router();
 const {
   postPresenterAnnouncement,
   testTelegramConnection,
+  sendTestMessage,
 } = require("../services/telegramService");
 const GoldenMondaySession = require("../models/GoldenMondaySession");
 const { protect, adminOrSuperAdmin } = require("../middleware/auth");
@@ -11,7 +12,6 @@ const { protect, adminOrSuperAdmin } = require("../middleware/auth");
 /**
  * Test Telegram connection
  * GET /api/telegram/test
- * Public - no auth required for testing
  */
 router.get("/test", async (req, res) => {
   try {
@@ -27,7 +27,26 @@ router.get("/test", async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message,
-      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+    });
+  }
+});
+
+/**
+ * Send a simple test message (for debugging)
+ * GET /api/telegram/test-message
+ */
+router.get("/test-message", async (req, res) => {
+  try {
+    const result = await sendTestMessage();
+    res.json({
+      success: result,
+      message: result ? "Test message sent!" : "Test message failed",
+    });
+  } catch (error) {
+    console.error("Test message error:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
     });
   }
 });
@@ -35,7 +54,6 @@ router.get("/test", async (req, res) => {
 /**
  * Post a specific session to Telegram
  * POST /api/telegram/post/:sessionId
- * Requires authentication and admin/superadmin role
  */
 router.post(
   "/post/:sessionId",
@@ -66,7 +84,7 @@ router.post(
         result,
         message: result.postId
           ? "Posted to Telegram!"
-          : "Failed to post to Telegram",
+          : `Failed to post to Telegram: ${result.error || "Unknown error"}`,
       });
     } catch (error) {
       console.error("Error posting to Telegram:", error);
@@ -78,7 +96,6 @@ router.post(
 /**
  * Post a test announcement to Telegram
  * POST /api/telegram/test-post
- * Requires authentication and admin/superadmin role
  */
 router.post("/test-post", protect, adminOrSuperAdmin, async (req, res) => {
   try {
@@ -104,7 +121,7 @@ router.post("/test-post", protect, adminOrSuperAdmin, async (req, res) => {
       result,
       message: result.postId
         ? "Test post sent to Telegram!"
-        : "Failed to send test post",
+        : `Failed to send test post: ${result.error || "Unknown error"}`,
     });
   } catch (error) {
     console.error("Error sending test post:", error);

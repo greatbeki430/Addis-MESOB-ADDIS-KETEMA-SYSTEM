@@ -1,9 +1,6 @@
 // backend/src/services/telegramService.js
 // Telegram bot integration for Golden Monday announcements
 
-// Remove axios import
-// const axios = require("axios");
-
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 
@@ -69,6 +66,11 @@ const postPresenterAnnouncement = async (session) => {
 
     const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
+    // Log what we're sending
+    console.log(`📤 Sending to Telegram:`);
+    console.log(`   Chat ID: ${TELEGRAM_CHANNEL_ID}`);
+    console.log(`   Message: ${message.substring(0, 100)}...`);
+
     let response;
     if (imageUrl) {
       // Send with image using fetch
@@ -100,12 +102,31 @@ const postPresenterAnnouncement = async (session) => {
     }
 
     const data = await response.json();
+
+    // ✅ Log the full response for debugging
+    console.log(`📥 Telegram Response:`, JSON.stringify(data, null, 2));
+
+    // ✅ Check if the response was successful
+    if (!data.ok) {
+      console.error(`❌ Telegram API Error: ${data.description}`);
+      return {
+        postId: null,
+        messageUrl: null,
+        error: data.description,
+      };
+    }
+
+    // ✅ Properly extract postId from response
     const postId = data.result?.message_id;
-    const channelIdClean = TELEGRAM_CHANNEL_ID.replace("@", "").replace(
-      "-100",
-      "",
-    );
-    const messageUrl = `https://t.me/${channelIdClean}/${postId}`;
+
+    if (!postId) {
+      console.error(`❌ No message_id in response:`, data);
+      return { postId: null, messageUrl: null };
+    }
+
+    // ✅ Get channel username or use channel ID for URL
+    const channelUsername = data.result?.chat?.username || "AddisMESOBGM";
+    const messageUrl = `https://t.me/${channelUsername}/${postId}`;
 
     console.log(`✅ Posted to Telegram: ${messageUrl}`);
     return { postId, messageUrl };
@@ -137,8 +158,51 @@ const testTelegramConnection = async () => {
   }
 };
 
+/**
+ * Send a test message directly (for debugging)
+ */
+const sendTestMessage = async () => {
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHANNEL_ID) {
+    console.warn("⚠️ Telegram not configured");
+    return false;
+  }
+
+  try {
+    const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
+
+    const response = await fetch(`${telegramApiUrl}/sendMessage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHANNEL_ID,
+        text: "🔧 Test message from Addis MESOB Bot!\n\nIf you see this, the bot is working correctly!",
+        parse_mode: "Markdown",
+      }),
+    });
+
+    const data = await response.json();
+    console.log(`📥 Test response:`, JSON.stringify(data, null, 2));
+
+    if (data.ok) {
+      console.log(
+        `✅ Test message sent! Message ID: ${data.result?.message_id}`,
+      );
+      return true;
+    } else {
+      console.error(`❌ Test failed: ${data.description}`);
+      return false;
+    }
+  } catch (error) {
+    console.error("❌ Test message error:", error.message);
+    return false;
+  }
+};
+
 module.exports = {
   postPresenterAnnouncement,
   generateAnnouncementImage,
   testTelegramConnection,
+  sendTestMessage,
 };
