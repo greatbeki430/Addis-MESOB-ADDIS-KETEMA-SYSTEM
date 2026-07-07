@@ -1079,6 +1079,123 @@ Generate 3 title options in this JSON format (no markdown):
       };
 };
 
+// ============================================================
+// 13. GOLDEN MONDAY — SESSION RECAP (bilingual)
+// NOTE: this fixes a pre-existing bug — goldenMondayController.js
+// imported generateGoldenMondayRecap / generateGoldenMondayTopics from
+// this file, but neither was ever defined here, so every recap/topic
+// request was throwing "generateGoldenMondayRecap is not a function".
+// ============================================================
+const generateGoldenMondayRecap = async ({
+  title,
+  date,
+  organization,
+  speaker,
+  rawNotes,
+}) => {
+  const prompt = `You are writing the official recap for a "Golden Monday" staff
+capacity-building session at ${organization || "Addis MESOB"}.
+
+Session: ${title}
+Date: ${date || new Date().toISOString().slice(0, 10)}
+Speaker/Presenter: ${speaker || "Staff Member"}
+
+Raw notes taken during the session:
+"""
+${rawNotes}
+"""
+
+Return ONLY valid JSON (no markdown fences):
+{
+  "recapEn": "3-5 sentence professional English recap of what was covered and why it matters",
+  "recapAm": "same recap translated into natural, formal Amharic (አማርኛ)",
+  "keyTakeaway": "one single-sentence key takeaway staff should remember",
+  "suggestedTags": ["3-5 short topic tags"]
+}`;
+
+  const text = await generateText(prompt);
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    return {
+      recapEn: text.slice(0, 600),
+      recapAm: "",
+      keyTakeaway: "",
+      suggestedTags: [],
+    };
+  }
+  return JSON.parse(jsonMatch[0]);
+};
+
+// ============================================================
+// 14. GOLDEN MONDAY — TOPIC SUGGESTIONS FOR UPCOMING SESSIONS
+// ============================================================
+const generateGoldenMondayTopics = async (recentSessions = []) => {
+  const history =
+    recentSessions
+      .map((s) => `- ${s.title} (${new Date(s.date).toDateString()})`)
+      .join("\n") || "No prior sessions recorded yet.";
+
+  const prompt = `Golden Monday is a weekly staff capacity-building session for
+Addis MESOB (Addis Ababa City Administration). Recent session history:
+${history}
+
+Suggest 6 NEW topics for upcoming sessions that have NOT already been covered,
+spanning a mix of: good governance, anti-corruption, service delivery
+improvement, QMS standards, exemplary work showcases, problem-solving, team
+collaboration, and digital/technology literacy.
+
+Return ONLY valid JSON (no markdown fences):
+{
+  "topics": [
+    {"title": "Topic title", "reason": "one sentence on why it's timely", "category": "one of the themes above"}
+  ]
+}`;
+
+  const text = await generateText(prompt);
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return [];
+  const parsed = JSON.parse(jsonMatch[0]);
+  return parsed.topics || [];
+};
+
+// ============================================================
+// 15. GOLDEN MONDAY — PERSONAL PRESENTATION TOPIC IDEAS
+// Used when a presenter is auto-assigned via the rotation, to give
+// them a running start. They can still title their own presentation.
+// ============================================================
+const generatePresentationTopicIdeas = async ({
+  presenterName,
+  department,
+  recentTitles = [],
+}) => {
+  const history =
+    recentTitles.length > 0
+      ? recentTitles.map((t) => `- ${t}`).join("\n")
+      : "No prior presentation titles recorded yet.";
+
+  const prompt = `${presenterName} from the ${department || "their"} department
+at Addis MESOB has just been assigned to present at the next Golden Monday
+session (a 50-minute peer-led staff training slot).
+
+Titles already presented recently (avoid close repeats):
+${history}
+
+Suggest 5 short, concrete presentation title ideas they could choose from —
+relevant to a city-administration office worker, covering a mix of their
+likely department expertise and general professional development
+(communication, service delivery, digital tools, problem-solving,
+governance). Titles only, no descriptions.
+
+Return ONLY valid JSON (no markdown fences):
+{ "titles": ["Title 1", "Title 2", "Title 3", "Title 4", "Title 5"] }`;
+
+  const text = await generateText(prompt);
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return [];
+  const parsed = JSON.parse(jsonMatch[0]);
+  return parsed.titles || [];
+};
+
 module.exports = {
   generateDailyInsight,
   generateEvaluationSummary,
@@ -1092,4 +1209,7 @@ module.exports = {
   categorizeComplaint,
   translateContent,
   generateReportTitle,
+  generateGoldenMondayRecap,
+  generateGoldenMondayTopics,
+  generatePresentationTopicIdeas,
 };

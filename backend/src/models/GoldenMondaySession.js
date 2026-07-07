@@ -1,4 +1,9 @@
 // backend/src/models/GoldenMondaySession.js
+// Addis MESOB — Golden Monday session record.
+// A "session" is one Monday 2:00-2:50 (8:00-8:50 AM) slot. It now carries
+// the presenter-rotation assignment and the (temporary) recording, in
+// addition to the original AI recap fields.
+
 const mongoose = require("mongoose");
 
 const goldenMondaySessionSchema = new mongoose.Schema(
@@ -12,6 +17,13 @@ const goldenMondaySessionSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    // Normalized Monday (00:00) this session belongs to — used as the
+    // unique key for "one assignment per week" and for calendar lookups.
+    weekOf: {
+      type: Date,
+      required: true,
+      index: true,
+    },
     organization: {
       type: String,
       trim: true,
@@ -24,28 +36,51 @@ const goldenMondaySessionSchema = new mongoose.Schema(
     },
     rawNotes: {
       type: String,
-      required: [true, "Raw session notes are required"],
       trim: true,
-    },
-    recapEn: {
-      type: String,
       default: "",
-      trim: true,
     },
-    recapAm: {
+    recapEn: { type: String, default: "", trim: true },
+    recapAm: { type: String, default: "", trim: true },
+    keyTakeaway: { type: String, default: "", trim: true },
+    tags: { type: [String], default: [] },
+
+    // ── Presenter rotation ─────────────────────────────────────
+    presenter: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    presenterName: { type: String, default: "", trim: true },
+    presenterDepartment: { type: String, default: "", trim: true },
+    // Employees choose their own title once assigned.
+    presentationTitle: { type: String, default: "", trim: true },
+    titleConfirmedAt: { type: Date, default: null },
+    // Topic ideas offered by the AI when the presenter is assigned
+    // (the presenter can pick one, tweak it, or ignore it).
+    suggestedTopics: { type: [String], default: [] },
+    assignmentMethod: {
       type: String,
-      default: "",
-      trim: true,
+      enum: ["auto-rotation", "manual-override", "self-selected", "legacy"],
+      default: "legacy",
     },
-    keyTakeaway: {
+
+    status: {
       type: String,
-      default: "",
-      trim: true,
+      enum: ["scheduled", "ongoing", "completed", "cancelled", "no-show"],
+      default: "scheduled",
     },
-    tags: {
-      type: [String],
-      default: [],
-    },
+
+    // ── Recording (temporary, auto-expiring) ───────────────────
+    recordingUrl: { type: String, default: "" },
+    recordingPublicId: { type: String, default: "" },
+    recordingDurationSec: { type: Number, default: 0 },
+    recordingUploadedAt: { type: Date, default: null },
+    // How many days the recording stays visible/downloadable after
+    // upload (default: rest of that ISO week, see recordingService).
+    recordingVisibleDays: { type: Number, default: 7 },
+    recordingExpiresAt: { type: Date, default: null, index: true },
+    recordingDeleted: { type: Boolean, default: false },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -61,8 +96,20 @@ const goldenMondaySessionSchema = new mongoose.Schema(
   },
 );
 
-// Index for efficient sorting
+// Efficient sorting / lookups
 goldenMondaySessionSchema.index({ date: -1 });
+goldenMondaySessionSchema.index({ weekOf: 1 }, { unique: true, sparse: true });
+
+// A recording is "live" (visible to staff) while it hasn't expired
+// and hasn't been soft-deleted.
+goldenMondaySessionSchema.methods.isRecordingLive = function () {
+  return (
+    !!this.recordingUrl &&
+    !this.recordingDeleted &&
+    this.recordingExpiresAt &&
+    this.recordingExpiresAt.getTime() > Date.now()
+  );
+};
 
 module.exports = mongoose.model(
   "GoldenMondaySession",

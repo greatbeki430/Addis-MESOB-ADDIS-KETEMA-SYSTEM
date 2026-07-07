@@ -209,11 +209,41 @@ export const documentAPI = {
 // ============================================================
 // GOLDEN MONDAY API — sessions + AI recap/topic generation
 // ============================================================
+// ============================================================
+// GOLDEN MONDAY API — sessions + AI recap/topic generation
+// ============================================================
 export const goldenMondayAPI = {
   getAll: () => api.get("/golden-monday"),
   create: (data) => api.post("/golden-monday", data),
   previewRecap: (data) => api.post("/golden-monday/recap", data),
   suggestTopics: () => api.get("/golden-monday/suggest-topics"),
+
+  // Catch-up recordings still within their visibility window
+  getLiveRecordings: () => api.get("/golden-monday/recordings/live"),
+  uploadRecording: (sessionId, file, visibleDays) =>
+    api.post(`/golden-monday/${sessionId}/recording`, { file, visibleDays }),
+  removeRecording: (sessionId) =>
+    api.delete(`/golden-monday/${sessionId}/recording`),
+
+  // Presenter rotation roster
+  getRoster: () => api.get("/golden-monday/roster"),
+  addToRoster: (userId, department) =>
+    api.post("/golden-monday/roster", { userId, department }),
+  updateRosterEntry: (id, updates) =>
+    api.put(`/golden-monday/roster/${id}`, updates),
+  removeFromRoster: (id) => api.delete(`/golden-monday/roster/${id}`),
+
+  // Rotation engine
+  previewRotation: (weekOf) =>
+    api.get("/golden-monday/rotation/preview", { params: { weekOf } }),
+  assignRotation: (weekOf, manualPresenterId) =>
+    api.post("/golden-monday/rotation/assign", { weekOf, manualPresenterId }),
+  reassignRotation: (sessionId, reason) =>
+    api.post(`/golden-monday/rotation/${sessionId}/reassign`, { reason }),
+
+  // Presenter locks in their own chosen title
+  setPresentationTitle: (sessionId, title) =>
+    api.put(`/golden-monday/${sessionId}/title`, { title }),
 };
 
 // ============================================================

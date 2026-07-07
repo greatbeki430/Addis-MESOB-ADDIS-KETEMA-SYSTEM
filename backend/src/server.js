@@ -20,6 +20,7 @@ const aiRoutes = require("./routes/aiRoutes");
 const chatbotRoutes = require("./routes/chatbotRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const goldenMondayRoutes = require("./routes/goldenMondayRoutes");
+const { startGoldenMondayScheduler } = require("./jobs/goldenMondayScheduler");
 
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 
@@ -141,5 +142,5 @@ const startServer = async () => {
     process.exit(1);
   }
 };
-
+startGoldenMondayScheduler();
 startServer();

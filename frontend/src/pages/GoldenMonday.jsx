@@ -9,6 +9,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../hooks/useLanguage";
 import { goldenMondayAPI } from "../services/api";
 import { showToast } from "../utils/toastHelper";
+import GoldenMondayRotationPanel from "../components/golden-monday/GoldenMondayRotationPanel";
 import {
   FiSunrise,
   FiUsers,
@@ -935,6 +936,17 @@ export default function GoldenMonday() {
           </div>
         </section>
       )}
+
+      {/* ── PRESENTER ROTATION & RECORDINGS ─────────────────── */}
+      <section
+        style={{
+          maxWidth: 1000,
+          margin: "0 auto",
+          padding: "0 clamp(16px, 4vw, 32px) 40px",
+        }}
+      >
+        <GoldenMondayRotationPanel />
+      </section>
 
       {/* ── TIMELINE ─────────────────────────────────────── */}
       <section
