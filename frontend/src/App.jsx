@@ -29,6 +29,9 @@ import ChatbotWidget from "./components/chatbot/ChatbotWidget";
 import DocumentVault from "./pages/documents/DocumentVault";
 import GoldenMonday from "./pages/GoldenMonday";
 
+// Landing Page import
+import Landing from "./pages/Landing";
+
 // =============================================
 // ANIMATED A-MESOB TITLE COMPONENT
 // =============================================
@@ -634,7 +637,19 @@ function AppRouter() {
     );
   }
 
-  if (!isAuthenticated) return <Login />;
+  // Show Landing page for unauthenticated users
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        {/* Redirect all other routes to landing for unauthenticated users */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
+
   return <AuthenticatedApp />;
 }
 
