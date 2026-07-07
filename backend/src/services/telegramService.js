@@ -1,7 +1,8 @@
 // backend/src/services/telegramService.js
 // Telegram bot integration for Golden Monday announcements
 
-const axios = require("axios");
+// Remove axios import
+// const axios = require("axios");
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
@@ -11,14 +12,10 @@ const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
  */
 const generateAnnouncementImage = async (presenter, session) => {
   try {
-    // If you have an AI image generation service, use it here
-    // For now, we'll use a simple placeholder
     const name = encodeURIComponent(presenter?.name || "Presenter");
     const title = encodeURIComponent(
       session?.presentationTitle || "Golden Monday",
     );
-
-    // This is a placeholder - you can replace with actual image generation
     return `https://via.placeholder.com/800x400/1a1a2e/ffd700?text=${name}%20-%20${title}`;
   } catch (err) {
     console.error("Failed to generate announcement image:", err.message);
@@ -44,10 +41,8 @@ const postPresenterAnnouncement = async (session) => {
       year: "numeric",
     });
 
-    // Generate image for the announcement
     const imageUrl = await generateAnnouncementImage(presenter, session);
 
-    // Prepare the message
     let message = `🎯 *Golden Monday - ${dateFormatted}*\n\n`;
     message += `👤 *Presenter:* ${presenter.name || "TBD"}\n`;
     if (presenter.department) {
@@ -72,28 +67,40 @@ const postPresenterAnnouncement = async (session) => {
     const presenterName = (presenter.name || "GM").replace(/\s/g, "");
     message += `\n#GoldenMonday #AddisMESOB #${presenterName}`;
 
-    // Send message via Telegram API
     const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
     let response;
     if (imageUrl) {
-      // Send with image
-      response = await axios.post(`${telegramApiUrl}/sendPhoto`, {
-        chat_id: TELEGRAM_CHANNEL_ID,
-        photo: imageUrl,
-        caption: message,
-        parse_mode: "Markdown",
+      // Send with image using fetch
+      response = await fetch(`${telegramApiUrl}/sendPhoto`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHANNEL_ID,
+          photo: imageUrl,
+          caption: message,
+          parse_mode: "Markdown",
+        }),
       });
     } else {
-      // Send text only
-      response = await axios.post(`${telegramApiUrl}/sendMessage`, {
-        chat_id: TELEGRAM_CHANNEL_ID,
-        text: message,
-        parse_mode: "Markdown",
+      // Send text only using fetch
+      response = await fetch(`${telegramApiUrl}/sendMessage`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chat_id: TELEGRAM_CHANNEL_ID,
+          text: message,
+          parse_mode: "Markdown",
+        }),
       });
     }
 
-    const postId = response.data.result.message_id;
+    const data = await response.json();
+    const postId = data.result?.message_id;
     const channelIdClean = TELEGRAM_CHANNEL_ID.replace("@", "").replace(
       "-100",
       "",
@@ -104,9 +111,6 @@ const postPresenterAnnouncement = async (session) => {
     return { postId, messageUrl };
   } catch (error) {
     console.error("❌ Failed to post to Telegram:", error.message);
-    if (error.response) {
-      console.error("Telegram API Error:", error.response.data);
-    }
     return { postId: null, messageUrl: null };
   }
 };
@@ -121,10 +125,11 @@ const testTelegramConnection = async () => {
   }
 
   try {
-    const response = await axios.get(
+    const response = await fetch(
       `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`,
     );
-    console.log(`✅ Bot connected: @${response.data.result.username}`);
+    const data = await response.json();
+    console.log(`✅ Bot connected: @${data.result?.username}`);
     return true;
   } catch (error) {
     console.error("❌ Bot connection failed:", error.message);
