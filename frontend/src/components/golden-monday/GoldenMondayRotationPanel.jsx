@@ -7,6 +7,7 @@
 import { useState, useCallback } from "react";
 import { C, F } from "../../styles/theme";
 import { useAuth } from "../../hooks/useAuth";
+import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
 import {
@@ -43,6 +44,8 @@ const btn = (bg = C.primary, color = C.white) => ({
 
 export default function GoldenMondayRotationPanel() {
   const { user } = useAuth();
+  const { language, t } = useLanguage();
+  const gmCopy = t?.goldenMonday || {};
   const isPrivileged = ["leader", "admin", "superadmin"].includes(user?.role);
 
   const [ranking, setRanking] = useState([]);
@@ -59,6 +62,9 @@ export default function GoldenMondayRotationPanel() {
 
   // Track if initial load has been done
   const [initialLoadDone, setInitialLoadDone] = useState(false);
+
+  // Helper for translations
+  const getText = (obj) => obj?.[language] || obj?.en || obj;
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -172,16 +178,18 @@ export default function GoldenMondayRotationPanel() {
         >
           <FiUsers color={C.primary} size={20} />
           <h3 style={{ margin: 0, color: C.dark, fontFamily: F.sans }}>
-            Presenter Rotation
+            {getText(gmCopy.rotationTitle) || "Presenter Rotation"}
           </h3>
         </div>
 
         {loading ? (
-          <p style={{ color: C.muted }}>Loading rotation…</p>
+          <p style={{ color: C.muted }}>
+            {getText(gmCopy.loadingRotation) || "Loading rotation…"}
+          </p>
         ) : currentSession?.presenter ? (
           <div>
             <p style={{ margin: "0 0 6px", color: C.muted, fontSize: 14 }}>
-              This week's presenter
+              {getText(gmCopy.thisWeekPresenter) || "This week's presenter"}
             </p>
             <p
               style={{
@@ -201,7 +209,7 @@ export default function GoldenMondayRotationPanel() {
             <p style={{ margin: "0 0 14px", color: C.muted, fontSize: 13 }}>
               {currentSession.presentationTitle
                 ? `Presenting: "${currentSession.presentationTitle}"`
-                : "Title not chosen yet"}
+                : getText(gmCopy.titleNotChosen) || "Title not chosen yet"}
             </p>
 
             {/* Presenter (or a leader/admin on their behalf) picks a title */}
@@ -216,8 +224,10 @@ export default function GoldenMondayRotationPanel() {
                   }}
                 >
                   {isMyTurn
-                    ? "Choose your presentation title"
-                    : "Set title on presenter's behalf"}
+                    ? getText(gmCopy.chooseTitle) ||
+                      "Choose your presentation title"
+                    : getText(gmCopy.setTitleOnBehalf) ||
+                      "Set title on presenter's behalf"}
                 </label>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <input
@@ -239,7 +249,9 @@ export default function GoldenMondayRotationPanel() {
                     disabled={savingTitle || !titleDraft.trim()}
                   >
                     <FiEdit3 size={14} />{" "}
-                    {savingTitle ? "Saving…" : "Save Title"}
+                    {savingTitle
+                      ? getText(gmCopy.saving) || "Saving…"
+                      : getText(gmCopy.saveTitle) || "Save Title"}
                   </button>
                 </div>
 
@@ -252,7 +264,8 @@ export default function GoldenMondayRotationPanel() {
                         margin: "0 0 6px",
                       }}
                     >
-                      AI topic ideas (tap to use):
+                      {getText(gmCopy.aiTopicIdeas) ||
+                        "AI topic ideas (tap to use):"}
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {currentSession.suggestedTopics.map((t, i) => (
@@ -281,7 +294,8 @@ export default function GoldenMondayRotationPanel() {
           </div>
         ) : (
           <p style={{ color: C.muted, marginBottom: 14 }}>
-            Nobody assigned yet for the coming Monday.
+            {getText(gmCopy.nobodyAssigned) ||
+              "Nobody assigned yet for the coming Monday."}
           </p>
         )}
 
@@ -292,7 +306,9 @@ export default function GoldenMondayRotationPanel() {
             disabled={assigning}
           >
             <FiRefreshCw size={14} />{" "}
-            {assigning ? "Assigning…" : "Assign Next Presenter"}
+            {assigning
+              ? getText(gmCopy.assigning) || "Assigning…"
+              : getText(gmCopy.assignNext) || "Assign Next Presenter"}
           </button>
         )}
 
@@ -300,7 +316,8 @@ export default function GoldenMondayRotationPanel() {
         {isPrivileged && ranking.length > 0 && (
           <div style={{ marginTop: 18 }}>
             <p style={{ fontSize: 13, color: C.muted, margin: "0 0 8px" }}>
-              Rotation order (longest-waiting first):
+              {getText(gmCopy.rotationOrder) ||
+                "Rotation order (longest-waiting first):"}
             </p>
             <ol
               style={{
@@ -316,8 +333,8 @@ export default function GoldenMondayRotationPanel() {
                   <span style={{ color: C.muted }}>
                     —{" "}
                     {r.daysSinceLastPresented === "never presented"
-                      ? "never presented"
-                      : `${r.daysSinceLastPresented} days since last time`}
+                      ? getText(gmCopy.neverPresented) || "never presented"
+                      : `${r.daysSinceLastPresented} ${getText(gmCopy.daysSince) || "days since last time"}`}
                   </span>
                 </li>
               ))}
@@ -339,12 +356,12 @@ export default function GoldenMondayRotationPanel() {
           >
             <FiVideo color={C.primary} size={20} />
             <h3 style={{ margin: 0, color: C.dark, fontFamily: F.sans }}>
-              Session Recording
+              {getText(gmCopy.sessionRecording) || "Session Recording"}
             </h3>
           </div>
           <p style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
-            Uploads are visible to all staff for 7 days, then automatically
-            removed.
+            {getText(gmCopy.recordingDescription) ||
+              "Uploads are visible to all staff for 7 days, then automatically removed."}
           </p>
           <div
             style={{
@@ -365,7 +382,9 @@ export default function GoldenMondayRotationPanel() {
               disabled={!recordingFile || uploadingRecording}
             >
               <FiVideo size={14} />{" "}
-              {uploadingRecording ? "Uploading…" : "Upload Recording"}
+              {uploadingRecording
+                ? getText(gmCopy.uploading) || "Uploading…"
+                : getText(gmCopy.uploadRecording) || "Upload Recording"}
             </button>
           </div>
         </div>
@@ -383,13 +402,13 @@ export default function GoldenMondayRotationPanel() {
         >
           <FiClock color={C.primary} size={20} />
           <h3 style={{ margin: 0, color: C.dark, fontFamily: F.sans }}>
-            Catch Up — Recent Recordings
+            {getText(gmCopy.catchUp) || "Catch Up — Recent Recordings"}
           </h3>
         </div>
         {recordings.length === 0 ? (
           <p style={{ color: C.muted, fontSize: 14 }}>
-            No recordings currently available (recordings expire 7 days after
-            upload).
+            {getText(gmCopy.noRecordings) ||
+              "No recordings currently available (recordings expire 7 days after upload)."}
           </p>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
@@ -415,7 +434,8 @@ export default function GoldenMondayRotationPanel() {
                     style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}
                   >
                     {r.presenterName} ·{" "}
-                    {new Date(r.recordingExpiresAt).toLocaleDateString()} expiry
+                    {new Date(r.recordingExpiresAt).toLocaleDateString()}{" "}
+                    {getText(gmCopy.expiry) || "expiry"}
                   </p>
                 </div>
                 <a
@@ -424,7 +444,7 @@ export default function GoldenMondayRotationPanel() {
                   rel="noopener noreferrer"
                   style={{ ...btn(C.bg, C.dark), textDecoration: "none" }}
                 >
-                  <FiCheckCircle size={14} /> Watch
+                  <FiCheckCircle size={14} /> {getText(gmCopy.watch) || "Watch"}
                 </a>
               </div>
             ))}

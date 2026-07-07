@@ -231,15 +231,31 @@ export const translations = {
     // GOLDEN MONDAY TRANSLATIONS
     // ─────────────────────────────────────────────
     goldenMonday: {
+      // Hero & Header
       eyebrow: "Every Monday · 2:00 – 2:50",
       title: "Golden Monday",
       subtitle:
-        "The city administration's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all.",
+        "The organization's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all.",
       scroll: "Explore the story",
+
+      // Pillars
       pillarsTitle: "Why a golden morning",
       pillarsSub: "Three things every session comes back to.",
+      pillarResetTitle: "A weekly reset",
+      pillarResetBody:
+        "Every Monday morning, offices across the organization pause the routine for shared learning — a deliberate start to the work week instead of a rushed one.",
+      pillarPeerTitle: "Peer-led, not top-down",
+      pillarPeerBody:
+        "Sessions are usually carried by colleagues themselves — department heads, team leaders, and long-serving staff sharing real experience, not scripted lectures.",
+      pillarMultiTitle: "Built for multiskilling",
+      pillarMultiBody:
+        "The stated goal is to push every employee beyond a single fixed skill set — technology literacy, service standards, and adaptability all get airtime over time.",
+
+      // Timeline
       timelineTitle: "Recent sessions",
       timelineSub: "A running record, not a one-off event.",
+
+      // AI Studio
       aiTitle: "AI session recap",
       aiSub:
         "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds.",
@@ -260,13 +276,44 @@ export const translations = {
         "Log a couple of sessions first so AI has something to build on.",
       aiError: "AI couldn't complete that — please try again in a moment.",
       aiSaved: "Session saved with an AI-generated recap.",
+
+      // MESOB Platform
       mesobTitle: "The platform this mindset built",
       mesobSub:
-        "MESOB is the city's one-stop digital service platform — the same drive for less friction, applied to how residents actually get things done.",
+        "MESOB is the organization's one-stop digital service platform — the same drive for less friction, applied to how citizens actually get things done.",
       mesobCta: "Open Document Vault",
+
+      // Closing
       closingTitle: "Start your week here",
       closingBody:
         "Golden Monday is a standing fixture — check back weekly for the next session's write-up.",
+
+      // Rotation Panel
+      rotationTitle: "Presenter Rotation",
+      thisWeekPresenter: "This week's presenter",
+      titleNotChosen: "Title not chosen yet",
+      chooseTitle: "Choose your presentation title",
+      setTitleOnBehalf: "Set title on presenter's behalf",
+      saveTitle: "Save Title",
+      saving: "Saving…",
+      aiTopicIdeas: "AI topic ideas (tap to use):",
+      assignNext: "Assign Next Presenter",
+      assigning: "Assigning…",
+      rotationOrder: "Rotation order (longest-waiting first):",
+      neverPresented: "never presented",
+      daysSince: "days since last time",
+      sessionRecording: "Session Recording",
+      recordingDescription:
+        "Uploads are visible to all staff for 7 days, then automatically removed.",
+      uploadRecording: "Upload Recording",
+      uploading: "Uploading…",
+      catchUp: "Catch Up — Recent Recordings",
+      noRecordings:
+        "No recordings currently available (recordings expire 7 days after upload).",
+      watch: "Watch",
+      expiry: "expiry",
+      loadingRotation: "Loading rotation…",
+      nobodyAssigned: "Nobody assigned yet for the coming Monday.",
     },
   },
   am: {
@@ -496,15 +543,31 @@ export const translations = {
     // GOLDEN MONDAY TRANSLATIONS - AMHARIC
     // ─────────────────────────────────────────────
     goldenMonday: {
+      // Hero & Header
       eyebrow: "በየሳምንቱ ሰኞ · ከ2፡00 – 2፡50",
       title: "ወርቃማ ሰኞ",
       subtitle:
-        "የከተማ አስተዳደሩ ሳምንታዊ የጋራ ትምህርት ልማድ — እና አዲስ መሶብ ለምን እንደተቋቋመ የሚያሳይ አስተሳሰብ።",
+        "የድርጅቱ ሳምንታዊ የጋራ ትምህርት ልማድ — እና አዲስ መሶብ ለምን እንደተቋቋመ የሚያሳይ አስተሳሰብ።",
       scroll: "ታሪኩን ይመልከቱ",
+
+      // Pillars
       pillarsTitle: "ወርቃማ ማለዳ ለምን አስፈለገ",
       pillarsSub: "እያንዳንዱ መርሃ-ግብር የሚመለስባቸው ሶስት ነጥቦች።",
+      pillarResetTitle: "ሳምንታዊ ዳግም መነሳት",
+      pillarResetBody:
+        "በየሳምንቱ ሰኞ ጠዋት፣ በድርጅቱ ውስጥ ያሉ ቢሮዎች ለጋራ ትምህርት የወትሮውን ተግባር ያቋርጣሉ — የስራ ሳምንቱ በፍጥነት ሳይሆን በአስተዋይ ሁኔታ ይጀምራል።",
+      pillarPeerTitle: "በእኩዮች የሚመራ፣ ከላይ ወደ ታች አይደለም",
+      pillarPeerBody:
+        "መርሃ-ግብሮቹ ብዙውን ጊዜ የሚካሄዱት በራሱ ሰራተኞች ነው — የዘርፍ ኃላፊዎች፣ የቡድን መሪዎች እና የረጅም ጊዜ ሰራተኞች ከተሞክሮ የተገኘ እውቀት ያካፍላሉ፣ ከመጽሀፍ የተዘጋጁ ትምህርቶች አይደሉም።",
+      pillarMultiTitle: "ለብዙ ክህሎት የተገነባ",
+      pillarMultiBody:
+        "ዋናው ግብ እያንዳንዱን ሰራተኛ ከአንድ የተወሰነ ክህሎት ባሻገር ማሳደግ ነው — የቴክኖሎጂ እውቀት፣ የአገልግሎት ደረጃዎች እና መላመድ ሁሉም ጊዜያቸውን ያገኛሉ።",
+
+      // Timeline
       timelineTitle: "የቅርብ ጊዜ መርሃ-ግብሮች",
       timelineSub: "ቀጣይነት ያለው ልማድ እንጂ የአንድ ጊዜ ዝግጅት አይደለም።",
+
+      // AI Studio
       aiTitle: "በAI የተዘጋጀ ማጠቃለያ",
       aiSub:
         "መርሃ-ግብሩን በቀላል ማስታወሻ ይመዝግቡ — AI በሰከንዶች ውስጥ ወደ ጥራት ያለው ሁለት-ቋንቋ ማጠቃለያ ይቀይረዋል።",
@@ -524,12 +587,42 @@ export const translations = {
       aiTopicsEmpty: "AI እንዲመሰረትበት መጀመሪያ ጥቂት መርሃ-ግብሮችን ይመዝግቡ።",
       aiError: "AI ጥያቄውን ማጠናቀቅ አልቻለም — እባክዎ ትንሽ ቆይተው ይሞክሩ።",
       aiSaved: "መርሃ-ግብሩ በAI ማጠቃለያ ተመዝግቧል።",
+
+      // MESOB Platform
       mesobTitle: "ይህ አስተሳሰብ የገነባው መድረክ",
       mesobSub:
-        "መሶብ የከተማው የአንድ ማዕከል ዲጂታል አገልግሎት መድረክ ነው — ተመሳሳይ ውጣ ውረድን የመቀነስ ጥረት፣ ነዋሪዎች አገልግሎት እንዲያገኙ በሚያግዝ መልኩ የተተገበረ።",
+        "መሶብ የድርጅቱ የአንድ ማዕከል ዲጂታል አገልግሎት መድረክ ነው — ተመሳሳይ ውጣ ውረድን የመቀነስ ጥረት፣ ዜጎች አገልግሎት እንዲያገኙ በሚያግዝ መልኩ የተተገበረ።",
       mesobCta: "ሰነድ ቋት ይክፈቱ",
+
+      // Closing
       closingTitle: "ሳምንትዎን ከዚህ ይጀምሩ",
       closingBody: "ወርቃማ ሰኞ ቋሚ መርሃ-ግብር ነው — ለቀጣዩ መርሃ-ግብር ማጠቃለያ በየሳምንቱ ይመልከቱ።",
+
+      // Rotation Panel
+      rotationTitle: "አቅራቢ ሽክርክር",
+      thisWeekPresenter: "የዚህ ሳምንት አቅራቢ",
+      titleNotChosen: "ርዕስ ገና አልተመረጠም",
+      chooseTitle: "የዝግጅትዎን ርዕስ ይምረጡ",
+      setTitleOnBehalf: "በአቅራቢው ስም ርዕስ ይምረጡ",
+      saveTitle: "ርዕስ አስቀምጥ",
+      saving: "በማስቀመጥ ላይ…",
+      aiTopicIdeas: "በAI የተጠቆሙ ርዕሶች (ለመጠቀም ይንኩ)፦",
+      assignNext: "ቀጣይ አቅራቢ መድብ",
+      assigning: "በመመደብ ላይ…",
+      rotationOrder: "የሽክርክር ቅደም ተከተል (ረጅም ጊዜ የጠበቁ በመጀመሪያ)፦",
+      neverPresented: "ገና አላቀረቡም",
+      daysSince: "ከመጨረሻ ጊዜ ጀምሮ ያሉ ቀናት",
+      sessionRecording: "የስብሰባ ቅጂ",
+      recordingDescription:
+        "የተሰቀሉ ቅጂዎች ለሁሉም ሰራተኞች ለ7 ቀናት ይታያሉ፣ ከዚያ በራስ-ሰር ይወገዳሉ።",
+      uploadRecording: "ቅጂ ስቀል",
+      uploading: "በማስቀመጥ ላይ…",
+      catchUp: "የተሰቀሉ ቅጂዎች",
+      noRecordings: "በአሁኑ ጊዜ ምንም ቅጂዎች የሉም (ቅጂዎች ከተሰቀሉ ከ7 ቀናት በኋላ ይቆያሉ)።",
+      watch: "ተመልከት",
+      expiry: "የሚቆይበት ጊዜ",
+      loadingRotation: "ሽክርክሩን በማጫን ላይ…",
+      nobodyAssigned: "ለመጪው ሰኞ አቅራቢ አልተመደበም።",
     },
   },
   om: {
@@ -763,15 +856,31 @@ export const translations = {
     // GOLDEN MONDAY TRANSLATIONS - OROMO
     // ─────────────────────────────────────────────
     goldenMonday: {
+      // Hero & Header
       eyebrow: "Wiixata hundaa · 2:00 – 2:50",
       title: "Wiixata Warqee",
       subtitle:
-        "Aadaa torbanii waliin barachuuf bulchiinsa magaalaa — fi filooftuu Addis MESOB maaliif akka jiraatu.",
+        "Aadaa torbanii waliin barachuuf dhaabbilee — fi filooftuu Addis MESOB maaliif akka jiraatu.",
       scroll: "Akeekkachiisa ilaali",
+
+      // Pillars
       pillarsTitle: "Wiixata warqee maaliif",
       pillarsSub: "Waan walga'ii hundi itti deebi'u sadan.",
+      pillarResetTitle: "Torbanii haaraa bu'uura",
+      pillarResetBody:
+        "Guyyaa wiixata ganama hunda, biiroowwan dhaabbilee keessatti sochii yeroo barachuuf ni addaan kutu — jalqaba itti yaadame kan torbanii hojii.",
+      pillarPeerTitle: "Hiriyaan durfama, gubbaa gaditti miti",
+      pillarPeerBody:
+        "Walga'iin yeroo baay'ee hiriyaan ofii isaanii — hoogganaa kutaa, hoogganaa garee, fi hojjattoota yeroo dheeraa, muuxannoo dhugaa qoodu, utuu hin taane barsiisa qophaa'e.",
+      pillarMultiTitle: "Dandeettii hedduutiif ijaarame",
+      pillarMultiBody:
+        "Kaayyoon ibsame hojjetaa tokkoon tokkoo dandeettii tokkoo ol isa dabarsuu — ogummaa teeknoolojii, sadarkaa tajaajila, fi mirkanaa'uu yeroo hundaaf bakka kenname.",
+
+      // Timeline
       timelineTitle: "Walga'iiwwan Dhiyoo",
       timelineSub: "Galmeen itti fufuu, utuu hin taane waan yeroo tokkoo.",
+
+      // AI Studio
       aiTitle: "Ibsa walga'ii AI",
       aiSub:
         "Walga'ii yaadannoo qabxii galchi — AI saniitiin ibsa lama afaan ta'e qopheessa.",
@@ -791,13 +900,44 @@ export const translations = {
       aiTopicsEmpty: "AI irratti hundaa'uuf walga'ii muraasa dura galchi.",
       aiError: "AI xumuruu hin dandeenye — maaloo yeroo xinnoo booda yaali.",
       aiSaved: "Walga'iin ibsa AI qopheessaan galmeeffame.",
+
+      // MESOB Platform
       mesobTitle: "Bu'uura gochima kanaan",
       mesobSub:
-        "MESOB buufata tajaajila dijitaalaa bakka tokkoo kan magaalaa — yaada dadhabbii hir'isu, akka namoonni tajaajila argatan.",
+        "MESOB buufata tajaajila dijitaalaa bakka tokkoo kan dhaabbilee — yaada dadhabbii hir'isu, akka lammiin tajaajila argatan.",
       mesobCta: "Kuusaa Dookumantii Bani",
+
+      // Closing
       closingTitle: "Torban keessan as eegaluu",
       closingBody:
         "Wiixata Warqee waan dhaabbataa — ibsa walga'ii itti aanuu torbaniin ilaalaa.",
+
+      // Rotation Panel
+      rotationTitle: "Naanna'iinsa Dhiheessituu",
+      thisWeekPresenter: "Dhiheessituu torban kanaa",
+      titleNotChosen: "Matadureen hin filatamne",
+      chooseTitle: "Mataduree dhiheessituu keessanii filadhu",
+      setTitleOnBehalf: "Maqaa dhiheessituu tiif mataduree filadhu",
+      saveTitle: "Mataduree Olkaayi",
+      saving: "Olkaayaa jira…",
+      aiTopicIdeas: "Yaadawwan mataduree AI (tapuuf fayyadami):",
+      assignNext: "Dhiheessituu Itti Aanu",
+      assigning: "Ramaduu jira…",
+      rotationOrder: "Tartiiiba naanna'iinsaa (kan turan duraan):",
+      neverPresented: "waan hin dhiheessine",
+      daysSince: "guyyaa yeroo dhumaa irraa",
+      sessionRecording: "Waraabbiisa Walga'ii",
+      recordingDescription:
+        "Waraabbiisonni hojjattoota hundaaf guyyaa 7 hafu, ergasii ofumaan ni haqamu.",
+      uploadRecording: "Waraabbiisa Fe'i",
+      uploading: "Fe'aa jira…",
+      catchUp: "Waraabbiisa Dhiyoo",
+      noRecordings:
+        "Waraabbiisa amma hin jiru (waraabbiisa guyyaa 7 booda ni haqamu).",
+      watch: "Ilaali",
+      expiry: "haflii",
+      loadingRotation: "Naanna'iinsa fe'aa jira…",
+      nobodyAssigned: "Wiixata dhufuuf dhiheessituun hin ramadne.",
     },
   },
 };

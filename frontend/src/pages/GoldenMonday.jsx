@@ -28,33 +28,33 @@ import {
   FiLoader,
   FiPlus,
   FiX,
-  FiSun, // ✅ Replaces FiLightbulb
-  FiStar, // ✅ Replaces FiSparkles
+  FiSun,
+  FiStar,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
-// PILLARS DATA (static content - now uses translations)
+// PILLARS DATA (uses translation keys)
 // ─────────────────────────────────────────────────────────────
 const PILLARS_KEYS = [
   {
     icon: <FiSunrise size={22} />,
-    titleKey: "reset",
-    bodyKey: "resetBody",
+    titleKey: "pillarResetTitle",
+    bodyKey: "pillarResetBody",
   },
   {
     icon: <FiUsers size={22} />,
-    titleKey: "peerLed",
-    bodyKey: "peerLedBody",
+    titleKey: "pillarPeerTitle",
+    bodyKey: "pillarPeerBody",
   },
   {
     icon: <FiTrendingUp size={22} />,
-    titleKey: "multiskilling",
-    bodyKey: "multiskillingBody",
+    titleKey: "pillarMultiTitle",
+    bodyKey: "pillarMultiBody",
   },
 ];
 
 // ─────────────────────────────────────────────────────────────
-// STATIC TIMELINE DATA
+// STATIC TIMELINE DATA (still hardcoded - these are specific events)
 // ─────────────────────────────────────────────────────────────
 const TIMELINE = [
   {
@@ -85,7 +85,7 @@ const TIMELINE = [
     },
     en: 'The Deputy Director General for Administration made the case for multiskilling directly: relying on one skill set "is no longer sufficient" in a fast-changing world, and staff were urged to build versatility across both technical and general knowledge.',
     am: "የአስተዳደር ዘርፍ ም/ዋና ዳይሬክተር ስለ ብዙ ክህሎት አስፈላጊነት አብራሩ፤ በፍጥነት በሚቀያየር ዓለም ውስጥ በአንድ ክህሎት ብቻ መተማመን በቂ አለመሆኑን ገልጸው፣ ሰራተኞች በቴክኖሎጂና በተለያዩ የእውቀት መስኮች እራሳቸውን እንዲያዳብሩ አሳሰቡ።",
-    om: "Dirreectoraan Morkii Bulchiinsa kallattiin waan dandeettii baay'ee barbaachisu dubbate: dandeettii tokko irratti of hundaa'uun 'ammas ga'aa miti' addunyaa saffisaa jiru keessatti, hojjattoonnis dandeettii ogummaa fi beekumsa waliigalaa keessatti of tolchuuf jajjabeessan.",
+    om: "Dirreectoraan Morkii Bulchiinsa kallattiin waan dandeettii baay'ee barbaachisu dubbate: dandeettii tokko irratti of hundaa'uun 'ammas ga'aa miti' addunyaa saffisaa jiru keessatti, hojjattoonis dandeettii ogummaa fi beekumsa waliigalaa keessatti of tolchuuf jajjabeessan.",
   },
   {
     date: {
@@ -225,7 +225,7 @@ function SectionHeading({ eyebrow, title, sub, dark }) {
 // ─────────────────────────────────────────────────────────────
 export default function GoldenMonday() {
   const { t, language } = useLanguage();
-  const copy = t?.goldenMonday || {};
+  const gmCopy = t?.goldenMonday || {};
   const [visible, setVisible] = useState({});
   const sectionRefs = useRef({});
   const { isLeaderOrAbove } = useAuth();
@@ -285,7 +285,7 @@ export default function GoldenMonday() {
 
   const handleGenerateAndSave = async () => {
     if (!form.title.trim() || !form.rawNotes.trim()) {
-      showToast(copy.aiFormTitle + " / " + copy.aiFormNotes, "warning");
+      showToast(gmCopy.aiFormTitle + " / " + gmCopy.aiFormNotes, "warning");
       return;
     }
     try {
@@ -301,14 +301,14 @@ export default function GoldenMonday() {
       });
       setShowComposer(false);
       showToast(
-        copy.aiSaved || "Session saved with an AI-generated recap.",
+        gmCopy.aiSaved || "Session saved with an AI-generated recap.",
         "success",
       );
     } catch (error) {
       console.error("Golden Monday AI recap failed:", error);
       showToast(
         error.response?.data?.message ||
-          copy.aiError ||
+          gmCopy.aiError ||
           "AI couldn't complete that — please try again in a moment.",
         "error",
       );
@@ -326,7 +326,7 @@ export default function GoldenMonday() {
       console.error("Golden Monday topic suggestions failed:", error);
       showToast(
         error.response?.data?.message ||
-          copy.aiError ||
+          gmCopy.aiError ||
           "AI couldn't complete that — please try again in a moment.",
         "error",
       );
@@ -407,30 +407,14 @@ export default function GoldenMonday() {
     ...TIMELINE,
   ];
 
+  // Helper to get translated text
+  const getText = (obj) => obj?.[language] || obj?.en || obj;
+
   // Get pillar content from translations
-  const getPillarContent = (key) => {
-    const pillarMap = {
-      reset: {
-        title: copy.pillarResetTitle || "A weekly reset",
-        body:
-          copy.pillarResetBody ||
-          "Every Monday morning, offices across the city administration pause the routine for shared learning — a deliberate start to the work week instead of a rushed one.",
-      },
-      peerLed: {
-        title: copy.pillarPeerTitle || "Peer-led, not top-down",
-        body:
-          copy.pillarPeerBody ||
-          "Sessions are usually carried by colleagues themselves — department heads, team leaders, and long-serving staff sharing real experience, not scripted lectures.",
-      },
-      multiskilling: {
-        title: copy.pillarMultiTitle || "Built for multiskilling",
-        body:
-          copy.pillarMultiBody ||
-          "The stated goal is to push every employee beyond a single fixed skill set — technology literacy, service standards, and adaptability all get airtime over time.",
-      },
-    };
-    return pillarMap[key] || { title: "", body: "" };
-  };
+  const getPillarContent = (titleKey, bodyKey) => ({
+    title: gmCopy[titleKey] || "",
+    body: gmCopy[bodyKey] || "",
+  });
 
   return (
     <div style={{ fontFamily: F.sans, background: C.gray }}>
@@ -503,7 +487,7 @@ export default function GoldenMonday() {
             }}
           >
             <FiClock size={13} />
-            {copy.eyebrow || "Every Monday · 2:00 – 2:50"}
+            {getText(gmCopy.eyebrow) || "Every Monday · 2:00 – 2:50"}
           </div>
 
           <h1
@@ -535,7 +519,7 @@ export default function GoldenMonday() {
             >
               <FiSunrise size={30} />
             </span>
-            {copy.title || "Golden Monday"}
+            {getText(gmCopy.title) || "Golden Monday"}
           </h1>
 
           <p
@@ -547,8 +531,8 @@ export default function GoldenMonday() {
               marginTop: 22,
             }}
           >
-            {copy.subtitle ||
-              "The city administration's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all."}
+            {getText(gmCopy.subtitle) ||
+              "The organization's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all."}
           </p>
 
           <a
@@ -566,7 +550,7 @@ export default function GoldenMonday() {
               paddingBottom: 4,
             }}
           >
-            {copy.scroll || "Explore the story"}
+            {getText(gmCopy.scroll) || "Explore the story"}
             <FiChevronDown size={16} />
           </a>
         </div>
@@ -586,8 +570,11 @@ export default function GoldenMonday() {
       >
         <SectionHeading
           eyebrow={<FiCompass size={14} />}
-          title={copy.pillarsTitle || "Why a golden morning"}
-          sub={copy.pillarsSub || "Three things every session comes back to."}
+          title={getText(gmCopy.pillarsTitle) || "Why a golden morning"}
+          sub={
+            getText(gmCopy.pillarsSub) ||
+            "Three things every session comes back to."
+          }
         />
         <div
           style={{
@@ -598,7 +585,7 @@ export default function GoldenMonday() {
           }}
         >
           {PILLARS_KEYS.map((p, i) => {
-            const content = getPillarContent(p.titleKey);
+            const content = getPillarContent(p.titleKey, p.bodyKey);
             return (
               <div
                 key={i}
@@ -666,9 +653,9 @@ export default function GoldenMonday() {
         >
           <SectionHeading
             eyebrow={<FiCpu size={14} />}
-            title={copy.aiTitle || "AI session recap"}
+            title={getText(gmCopy.aiTitle) || "AI session recap"}
             sub={
-              copy.aiSub ||
+              getText(gmCopy.aiSub) ||
               "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds."
             }
           />
@@ -711,26 +698,26 @@ export default function GoldenMonday() {
                   }}
                 >
                   <FiPlus size={16} />
-                  {copy.aiNewSession || "Log a new session"}
+                  {getText(gmCopy.aiNewSession) || "Log a new session"}
                 </button>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
                   <input
-                    placeholder={copy.aiFormTitle || "Session title"}
+                    placeholder={getText(gmCopy.aiFormTitle) || "Session title"}
                     value={form.title}
                     onChange={handleFormChange("title")}
                     style={inputStyle}
                   />
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <input
-                      placeholder={copy.aiFormOrg || "Organization"}
+                      placeholder={getText(gmCopy.aiFormOrg) || "Organization"}
                       value={form.organization}
                       onChange={handleFormChange("organization")}
                       style={{ ...inputStyle, flex: "1 1 160px" }}
                     />
                     <input
                       placeholder={
-                        copy.aiFormSpeaker || "Speaker / facilitator"
+                        getText(gmCopy.aiFormSpeaker) || "Speaker / facilitator"
                       }
                       value={form.speaker}
                       onChange={handleFormChange("speaker")}
@@ -745,7 +732,7 @@ export default function GoldenMonday() {
                   />
                   <textarea
                     placeholder={
-                      copy.aiFormNotes ||
+                      getText(gmCopy.aiFormNotes) ||
                       "Raw notes — write it however you like, AI will clean it up"
                     }
                     value={form.rawNotes}
@@ -783,7 +770,7 @@ export default function GoldenMonday() {
                       }}
                     >
                       <FiX size={14} />
-                      {copy.aiCancel || "Cancel"}
+                      {getText(gmCopy.aiCancel) || "Cancel"}
                     </button>
                     <button
                       onClick={handleGenerateAndSave}
@@ -810,12 +797,13 @@ export default function GoldenMonday() {
                             size={14}
                             style={{ animation: "spin 1s linear infinite" }}
                           />
-                          {copy.aiGenerating || "Writing recap…"}
+                          {getText(gmCopy.aiGenerating) || "Writing recap…"}
                         </>
                       ) : (
                         <>
                           <FiSend size={14} />
-                          {copy.aiGenerate || "Generate & save with AI"}
+                          {getText(gmCopy.aiGenerate) ||
+                            "Generate & save with AI"}
                         </>
                       )}
                     </button>
@@ -851,9 +839,8 @@ export default function GoldenMonday() {
                     fontSize: 14,
                   }}
                 >
-                  <FiSun size={16} color={C.gold} />{" "}
-                  {/* ✅ Replaced FiLightbulb with FiSun */}
-                  {copy.aiTopicsTitle || "AI: suggest next topics"}
+                  <FiSun size={16} color={C.gold} />
+                  {getText(gmCopy.aiTopicsTitle) || "AI: suggest next topics"}
                 </div>
                 <button
                   onClick={handleSuggestTopics}
@@ -882,21 +869,21 @@ export default function GoldenMonday() {
                     <FiCpu size={13} />
                   )}
                   {loadingTopics
-                    ? copy.aiTopicsLoading || "Thinking of topics…"
-                    : copy.aiTopicsBtn || "Suggest topics"}
+                    ? getText(gmCopy.aiTopicsLoading) || "Thinking of topics…"
+                    : getText(gmCopy.aiTopicsBtn) || "Suggest topics"}
                 </button>
               </div>
 
               <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
                 {topics === null && (
                   <p style={{ fontSize: 12.5, color: "#a9b3e0", margin: 0 }}>
-                    {copy.aiTopicsEmpty ||
+                    {getText(gmCopy.aiTopicsEmpty) ||
                       "Log a couple of sessions first so AI has something to build on."}
                   </p>
                 )}
                 {topics?.length === 0 && (
                   <p style={{ fontSize: 12.5, color: "#a9b3e0", margin: 0 }}>
-                    {copy.aiTopicsEmpty ||
+                    {getText(gmCopy.aiTopicsEmpty) ||
                       "Log a couple of sessions first so AI has something to build on."}
                   </p>
                 )}
@@ -961,8 +948,11 @@ export default function GoldenMonday() {
       >
         <SectionHeading
           eyebrow={<FiCalendar size={14} />}
-          title={copy.timelineTitle || "Recent sessions"}
-          sub={copy.timelineSub || "A running record, not a one-off event."}
+          title={getText(gmCopy.timelineTitle) || "Recent sessions"}
+          sub={
+            getText(gmCopy.timelineSub) ||
+            "A running record, not a one-off event."
+          }
         />
         <div style={{ marginTop: 30, position: "relative" }}>
           <div
@@ -1003,11 +993,7 @@ export default function GoldenMonday() {
                   zIndex: 1,
                 }}
               >
-                {item.live ? (
-                  <FiStar size={14} /> /* ✅ Replaced FiSparkles with FiStar */
-                ) : (
-                  combinedTimeline.length - i
-                )}
+                {item.live ? <FiStar size={14} /> : combinedTimeline.length - i}
               </div>
               <div
                 className="gm-card"
@@ -1039,7 +1025,7 @@ export default function GoldenMonday() {
                       gap: 6,
                     }}
                   >
-                    {item.org[language] || item.org.en}
+                    {getText(item.org)}
                     {item.live && (
                       <span
                         style={{
@@ -1052,14 +1038,14 @@ export default function GoldenMonday() {
                           letterSpacing: 0.3,
                         }}
                       >
-                        {copy.aiLive || "AI-generated"}
+                        {getText(gmCopy.aiLive) || "AI-generated"}
                       </span>
                     )}
                   </span>
                   <span
                     style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}
                   >
-                    {item.date[language] || item.date.en}
+                    {getText(item.date)}
                   </span>
                 </div>
                 <p
@@ -1070,7 +1056,7 @@ export default function GoldenMonday() {
                     color: "#334",
                   }}
                 >
-                  {item[language] || item.en}
+                  {getText(item)}
                 </p>
               </div>
             </div>
@@ -1102,10 +1088,13 @@ export default function GoldenMonday() {
             <div style={{ flex: "1 1 320px" }}>
               <SectionHeading
                 eyebrow={<FiGrid size={14} />}
-                title={copy.mesobTitle || "The platform this mindset built"}
+                title={
+                  getText(gmCopy.mesobTitle) ||
+                  "The platform this mindset built"
+                }
                 sub={
-                  copy.mesobSub ||
-                  "MESOB is the city's one-stop digital service platform — the same drive for less friction, applied to how residents actually get things done."
+                  getText(gmCopy.mesobSub) ||
+                  "MESOB is the organization's one-stop digital service platform — the same drive for less friction, applied to how citizens actually get things done."
                 }
                 dark
               />
@@ -1127,7 +1116,7 @@ export default function GoldenMonday() {
                   transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               >
-                {copy.mesobCta || "Open Document Vault"}
+                {getText(gmCopy.mesobCta) || "Open Document Vault"}
                 <FiArrowRight size={16} />
               </a>
             </div>
@@ -1169,7 +1158,7 @@ export default function GoldenMonday() {
                       color: "#dfe4ff",
                     }}
                   >
-                    {pt[language] || pt.en}
+                    {getText(pt)}
                   </p>
                 </div>
               ))}
@@ -1193,7 +1182,7 @@ export default function GoldenMonday() {
             margin: "0 0 8px",
           }}
         >
-          {copy.closingTitle || "Start your week here"}
+          {getText(gmCopy.closingTitle) || "Start your week here"}
         </h3>
         <p
           style={{
@@ -1203,7 +1192,7 @@ export default function GoldenMonday() {
             margin: "0 auto",
           }}
         >
-          {copy.closingBody ||
+          {getText(gmCopy.closingBody) ||
             "Golden Monday is a standing fixture — check back weekly for the next session's write-up."}
         </p>
       </section>

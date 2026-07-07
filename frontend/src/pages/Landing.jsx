@@ -32,23 +32,23 @@ import {
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
-// STATIC BILINGUAL CONTENT
+// LANDING SPECIFIC CONTENT (not in main translations)
 // ─────────────────────────────────────────────────────────────
-const COPY = {
+const LANDING_COPY = {
   eyebrow: {
-    en: "Addis Ketema Sub-City · CRRSA Digital Services",
-    am: "አዲስ ከተማ ክ/ከተማ · የCRRSA ዲጂታል አገልግሎቶች",
-    om: "Magaalaa Addis Ketema · Tajaajila Dijitaalaa CRRSA",
+    en: "Digital Ethiopia · Addis MESOB Platform",
+    am: "ዲጂታል ኢትዮጵያ · አዲስ መሶብ መድረክ",
+    om: "Itoophiyaa Dijitaalaa · Addis MESOB Platform",
   },
   heroTitle: {
-    en: "One platform for every CRRSA service.",
-    am: "ለሁሉም የCRRSA አገልግሎቶች አንድ መድረክ።",
-    om: "Waltajjii tokko tajaajila CRRSA hunda dura.",
+    en: "One platform for Ethiopia's digital future.",
+    am: "ለኢትዮጵያ ዲጂታል የወደፊት ጊዜ አንድ መድረክ።",
+    om: "Waltajjii tokko fuuldura dijitaalaa Itoophiyaatiif.",
   },
   heroBody: {
-    en: "Addis MESOB brings registration, evaluation, reporting, document handling, and AI-assisted service management into one digital front door for Addis Ketema sub-city's civil registration and residency departments.",
-    am: "አዲስ መሶብ ምዝገባን፣ ግምገማን፣ ሪፖርት ማድረግን፣ የሰነድ አያያዝንና በአርቴፊሻል ኢንተለጀንስ የታገዘ የአገልግሎት አስተዳደርን ለአዲስ ከተማ ክ/ከተማ የሲቪል ምዝገባና ነዋሪነት መምሪያዎች በአንድ ዲጂታል በር ስር ያመጣል።",
-    om: "Addis MESOB galmee, madaallii, gabaasa, qabiinsa ragaa fi bulchiinsa tajaajilaa AI-tiin deeggaramu, kutaalee bulchiinsa galmee lammummaa fi jireenyaa magaalaa Addis Ketema tokkicha keessatti walitti fida.",
+    en: "Addis MESOB is Ethiopia's integrated digital service platform — bringing registration, evaluation, reporting, document management, and AI-assisted services into one seamless experience for citizens and government agencies alike.",
+    am: "አዲስ መሶብ የኢትዮጵያ የተቀናጀ ዲጂታል አገልግሎት መድረክ ነው — ምዝገባን፣ ግምገማን፣ ሪፖርት ማድረግን፣ የሰነድ አያያዝን እና በአርቴፊሻል ኢንተለጀንስ የታገዙ አገልግሎቶችን ለዜጎች እና ለመንግስት ተቋማት በአንድ ወጥ ተሞክሮ ያቀርባል።",
+    om: "Addis MESOB waltajjii tajaajila dijitaalaa walitti makuu Itoophiyaa ti — galmee, madaallii, gabaasa, qabiinsa ragaa, fi tajaajiloota AI-tiin deeggaraman, lammiifii fi dhaabbilee mootummaatiif ilmaan tokkoon dhiheessa.",
   },
   ctaPrimary: {
     en: "Sign in to your account",
@@ -76,9 +76,9 @@ const COPY = {
     om: "Afaanota Deeggaraman",
   },
   statAI: {
-    en: "AI-assisted",
-    am: "በAI የታገዘ",
-    om: "AI-n Deeggarame",
+    en: "AI-powered",
+    am: "በAI የተጠናከረ",
+    om: "AI-n deeggarame",
   },
   featuresEyebrow: {
     en: "One login, every tool",
@@ -86,9 +86,9 @@ const COPY = {
     om: "Seensa Tokko, Meeshaa Hunda",
   },
   featuresTitle: {
-    en: "Everything your team needs, in one place",
-    am: "ቡድንዎ የሚያስፈልገው ሁሉ በአንድ ቦታ",
-    om: "Wanti Garee Keessan Barbaadu Hundi Bakka Tokkotti",
+    en: "Everything your organization needs, in one place",
+    am: "ድርጅትዎ የሚያስፈልገው ሁሉ በአንድ ቦታ",
+    om: "Wanti Dhaabbileen Keessan Barbaadu Hundi Bakka Tokkotti",
   },
   featuresSub: {
     en: "Access adapts automatically to your role — employee, team leader, admin, or super admin.",
@@ -116,9 +116,9 @@ const COPY = {
     om: "Yaad-rimee Wiixata Warqee Irratti Ijaarame",
   },
   gmBody: {
-    en: "Addis Ketema's weekly Golden Monday (ወርቃማ ሰኞ) sessions push every employee toward multiskilling and peer-led learning. Addis MESOB is that same drive for less friction, applied to how residents actually get things done — and the program itself now lives inside the platform for every signed-in team.",
-    am: "የአዲስ ከተማ ሳምንታዊ ወርቃማ ሰኞ ስብሰባዎች እያንዳንዱን ሰራተኛ ወደ ብዙ ክህሎትና በእኩዮች ወደሚመራ ትምህርት ይገፋፋሉ። አዲስ መሶብ ያንኑ ግፊት ወደ ነዋሪዎች ትክክለኛ አገልግሎት አሰጣጥ ተግባራዊ ያደርገዋል — ፕሮግራሙም ራሱ ለተመዘገበ እያንዳንዱ ቡድን በመድረኩ ውስጥ ይገኛል።",
-    om: "Walga'iiwwan Wiixata Warqee (ወርቃማ ሰኞ) torbaniin Addis Ketema hojjetaa hunda gara dandeettii hedduu fi barnoota hiriyaan durfamu geggeessa. Addis MESOB dhiibbaa wal fakkaataa kanaan rakkina hir'isuun, akkaataa jiraattoonni dhugumaan waan hojjetan irratti hojjeta — sagantichi mataan isaas amma garee seenan hundaaf waltajjicha keessatti argama.",
+    en: "Ethiopia's weekly Golden Monday (ወርቃማ ሰኞ) sessions push every employee toward multiskilling and peer-led learning. Addis MESOB is that same drive for less friction, applied to how citizens actually get things done — and the program itself now lives inside the platform for every signed-in team.",
+    am: "የኢትዮጵያ ሳምንታዊ ወርቃማ ሰኞ ስብሰባዎች እያንዳንዱን ሰራተኛ ወደ ብዙ ክህሎትና በእኩዮች ወደሚመራ ትምህርት ይገፋፋሉ። አዲስ መሶብ ያንኑ ግፊት ወደ ዜጎች ትክክለኛ አገልግሎት አሰጣጥ ተግባራዊ ያደርገዋል — ፕሮግራሙም ራሱ ለተመዘገበ እያንዳንዱ ቡድን በመድረኩ ውስጥ ይገኛል።",
+    om: "Walga'iiwwan Wiixata Warqee (ወርቃማ ሰኞ) torbaniin Itoophiyaa hojjetaa hunda gara dandeettii hedduu fi barnoota hiriyaan durfamu geggeessa. Addis MESOB dhiibbaa wal fakkaataa kanaan rakkina hir'isuun, akkaataa lammiin dhugumaan waan hojjetan irratti hojjeta — sagantichi mataan isaas amma garee seenan hundaaf waltajjicha keessatti argama.",
   },
   gmCta: {
     en: "Sign in to view this week's session",
@@ -126,9 +126,9 @@ const COPY = {
     om: "Walga'ii Torban Kanaa Ilaaluuf Seeni",
   },
   footerTagline: {
-    en: "A one-stop digital service platform for Addis Ketema sub-city.",
-    am: "ለአዲስ ከተማ ክ/ከተማ የአንድ ማዕከል ዲጂታል አገልግሎት መድረክ።",
-    om: "Waltajjii tajaajila dijitaalaa bakka tokkotti kutaa magaalaa Addis Ketema-tiif.",
+    en: "A one-stop digital service platform for Digital Ethiopia.",
+    am: "ለዲጂታል ኢትዮጵያ የአንድ ማዕከል ዲጂታል አገልግሎት መድረክ።",
+    om: "Waltajjii tajaajila dijitaalaa bakka tokkotti Itoophiyaa Dijitaalaatiif.",
   },
 };
 
@@ -141,9 +141,9 @@ const FEATURES = [
       om: "Daashboordii fi Xiinxala",
     },
     body: {
-      en: "Live overview of team performance, submissions, and trends, with drill-down reports for leaders and admins.",
-      am: "የቡድን አፈጻጸም፣ ማስገቢያዎችና አዝማሚያዎች ቀጥታ ዕይታ፣ ለመሪዎችና አድሚኖች ዝርዝር ሪፖርቶች ጋር።",
-      om: "Ilaalcha yeroo dhugaa raawwii garee, galmee fi ce'umsaa, gabaasa bal'aa hoogganootaa fi admin-oota waliin.",
+      en: "Live overview of organizational performance, submissions, and trends, with drill-down reports for leaders and admins.",
+      am: "የድርጅት አፈጻጸም፣ ማስገቢያዎችና አዝማሚያዎች ቀጥታ ዕይታ፣ ለመሪዎችና አድሚኖች ዝርዝር ሪፖርቶች ጋር።",
+      om: "Ilaalcha yeroo dhugaa raawwii dhaabbilee, galmee fi ce'umsaa, gabaasa bal'aa hoogganootaa fi admin-oota waliin.",
     },
   },
   {
@@ -185,22 +185,22 @@ const FEATURES = [
       om: "Kaataloogii Tajaajilaa",
     },
     body: {
-      en: "The full CRRSA service list across every partner agency, kept current by admins in one shared registry.",
-      am: "በሁሉም አጋር ተቋማት የተሟላ የCRRSA አገልግሎት ዝርዝር፣ በአድሚኖች በአንድ የጋራ መዝገብ ውስጥ ወቅታዊ ሆኖ የሚቆይ።",
-      om: "Tarreeffama guutuu tajaajila CRRSA dhaabbilee hiriyaa hunda keessatti, admin-oonni galmee waloo tokko keessatti haaromsan.",
+      en: "The full service list across every partner agency, kept current by admins in one shared registry.",
+      am: "በሁሉም አጋር ተቋማት የተሟላ የአገልግሎት ዝርዝር፣ በአድሚኖች በአንድ የጋራ መዝገብ ውስጥ ወቅታዊ ሆኖ የሚቆይ።",
+      om: "Tarreeffama guutuu tajaajila dhaabbilee hiriyaa hunda keessatti, admin-oonni galmee waloo tokko keessatti haaromsan.",
     },
   },
   {
     icon: <FiShield size={22} />,
     title: {
-      en: "CRRSA Document Vault",
-      am: "የCRRSA ሰነድ ማከማቻ",
-      om: "Kuusaa Ragaa CRRSA",
+      en: "Document Vault",
+      am: "የሰነድ ማከማቻ",
+      om: "Kuusaa Ragaa",
     },
     body: {
-      en: "Secure, traceable document storage with Gemini vision auto-fill that reads a scanned form and populates it for you.",
-      am: "ደህንነቱ የተጠበቀና ክትትል የሚደረግበት የሰነድ ማከማቻ፣ የተቃኘ ቅጽን በማንበብ ራስ-ሰር በሚሞላ Gemini vision ችሎታ የተደገፈ።",
-      om: "Kuusaa ragaa nageenya qabu, hordoffii qabu, fi dandeettii Gemini vision-tiin unka sikaanamee dubbisee ofumaan guutu.",
+      en: "Secure, traceable document storage with AI auto-fill that reads scanned forms and populates them for you.",
+      am: "ደህንነቱ የተጠበቀና ክትትል የሚደረግበት የሰነድ ማከማቻ፣ የተቃኙን ቅጾች በማንበብ ራስ-ሰር በሚሞላ AI ችሎታ የተደገፈ።",
+      om: "Kuusaa ragaa nageenya qabu, hordoffii qabu, fi dandeettii AI-tiin unka sikaanamee dubbisee ofumaan guutu.",
     },
   },
   {
@@ -211,18 +211,18 @@ const FEATURES = [
       om: "Deeggartuu AI, Bakka Hundatti",
     },
     body: {
-      en: "A floating assistant and inline AI summaries across dashboards and reports, powered by Google Gemini.",
-      am: "በዳሽቦርድና ሪፖርቶች ላይ ተንሳፋፊ ረዳትና በውስጥ የተካተቱ የAI ማጠቃለያዎች፣ በGoogle Gemini የተደገፉ።",
-      om: "Deeggartuu dafqee fi cuunfaa AI dashboard fi gabaasaa keessatti, Google Gemini-tiin deeggarame.",
+      en: "A floating assistant and inline AI summaries across dashboards and reports, powered by advanced AI technology.",
+      am: "በዳሽቦርድና ሪፖርቶች ላይ ተንሳፋፊ ረዳትና በውስጥ የተካተቱ የAI ማጠቃለያዎች፣ በላቀ የAI ቴክኖሎጂ የተደገፉ።",
+      om: "Deeggartuu dafqee fi cuunfaa AI dashboard fi gabaasaa keessatti, teeknooloojii AI-n deeggarame.",
     },
   },
   {
     icon: <FiSunrise size={22} />,
     title: { en: "Golden Monday", am: "ወርቃማ ሰኞ", om: "Wiixata Warqee" },
     body: {
-      en: "The city's weekly capacity-building program — session recaps, presenter rotation, and AI-suggested topics, right inside the app.",
-      am: "የከተማው ሳምንታዊ የአቅም ግንባታ መርሃ-ግብር — የስብሰባ ማጠቃለያ፣ የአቅራቢ ሽክርክር እና በAI የተጠቆሙ ርዕሶች በመተግበሪያው ውስጥ።",
-      om: "Sagantaa dandeettii ijaarsaa torbanii magaalaa — cuunfaa walga'ii, naanna'iinsa dhiheessituu, fi mata duree AI-n yaadame, appii keessatti.",
+      en: "Weekly capacity-building program — session recaps, presenter rotation, and AI-suggested topics, right inside the app.",
+      am: "ሳምንታዊ የአቅም ግንባታ መርሃ-ግብር — የስብሰባ ማጠቃለያ፣ የአቅራቢ ሽክርክር እና በAI የተጠቆሙ ርዕሶች በመተግበሪያው ውስጥ።",
+      om: "Sagantaa dandeettii ijaarsaa torbanii — cuunfaa walga'ii, naanna'iinsa dhiheessituu, fi mata duree AI-n yaadame, appii keessatti.",
     },
   },
   {
@@ -257,14 +257,14 @@ const STEPS = [
   {
     icon: <FiLogIn size={20} />,
     title: {
-      en: "Sign in with your CRRSA account",
-      am: "በCRRSA መለያዎ ይግቡ",
-      om: "Herrega CRRSA Keetiin Seeni",
+      en: "Sign in with your organization account",
+      am: "በድርጅትዎ መለያ ይግቡ",
+      om: "Herrega Dhaabbilee Keetiin Seeni",
     },
     body: {
-      en: "Your sub-city admin creates your account; you sign in and land straight on your dashboard.",
-      am: "የክ/ከተማ አድሚንዎ መለያዎን ይፈጥራል፤ ይግቡና በቀጥታ ወደ ዳሽቦርድዎ ይደርሳሉ።",
-      om: "Admin-iin kutaa magaalaa keetii herrega siif uuma; seentee kallattiin gara daashboordii keetiitti geessa.",
+      en: "Your organization admin creates your account; you sign in and land straight on your dashboard.",
+      am: "የድርጅትዎ አድሚን መለያዎን ይፈጥራል፤ ይግቡና በቀጥታ ወደ ዳሽቦርድዎ ይደርሳሉ።",
+      om: "Admin-iin dhaabbilee keetii herrega siif uuma; seentee kallattiin gara daashboordii keetiitti geessa.",
     },
   },
   {
@@ -393,6 +393,9 @@ export default function Landing() {
 
   const goLogin = () => navigate("/login");
 
+  // Get translated text helper
+  const getText = (obj) => obj[language] || obj.en;
+
   return (
     <div style={{ fontFamily: F.sans, background: C.gray, minHeight: "100vh" }}>
       <style>{`
@@ -506,7 +509,7 @@ export default function Landing() {
             }}
           >
             <FiLogIn size={14} />
-            {COPY.ctaPrimary[language] || COPY.ctaPrimary.en}
+            {getText(LANDING_COPY.ctaPrimary)}
           </button>
         </div>
       </header>
@@ -568,7 +571,7 @@ export default function Landing() {
               }}
             >
               <FiMapPin size={13} />
-              {COPY.eyebrow[language] || COPY.eyebrow.en}
+              {getText(LANDING_COPY.eyebrow)}
             </div>
 
             <h1
@@ -580,7 +583,7 @@ export default function Landing() {
                 margin: 0,
               }}
             >
-              {COPY.heroTitle[language] || COPY.heroTitle.en}
+              {getText(LANDING_COPY.heroTitle)}
             </h1>
 
             <p
@@ -592,7 +595,7 @@ export default function Landing() {
                 marginTop: 22,
               }}
             >
-              {COPY.heroBody[language] || COPY.heroBody.en}
+              {getText(LANDING_COPY.heroBody)}
             </p>
 
             <div
@@ -622,7 +625,7 @@ export default function Landing() {
                   transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               >
-                {COPY.ctaPrimary[language] || COPY.ctaPrimary.en}
+                {getText(LANDING_COPY.ctaPrimary)}
                 <FiArrowRight size={16} />
               </button>
               <a
@@ -640,7 +643,7 @@ export default function Landing() {
                   borderRadius: 10,
                 }}
               >
-                {COPY.ctaSecondary[language] || COPY.ctaSecondary.en}
+                {getText(LANDING_COPY.ctaSecondary)}
                 <FiChevronDown size={16} />
               </a>
             </div>
@@ -655,10 +658,10 @@ export default function Landing() {
               }}
             >
               {[
-                [stats.services + "+", COPY.statServices],
-                [stats.agencies, COPY.statAgencies],
-                ["3", COPY.statLanguages],
-                ["AI", COPY.statAI],
+                [stats.services + "+", LANDING_COPY.statServices],
+                [stats.agencies, LANDING_COPY.statAgencies],
+                ["3", LANDING_COPY.statLanguages],
+                ["AI", LANDING_COPY.statAI],
               ].map(([num, label], i) => (
                 <div key={i}>
                   <div
@@ -679,7 +682,7 @@ export default function Landing() {
                       marginTop: 2,
                     }}
                   >
-                    {label[language] || label.en}
+                    {getText(label)}
                   </div>
                 </div>
               ))}
@@ -720,9 +723,9 @@ export default function Landing() {
         }}
       >
         <SectionHeading
-          eyebrow={COPY.featuresEyebrow[language] || COPY.featuresEyebrow.en}
-          title={COPY.featuresTitle[language] || COPY.featuresTitle.en}
-          sub={COPY.featuresSub[language] || COPY.featuresSub.en}
+          eyebrow={getText(LANDING_COPY.featuresEyebrow)}
+          title={getText(LANDING_COPY.featuresTitle)}
+          sub={getText(LANDING_COPY.featuresSub)}
           center
         />
         <div
@@ -768,7 +771,7 @@ export default function Landing() {
                   fontFamily: F.serif,
                 }}
               >
-                {f.title[language] || f.title.en}
+                {getText(f.title)}
               </h3>
               <p
                 style={{
@@ -778,7 +781,7 @@ export default function Landing() {
                   color: C.muted,
                 }}
               >
-                {f.body[language] || f.body.en}
+                {getText(f.body)}
               </p>
             </div>
           ))}
@@ -797,8 +800,8 @@ export default function Landing() {
         }}
       >
         <SectionHeading
-          eyebrow={COPY.howEyebrow[language] || COPY.howEyebrow.en}
-          title={COPY.howTitle[language] || COPY.howTitle.en}
+          eyebrow={getText(LANDING_COPY.howEyebrow)}
+          title={getText(LANDING_COPY.howTitle)}
           center
         />
         <div
@@ -863,7 +866,7 @@ export default function Landing() {
                   fontFamily: F.serif,
                 }}
               >
-                {s.title[language] || s.title.en}
+                {getText(s.title)}
               </h3>
               <p
                 style={{
@@ -873,7 +876,7 @@ export default function Landing() {
                   color: C.muted,
                 }}
               >
-                {s.body[language] || s.body.en}
+                {getText(s.body)}
               </p>
             </div>
           ))}
@@ -919,9 +922,9 @@ export default function Landing() {
           </div>
           <div style={{ flex: "1 1 480px" }}>
             <SectionHeading
-              eyebrow={COPY.gmEyebrow[language] || COPY.gmEyebrow.en}
-              title={COPY.gmTitle[language] || COPY.gmTitle.en}
-              sub={COPY.gmBody[language] || COPY.gmBody.en}
+              eyebrow={getText(LANDING_COPY.gmEyebrow)}
+              title={getText(LANDING_COPY.gmTitle)}
+              sub={getText(LANDING_COPY.gmBody)}
               dark
             />
             <button
@@ -944,7 +947,7 @@ export default function Landing() {
                 transition: "transform 0.2s ease, box-shadow 0.2s ease",
               }}
             >
-              {COPY.gmCta[language] || COPY.gmCta.en}
+              {getText(LANDING_COPY.gmCta)}
               <FiArrowRight size={16} />
             </button>
           </div>
@@ -979,10 +982,10 @@ export default function Landing() {
           </span>
         </div>
         <p style={{ fontSize: 12.5, margin: "0 0 6px" }}>
-          {COPY.footerTagline[language] || COPY.footerTagline.en}
+          {getText(LANDING_COPY.footerTagline)}
         </p>
         <p style={{ fontSize: 11, color: "#7a8fc8", margin: 0 }}>
-          © {new Date().getFullYear()} Addis Ketema Sub-City · CRRSA
+          © {new Date().getFullYear()} Digital Ethiopia · Addis MESOB
         </p>
       </footer>
     </div>
