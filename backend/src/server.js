@@ -1,10 +1,10 @@
+// backend/src/server.js
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const connectDB = require("./config/db");
-const { corsOptions } = require("./middleware/cors");
 
 const authRoutes = require("./routes/authRoutes");
 const teamRoutes = require("./routes/teamRoutes");
@@ -15,7 +15,7 @@ const serviceRoutes = require("./routes/serviceRoutes");
 const userRoutes = require("./routes/userRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 
-// ✅ NEW: AI Features
+// AI Features
 const aiRoutes = require("./routes/aiRoutes");
 const chatbotRoutes = require("./routes/chatbotRoutes");
 const documentRoutes = require("./routes/documentRoutes");
@@ -23,14 +23,52 @@ const goldenMondayRoutes = require("./routes/goldenMondayRoutes");
 const { startGoldenMondayScheduler } = require("./jobs/goldenMondayScheduler");
 
 const { notFound, errorHandler } = require("./middleware/errorHandler");
-
 const telegramRoutes = require("./routes/telegramRoutes");
 
 const app = express();
 
 // =============================================
-// ✅ CORS - Using imported corsOptions
+// ✅ CORS CONFIGURATION - FIXED
 // =============================================
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://akmesob.vercel.app",
+  "https://addis-mesob-frontend.vercel.app",
+  "https://akmesob-git-main.vercel.app",
+  process.env.FRONTEND_URL,
+].filter(Boolean);
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (
+      allowedOrigins.indexOf(origin) !== -1 ||
+      process.env.NODE_ENV === "development"
+    ) {
+      callback(null, true);
+    } else {
+      console.log("Blocked origin:", origin);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "X-Requested-With",
+    "Accept",
+    "Origin",
+    "Access-Control-Allow-Origin",
+    "Access-Control-Allow-Headers",
+    "Access-Control-Allow-Credentials",
+  ],
+};
+
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
@@ -48,8 +86,10 @@ app.use(
         connectSrc: [
           "'self'",
           "https://akmesob.vercel.app",
+          "https://addis-mesob-frontend.vercel.app",
           "http://localhost:5173",
-          "https://api.anthropic.com", // ✅ Allow Anthropic API
+          "http://localhost:3000",
+          "https://api.anthropic.com",
         ],
         imgSrc: ["'self'", "data:", "https://res.cloudinary.com"],
         scriptSrc: ["'self'"],
@@ -63,12 +103,12 @@ app.use(
 // =============================================
 // ✅ MIDDLEWARE
 // =============================================
-app.use(express.json({ limit: "25mb" })); // ✅ Increased for document uploads (base64)
+app.use(express.json({ limit: "25mb" }));
 app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 app.use(morgan("dev"));
 
 // =============================================
-// ✅ ROUTES — Existing
+// ✅ ROUTES
 // =============================================
 app.use("/api/auth", authRoutes);
 app.use("/api/teams", teamRoutes);
@@ -79,13 +119,11 @@ app.use("/api/services", serviceRoutes);
 app.use("/api/auth/users", userRoutes);
 app.use("/api/reports", reportRoutes);
 
-// =============================================
-// ✅ ROUTES — NEW: AI Features
-// =============================================
+// AI Features
 app.use("/api/ai", aiRoutes);
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/documents", documentRoutes);
-app.use("/api/golden-monday", goldenMondayRoutes); // ✅ Added Golden Monday routes
+app.use("/api/golden-monday", goldenMondayRoutes);
 app.use("/api/telegram", telegramRoutes);
 
 // =============================================
@@ -102,7 +140,7 @@ app.get("/api/health", (req, res) => {
 
 app.get("/", (req, res) => {
   res.json({
-    message: "✅ Acha Forum Backend API is running",
+    message: "✅ Addis MESOB Backend API is running",
     endpoints: {
       health: "/api/health",
       auth: "/api/auth",
@@ -112,7 +150,7 @@ app.get("/", (req, res) => {
       ai: "/api/ai",
       chatbot: "/api/chatbot",
       documents: "/api/documents",
-      "golden-monday": "/api/golden-monday", // ✅ Added to endpoints list
+      "golden-monday": "/api/golden-monday",
     },
   });
 });
@@ -136,6 +174,7 @@ const startServer = async () => {
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
+      console.log(`✅ CORS enabled for: ${allowedOrigins.join(", ")}`);
       console.log(
         `🤖 AI routes: /api/ai, /api/chatbot, /api/documents, /api/golden-monday`,
       );
@@ -145,5 +184,6 @@ const startServer = async () => {
     process.exit(1);
   }
 };
+
 startGoldenMondayScheduler();
 startServer();
