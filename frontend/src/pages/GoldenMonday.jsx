@@ -1804,6 +1804,7 @@ export default function GoldenMonday() {
       </section>
 
       {/* ── REGISTER EMPLOYEE MODAL ── */}
+      {/* ── REGISTER EMPLOYEE MODAL ── */}
       {showEmployeeModal && (
         <div
           style={{
@@ -1813,8 +1814,9 @@ export default function GoldenMonday() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 1000,
+            zIndex: 9999,
             animation: "fadeIn 0.3s ease",
+            backdropFilter: "blur(4px)",
           }}
           onClick={() => setShowEmployeeModal(false)}
         >
@@ -1823,10 +1825,13 @@ export default function GoldenMonday() {
               background: C.white,
               borderRadius: 16,
               padding: 32,
-              maxWidth: 480,
-              width: "100%",
+              maxWidth: 500,
+              width: "90%",
               maxHeight: "90vh",
               overflow: "auto",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              position: "relative",
+              zIndex: 10000,
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -1835,6 +1840,7 @@ export default function GoldenMonday() {
             >
               Register Employee
             </h3>
+
             <div style={{ display: "grid", gap: 14 }}>
               <div>
                 <label
@@ -1855,7 +1861,12 @@ export default function GoldenMonday() {
                   }
                   style={inputStyle}
                 />
+                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                  Enter the MongoDB ObjectId of the user (e.g.,
+                  6a3133c7ed17c1d7c0530ff8)
+                </div>
               </div>
+
               <div>
                 <label
                   style={{
@@ -1879,6 +1890,7 @@ export default function GoldenMonday() {
                   style={inputStyle}
                 />
               </div>
+
               <div>
                 <label
                   style={{
@@ -1902,6 +1914,7 @@ export default function GoldenMonday() {
                   style={inputStyle}
                 />
               </div>
+
               <div>
                 <label
                   style={{
@@ -1925,12 +1938,15 @@ export default function GoldenMonday() {
                   style={inputStyle}
                 />
               </div>
+
               <div
                 style={{
                   display: "flex",
                   gap: 10,
                   justifyContent: "flex-end",
                   marginTop: 8,
+                  paddingTop: 16,
+                  borderTop: `1px solid ${C.border}`,
                 }}
               >
                 <button
@@ -1947,7 +1963,7 @@ export default function GoldenMonday() {
                     opacity: registering || !employeeForm.userId ? 0.6 : 1,
                   }}
                 >
-                  {registering ? "Registering..." : "Register"}
+                  {registering ? "Registering..." : "Register Employee"}
                 </button>
               </div>
             </div>
