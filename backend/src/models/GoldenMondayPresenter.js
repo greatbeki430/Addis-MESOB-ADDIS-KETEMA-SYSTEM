@@ -1,8 +1,5 @@
 // backend/src/models/GoldenMondayPresenter.js
-// The rotation roster: one row per eligible employee. This is the source
-// of truth the rotation algorithm scores against — it is NOT the same as
-// the session history (a presenter can be on the roster for months before
-// ever presenting).
+// The rotation roster: one row per eligible employee.
 
 const mongoose = require("mongoose");
 
@@ -15,32 +12,37 @@ const goldenMondayPresenterSchema = new mongoose.Schema(
       unique: true,
     },
     name: { type: String, required: true, trim: true },
+    email: { type: String, required: true, trim: true },
     department: { type: String, default: "", trim: true },
+    position: { type: String, default: "", trim: true },
 
-    // Whether this person currently takes part in the rotation.
-    // Toggled off for people on leave, new hires still onboarding, etc.
+    // Profile photo for Telegram posts
+    profilePhotoUrl: { type: String, default: "" },
+    profilePhotoPublicId: { type: String, default: "" },
+
+    // Eligibility
     isEligible: { type: Boolean, default: true },
-    // Temporary skip window (e.g. maternity/sick leave) — excluded from
-    // selection while onLeaveUntil is in the future, without touching
-    // their stats or requiring an admin to remember to re-enable them.
     onLeaveUntil: { type: Date, default: null },
 
-    // ── Rotation stats (maintained by goldenMondayRotationService) ──
+    // Registration tracking
+    registeredAt: { type: Date, default: Date.now },
+    registeredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+
+    // Rotation stats
     timesPresented: { type: Number, default: 0 },
     lastPresentedAt: { type: Date, default: null },
-    // Incremented each time this person is skipped/passed over while
-    // eligible (e.g. manual override chose someone else). Used as a
-    // gentle tie-breaker so being passed over repeatedly increases
-    // priority next time.
     timesSkipped: { type: Number, default: 0 },
-    // Set when this person is auto-assigned but hasn't confirmed a
-    // title yet — lets the dashboard flag "needs a title".
     joinedRotationAt: { type: Date, default: Date.now },
+
+    // Preferences
+    preferredTopics: { type: [String], default: [] },
+    availableDays: { type: [String], default: ["Monday"] },
   },
   { timestamps: true },
 );
 
 goldenMondayPresenterSchema.index({ isEligible: 1, lastPresentedAt: 1 });
+goldenMondayPresenterSchema.index({ user: 1 }, { unique: true });
 
 module.exports = mongoose.model(
   "GoldenMondayPresenter",
