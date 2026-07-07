@@ -22,39 +22,80 @@ const {
   getLiveRecordings,
 } = require("../controllers/goldenMondayController");
 
+const rotationService = require("../services/goldenMondayRotationService");
+const GoldenMondaySession = require("../models/GoldenMondaySession");
+const GoldenMondayPresenter = require("../models/GoldenMondayPresenter");
+
 // ── Sessions ────────────────────────────────────────────────
-// GET  /api/golden-monday                — list saved sessions, any authenticated user
 router.get("/", protect, anyRole, getSessions);
-
-// GET  /api/golden-monday/suggest-topics — AI-suggested topics for the next session
 router.get("/suggest-topics", protect, leaderOrAdmin, suggestTopics);
-
-// POST /api/golden-monday/recap          — generate an AI recap preview (not saved)
 router.post("/recap", protect, leaderOrAdmin, previewRecap);
-
-// POST /api/golden-monday                — save a session (auto-generates recap if omitted)
 router.post("/", protect, leaderOrAdmin, createSession);
 
-// ── Recordings (catch-up list) ─────────────────────────────
-// GET  /api/golden-monday/recordings/live — recordings still within their visibility window
+// ── Sessions - Upcoming & Past ─────────────────────────────
+router.get("/sessions/upcoming", protect, anyRole, async (req, res) => {
+  try {
+    const sessions = await GoldenMondaySession.find({
+      status: { $in: ["scheduled", "ongoing"] },
+      date: { $gte: new Date() },
+    })
+      .sort({ date: 1 })
+      .populate("presenter", "name email department profilePhotoUrl");
+    res.json(sessions);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get("/sessions/past", protect, anyRole, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const sessions = await GoldenMondaySession.find({
+      status: "completed",
+      date: { $lt: new Date() },
+    })
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(limit)
+      .populate("presenter", "name email department profilePhotoUrl");
+
+    const total = await GoldenMondaySession.countDocuments({
+      status: "completed",
+      date: { $lt: new Date() },
+    });
+
+    res.json({
+      sessions,
+      pagination: { total, page, limit, pages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── Recordings ─────────────────────────────────────────────
 router.get("/recordings/live", protect, anyRole, getLiveRecordings);
 
 // ── Rotation roster ─────────────────────────────────────────
-// GET    /api/golden-monday/roster       — list the presenter roster
 router.get("/roster", protect, anyRole, getRoster);
-// POST   /api/golden-monday/roster       — add an employee to the roster
 router.post("/roster", protect, leaderOrAdmin, addToRoster);
-// PUT    /api/golden-monday/roster/:id   — update eligibility / leave / department
 router.put("/roster/:id", protect, leaderOrAdmin, updateRosterEntry);
-// DELETE /api/golden-monday/roster/:id   — remove from the roster
 router.delete("/roster/:id", protect, leaderOrAdmin, removeFromRoster);
 
 // ── Rotation engine ─────────────────────────────────────────
-// GET  /api/golden-monday/rotation/preview        — ranked candidates for a week (no side effects)
 router.get("/rotation/preview", protect, anyRole, previewRotation);
-// POST /api/golden-monday/rotation/assign         — assign next presenter (auto or manual override)
+router.get("/rotation/next", protect, anyRole, async (req, res) => {
+  try {
+    const next = await rotationService.getNextPresenter();
+    res.json(next);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 router.post("/rotation/assign", protect, leaderOrAdmin, assignRotation);
-// POST /api/golden-monday/rotation/:sessionId/reassign — undo + re-assign a week
 router.post(
   "/rotation/:sessionId/reassign",
   protect,
@@ -63,21 +104,88 @@ router.post(
 );
 
 // ── Per-session actions ─────────────────────────────────────
-// PUT    /api/golden-monday/:sessionId/title      — presenter locks in their own title
 router.put("/:sessionId/title", protect, anyRole, setPresentationTitle);
-// POST   /api/golden-monday/:sessionId/recording  — upload the session recording
 router.post(
   "/:sessionId/recording",
   protect,
   leaderOrAdmin,
   uploadSessionRecording,
 );
-// DELETE /api/golden-monday/:sessionId/recording  — remove a recording early
 router.delete(
   "/:sessionId/recording",
   protect,
   leaderOrAdmin,
   removeSessionRecording,
 );
+
+// ── Stats ────────────────────────────────────────────────────
+router.get("/stats", protect, anyRole, async (req, res) => {
+  try {
+    const [
+      totalSessions,
+      totalPresenters,
+      upcomingSessions,
+      completedSessions,
+    ] = await Promise.all([
+      GoldenMondaySession.countDocuments(),
+      GoldenMondayPresenter.countDocuments({ isEligible: true }),
+      GoldenMondaySession.countDocuments({
+        status: { $in: ["scheduled", "ongoing"] },
+        date: { $gte: new Date() },
+      }),
+      GoldenMondaySession.countDocuments({ status: "completed" }),
+    ]);
+
+    const sessionsWithRatings = await GoldenMondaySession.find({
+      averageRating: { $gt: 0 },
+    }).select("averageRating");
+
+    let averageRating = 0;
+    if (sessionsWithRatings.length > 0) {
+      const total = sessionsWithRatings.reduce(
+        (sum, s) => sum + s.averageRating,
+        0,
+      );
+      averageRating = total / sessionsWithRatings.length;
+    }
+
+    res.json({
+      totalSessions,
+      totalPresenters,
+      upcomingSessions,
+      completedSessions,
+      averageRating: Math.round(averageRating * 10) / 10,
+    });
+  } catch (error) {
+    console.error("Error fetching stats:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ── Pillars ──────────────────────────────────────────────────
+router.get("/pillars", protect, anyRole, async (req, res) => {
+  try {
+    const pillars = [
+      {
+        icon: "FiSunrise",
+        title: "A weekly reset",
+        body: "Every Monday morning, offices across the organization pause the routine for shared learning — a deliberate start to the work week instead of a rushed one.",
+      },
+      {
+        icon: "FiUsers",
+        title: "Peer-led, not top-down",
+        body: "Sessions are usually carried by colleagues themselves — department heads, team leaders, and long-serving staff sharing real experience, not scripted lectures.",
+      },
+      {
+        icon: "FiTrendingUp",
+        title: "Built for multiskilling",
+        body: "The stated goal is to push every employee beyond a single fixed skill set — technology literacy, service standards, and adaptability all get airtime over time.",
+      },
+    ];
+    res.json(pillars);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 module.exports = router;
