@@ -1,14 +1,17 @@
 // src/pages/GoldenMonday.jsx
 // ════════════════════════════════════════════════════════════
-// "Golden Monday" — weekly capacity-building landing page
-// Doubles as a general MESOB home / welcome page.
+// COMPLETE Golden Monday Management System
+// All data dynamic from database, full CRUD, AI integration,
+// Telegram posting, and role-based access control
 // ════════════════════════════════════════════════════════════
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { C, F } from "../styles/theme";
 import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../hooks/useLanguage";
 import { goldenMondayAPI } from "../services/api";
 import { showToast } from "../utils/toastHelper";
+import { ROLES, hasMinRole } from "../utils/roles";
 import GoldenMondayRotationPanel from "../components/golden-monday/GoldenMondayRotationPanel";
 import {
   FiSunrise,
@@ -30,111 +33,38 @@ import {
   FiX,
   FiSun,
   FiStar,
+  FiRefreshCw,
+  FiInfo,
+  FiTrash2,
+  FiUserPlus,
+  FiUserCheck,
+  FiUserX,
+  FiVideo,
+  FiBell,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
-// PILLARS DATA (uses translation keys)
+// STATIC PILLARS (fallback data, but should come from DB)
 // ─────────────────────────────────────────────────────────────
-const PILLARS_KEYS = [
+const FALLBACK_PILLARS = [
   {
     icon: <FiSunrise size={22} />,
-    titleKey: "pillarResetTitle",
-    bodyKey: "pillarResetBody",
+    title: "A weekly reset",
+    body: "Every Monday morning, offices across the organization pause the routine for shared learning — a deliberate start to the work week instead of a rushed one.",
   },
   {
     icon: <FiUsers size={22} />,
-    titleKey: "pillarPeerTitle",
-    bodyKey: "pillarPeerBody",
+    title: "Peer-led, not top-down",
+    body: "Sessions are usually carried by colleagues themselves — department heads, team leaders, and long-serving staff sharing real experience, not scripted lectures.",
   },
   {
     icon: <FiTrendingUp size={22} />,
-    titleKey: "pillarMultiTitle",
-    bodyKey: "pillarMultiBody",
+    title: "Built for multiskilling",
+    body: "The stated goal is to push every employee beyond a single fixed skill set — technology literacy, service standards, and adaptability all get airtime over time.",
   },
 ];
 
-// ─────────────────────────────────────────────────────────────
-// STATIC TIMELINE DATA (still hardcoded - these are specific events)
-// ─────────────────────────────────────────────────────────────
-const TIMELINE = [
-  {
-    date: {
-      en: "Jul 2018 E.C. · Jan 2026",
-      am: "ጥር 04/2018 ዓ.ም",
-      om: "Hagayya 2018 E.C. · Amajjii 2026",
-    },
-    org: {
-      en: "Addis Ababa Traffic Management Authority",
-      am: "የአዲስ አበባ ትራፊክ ማኔጅመንት ባለሥልጣን",
-      om: "Murtii Bulchiinsa Tiraafikii Finfinnee",
-    },
-    en: "The Parking Administration team lead opened up about her path into public service — the community that raised her, the setbacks along the way, and how she works through challenges on the job. The session closed with an open Q&A with staff.",
-    am: "የፓርኪንግ አስተዳደር ቡድን መሪ የህይወት ጉዞዋን አካፍላለች — ስላደገችበት ማህበረሰብ፣ ስላጋጠሟት ተግዳሮቶች እና በስራ ቦታ ውጤታማ ለመሆን ስለተጠቀመችባቸው መንገዶች ተናገረች። መርሃ-ግብሩ በሰራተኞች ጥያቄና መልስ ተጠናቋል።",
-    om: "Hoogganaan garee bulchiinsa paarkii waan gahii tajaajila ummataa keessa seenuu irratti ifa baase — hawaasa inni ishee guddisse, dadhabbiin karaa irratti, fi akka itti rakkina hojii irratti itti hojjatu. Walga'iin gaaffii fi deebii hafteewwan waliin xumurame.",
-  },
-  {
-    date: {
-      en: "Feb 2, 2026 · Tir 25, 2018 E.C.",
-      am: "የካቲት 2፣ 2026 · ጥር 25/2018 ዓ.ም",
-      om: "Guraandhala 2, 2026 · Tir 25, 2018 E.C.",
-    },
-    org: {
-      en: "Addis Ababa Food & Drug Authority",
-      am: "የአዲስ አበባ ምግብና መድሃኒት ባለስልጣን",
-      om: "Murtii Qoricha fi Nyaata Finfinnee",
-    },
-    en: 'The Deputy Director General for Administration made the case for multiskilling directly: relying on one skill set "is no longer sufficient" in a fast-changing world, and staff were urged to build versatility across both technical and general knowledge.',
-    am: "የአስተዳደር ዘርፍ ም/ዋና ዳይሬክተር ስለ ብዙ ክህሎት አስፈላጊነት አብራሩ፤ በፍጥነት በሚቀያየር ዓለም ውስጥ በአንድ ክህሎት ብቻ መተማመን በቂ አለመሆኑን ገልጸው፣ ሰራተኞች በቴክኖሎጂና በተለያዩ የእውቀት መስኮች እራሳቸውን እንዲያዳብሩ አሳሰቡ።",
-    om: "Dirreectoraan Morkii Bulchiinsa kallattiin waan dandeettii baay'ee barbaachisu dubbate: dandeettii tokko irratti of hundaa'uun 'ammas ga'aa miti' addunyaa saffisaa jiru keessatti, hojjattoonis dandeettii ogummaa fi beekumsa waliigalaa keessatti of tolchuuf jajjabeessan.",
-  },
-  {
-    date: {
-      en: "Aug 19, 2017 E.C.",
-      am: "ነሐሴ 19/2017 ዓ.ም",
-      om: "Hagayya 19, 2017 E.C.",
-    },
-    org: {
-      en: "Addis Ababa Food & Drug Authority",
-      am: "የአዲስ አበባ ምግብና መድሃኒት ባለስልጣን",
-      om: "Murtii Qoricha fi Nyaata Finfinnee",
-    },
-    en: "A wide-ranging discussion on what success actually takes — staying the course, building a resilient mindset, and committing to continuous growth — with participants also weighing in on the authority's recognition program.",
-    am: "ስኬት ምን እንደሚጠይቅ ላይ ሰፊ ውይይት ተካሂዷል — ጉዞን መቀጠል፣ ጠንካራ አስተሳሰብ መገንባትና ለቀጣይ እድገት ቁርጠኝነት፤ ተሳታፊዎችም ስለ ባለስልጣኑ የእውቅና መርሃ-ግብር አስተያየታቸውን ሰጥተዋል።",
-    om: "Marii bal'aa waan milkaa'in dhugaa barbaadu irratti — karaa itti fufuu, yaada jabaa ijaaruu, fi guddina itti fufuuf of kennuu — qoodduun yeroo sanatti sagantaa beekumsaa murtiirratti yaada isaanii dabalan.",
-  },
-  {
-    date: {
-      en: "Jun 9, 2017 E.C.",
-      am: "ሰኔ 09/2017 ዓ.ም",
-      om: "Waxabajjii 9, 2017 E.C.",
-    },
-    org: {
-      en: "Addis Ababa Food & Drug Authority",
-      am: "የአዲስ አበባ ምግብና መድሃኒት ባለስልጣን",
-      om: "Murtii Qoricha fi Nyaata Finfinnee",
-    },
-    en: "A hands-on training on the standard performance registration form — how it's calculated, documented, and used as the basis for staff evaluation going forward.",
-    am: "በመደበኛ የአፈጻጸም ምዝገባ ቅጽ አጠቃቀም ላይ ተግባራዊ ስልጠና ተሰጥቷል — አፈጻጸም እንዴት እንደሚሰላ፣ እንደሚመዘገብና ለወደፊት ግምገማ መሰረት እንደሚሆን ተብራርቷል።",
-    om: "Leenjiin harkaan unka galmee hojii idileetti - akka itti lakkaa'amu, galmeeffamu, fi madaallii hojjattootaa itti fufuuf bu'uura ta'u irratti kenname.",
-  },
-  {
-    date: {
-      en: "2018 E.C. Planning",
-      am: "የ2018 ዓ.ም እቅድ",
-      om: "Karoora 2018 E.C.",
-    },
-    org: {
-      en: "Addis Ababa Food & Drug Authority — HR Directorate",
-      am: "የአዲስ አበባ ምግብና መድሃኒት ባለስልጣን — የሰው ሀብት አመራር",
-      om: "Murtii Qoricha fi Nyaata Finfinnee - Bulchiinsa Hojjattoota",
-    },
-    en: "HR leadership confirmed the program continues weekly (2:00–2:50) with a mayor's-office mandate behind it, plus a planned breakfast component and short add-on trainings.",
-    am: "የሰው ሀብት አመራር መርሃ-ግብሩ በየሳምንቱ ከ2፡00–2፡50 እንደሚቀጥል አረጋግጦ፣ ይህም ከከንቲባ ጽ/ቤት አቅጣጫ የመነጨ መሆኑን፣ ተጨማሪ የቁርስ ፕሮግራምና አጫጭር ስልጠናዎች እንደሚካተቱ ገልጿል።",
-    om: "Hooggantoonni HR akka sagantaan torbaniin (2:00–2:50) itti fufuuf akka yaadu mirkaneessan, kunis ajaja biiroo maayiraa irraa kan dhufe, akkasumas sagantaa ciree fi leenjii gabaabaa itti dabalamu.",
-  },
-];
-
-const MESOB_POINTS = [
+const FALLBACK_MESOB_POINTS = [
   {
     icon: <FiGrid size={20} />,
     en: "One digital front door for services that used to mean visiting several separate offices.",
@@ -174,6 +104,22 @@ const inputStyle = {
   outline: "none",
   boxSizing: "border-box",
 };
+
+const btnStyle = (bg = C.primary, color = "#fff") => ({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "8px 16px",
+  borderRadius: 8,
+  border: "none",
+  background: bg,
+  color: color,
+  fontWeight: 600,
+  fontSize: 13,
+  cursor: "pointer",
+  fontFamily: F.sans,
+  transition: "all 0.2s ease",
+});
 
 // ─────────────────────────────────────────────────────────────
 // SECTION HEADING COMPONENT
@@ -221,21 +167,429 @@ function SectionHeading({ eyebrow, title, sub, dark }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// COMPONENT
+// STATS DASHBOARD COMPONENT
+// ─────────────────────────────────────────────────────────────
+function StatsDashboard({ stats, nextPresenter, loading }) {
+  if (loading || !stats) {
+    return (
+      <div
+        style={{
+          background: C.white,
+          borderRadius: 16,
+          padding: "24px 32px",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+          textAlign: "center",
+        }}
+      >
+        <p style={{ color: C.muted }}>Loading stats...</p>
+      </div>
+    );
+  }
+
+  const statItems = [
+    {
+      label: "Total Sessions",
+      value: stats.totalSessions || 0,
+      icon: <FiCalendar size={20} />,
+    },
+    {
+      label: "Presenters",
+      value: stats.totalPresenters || 0,
+      icon: <FiUsers size={20} />,
+    },
+    {
+      label: "Upcoming",
+      value: stats.upcomingSessions || 0,
+      icon: <FiClock size={20} />,
+    },
+    {
+      label: "Avg Rating",
+      value: stats.averageRating ? stats.averageRating.toFixed(1) : "N/A",
+      icon: <FiStar size={20} />,
+    },
+  ];
+
+  return (
+    <div
+      style={{
+        background: C.white,
+        borderRadius: 16,
+        padding: "24px 32px",
+        boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+        gap: 16,
+      }}
+    >
+      {statItems.map((item, i) => (
+        <div key={i} style={{ textAlign: "center" }}>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: C.bg,
+              color: C.primary,
+              marginBottom: 8,
+            }}
+          >
+            {item.icon}
+          </div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: C.dark }}>
+            {item.value}
+          </div>
+          <div style={{ fontSize: 12, color: C.muted }}>{item.label}</div>
+        </div>
+      ))}
+
+      {nextPresenter && (
+        <div
+          style={{
+            textAlign: "center",
+            borderLeft: `2px solid ${C.border}`,
+            paddingLeft: 16,
+          }}
+        >
+          <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>
+            Next Presenter
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+            }}
+          >
+            {nextPresenter.profilePhotoUrl ? (
+              <img
+                src={nextPresenter.profilePhotoUrl}
+                alt={nextPresenter.name}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  background: C.primary,
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 14,
+                  fontWeight: 700,
+                }}
+              >
+                {nextPresenter.name?.charAt(0) || "?"}
+              </div>
+            )}
+            <div>
+              <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>
+                {nextPresenter.name}
+              </div>
+              <div style={{ fontSize: 11, color: C.muted }}>
+                {nextPresenter.department || ""}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// TELEGRAM POST BUTTON COMPONENT
+// ─────────────────────────────────────────────────────────────
+function TelegramPostButton({ sessionId, onPosted }) {
+  const [posting, setPosting] = useState(false);
+
+  const handlePost = async () => {
+    setPosting(true);
+    try {
+      await goldenMondayAPI.postToTelegram(sessionId);
+      showToast("Posted to Telegram successfully!", "success");
+      if (onPosted) onPosted();
+    } catch {
+      showToast("Failed to post to Telegram", "error");
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  return (
+    <button
+      onClick={handlePost}
+      disabled={posting}
+      style={{
+        ...btnStyle(C.gold, C.dark),
+        fontSize: 12,
+        padding: "4px 12px",
+      }}
+    >
+      <FiBell size={14} />
+      {posting ? "Posting..." : "Post to Telegram"}
+    </button>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// SESSION CARD COMPONENT
+// ─────────────────────────────────────────────────────────────
+function SessionCard({ session, language, isAdmin, onRefresh }) {
+  const [expanded, setExpanded] = useState(false);
+
+  // eslint-disable-next-line no-unused-vars
+  const getTranslatedText = (obj) => obj?.[language] || obj?.en || obj;
+  const date = new Date(session.date);
+  const isUpcoming = session.status === "scheduled" || date > new Date();
+
+  return (
+    <div
+      style={{
+        background: C.white,
+        borderRadius: 12,
+        padding: "16px 20px",
+        border: `1px solid ${isUpcoming ? C.gold + "66" : C.border}`,
+        transition: "all 0.2s ease",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 10,
+          cursor: "pointer",
+        }}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: isUpcoming ? C.gold : C.primary,
+              color: isUpcoming ? C.dark : "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              fontWeight: 700,
+              flexShrink: 0,
+            }}
+          >
+            {date.getDate()}
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, color: C.dark }}>
+              {session.presentationTitle || session.title || "Untitled Session"}
+            </div>
+            <div style={{ fontSize: 12, color: C.muted }}>
+              {session.presenterName || "No presenter"} ·{" "}
+              {date.toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+              {isUpcoming && (
+                <span
+                  style={{
+                    marginLeft: 8,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    background: C.gold + "33",
+                    color: C.gold,
+                  }}
+                >
+                  Upcoming
+                </span>
+              )}
+              {session.averageRating > 0 && (
+                <span style={{ marginLeft: 8, fontSize: 12, color: C.gold }}>
+                  ★ {session.averageRating.toFixed(1)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {session.recordingUrl && (
+            <a
+              href={session.recordingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                fontSize: 12,
+                color: C.primary,
+                textDecoration: "none",
+                fontWeight: 600,
+              }}
+            >
+              <FiVideo size={14} /> Watch
+            </a>
+          )}
+          {isAdmin && isUpcoming && (
+            <TelegramPostButton sessionId={session._id} onPosted={onRefresh} />
+          )}
+          <button
+            onClick={() => setExpanded(!expanded)}
+            style={{
+              background: "none",
+              border: "none",
+              color: C.muted,
+              cursor: "pointer",
+              padding: "4px",
+            }}
+          >
+            <FiChevronDown
+              size={18}
+              style={{ transform: expanded ? "rotate(180deg)" : "none" }}
+            />
+          </button>
+        </div>
+      </div>
+
+      {expanded && (
+        <div
+          style={{
+            marginTop: 14,
+            paddingTop: 14,
+            borderTop: `1px solid ${C.border}`,
+          }}
+        >
+          {session.presentationDescription && (
+            <p style={{ fontSize: 13, color: C.dark, marginBottom: 8 }}>
+              {session.presentationDescription}
+            </p>
+          )}
+          {session.suggestedTopics && session.suggestedTopics.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <span style={{ fontSize: 11, color: C.muted }}>
+                AI Suggested:
+              </span>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 4,
+                  marginTop: 4,
+                }}
+              >
+                {session.suggestedTopics.slice(0, 3).map((topic, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      fontSize: 11,
+                      background: C.bg,
+                      padding: "2px 10px",
+                      borderRadius: 999,
+                      color: C.dark,
+                    }}
+                  >
+                    {topic}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+          {session.recapEn && (
+            <details style={{ marginTop: 8 }}>
+              <summary
+                style={{ fontSize: 12, color: C.primary, cursor: "pointer" }}
+              >
+                <FiInfo size={12} style={{ marginRight: 4 }} /> View AI Recap
+              </summary>
+              <p
+                style={{
+                  fontSize: 13,
+                  color: C.dark,
+                  marginTop: 8,
+                  padding: 12,
+                  background: C.bg,
+                  borderRadius: 8,
+                }}
+              >
+                {session.recapEn}
+              </p>
+            </details>
+          )}
+          {session.photos && session.photos.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                marginTop: 8,
+                flexWrap: "wrap",
+              }}
+            >
+              {session.photos.slice(0, 3).map((photo, i) => (
+                <img
+                  key={i}
+                  src={photo.url}
+                  alt={photo.caption || "Session photo"}
+                  style={{
+                    width: 60,
+                    height: 60,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────
 export default function GoldenMonday() {
   const { t, language } = useLanguage();
+  const { user } = useAuth();
+
   const gmCopy = t?.goldenMonday || {};
   const [visible, setVisible] = useState({});
   const sectionRefs = useRef({});
-  const { isLeaderOrAbove } = useAuth();
 
-  // ── Persisted sessions (from the AI-backed API) ──────────
-  const [dbSessions, setDbSessions] = useState([]);
-  // eslint-disable-next-line no-unused-vars
-  const [isLoading, setIsLoading] = useState(true);
+  // ── Role-based access ──
+  const userRole = user?.role || ROLES.EMPLOYEE;
+  const isLeaderOrAbove = hasMinRole(userRole, ROLES.TEAM_LEADER);
+  const isAdminOrAbove = hasMinRole(userRole, ROLES.ADMIN);
+  const isSuperAdmin = userRole === ROLES.SUPER_ADMIN;
 
-  // ── AI session composer ───────────────────────────────────
+  // ── State ──
+  const [upcomingSessions, setUpcomingSessions] = useState([]);
+  const [pastSessions, setPastSessions] = useState([]);
+  const [nextPresenter, setNextPresenter] = useState(null);
+  const [ranking, setRanking] = useState([]);
+  const [employees, setEmployees] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [pillars, setPillars] = useState(FALLBACK_PILLARS);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // ── AI Studio State ──
   const [showComposer, setShowComposer] = useState(false);
   const [form, setForm] = useState({
     title: "",
@@ -243,109 +597,94 @@ export default function GoldenMonday() {
     speaker: "",
     date: new Date().toISOString().slice(0, 10),
     rawNotes: "",
+    description: "",
   });
   const [generating, setGenerating] = useState(false);
-
-  // ── AI topic suggestions ──────────────────────────────────
   const [topics, setTopics] = useState(null);
   const [loadingTopics, setLoadingTopics] = useState(false);
 
-  // ── Load sessions using useCallback ──
-  const loadSessions = useCallback(async () => {
+  // ── Admin Panel State ──
+  const [showEmployeeModal, setShowEmployeeModal] = useState(false);
+  const [employeeForm, setEmployeeForm] = useState({
+    userId: "",
+    department: "",
+    position: "",
+    profilePhotoUrl: "",
+  });
+  const [registering, setRegistering] = useState(false);
+
+  // ── Translation helper ──
+  const getTranslatedText = (obj) => obj?.[language] || obj?.en || obj;
+
+  // ── Load all data from API ──
+  const loadAllData = useCallback(async () => {
+    setLoading(true);
     try {
-      setIsLoading(true);
-      const res = await goldenMondayAPI.getAll();
-      setDbSessions(Array.isArray(res.data) ? res.data : []);
-    } catch (error) {
-      console.error("Failed to load Golden Monday sessions:", error);
+      const [
+        upcomingRes,
+        pastRes,
+        nextPresenterRes,
+        rankingRes,
+        employeesRes,
+        statsRes,
+        pillarsRes,
+      ] = await Promise.all([
+        goldenMondayAPI.getUpcomingSessions().catch(() => ({ data: [] })),
+        goldenMondayAPI
+          .getPastSessions()
+          .catch(() => ({ data: { sessions: [], pagination: {} } })),
+        goldenMondayAPI.getNextPresenter().catch(() => ({ data: null })),
+        goldenMondayAPI.getRanking().catch(() => ({ data: [] })),
+        goldenMondayAPI.getEmployees().catch(() => ({ data: [] })),
+        goldenMondayAPI.getStats().catch(() => ({ data: null })),
+        goldenMondayAPI.getPillars().catch(() => ({ data: FALLBACK_PILLARS })),
+      ]);
+
+      setUpcomingSessions(upcomingRes.data || []);
+      setPastSessions(pastRes.data?.sessions || []);
+      setNextPresenter(nextPresenterRes.data || null);
+      setRanking(rankingRes.data || []);
+      setEmployees(employeesRes.data || []);
+      setStats(statsRes.data || null);
+      setPillars(pillarsRes.data || FALLBACK_PILLARS);
+    } catch {
+      console.error("Failed to load Golden Monday data");
+      showToast("Failed to load data", "error");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   }, []);
 
-  // ── Load sessions on mount ──
+  const refreshData = async () => {
+    setRefreshing(true);
+    await loadAllData();
+    setRefreshing(false);
+    showToast("Data refreshed", "success");
+  };
+
+  // ── Load on mount ──
   useEffect(() => {
     let isMounted = true;
-
     const fetchData = async () => {
       if (isMounted) {
-        await loadSessions();
+        await loadAllData();
       }
     };
-
     fetchData();
-
     return () => {
       isMounted = false;
     };
-  }, [loadSessions]);
+  }, [loadAllData]);
 
-  const handleFormChange = (field) => (e) =>
-    setForm((f) => ({ ...f, [field]: e.target.value }));
-
-  const handleGenerateAndSave = async () => {
-    if (!form.title.trim() || !form.rawNotes.trim()) {
-      showToast(gmCopy.aiFormTitle + " / " + gmCopy.aiFormNotes, "warning");
-      return;
-    }
-    try {
-      setGenerating(true);
-      const res = await goldenMondayAPI.create(form);
-      setDbSessions((prev) => [res.data, ...prev]);
-      setForm({
-        title: "",
-        organization: "",
-        speaker: "",
-        date: new Date().toISOString().slice(0, 10),
-        rawNotes: "",
-      });
-      setShowComposer(false);
-      showToast(
-        gmCopy.aiSaved || "Session saved with an AI-generated recap.",
-        "success",
-      );
-    } catch (error) {
-      console.error("Golden Monday AI recap failed:", error);
-      showToast(
-        error.response?.data?.message ||
-          gmCopy.aiError ||
-          "AI couldn't complete that — please try again in a moment.",
-        "error",
-      );
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const handleSuggestTopics = async () => {
-    try {
-      setLoadingTopics(true);
-      const res = await goldenMondayAPI.suggestTopics();
-      setTopics(Array.isArray(res.data?.topics) ? res.data.topics : []);
-    } catch (error) {
-      console.error("Golden Monday topic suggestions failed:", error);
-      showToast(
-        error.response?.data?.message ||
-          gmCopy.aiError ||
-          "AI couldn't complete that — please try again in a moment.",
-        "error",
-      );
-    } finally {
-      setLoadingTopics(false);
-    }
-  };
-
-  // ── Register refs using useCallback to avoid render-time access ──
+  // ── Register refs ──
   const registerRef = useCallback(
     (key) => (el) => {
-      if (el) {
-        sectionRefs.current[key] = el;
-      }
+      if (el) sectionRefs.current[key] = el;
     },
     [],
   );
 
-  // ── Intersection Observer for scroll animations ──
+  // ── Intersection Observer ──
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -358,14 +697,11 @@ export default function GoldenMonday() {
       { threshold: 0.15 },
     );
 
-    // Get current refs and observe them
     const currentRefs = { ...sectionRefs.current };
     const elements = Object.values(currentRefs).filter(Boolean);
     elements.forEach((el) => observer.observe(el));
 
-    return () => {
-      elements.forEach((el) => observer.unobserve(el));
-    };
+    return () => elements.forEach((el) => observer.unobserve(el));
   }, []);
 
   const revealStyle = (key) => ({
@@ -374,48 +710,104 @@ export default function GoldenMonday() {
     transition: "opacity 0.7s ease, transform 0.7s ease",
   });
 
-  const combinedTimeline = [
-    ...dbSessions.map((s) => ({
-      _id: s._id,
-      live: true,
-      date: {
-        en: new Date(s.date).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
-        am: new Date(s.date).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
-        om: new Date(s.date).toLocaleDateString("en-GB", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
-      },
-      org: {
-        en: s.organization || "Addis MESOB",
-        am: s.organization || "አዲስ መሶብ",
-        om: s.organization || "Addis MESOB",
-      },
-      en: s.recapEn || s.rawNotes,
-      am: s.recapAm || s.recapEn || s.rawNotes,
-      om: s.recapAm || s.recapEn || s.rawNotes,
-    })),
-    ...TIMELINE,
-  ];
+  // ── AI Studio Handlers ──
+  const handleFormChange = (field) => (e) =>
+    setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  // Helper to get translated text
-  const getText = (obj) => obj?.[language] || obj?.en || obj;
+  const handleGenerateAndSave = async () => {
+    if (!form.title.trim() || !form.rawNotes.trim()) {
+      showToast("Title and notes are required", "warning");
+      return;
+    }
+    try {
+      setGenerating(true);
+      await goldenMondayAPI.createSession(form);
+      await refreshData();
+      setForm({
+        title: "",
+        organization: "",
+        speaker: "",
+        date: new Date().toISOString().slice(0, 10),
+        rawNotes: "",
+        description: "",
+      });
+      setShowComposer(false);
+      showToast("Session saved with AI recap!", "success");
+    } catch (error) {
+      showToast(
+        error.response?.data?.message || "Failed to save session",
+        "error",
+      );
+    } finally {
+      setGenerating(false);
+    }
+  };
 
-  // Get pillar content from translations
-  const getPillarContent = (titleKey, bodyKey) => ({
-    title: gmCopy[titleKey] || "",
-    body: gmCopy[bodyKey] || "",
-  });
+  const handleSuggestTopics = async () => {
+    try {
+      setLoadingTopics(true);
+      const response = await goldenMondayAPI.suggestTopics();
+      setTopics(response.data?.topics || []);
+    } catch {
+      showToast("Failed to suggest topics", "error");
+    } finally {
+      setLoadingTopics(false);
+    }
+  };
 
+  // ── Admin Handlers ──
+  const handleRegisterEmployee = async () => {
+    if (!employeeForm.userId) {
+      showToast("Please select a user", "warning");
+      return;
+    }
+    setRegistering(true);
+    try {
+      await goldenMondayAPI.registerEmployee(employeeForm);
+      showToast("Employee registered successfully!", "success");
+      setShowEmployeeModal(false);
+      setEmployeeForm({
+        userId: "",
+        department: "",
+        position: "",
+        profilePhotoUrl: "",
+      });
+      await refreshData();
+    } catch (error) {
+      showToast(
+        error.response?.data?.message || "Failed to register employee",
+        "error",
+      );
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  const handleRemoveEmployee = async (userId) => {
+    if (!window.confirm("Remove this employee from rotation?")) return;
+    try {
+      await goldenMondayAPI.removeEmployee(userId);
+      showToast("Employee removed", "success");
+      await refreshData();
+    } catch {
+      showToast("Failed to remove employee", "error");
+    }
+  };
+
+  const handleToggleEligibility = async (userId, isEligible) => {
+    try {
+      await goldenMondayAPI.updateEmployeeEligibility(userId, !isEligible);
+      showToast(
+        `Employee ${isEligible ? "deactivated" : "activated"}`,
+        "success",
+      );
+      await refreshData();
+    } catch {
+      showToast("Failed to update eligibility", "error");
+    }
+  };
+
+  // ── Render ──
   return (
     <div style={{ fontFamily: F.sans, background: C.gray }}>
       <style>{`
@@ -440,9 +832,12 @@ export default function GoldenMonday() {
         .gm-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(13,26,94,0.14); }
         .gm-mesob-point:hover { background: ${C.bg}; }
         .gm-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 26px ${C.primary}55; }
+        .gm-refresh-btn:hover { transform: rotate(180deg); }
+        .fade-in { animation: fadeIn 0.3s ease forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
-      {/* ── HERO ─────────────────────────────────────────── */}
+      {/* ── HERO SECTION ── */}
       <section
         style={{
           position: "relative",
@@ -487,7 +882,7 @@ export default function GoldenMonday() {
             }}
           >
             <FiClock size={13} />
-            {getText(gmCopy.eyebrow) || "Every Monday · 2:00 – 2:50"}
+            {getTranslatedText(gmCopy.eyebrow) || "Every Monday · 2:00 – 2:50"}
           </div>
 
           <h1
@@ -519,7 +914,7 @@ export default function GoldenMonday() {
             >
               <FiSunrise size={30} />
             </span>
-            {getText(gmCopy.title) || "Golden Monday"}
+            {getTranslatedText(gmCopy.title) || "Golden Monday"}
           </h1>
 
           <p
@@ -531,32 +926,89 @@ export default function GoldenMonday() {
               marginTop: 22,
             }}
           >
-            {getText(gmCopy.subtitle) ||
+            {getTranslatedText(gmCopy.subtitle) ||
               "The organization's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all."}
           </p>
 
-          <a
-            href="#gm-pillars"
+          <div
             style={{
-              marginTop: 34,
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              color: C.goldLight,
-              textDecoration: "none",
-              fontWeight: 700,
-              fontSize: 14,
-              borderBottom: `1.5px solid ${C.gold}66`,
-              paddingBottom: 4,
+              display: "flex",
+              gap: 12,
+              marginTop: 28,
+              flexWrap: "wrap",
             }}
           >
-            {getText(gmCopy.scroll) || "Explore the story"}
-            <FiChevronDown size={16} />
-          </a>
+            <a
+              href="#gm-pillars"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 8,
+                color: C.goldLight,
+                textDecoration: "none",
+                fontWeight: 700,
+                fontSize: 14,
+                borderBottom: `1.5px solid ${C.gold}66`,
+                paddingBottom: 4,
+              }}
+            >
+              {getTranslatedText(gmCopy.scroll) || "Explore the story"}
+              <FiChevronDown size={16} />
+            </a>
+
+            {(isAdminOrAbove || isSuperAdmin) && (
+              <button
+                onClick={refreshData}
+                disabled={refreshing}
+                className="gm-refresh-btn"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  background: "rgba(255,255,255,0.1)",
+                  border: `1px solid rgba(255,255,255,0.2)`,
+                  borderRadius: 8,
+                  padding: "6px 14px",
+                  color: "#fff",
+                  fontSize: 12,
+                  cursor: "pointer",
+                  transition: "transform 0.3s ease",
+                }}
+              >
+                <FiRefreshCw
+                  size={14}
+                  style={{
+                    animation: refreshing ? "spin 1s linear infinite" : "none",
+                  }}
+                />
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+            )}
+          </div>
         </div>
       </section>
 
-      {/* ── PILLARS ──────────────────────────────────────── */}
+      {/* ── STATS DASHBOARD ── */}
+      <section
+        ref={registerRef("stats")}
+        data-reveal="stats"
+        style={{
+          maxWidth: 1200,
+          margin: "-30px auto 0",
+          padding: "0 clamp(20px, 6vw, 40px)",
+          ...revealStyle("stats"),
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        <StatsDashboard
+          stats={stats}
+          nextPresenter={nextPresenter}
+          loading={loading}
+        />
+      </section>
+
+      {/* ── PILLARS ── */}
       <section
         id="gm-pillars"
         ref={registerRef("pillars")}
@@ -570,9 +1022,11 @@ export default function GoldenMonday() {
       >
         <SectionHeading
           eyebrow={<FiCompass size={14} />}
-          title={getText(gmCopy.pillarsTitle) || "Why a golden morning"}
+          title={
+            getTranslatedText(gmCopy.pillarsTitle) || "Why a golden morning"
+          }
           sub={
-            getText(gmCopy.pillarsSub) ||
+            getTranslatedText(gmCopy.pillarsSub) ||
             "Three things every session comes back to."
           }
         />
@@ -584,62 +1038,59 @@ export default function GoldenMonday() {
             marginTop: 28,
           }}
         >
-          {PILLARS_KEYS.map((p, i) => {
-            const content = getPillarContent(p.titleKey, p.bodyKey);
-            return (
+          {pillars.map((pillar, i) => (
+            <div
+              key={i}
+              className="gm-card"
+              style={{
+                background: C.white,
+                borderRadius: 16,
+                padding: 24,
+                border: `1px solid ${C.border}`,
+                transition: "transform 0.25s ease, box-shadow 0.25s ease",
+              }}
+            >
               <div
-                key={i}
-                className="gm-card"
                 style={{
-                  background: C.white,
-                  borderRadius: 16,
-                  padding: 24,
-                  border: `1px solid ${C.border}`,
-                  transition: "transform 0.25s ease, box-shadow 0.25s ease",
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
+                  background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 16,
                 }}
               >
-                <div
-                  style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 12,
-                    background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-                    color: "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: 16,
-                  }}
-                >
-                  {p.icon}
-                </div>
-                <h3
-                  style={{
-                    margin: "0 0 8px",
-                    fontSize: 16,
-                    color: C.dark,
-                    fontFamily: F.serif,
-                  }}
-                >
-                  {content.title}
-                </h3>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 13.5,
-                    lineHeight: 1.6,
-                    color: C.muted,
-                  }}
-                >
-                  {content.body}
-                </p>
+                {pillar.icon}
               </div>
-            );
-          })}
+              <h3
+                style={{
+                  margin: "0 0 8px",
+                  fontSize: 16,
+                  color: C.dark,
+                  fontFamily: F.serif,
+                }}
+              >
+                {pillar.title}
+              </h3>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 13.5,
+                  lineHeight: 1.6,
+                  color: C.muted,
+                }}
+              >
+                {pillar.body}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* ── AI SESSION STUDIO (leader/admin only) ───────────── */}
+      {/* ── AI SESSION STUDIO (Leader/Admin only) ── */}
       {isLeaderOrAbove && (
         <section
           ref={registerRef("aiStudio")}
@@ -653,9 +1104,9 @@ export default function GoldenMonday() {
         >
           <SectionHeading
             eyebrow={<FiCpu size={14} />}
-            title={getText(gmCopy.aiTitle) || "AI session recap"}
+            title={getTranslatedText(gmCopy.aiTitle) || "AI session recap"}
             sub={
-              getText(gmCopy.aiSub) ||
+              getTranslatedText(gmCopy.aiSub) ||
               "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds."
             }
           />
@@ -698,26 +1149,32 @@ export default function GoldenMonday() {
                   }}
                 >
                   <FiPlus size={16} />
-                  {getText(gmCopy.aiNewSession) || "Log a new session"}
+                  {getTranslatedText(gmCopy.aiNewSession) ||
+                    "Log a new session"}
                 </button>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
                   <input
-                    placeholder={getText(gmCopy.aiFormTitle) || "Session title"}
+                    placeholder={
+                      getTranslatedText(gmCopy.aiFormTitle) || "Session title"
+                    }
                     value={form.title}
                     onChange={handleFormChange("title")}
                     style={inputStyle}
                   />
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <input
-                      placeholder={getText(gmCopy.aiFormOrg) || "Organization"}
+                      placeholder={
+                        getTranslatedText(gmCopy.aiFormOrg) || "Organization"
+                      }
                       value={form.organization}
                       onChange={handleFormChange("organization")}
                       style={{ ...inputStyle, flex: "1 1 160px" }}
                     />
                     <input
                       placeholder={
-                        getText(gmCopy.aiFormSpeaker) || "Speaker / facilitator"
+                        getTranslatedText(gmCopy.aiFormSpeaker) ||
+                        "Speaker / facilitator"
                       }
                       value={form.speaker}
                       onChange={handleFormChange("speaker")}
@@ -732,7 +1189,7 @@ export default function GoldenMonday() {
                   />
                   <textarea
                     placeholder={
-                      getText(gmCopy.aiFormNotes) ||
+                      getTranslatedText(gmCopy.aiFormNotes) ||
                       "Raw notes — write it however you like, AI will clean it up"
                     }
                     value={form.rawNotes}
@@ -770,7 +1227,7 @@ export default function GoldenMonday() {
                       }}
                     >
                       <FiX size={14} />
-                      {getText(gmCopy.aiCancel) || "Cancel"}
+                      {getTranslatedText(gmCopy.aiCancel) || "Cancel"}
                     </button>
                     <button
                       onClick={handleGenerateAndSave}
@@ -797,12 +1254,13 @@ export default function GoldenMonday() {
                             size={14}
                             style={{ animation: "spin 1s linear infinite" }}
                           />
-                          {getText(gmCopy.aiGenerating) || "Writing recap…"}
+                          {getTranslatedText(gmCopy.aiGenerating) ||
+                            "Writing recap…"}
                         </>
                       ) : (
                         <>
                           <FiSend size={14} />
-                          {getText(gmCopy.aiGenerate) ||
+                          {getTranslatedText(gmCopy.aiGenerate) ||
                             "Generate & save with AI"}
                         </>
                       )}
@@ -840,7 +1298,8 @@ export default function GoldenMonday() {
                   }}
                 >
                   <FiSun size={16} color={C.gold} />
-                  {getText(gmCopy.aiTopicsTitle) || "AI: suggest next topics"}
+                  {getTranslatedText(gmCopy.aiTopicsTitle) ||
+                    "AI: suggest next topics"}
                 </div>
                 <button
                   onClick={handleSuggestTopics}
@@ -869,21 +1328,22 @@ export default function GoldenMonday() {
                     <FiCpu size={13} />
                   )}
                   {loadingTopics
-                    ? getText(gmCopy.aiTopicsLoading) || "Thinking of topics…"
-                    : getText(gmCopy.aiTopicsBtn) || "Suggest topics"}
+                    ? getTranslatedText(gmCopy.aiTopicsLoading) ||
+                      "Thinking of topics…"
+                    : getTranslatedText(gmCopy.aiTopicsBtn) || "Suggest topics"}
                 </button>
               </div>
 
               <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
                 {topics === null && (
                   <p style={{ fontSize: 12.5, color: "#a9b3e0", margin: 0 }}>
-                    {getText(gmCopy.aiTopicsEmpty) ||
+                    {getTranslatedText(gmCopy.aiTopicsEmpty) ||
                       "Log a couple of sessions first so AI has something to build on."}
                   </p>
                 )}
                 {topics?.length === 0 && (
                   <p style={{ fontSize: 12.5, color: "#a9b3e0", margin: 0 }}>
-                    {getText(gmCopy.aiTopicsEmpty) ||
+                    {getTranslatedText(gmCopy.aiTopicsEmpty) ||
                       "Log a couple of sessions first so AI has something to build on."}
                   </p>
                 )}
@@ -924,7 +1384,7 @@ export default function GoldenMonday() {
         </section>
       )}
 
-      {/* ── PRESENTER ROTATION & RECORDINGS ─────────────────── */}
+      {/* ── ROTATION PANEL ── */}
       <section
         style={{
           maxWidth: 1000,
@@ -932,10 +1392,25 @@ export default function GoldenMonday() {
           padding: "0 clamp(16px, 4vw, 32px) 40px",
         }}
       >
-        <GoldenMondayRotationPanel />
+        <GoldenMondayRotationPanel
+          nextPresenter={nextPresenter}
+          ranking={ranking}
+          employees={employees}
+          onRefresh={refreshData}
+          isAdmin={isAdminOrAbove}
+          onAssignPresenter={async (userId) => {
+            try {
+              await goldenMondayAPI.assignPresenter(userId);
+              showToast("Presenter assigned!", "success");
+              await refreshData();
+            } catch {
+              showToast("Failed to assign presenter", "error");
+            }
+          }}
+        />
       </section>
 
-      {/* ── TIMELINE ─────────────────────────────────────── */}
+      {/* ── UPCOMING & PAST SESSIONS TIMELINE ── */}
       <section
         ref={registerRef("timeline")}
         data-reveal="timeline"
@@ -948,123 +1423,254 @@ export default function GoldenMonday() {
       >
         <SectionHeading
           eyebrow={<FiCalendar size={14} />}
-          title={getText(gmCopy.timelineTitle) || "Recent sessions"}
+          title={getTranslatedText(gmCopy.timelineTitle) || "Sessions Timeline"}
           sub={
-            getText(gmCopy.timelineSub) ||
+            getTranslatedText(gmCopy.timelineSub) ||
             "A running record, not a one-off event."
           }
         />
-        <div style={{ marginTop: 30, position: "relative" }}>
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              left: 15,
-              top: 8,
-              bottom: 8,
-              width: 2,
-              background: `linear-gradient(${C.gold}, ${C.primary})`,
-            }}
-          />
-          {combinedTimeline.map((item, i) => (
-            <div
-              key={item._id || i}
-              style={{
-                display: "flex",
-                gap: 20,
-                marginBottom: 30,
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  background: C.white,
-                  border: `3px solid ${item.live ? C.gold : C.primary}`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 12,
-                  fontWeight: 800,
-                  color: item.live ? C.gold : C.primary,
-                  flexShrink: 0,
-                  zIndex: 1,
-                }}
-              >
-                {item.live ? <FiStar size={14} /> : combinedTimeline.length - i}
-              </div>
-              <div
-                className="gm-card"
-                style={{
-                  background: C.white,
-                  border: `1px solid ${item.live ? C.gold + "88" : C.border}`,
-                  borderRadius: 14,
-                  padding: "16px 20px",
-                  flex: 1,
-                  transition: "transform 0.25s ease, box-shadow 0.25s ease",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    flexWrap: "wrap",
-                    gap: 8,
-                    marginBottom: 8,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: C.primary,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 6,
-                    }}
-                  >
-                    {getText(item.org)}
-                    {item.live && (
-                      <span
-                        style={{
-                          fontSize: 9,
-                          fontWeight: 800,
-                          color: C.dark,
-                          background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-                          padding: "2px 7px",
-                          borderRadius: 999,
-                          letterSpacing: 0.3,
-                        }}
-                      >
-                        {getText(gmCopy.aiLive) || "AI-generated"}
-                      </span>
-                    )}
-                  </span>
-                  <span
-                    style={{ fontSize: 11, color: C.muted, fontWeight: 600 }}
-                  >
-                    {getText(item.date)}
-                  </span>
-                </div>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 13.5,
-                    lineHeight: 1.65,
-                    color: "#334",
-                  }}
-                >
-                  {getText(item)}
-                </p>
-              </div>
+
+        {/* Upcoming Sessions */}
+        {upcomingSessions.length > 0 && (
+          <div style={{ marginTop: 30 }}>
+            <h3 style={{ color: C.primary, fontSize: 16, marginBottom: 16 }}>
+              <FiClock size={16} style={{ marginRight: 8 }} />
+              Upcoming Sessions
+            </h3>
+            <div style={{ display: "grid", gap: 12 }}>
+              {upcomingSessions.map((session) => (
+                <SessionCard
+                  key={session._id}
+                  session={session}
+                  language={language}
+                  isAdmin={isAdminOrAbove}
+                  onRefresh={refreshData}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+          </div>
+        )}
+
+        {/* Past Sessions */}
+        {pastSessions.length > 0 && (
+          <div style={{ marginTop: 40 }}>
+            <h3 style={{ color: C.muted, fontSize: 16, marginBottom: 16 }}>
+              <FiStar size={16} style={{ marginRight: 8 }} />
+              Past Sessions
+            </h3>
+            <div style={{ display: "grid", gap: 12 }}>
+              {pastSessions.slice(0, 10).map((session) => (
+                <SessionCard
+                  key={session._id}
+                  session={session}
+                  language={language}
+                  isAdmin={isAdminOrAbove}
+                  onRefresh={refreshData}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {upcomingSessions.length === 0 && pastSessions.length === 0 && (
+          <p style={{ color: C.muted, textAlign: "center", padding: "40px 0" }}>
+            No sessions recorded yet. Start by logging a session with AI!
+          </p>
+        )}
       </section>
 
-      {/* ── MESOB PLATFORM ───────────────────────────────── */}
+      {/* ── ADMIN PANEL (Admin/SuperAdmin only) ── */}
+      {isAdminOrAbove && (
+        <section
+          ref={registerRef("admin")}
+          data-reveal="admin"
+          style={{
+            maxWidth: 1000,
+            margin: "0 auto",
+            padding: "clamp(48px, 8vw, 72px) clamp(20px, 6vw, 40px) 12px",
+            ...revealStyle("admin"),
+          }}
+        >
+          <SectionHeading
+            eyebrow={<FiUsers size={14} />}
+            title="Employee Management"
+            sub="Register and manage employees for Golden Monday rotation"
+          />
+
+          <div
+            style={{
+              background: C.white,
+              borderRadius: 16,
+              padding: 24,
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
+              <div>
+                <span style={{ fontWeight: 600, color: C.dark }}>
+                  Registered Employees: {employees.length}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowEmployeeModal(true)}
+                style={btnStyle(C.primary)}
+              >
+                <FiUserPlus size={14} /> Register Employee
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gap: 8 }}>
+              {employees.length === 0 ? (
+                <p
+                  style={{
+                    color: C.muted,
+                    textAlign: "center",
+                    padding: "20px 0",
+                  }}
+                >
+                  No employees registered yet. Click "Register Employee" to add.
+                </p>
+              ) : (
+                employees.map((emp) => (
+                  <div
+                    key={emp.user?._id || emp._id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "10px 14px",
+                      borderRadius: 8,
+                      background: emp.isEligible ? C.bg : "#fef2f2",
+                      border: `1px solid ${emp.isEligible ? C.border : "#fecaca"}`,
+                      flexWrap: "wrap",
+                      gap: 8,
+                    }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 12 }}
+                    >
+                      {emp.profilePhotoUrl ? (
+                        <img
+                          src={emp.profilePhotoUrl}
+                          alt={emp.name}
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: "50%",
+                            objectFit: "cover",
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: "50%",
+                            background: C.primary,
+                            color: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 14,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {emp.name?.charAt(0) || "?"}
+                        </div>
+                      )}
+                      <div>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            color: C.dark,
+                            fontSize: 14,
+                          }}
+                        >
+                          {emp.name}
+                        </div>
+                        <div style={{ fontSize: 12, color: C.muted }}>
+                          {emp.department || "No department"} ·{" "}
+                          {emp.position || "No position"}
+                        </div>
+                      </div>
+                    </div>
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: "2px 10px",
+                          borderRadius: 999,
+                          background: emp.isEligible ? "#d1fae5" : "#fef2f2",
+                          color: emp.isEligible ? "#065f46" : "#991b1b",
+                        }}
+                      >
+                        {emp.isEligible ? "Active" : "Inactive"}
+                      </span>
+                      <span style={{ fontSize: 11, color: C.muted }}>
+                        Presented: {emp.timesPresented || 0}x
+                      </span>
+                      <button
+                        onClick={() =>
+                          handleToggleEligibility(
+                            emp.user?._id || emp._id,
+                            emp.isEligible,
+                          )
+                        }
+                        style={{
+                          ...btnStyle(
+                            emp.isEligible ? "#f59e0b" : "#10b981",
+                            "#fff",
+                          ),
+                          fontSize: 11,
+                          padding: "4px 10px",
+                        }}
+                      >
+                        {emp.isEligible ? (
+                          <FiUserX size={12} />
+                        ) : (
+                          <FiUserCheck size={12} />
+                        )}
+                        {emp.isEligible ? "Deactivate" : "Activate"}
+                      </button>
+                      {isSuperAdmin && (
+                        <button
+                          onClick={() =>
+                            handleRemoveEmployee(emp.user?._id || emp._id)
+                          }
+                          style={{
+                            ...btnStyle("#ef4444", "#fff"),
+                            fontSize: 11,
+                            padding: "4px 10px",
+                          }}
+                        >
+                          <FiTrash2 size={12} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── MESOB PLATFORM ── */}
       <section
         ref={registerRef("mesob")}
         data-reveal="mesob"
@@ -1089,11 +1695,11 @@ export default function GoldenMonday() {
               <SectionHeading
                 eyebrow={<FiGrid size={14} />}
                 title={
-                  getText(gmCopy.mesobTitle) ||
+                  getTranslatedText(gmCopy.mesobTitle) ||
                   "The platform this mindset built"
                 }
                 sub={
-                  getText(gmCopy.mesobSub) ||
+                  getTranslatedText(gmCopy.mesobSub) ||
                   "MESOB is the organization's one-stop digital service platform — the same drive for less friction, applied to how citizens actually get things done."
                 }
                 dark
@@ -1116,13 +1722,13 @@ export default function GoldenMonday() {
                   transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               >
-                {getText(gmCopy.mesobCta) || "Open Document Vault"}
+                {getTranslatedText(gmCopy.mesobCta) || "Open Document Vault"}
                 <FiArrowRight size={16} />
               </a>
             </div>
 
             <div style={{ flex: "1 1 380px", display: "grid", gap: 12 }}>
-              {MESOB_POINTS.map((pt, i) => (
+              {FALLBACK_MESOB_POINTS.map((pt, i) => (
                 <div
                   key={i}
                   className="gm-mesob-point"
@@ -1158,7 +1764,7 @@ export default function GoldenMonday() {
                       color: "#dfe4ff",
                     }}
                   >
-                    {getText(pt)}
+                    {getTranslatedText(pt)}
                   </p>
                 </div>
               ))}
@@ -1167,7 +1773,7 @@ export default function GoldenMonday() {
         </div>
       </section>
 
-      {/* ── CLOSING ──────────────────────────────────────── */}
+      {/* ── CLOSING ── */}
       <section
         style={{
           textAlign: "center",
@@ -1182,7 +1788,7 @@ export default function GoldenMonday() {
             margin: "0 0 8px",
           }}
         >
-          {getText(gmCopy.closingTitle) || "Start your week here"}
+          {getTranslatedText(gmCopy.closingTitle) || "Start your week here"}
         </h3>
         <p
           style={{
@@ -1192,10 +1798,162 @@ export default function GoldenMonday() {
             margin: "0 auto",
           }}
         >
-          {getText(gmCopy.closingBody) ||
+          {getTranslatedText(gmCopy.closingBody) ||
             "Golden Monday is a standing fixture — check back weekly for the next session's write-up."}
         </p>
       </section>
+
+      {/* ── REGISTER EMPLOYEE MODAL ── */}
+      {showEmployeeModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            animation: "fadeIn 0.3s ease",
+          }}
+          onClick={() => setShowEmployeeModal(false)}
+        >
+          <div
+            style={{
+              background: C.white,
+              borderRadius: 16,
+              padding: 32,
+              maxWidth: 480,
+              width: "100%",
+              maxHeight: "90vh",
+              overflow: "auto",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              style={{ margin: "0 0 20px", color: C.dark, fontFamily: F.serif }}
+            >
+              Register Employee
+            </h3>
+            <div style={{ display: "grid", gap: 14 }}>
+              <div>
+                <label
+                  style={{
+                    fontSize: 13,
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: 4,
+                  }}
+                >
+                  User ID *
+                </label>
+                <input
+                  placeholder="Enter user ID"
+                  value={employeeForm.userId}
+                  onChange={(e) =>
+                    setEmployeeForm({ ...employeeForm, userId: e.target.value })
+                  }
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 13,
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: 4,
+                  }}
+                >
+                  Department
+                </label>
+                <input
+                  placeholder="Department name"
+                  value={employeeForm.department}
+                  onChange={(e) =>
+                    setEmployeeForm({
+                      ...employeeForm,
+                      department: e.target.value,
+                    })
+                  }
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 13,
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: 4,
+                  }}
+                >
+                  Position
+                </label>
+                <input
+                  placeholder="Job position"
+                  value={employeeForm.position}
+                  onChange={(e) =>
+                    setEmployeeForm({
+                      ...employeeForm,
+                      position: e.target.value,
+                    })
+                  }
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label
+                  style={{
+                    fontSize: 13,
+                    color: C.muted,
+                    display: "block",
+                    marginBottom: 4,
+                  }}
+                >
+                  Profile Photo URL
+                </label>
+                <input
+                  placeholder="https://example.com/photo.jpg"
+                  value={employeeForm.profilePhotoUrl}
+                  onChange={(e) =>
+                    setEmployeeForm({
+                      ...employeeForm,
+                      profilePhotoUrl: e.target.value,
+                    })
+                  }
+                  style={inputStyle}
+                />
+              </div>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  justifyContent: "flex-end",
+                  marginTop: 8,
+                }}
+              >
+                <button
+                  onClick={() => setShowEmployeeModal(false)}
+                  style={btnStyle("#e5e7eb", "#444")}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRegisterEmployee}
+                  disabled={registering || !employeeForm.userId}
+                  style={{
+                    ...btnStyle(C.primary),
+                    opacity: registering || !employeeForm.userId ? 0.6 : 1,
+                  }}
+                >
+                  {registering ? "Registering..." : "Register"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
