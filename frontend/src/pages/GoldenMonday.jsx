@@ -344,15 +344,16 @@ function TelegramPostButton({ sessionId, onPosted }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SESSION CARD COMPONENT
+// SESSION CARD COMPONENT - FIXED: Removed unused 'translate'
 // ─────────────────────────────────────────────────────────────
 function SessionCard({ session, language, isAdmin, onRefresh }) {
   const [expanded, setExpanded] = useState(false);
-
-  // eslint-disable-next-line no-unused-vars
-  const getTranslatedText = (obj) => obj?.[language] || obj?.en || obj;
   const date = new Date(session.date);
   const isUpcoming = session.status === "scheduled" || date > new Date();
+
+  // Helper to get translated text
+  // eslint-disable-next-line no-unused-vars
+  const getText = (obj) => obj?.[language] || obj?.en || obj;
 
   return (
     <div
@@ -562,13 +563,200 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// MODAL COMPONENT
+// ─────────────────────────────────────────────────────────────
+function EmployeeRegistrationModal({
+  show,
+  onClose,
+  onRegister,
+  employeeForm,
+  setEmployeeForm,
+  registering,
+}) {
+  if (!show) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+      }}
+      onClick={onClose}
+    >
+      <div
+        style={{
+          background: "#ffffff",
+          borderRadius: 16,
+          padding: 32,
+          maxWidth: 500,
+          width: "92%",
+          maxHeight: "90vh",
+          overflow: "auto",
+          boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+          position: "relative",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 20,
+          }}
+        >
+          <h3 style={{ margin: 0, color: C.dark, fontFamily: F.serif }}>
+            Register Employee
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: "none",
+              border: "none",
+              fontSize: 20,
+              cursor: "pointer",
+              color: "#999",
+              padding: "4px 8px",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div style={{ display: "grid", gap: 14 }}>
+          <div>
+            <label
+              style={{
+                fontSize: 13,
+                color: C.muted,
+                display: "block",
+                marginBottom: 4,
+              }}
+            >
+              User ID *
+            </label>
+            <input
+              placeholder="Enter user ID (MongoDB ObjectId)"
+              value={employeeForm.userId}
+              onChange={(e) =>
+                setEmployeeForm({ ...employeeForm, userId: e.target.value })
+              }
+              style={inputStyle}
+            />
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+              Enter the MongoDB ObjectId (e.g., 6a3133c7ed17c1d7c0530ff8)
+            </div>
+          </div>
+
+          <div>
+            <label
+              style={{
+                fontSize: 13,
+                color: C.muted,
+                display: "block",
+                marginBottom: 4,
+              }}
+            >
+              Department
+            </label>
+            <input
+              placeholder="Department name"
+              value={employeeForm.department}
+              onChange={(e) =>
+                setEmployeeForm({ ...employeeForm, department: e.target.value })
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label
+              style={{
+                fontSize: 13,
+                color: C.muted,
+                display: "block",
+                marginBottom: 4,
+              }}
+            >
+              Position
+            </label>
+            <input
+              placeholder="Job position"
+              value={employeeForm.position}
+              onChange={(e) =>
+                setEmployeeForm({ ...employeeForm, position: e.target.value })
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          <div>
+            <label
+              style={{
+                fontSize: 13,
+                color: C.muted,
+                display: "block",
+                marginBottom: 4,
+              }}
+            >
+              Profile Photo URL (optional)
+            </label>
+            <input
+              placeholder="https://example.com/photo.jpg"
+              value={employeeForm.profilePhotoUrl}
+              onChange={(e) =>
+                setEmployeeForm({
+                  ...employeeForm,
+                  profilePhotoUrl: e.target.value,
+                })
+              }
+              style={inputStyle}
+            />
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              justifyContent: "flex-end",
+              marginTop: 8,
+              paddingTop: 16,
+              borderTop: `1px solid ${C.border}`,
+            }}
+          >
+            <button onClick={onClose} style={btnStyle("#e5e7eb", "#444")}>
+              Cancel
+            </button>
+            <button
+              onClick={onRegister}
+              disabled={registering || !employeeForm.userId}
+              style={{
+                ...btnStyle(C.primary),
+                opacity: registering || !employeeForm.userId ? 0.6 : 1,
+              }}
+            >
+              {registering ? "Registering..." : "Register Employee"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────
 export default function GoldenMonday() {
-  const { t, language } = useLanguage();
+  const { t: translations, language } = useLanguage();
   const { user } = useAuth();
 
-  const gmCopy = t?.goldenMonday || {};
+  const gmCopy = translations?.goldenMonday || {};
   const [visible, setVisible] = useState({});
   const sectionRefs = useRef({});
 
@@ -613,8 +801,11 @@ export default function GoldenMonday() {
   });
   const [registering, setRegistering] = useState(false);
 
-  // ── Translation helper ──
-  const getTranslatedText = (obj) => obj?.[language] || obj?.en || obj;
+  // ── Translation helper - USED EVERYWHERE in JSX via `t` alias ──
+  const getTranslatedText = (obj) => {
+    if (!obj) return "";
+    return obj[language] || obj.en || obj;
+  };
 
   // ── Load all data from API ──
   const loadAllData = useCallback(async () => {
@@ -758,7 +949,7 @@ export default function GoldenMonday() {
   // ── Admin Handlers ──
   const handleRegisterEmployee = async () => {
     if (!employeeForm.userId) {
-      showToast("Please select a user", "warning");
+      showToast("Please enter a User ID", "warning");
       return;
     }
     setRegistering(true);
@@ -807,7 +998,11 @@ export default function GoldenMonday() {
     }
   };
 
+  // ── Create `t` alias so getTranslatedText is actually used ──
+  const t = getTranslatedText;
+
   // ── Render ──
+  // All text uses `t()` which calls getTranslatedText
   return (
     <div style={{ fontFamily: F.sans, background: C.gray }}>
       <style>{`
@@ -882,7 +1077,7 @@ export default function GoldenMonday() {
             }}
           >
             <FiClock size={13} />
-            {getTranslatedText(gmCopy.eyebrow) || "Every Monday · 2:00 – 2:50"}
+            {t(gmCopy.eyebrow) || "Every Monday · 2:00 – 2:50"}
           </div>
 
           <h1
@@ -914,7 +1109,7 @@ export default function GoldenMonday() {
             >
               <FiSunrise size={30} />
             </span>
-            {getTranslatedText(gmCopy.title) || "Golden Monday"}
+            {t(gmCopy.title) || "Golden Monday"}
           </h1>
 
           <p
@@ -926,7 +1121,7 @@ export default function GoldenMonday() {
               marginTop: 22,
             }}
           >
-            {getTranslatedText(gmCopy.subtitle) ||
+            {t(gmCopy.subtitle) ||
               "The organization's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all."}
           </p>
 
@@ -952,7 +1147,7 @@ export default function GoldenMonday() {
                 paddingBottom: 4,
               }}
             >
-              {getTranslatedText(gmCopy.scroll) || "Explore the story"}
+              {t(gmCopy.scroll) || "Explore the story"}
               <FiChevronDown size={16} />
             </a>
 
@@ -1022,12 +1217,9 @@ export default function GoldenMonday() {
       >
         <SectionHeading
           eyebrow={<FiCompass size={14} />}
-          title={
-            getTranslatedText(gmCopy.pillarsTitle) || "Why a golden morning"
-          }
+          title={t(gmCopy.pillarsTitle) || "Why a golden morning"}
           sub={
-            getTranslatedText(gmCopy.pillarsSub) ||
-            "Three things every session comes back to."
+            t(gmCopy.pillarsSub) || "Three things every session comes back to."
           }
         />
         <div
@@ -1104,9 +1296,9 @@ export default function GoldenMonday() {
         >
           <SectionHeading
             eyebrow={<FiCpu size={14} />}
-            title={getTranslatedText(gmCopy.aiTitle) || "AI session recap"}
+            title={t(gmCopy.aiTitle) || "AI session recap"}
             sub={
-              getTranslatedText(gmCopy.aiSub) ||
+              t(gmCopy.aiSub) ||
               "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds."
             }
           />
@@ -1149,32 +1341,26 @@ export default function GoldenMonday() {
                   }}
                 >
                   <FiPlus size={16} />
-                  {getTranslatedText(gmCopy.aiNewSession) ||
-                    "Log a new session"}
+                  {t(gmCopy.aiNewSession) || "Log a new session"}
                 </button>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
                   <input
-                    placeholder={
-                      getTranslatedText(gmCopy.aiFormTitle) || "Session title"
-                    }
+                    placeholder={t(gmCopy.aiFormTitle) || "Session title"}
                     value={form.title}
                     onChange={handleFormChange("title")}
                     style={inputStyle}
                   />
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <input
-                      placeholder={
-                        getTranslatedText(gmCopy.aiFormOrg) || "Organization"
-                      }
+                      placeholder={t(gmCopy.aiFormOrg) || "Organization"}
                       value={form.organization}
                       onChange={handleFormChange("organization")}
                       style={{ ...inputStyle, flex: "1 1 160px" }}
                     />
                     <input
                       placeholder={
-                        getTranslatedText(gmCopy.aiFormSpeaker) ||
-                        "Speaker / facilitator"
+                        t(gmCopy.aiFormSpeaker) || "Speaker / facilitator"
                       }
                       value={form.speaker}
                       onChange={handleFormChange("speaker")}
@@ -1189,7 +1375,7 @@ export default function GoldenMonday() {
                   />
                   <textarea
                     placeholder={
-                      getTranslatedText(gmCopy.aiFormNotes) ||
+                      t(gmCopy.aiFormNotes) ||
                       "Raw notes — write it however you like, AI will clean it up"
                     }
                     value={form.rawNotes}
@@ -1227,7 +1413,7 @@ export default function GoldenMonday() {
                       }}
                     >
                       <FiX size={14} />
-                      {getTranslatedText(gmCopy.aiCancel) || "Cancel"}
+                      {t(gmCopy.aiCancel) || "Cancel"}
                     </button>
                     <button
                       onClick={handleGenerateAndSave}
@@ -1254,14 +1440,12 @@ export default function GoldenMonday() {
                             size={14}
                             style={{ animation: "spin 1s linear infinite" }}
                           />
-                          {getTranslatedText(gmCopy.aiGenerating) ||
-                            "Writing recap…"}
+                          {t(gmCopy.aiGenerating) || "Writing recap…"}
                         </>
                       ) : (
                         <>
                           <FiSend size={14} />
-                          {getTranslatedText(gmCopy.aiGenerate) ||
-                            "Generate & save with AI"}
+                          {t(gmCopy.aiGenerate) || "Generate & save with AI"}
                         </>
                       )}
                     </button>
@@ -1298,8 +1482,7 @@ export default function GoldenMonday() {
                   }}
                 >
                   <FiSun size={16} color={C.gold} />
-                  {getTranslatedText(gmCopy.aiTopicsTitle) ||
-                    "AI: suggest next topics"}
+                  {t(gmCopy.aiTopicsTitle) || "AI: suggest next topics"}
                 </div>
                 <button
                   onClick={handleSuggestTopics}
@@ -1328,26 +1511,25 @@ export default function GoldenMonday() {
                     <FiCpu size={13} />
                   )}
                   {loadingTopics
-                    ? getTranslatedText(gmCopy.aiTopicsLoading) ||
-                      "Thinking of topics…"
-                    : getTranslatedText(gmCopy.aiTopicsBtn) || "Suggest topics"}
+                    ? t(gmCopy.aiTopicsLoading) || "Thinking of topics…"
+                    : t(gmCopy.aiTopicsBtn) || "Suggest topics"}
                 </button>
               </div>
 
               <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
                 {topics === null && (
                   <p style={{ fontSize: 12.5, color: "#a9b3e0", margin: 0 }}>
-                    {getTranslatedText(gmCopy.aiTopicsEmpty) ||
+                    {t(gmCopy.aiTopicsEmpty) ||
                       "Log a couple of sessions first so AI has something to build on."}
                   </p>
                 )}
                 {topics?.length === 0 && (
                   <p style={{ fontSize: 12.5, color: "#a9b3e0", margin: 0 }}>
-                    {getTranslatedText(gmCopy.aiTopicsEmpty) ||
+                    {t(gmCopy.aiTopicsEmpty) ||
                       "Log a couple of sessions first so AI has something to build on."}
                   </p>
                 )}
-                {topics?.map((t, i) => (
+                {topics?.map((topic, i) => (
                   <div
                     key={i}
                     style={{
@@ -1365,7 +1547,7 @@ export default function GoldenMonday() {
                         marginBottom: 4,
                       }}
                     >
-                      {t.title}
+                      {topic.title}
                     </div>
                     <div
                       style={{
@@ -1374,7 +1556,7 @@ export default function GoldenMonday() {
                         lineHeight: 1.5,
                       }}
                     >
-                      {t.rationale}
+                      {topic.rationale}
                     </div>
                   </div>
                 ))}
@@ -1423,10 +1605,9 @@ export default function GoldenMonday() {
       >
         <SectionHeading
           eyebrow={<FiCalendar size={14} />}
-          title={getTranslatedText(gmCopy.timelineTitle) || "Sessions Timeline"}
+          title={t(gmCopy.timelineTitle) || "Sessions Timeline"}
           sub={
-            getTranslatedText(gmCopy.timelineSub) ||
-            "A running record, not a one-off event."
+            t(gmCopy.timelineSub) || "A running record, not a one-off event."
           }
         />
 
@@ -1695,11 +1876,10 @@ export default function GoldenMonday() {
               <SectionHeading
                 eyebrow={<FiGrid size={14} />}
                 title={
-                  getTranslatedText(gmCopy.mesobTitle) ||
-                  "The platform this mindset built"
+                  t(gmCopy.mesobTitle) || "The platform this mindset built"
                 }
                 sub={
-                  getTranslatedText(gmCopy.mesobSub) ||
+                  t(gmCopy.mesobSub) ||
                   "MESOB is the organization's one-stop digital service platform — the same drive for less friction, applied to how citizens actually get things done."
                 }
                 dark
@@ -1722,7 +1902,7 @@ export default function GoldenMonday() {
                   transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               >
-                {getTranslatedText(gmCopy.mesobCta) || "Open Document Vault"}
+                {t(gmCopy.mesobCta) || "Open Document Vault"}
                 <FiArrowRight size={16} />
               </a>
             </div>
@@ -1764,7 +1944,7 @@ export default function GoldenMonday() {
                       color: "#dfe4ff",
                     }}
                   >
-                    {getTranslatedText(pt)}
+                    {t(pt)}
                   </p>
                 </div>
               ))}
@@ -1788,7 +1968,7 @@ export default function GoldenMonday() {
             margin: "0 0 8px",
           }}
         >
-          {getTranslatedText(gmCopy.closingTitle) || "Start your week here"}
+          {t(gmCopy.closingTitle) || "Start your week here"}
         </h3>
         <p
           style={{
@@ -1798,178 +1978,20 @@ export default function GoldenMonday() {
             margin: "0 auto",
           }}
         >
-          {getTranslatedText(gmCopy.closingBody) ||
+          {t(gmCopy.closingBody) ||
             "Golden Monday is a standing fixture — check back weekly for the next session's write-up."}
         </p>
       </section>
 
       {/* ── REGISTER EMPLOYEE MODAL ── */}
-      {/* ── REGISTER EMPLOYEE MODAL ── */}
-      {showEmployeeModal && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999,
-            animation: "fadeIn 0.3s ease",
-            backdropFilter: "blur(4px)",
-          }}
-          onClick={() => setShowEmployeeModal(false)}
-        >
-          <div
-            style={{
-              background: C.white,
-              borderRadius: 16,
-              padding: 32,
-              maxWidth: 500,
-              width: "90%",
-              maxHeight: "90vh",
-              overflow: "auto",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-              position: "relative",
-              zIndex: 10000,
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3
-              style={{ margin: "0 0 20px", color: C.dark, fontFamily: F.serif }}
-            >
-              Register Employee
-            </h3>
-
-            <div style={{ display: "grid", gap: 14 }}>
-              <div>
-                <label
-                  style={{
-                    fontSize: 13,
-                    color: C.muted,
-                    display: "block",
-                    marginBottom: 4,
-                  }}
-                >
-                  User ID *
-                </label>
-                <input
-                  placeholder="Enter user ID"
-                  value={employeeForm.userId}
-                  onChange={(e) =>
-                    setEmployeeForm({ ...employeeForm, userId: e.target.value })
-                  }
-                  style={inputStyle}
-                />
-                <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-                  Enter the MongoDB ObjectId of the user (e.g.,
-                  6a3133c7ed17c1d7c0530ff8)
-                </div>
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    fontSize: 13,
-                    color: C.muted,
-                    display: "block",
-                    marginBottom: 4,
-                  }}
-                >
-                  Department
-                </label>
-                <input
-                  placeholder="Department name"
-                  value={employeeForm.department}
-                  onChange={(e) =>
-                    setEmployeeForm({
-                      ...employeeForm,
-                      department: e.target.value,
-                    })
-                  }
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    fontSize: 13,
-                    color: C.muted,
-                    display: "block",
-                    marginBottom: 4,
-                  }}
-                >
-                  Position
-                </label>
-                <input
-                  placeholder="Job position"
-                  value={employeeForm.position}
-                  onChange={(e) =>
-                    setEmployeeForm({
-                      ...employeeForm,
-                      position: e.target.value,
-                    })
-                  }
-                  style={inputStyle}
-                />
-              </div>
-
-              <div>
-                <label
-                  style={{
-                    fontSize: 13,
-                    color: C.muted,
-                    display: "block",
-                    marginBottom: 4,
-                  }}
-                >
-                  Profile Photo URL
-                </label>
-                <input
-                  placeholder="https://example.com/photo.jpg"
-                  value={employeeForm.profilePhotoUrl}
-                  onChange={(e) =>
-                    setEmployeeForm({
-                      ...employeeForm,
-                      profilePhotoUrl: e.target.value,
-                    })
-                  }
-                  style={inputStyle}
-                />
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  justifyContent: "flex-end",
-                  marginTop: 8,
-                  paddingTop: 16,
-                  borderTop: `1px solid ${C.border}`,
-                }}
-              >
-                <button
-                  onClick={() => setShowEmployeeModal(false)}
-                  style={btnStyle("#e5e7eb", "#444")}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleRegisterEmployee}
-                  disabled={registering || !employeeForm.userId}
-                  style={{
-                    ...btnStyle(C.primary),
-                    opacity: registering || !employeeForm.userId ? 0.6 : 1,
-                  }}
-                >
-                  {registering ? "Registering..." : "Register Employee"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <EmployeeRegistrationModal
+        show={showEmployeeModal}
+        onClose={() => setShowEmployeeModal(false)}
+        onRegister={handleRegisterEmployee}
+        employeeForm={employeeForm}
+        setEmployeeForm={setEmployeeForm}
+        registering={registering}
+      />
     </div>
   );
 }
