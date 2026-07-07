@@ -207,43 +207,98 @@ export const documentAPI = {
 };
 
 // ============================================================
-// GOLDEN MONDAY API — sessions + AI recap/topic generation
-// ============================================================
-// ============================================================
-// GOLDEN MONDAY API — sessions + AI recap/topic generation
+// GOLDEN MONDAY API — COMPLETE
 // ============================================================
 export const goldenMondayAPI = {
+  // ── Sessions ──
+  // GET /api/golden-monday - Get all sessions
   getAll: () => api.get("/golden-monday"),
-  create: (data) => api.post("/golden-monday", data),
-  previewRecap: (data) => api.post("/golden-monday/recap", data),
-  suggestTopics: () => api.get("/golden-monday/suggest-topics"),
+  getSessions: () => api.get("/golden-monday"),
 
-  // Catch-up recordings still within their visibility window
+  // GET /api/golden-monday/sessions/upcoming - Get upcoming sessions
+  getUpcomingSessions: () => api.get("/golden-monday/sessions/upcoming"),
+
+  // GET /api/golden-monday/sessions/past - Get past sessions
+  getPastSessions: () => api.get("/golden-monday/sessions/past"),
+
+  // POST /api/golden-monday - Create a session
+  create: (data) => api.post("/golden-monday", data),
+  createSession: (data) => api.post("/golden-monday", data),
+
+  // POST /api/golden-monday/recap - Generate AI recap preview
+  previewRecap: (data) => api.post("/golden-monday/recap", data),
+
+  // GET /api/golden-monday/suggest-topics - AI topic suggestions
+  suggestTopics: () => api.get("/golden-monday/suggest-topics"),
+  getSuggestedTopics: () => api.get("/golden-monday/suggest-topics"),
+
+  // ── Recordings ──
+  // GET /api/golden-monday/recordings/live - Get live recordings
   getLiveRecordings: () => api.get("/golden-monday/recordings/live"),
+
+  // POST /api/golden-monday/:sessionId/recording - Upload recording
   uploadRecording: (sessionId, file, visibleDays) =>
     api.post(`/golden-monday/${sessionId}/recording`, { file, visibleDays }),
+
+  // DELETE /api/golden-monday/:sessionId/recording - Remove recording
   removeRecording: (sessionId) =>
     api.delete(`/golden-monday/${sessionId}/recording`),
 
-  // Presenter rotation roster
+  // ── Rotation Roster ──
+  // GET /api/golden-monday/roster - Get roster
   getRoster: () => api.get("/golden-monday/roster"),
+  getEmployees: () => api.get("/golden-monday/roster"),
+
+  // POST /api/golden-monday/roster - Add to roster
   addToRoster: (userId, department) =>
     api.post("/golden-monday/roster", { userId, department }),
+  registerEmployee: (data) => api.post("/golden-monday/roster", data),
+
+  // PUT /api/golden-monday/roster/:id - Update roster entry
   updateRosterEntry: (id, updates) =>
     api.put(`/golden-monday/roster/${id}`, updates),
-  removeFromRoster: (id) => api.delete(`/golden-monday/roster/${id}`),
+  updateEmployeeEligibility: (userId, isEligible) =>
+    api.put(`/golden-monday/roster/${userId}`, { isEligible }),
 
-  // Rotation engine
+  // DELETE /api/golden-monday/roster/:id - Remove from roster
+  removeFromRoster: (id) => api.delete(`/golden-monday/roster/${id}`),
+  removeEmployee: (userId) => api.delete(`/golden-monday/roster/${userId}`),
+
+  // ── Rotation Engine ──
+  // GET /api/golden-monday/rotation/preview - Preview rotation ranking
   previewRotation: (weekOf) =>
     api.get("/golden-monday/rotation/preview", { params: { weekOf } }),
+  getRanking: () => api.get("/golden-monday/rotation/preview"),
+
+  // GET /api/golden-monday/rotation/next - Get next presenter
+  getNextPresenter: () => api.get("/golden-monday/rotation/next"),
+
+  // POST /api/golden-monday/rotation/assign - Assign next presenter
   assignRotation: (weekOf, manualPresenterId) =>
     api.post("/golden-monday/rotation/assign", { weekOf, manualPresenterId }),
+  assignPresenter: (userId) =>
+    api.post("/golden-monday/rotation/assign", { manualPresenterId: userId }),
+
+  // POST /api/golden-monday/rotation/:sessionId/reassign - Reassign
   reassignRotation: (sessionId, reason) =>
     api.post(`/golden-monday/rotation/${sessionId}/reassign`, { reason }),
 
-  // Presenter locks in their own chosen title
+  // ── Per-session actions ──
+  // PUT /api/golden-monday/:sessionId/title - Set presentation title
   setPresentationTitle: (sessionId, title) =>
     api.put(`/golden-monday/${sessionId}/title`, { title }),
+
+  // ── Stats ──
+  // GET /api/golden-monday/stats - Get stats
+  getStats: () => api.get("/golden-monday/stats"),
+
+  // ── Pillars ──
+  // GET /api/golden-monday/pillars - Get pillars
+  getPillars: () => api.get("/golden-monday/pillars"),
+
+  // ── Telegram ──
+  // POST /api/telegram/post/:sessionId - Post to Telegram
+  postToTelegram: (sessionId) => api.post(`/telegram/post/${sessionId}`),
 };
 
 // ============================================================
