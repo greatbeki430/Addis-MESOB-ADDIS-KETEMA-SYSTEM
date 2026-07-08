@@ -217,7 +217,7 @@ const getRoster = async (req, res) => {
 // POST /api/golden-monday/roster  { userId }
 const addToRoster = async (req, res) => {
   try {
-    const { userId, department } = req.body;
+    const { userId, department, position, profilePhotoUrl } = req.body;
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -231,7 +231,11 @@ const addToRoster = async (req, res) => {
     const entry = await GoldenMondayPresenter.create({
       user: user._id,
       name: user.name,
+      email: user.email, // was missing -> caused the required-field validation error
       department: department || "",
+      position: position || "",
+      profilePhotoUrl: profilePhotoUrl || "",
+      registeredBy: req.user._id,
     });
     res.status(201).json(entry);
   } catch (error) {

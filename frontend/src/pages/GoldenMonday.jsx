@@ -10,7 +10,7 @@ import { createPortal } from "react-dom";
 import { C, F } from "../styles/theme";
 import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../hooks/useLanguage";
-import { goldenMondayAPI } from "../services/api";
+import { goldenMondayAPI, authAPI } from "../services/api";
 import { showToast } from "../utils/toastHelper";
 import { ROLES, hasMinRole } from "../utils/roles";
 import GoldenMondayRotationPanel from "../components/golden-monday/GoldenMondayRotationPanel";
@@ -573,6 +573,12 @@ function EmployeeRegistrationModal({
   employeeForm,
   setEmployeeForm,
   registering,
+  filteredUsers,
+  selectedUser,
+  setSelectedUser,
+  userSearch,
+  setUserSearch,
+  handleSelectUser,
 }) {
   if (!show) return null;
 
@@ -639,19 +645,110 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              User ID *
+              Employee *
             </label>
-            <input
-              placeholder="Enter user ID (MongoDB ObjectId)"
-              value={employeeForm.userId}
-              onChange={(e) =>
-                setEmployeeForm({ ...employeeForm, userId: e.target.value })
-              }
-              style={inputStyle}
-            />
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-              Enter the MongoDB ObjectId (e.g., 6a3133c7ed17c1d7c0530ff8)
-            </div>
+
+            {selectedUser ? (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: `1.5px solid ${C.border}`,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      background: C.primary,
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 13,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {selectedUser.name?.charAt(0) || "?"}
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>
+                      {selectedUser.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.muted }}>
+                      {selectedUser.email}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setSelectedUser(null);
+                    setEmployeeForm({ ...employeeForm, userId: "" });
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    color: C.muted,
+                  }}
+                >
+                  <FiX size={16} />
+                </button>
+              </div>
+            ) : (
+              <>
+                <input
+                  placeholder="Search by name or email…"
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  style={inputStyle}
+                />
+                <div
+                  style={{
+                    maxHeight: 160,
+                    overflowY: "auto",
+                    marginTop: 6,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 8,
+                  }}
+                >
+                  {filteredUsers.length === 0 ? (
+                    <div style={{ padding: 10, fontSize: 12, color: C.muted }}>
+                      No matching users
+                    </div>
+                  ) : (
+                    filteredUsers.map((u) => (
+                      <div
+                        key={u._id}
+                        onClick={() => handleSelectUser(u)}
+                        style={{
+                          padding: "8px 12px",
+                          cursor: "pointer",
+                          fontSize: 13,
+                          borderBottom: `1px solid ${C.border}`,
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.background = C.bg)
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.background = "transparent")
+                        }
+                      >
+                        <div style={{ fontWeight: 600 }}>{u.name}</div>
+                        <div style={{ fontSize: 11, color: C.muted }}>
+                          {u.email}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           <div>
@@ -802,6 +899,9 @@ export default function GoldenMonday() {
     profilePhotoUrl: "",
   });
   const [registering, setRegistering] = useState(false);
+  const [allUsers, setAllUsers] = useState([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
 
   // ── Translation helper - USED EVERYWHERE in JSX via `t` alias ──
   const getTranslatedText = (obj) => {
@@ -897,6 +997,33 @@ export default function GoldenMonday() {
     return () => elements.forEach((el) => observer.unobserve(el));
   }, []);
 
+  useEffect(() => {
+    if (!showEmployeeModal) return;
+    authAPI
+      .getUsers()
+      .then((res) => setAllUsers(res.data || []))
+      .catch(() => showToast("Failed to load users", "error"));
+  }, [showEmployeeModal]);
+
+  const rosterUserIds = new Set(
+    employees.map((e) => (e.user?._id || e.user || "").toString()),
+  );
+
+  const filteredUsers = allUsers.filter((u) => {
+    if (rosterUserIds.has(u._id)) return false;
+    const q = userSearch.toLowerCase();
+    return (
+      !q ||
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q)
+    );
+  });
+
+  const handleSelectUser = (u) => {
+    setSelectedUser(u);
+    setEmployeeForm((f) => ({ ...f, userId: u._id }));
+  };
+
   const revealStyle = (key) => ({
     opacity: visible[key] ? 1 : 0,
     transform: visible[key] ? "translateY(0)" : "translateY(24px)",
@@ -965,6 +1092,8 @@ export default function GoldenMonday() {
         position: "",
         profilePhotoUrl: "",
       });
+      setSelectedUser(null);
+      setUserSearch("");
       await refreshData();
     } catch (error) {
       showToast(
@@ -1988,11 +2117,22 @@ export default function GoldenMonday() {
       {/* ── REGISTER EMPLOYEE MODAL ── */}
       <EmployeeRegistrationModal
         show={showEmployeeModal}
-        onClose={() => setShowEmployeeModal(false)}
+        // onClose={() => setShowEmployeeModal(false)}
+        onClose={() => {
+          setShowEmployeeModal(false);
+          setSelectedUser(null);
+          setUserSearch("");
+        }}
         onRegister={handleRegisterEmployee}
         employeeForm={employeeForm}
         setEmployeeForm={setEmployeeForm}
         registering={registering}
+        filteredUsers={filteredUsers}
+        selectedUser={selectedUser}
+        setSelectedUser={setSelectedUser}
+        userSearch={userSearch}
+        setUserSearch={setUserSearch}
+        handleSelectUser={handleSelectUser}
       />
     </div>
   );

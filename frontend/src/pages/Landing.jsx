@@ -326,6 +326,10 @@ function DigitalMesob() {
             <stop offset="0%" stopColor={C.gold} stopOpacity="0.9" />
             <stop offset="100%" stopColor={C.goldLight} stopOpacity="0.5" />
           </linearGradient>
+          <path
+            id="mesobOrbitTextPath"
+            d="M170,170 m-92,0 a92,92 0 1,1 184,0 a92,92 0 1,1 -184,0"
+          />
         </defs>
         {[0, 1, 2].map((ring) => (
           <circle
@@ -359,6 +363,21 @@ function DigitalMesob() {
             />
           );
         })}
+
+        {/* Rotating "Addis MESOB" wordmark, curved around the core */}
+        <g className="mesob-orbit-text">
+          <text
+            fill={C.goldLight}
+            fontSize="13.5"
+            fontWeight="800"
+            letterSpacing="3.5"
+            style={{ fontFamily: F.sans }}
+          >
+            <textPath href="#mesobOrbitTextPath" startOffset="0%">
+              ADDIS MESOB • ADDIS MESOB •&nbsp;
+            </textPath>
+          </text>
+        </g>
       </svg>
 
       {/* Central basket glyph */}
@@ -553,6 +572,16 @@ export default function Landing() {
         @keyframes marquee-scroll {
           from { transform: translateX(0); }
           to { transform: translateX(-50%); }
+        }
+        @keyframes mesob-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        .mesob-orbit-text {
+          transform-origin: 170px 170px;
+          transform-box: fill-box;
+          animation: mesob-spin 22s linear infinite;
         }
 
         .lp-card { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
