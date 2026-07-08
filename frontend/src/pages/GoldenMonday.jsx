@@ -6,6 +6,7 @@
 // ════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { C, F } from "../styles/theme";
 import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../hooks/useLanguage";
@@ -575,7 +576,7 @@ function EmployeeRegistrationModal({
 }) {
   if (!show) return null;
 
-  return (
+  return createPortal(
     <div
       style={{
         position: "fixed",
@@ -584,7 +585,7 @@ function EmployeeRegistrationModal({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 9999,
+        zIndex: 2147483000,
       }}
       onClick={onClose}
     >
@@ -745,7 +746,8 @@ function EmployeeRegistrationModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

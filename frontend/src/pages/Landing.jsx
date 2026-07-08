@@ -3,6 +3,13 @@
 // Public system-wide landing page for Addis MESOB.
 // Shown to unauthenticated visitors at "/". Introduces the whole
 // platform (not a single feature) and funnels into /login.
+//
+// DESIGN NOTE: the signature visual is a "digital mesob" — a
+// woven-basket motif with service icons orbiting a central core.
+// A mesob is the traditional Ethiopian basket used to serve many
+// dishes from one vessel; that's a literal, specific metaphor for
+// "one platform, many services," so it replaces a generic stock
+// hero image rather than decorating around one.
 // ════════════════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -11,9 +18,7 @@ import { useLanguage } from "../hooks/useLanguage";
 import { LANGUAGES } from "../constants/translations";
 import { SERVICES } from "../constants/services";
 import mesobLogo from "../assets/mesoblogo.png";
-import heroArt from "../assets/hero.png";
 import {
-  FiGrid,
   FiMessageSquare,
   FiStar,
   FiFileText,
@@ -28,11 +33,21 @@ import {
   FiCheckCircle,
   FiLogIn,
   FiMapPin,
-  FiZap,
+  FiMenu,
+  FiX,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
-// LANDING SPECIFIC CONTENT (not in main translations)
+// TOKENS — extending the existing brand palette, not replacing it
+// ─────────────────────────────────────────────────────────────
+const T = {
+  ink: "#060b2e", // deeper than C.dark, for layered hero depth
+  paper: "#fbfaf6", // warm off-white for section alternation (basket-fiber tone)
+  weave: "rgba(245,197,24,0.14)", // gold at low alpha, used for woven line accents
+};
+
+// ─────────────────────────────────────────────────────────────
+// COPY
 // ─────────────────────────────────────────────────────────────
 const LANDING_COPY = {
   eyebrow: {
@@ -41,14 +56,14 @@ const LANDING_COPY = {
     om: "Itoophiyaa Dijitaalaa · Addis MESOB Platform",
   },
   heroTitle: {
-    en: "One platform for Ethiopia's digital future.",
-    am: "ለኢትዮጵያ ዲጂታል የወደፊት ጊዜ አንድ መድረክ።",
-    om: "Waltajjii tokko fuuldura dijitaalaa Itoophiyaatiif.",
+    en: "Every service, in one basket.",
+    am: "ሁሉም አገልግሎት፣ በአንድ መሶብ።",
+    om: "Tajaajila Hunda, Guuboo Tokko Keessatti.",
   },
   heroBody: {
-    en: "Addis MESOB is Ethiopia's integrated digital service platform — bringing registration, evaluation, reporting, document management, and AI-assisted services into one seamless experience for citizens and government agencies alike.",
-    am: "አዲስ መሶብ የኢትዮጵያ የተቀናጀ ዲጂታል አገልግሎት መድረክ ነው — ምዝገባን፣ ግምገማን፣ ሪፖርት ማድረግን፣ የሰነድ አያያዝን እና በአርቴፊሻል ኢንተለጀንስ የታገዙ አገልግሎቶችን ለዜጎች እና ለመንግስት ተቋማት በአንድ ወጥ ተሞክሮ ያቀርባል።",
-    om: "Addis MESOB waltajjii tajaajila dijitaalaa walitti makuu Itoophiyaa ti — galmee, madaallii, gabaasa, qabiinsa ragaa, fi tajaajiloota AI-tiin deeggaraman, lammiifii fi dhaabbilee mootummaatiif ilmaan tokkoon dhiheessa.",
+    en: "For generations, a mesob has meant many dishes served from one vessel. Addis MESOB carries that same idea into government service — registration, evaluation, reporting, documents, and AI assistance, gathered into one digital basket for staff and citizens alike.",
+    am: "ለብዙ ትውልዶች መሶብ ማለት ከአንድ ዕቃ የሚቀርቡ የተለያዩ ምግቦችን ማለት ነው። አዲስ መሶብ ይህንኑ ሀሳብ ወደ መንግስት አገልግሎት ያመጣል — ምዝገባ፣ ግምገማ፣ ሪፖርት፣ ሰነድ እና በAI የታገዘ ድጋፍ በአንድ ዲጂታል መሶብ ውስጥ ተሰብስበዋል።",
+    om: "Dhaloota hedduuf, gubbeen waan nyaata garaagaraa meeshaa tokko irraa dhiheessu jechuudha. Addis MESOB yaadicha gara tajaajila mootummaatti fida — galmee, madaallii, gabaasa, ragaa, fi deeggarsa AI, hundi gubbeen dijitaalaa tokko keessatti walitti qabaman.",
   },
   ctaPrimary: {
     en: "Sign in to your account",
@@ -56,34 +71,23 @@ const LANDING_COPY = {
     om: "Gara Herrega Keetii Seeni",
   },
   ctaSecondary: {
-    en: "Explore what's inside",
+    en: "See what's inside",
     am: "የያዘውን ይመልከቱ",
     om: "Waan Keessa Jiru Ilaali",
   },
-  statServices: {
-    en: "Digital services",
-    am: "ዲጂታል አገልግሎቶች",
-    om: "Tajaajiloota Dijitaalaa",
-  },
-  statAgencies: {
-    en: "Partner agencies",
-    am: "አጋር ተቋማት",
-    om: "Dhaabbilee Hiriyaa",
-  },
-  statLanguages: {
-    en: "Languages supported",
-    am: "የሚደገፉ ቋንቋዎች",
-    om: "Afaanota Deeggaraman",
-  },
-  statAI: {
-    en: "AI-powered",
-    am: "በAI የተጠናከረ",
-    om: "AI-n deeggarame",
+  statServices: { en: "Services", am: "አገልግሎቶች", om: "Tajaajiloota" },
+  statAgencies: { en: "Agencies", am: "ተቋማት", om: "Dhaabbilee" },
+  statLanguages: { en: "Languages", am: "ቋንቋዎች", om: "Afaanota" },
+  statAI: { en: "AI-assisted", am: "በAI የተደገፈ", om: "AI-n Deeggarame" },
+  deptsEyebrow: {
+    en: "One login, every department",
+    am: "አንድ መግቢያ፣ ሁሉም ክፍል",
+    om: "Seensa Tokko, Kutaa Hunda",
   },
   featuresEyebrow: {
-    en: "One login, every tool",
-    am: "አንድ መግቢያ፣ ሁሉም መሳሪያ",
-    om: "Seensa Tokko, Meeshaa Hunda",
+    en: "What's inside the basket",
+    am: "በመሶቡ ውስጥ ያለው",
+    om: "Wanti Guuboo Keessa Jiru",
   },
   featuresTitle: {
     en: "Everything your organization needs, in one place",
@@ -116,7 +120,7 @@ const LANDING_COPY = {
     om: "Yaad-rimee Wiixata Warqee Irratti Ijaarame",
   },
   gmBody: {
-    en: "Ethiopia's weekly Golden Monday (ወርቃማ ሰኞ) sessions push every employee toward multiskilling and peer-led learning. Addis MESOB is that same drive for less friction, applied to how citizens actually get things done — and the program itself now lives inside the platform for every signed-in team.",
+    en: "Ethiopia's weekly Golden Monday (ወርቃማ ሰኞ) sessions push every employee toward multiskilling and peer-led learning. Addis MESOB carries that same drive for less friction into how citizens actually get things done — and the program itself now lives inside the platform for every signed-in team.",
     am: "የኢትዮጵያ ሳምንታዊ ወርቃማ ሰኞ ስብሰባዎች እያንዳንዱን ሰራተኛ ወደ ብዙ ክህሎትና በእኩዮች ወደሚመራ ትምህርት ይገፋፋሉ። አዲስ መሶብ ያንኑ ግፊት ወደ ዜጎች ትክክለኛ አገልግሎት አሰጣጥ ተግባራዊ ያደርገዋል — ፕሮግራሙም ራሱ ለተመዘገበ እያንዳንዱ ቡድን በመድረኩ ውስጥ ይገኛል።",
     om: "Walga'iiwwan Wiixata Warqee (ወርቃማ ሰኞ) torbaniin Itoophiyaa hojjetaa hunda gara dandeettii hedduu fi barnoota hiriyaan durfamu geggeessa. Addis MESOB dhiibbaa wal fakkaataa kanaan rakkina hir'isuun, akkaataa lammiin dhugumaan waan hojjetan irratti hojjeta — sagantichi mataan isaas amma garee seenan hundaaf waltajjicha keessatti argama.",
   },
@@ -132,9 +136,21 @@ const LANDING_COPY = {
   },
 };
 
+// Orbiting service icons for the signature hero graphic — each one
+// maps to a real in-app module, not decorative filler.
+const ORBIT_ICONS = [
+  { icon: <FiBarChart2 size={18} />, label: "Dashboard" },
+  { icon: <FiMessageSquare size={18} />, label: "Forum" },
+  { icon: <FiStar size={18} />, label: "Evaluation" },
+  { icon: <FiFileText size={18} />, label: "Reports" },
+  { icon: <FiShield size={18} />, label: "Documents" },
+  { icon: <FiSunrise size={18} />, label: "Golden Monday" },
+];
+
 const FEATURES = [
   {
-    icon: <FiBarChart2 size={22} />,
+    icon: <FiBarChart2 size={24} />,
+    big: true,
     title: {
       en: "Dashboard & Analytics",
       am: "ዳሽቦርድና ትንተና",
@@ -147,77 +163,8 @@ const FEATURES = [
     },
   },
   {
-    icon: <FiMessageSquare size={22} />,
-    title: { en: "Peer Forum", am: "የእኩዮች መድረክ", om: "Waltajjii Hiriyootaa" },
-    body: {
-      en: "A shared space for teams to discuss cases, ask questions, and learn from one another day to day.",
-      am: "ቡድኖች ጉዳዮችን ለመወያየት፣ ጥያቄ ለመጠየቅና በየቀኑ ከእርስ በርስ ለመማር የሚጠቀሙበት የጋራ ቦታ።",
-      om: "Bakka waloo garee waliin haala dubbachuuf, gaaffii gaafachuuf, fi guyyaa guyyaan waliin baruuf.",
-    },
-  },
-  {
-    icon: <FiStar size={22} />,
-    title: { en: "Evaluation", am: "ግምገማ", om: "Madaallii" },
-    body: {
-      en: "Structured, criteria-based staff evaluation that feeds directly into recognition and growth planning.",
-      am: "በተዋቀሩ መስፈርቶች ላይ የተመሰረተ የሰራተኛ ግምገማ ለእውቅናና ለእድገት እቅድ በቀጥታ ግብዓት የሚሆን።",
-      om: "Madaallii hojjetaa ulaagaa irratti hundaa'e kan beekamtii fi karoora guddinaatiif kallattiin galtee ta'u.",
-    },
-  },
-  {
-    icon: <FiFileText size={22} />,
-    title: {
-      en: "Daily Reports & Forum Reports",
-      am: "ዕለታዊ ሪፖርትና የመድረክ ሪፖርት",
-      om: "Gabaasa Guyyaa fi Waltajjii",
-    },
-    body: {
-      en: "Team leaders log daily activity once — it flows into analytics, PDFs, and leadership reviews automatically.",
-      am: "ቡድን መሪዎች ዕለታዊ እንቅስቃሴን አንዴ ይመዘግባሉ — ወደ ትንተና፣ PDFና የአመራር ግምገማ ራሱ በራሱ ይፈስሳል።",
-      om: "Hoogganoonni garee sochii guyyaa yeroo tokko galmeessu — gara xiinxalaa, PDF, fi ilaalcha hooggantootaatti ofumaan dabra.",
-    },
-  },
-  {
-    icon: <FiGrid size={22} />,
-    title: {
-      en: "Service Catalogue",
-      am: "የአገልግሎት ካታሎግ",
-      om: "Kaataloogii Tajaajilaa",
-    },
-    body: {
-      en: "The full service list across every partner agency, kept current by admins in one shared registry.",
-      am: "በሁሉም አጋር ተቋማት የተሟላ የአገልግሎት ዝርዝር፣ በአድሚኖች በአንድ የጋራ መዝገብ ውስጥ ወቅታዊ ሆኖ የሚቆይ።",
-      om: "Tarreeffama guutuu tajaajila dhaabbilee hiriyaa hunda keessatti, admin-oonni galmee waloo tokko keessatti haaromsan.",
-    },
-  },
-  {
-    icon: <FiShield size={22} />,
-    title: {
-      en: "Document Vault",
-      am: "የሰነድ ማከማቻ",
-      om: "Kuusaa Ragaa",
-    },
-    body: {
-      en: "Secure, traceable document storage with AI auto-fill that reads scanned forms and populates them for you.",
-      am: "ደህንነቱ የተጠበቀና ክትትል የሚደረግበት የሰነድ ማከማቻ፣ የተቃኙን ቅጾች በማንበብ ራስ-ሰር በሚሞላ AI ችሎታ የተደገፈ።",
-      om: "Kuusaa ragaa nageenya qabu, hordoffii qabu, fi dandeettii AI-tiin unka sikaanamee dubbisee ofumaan guutu.",
-    },
-  },
-  {
-    icon: <FiCpu size={22} />,
-    title: {
-      en: "AI Assistant, everywhere",
-      am: "የAI ረዳት፣ በየትም",
-      om: "Deeggartuu AI, Bakka Hundatti",
-    },
-    body: {
-      en: "A floating assistant and inline AI summaries across dashboards and reports, powered by advanced AI technology.",
-      am: "በዳሽቦርድና ሪፖርቶች ላይ ተንሳፋፊ ረዳትና በውስጥ የተካተቱ የAI ማጠቃለያዎች፣ በላቀ የAI ቴክኖሎጂ የተደገፉ።",
-      om: "Deeggartuu dafqee fi cuunfaa AI dashboard fi gabaasaa keessatti, teeknooloojii AI-n deeggarame.",
-    },
-  },
-  {
-    icon: <FiSunrise size={22} />,
+    icon: <FiSunrise size={24} />,
+    big: true,
     title: { en: "Golden Monday", am: "ወርቃማ ሰኞ", om: "Wiixata Warqee" },
     body: {
       en: "Weekly capacity-building program — session recaps, presenter rotation, and AI-suggested topics, right inside the app.",
@@ -226,29 +173,82 @@ const FEATURES = [
     },
   },
   {
-    icon: <FiUsers size={22} />,
+    icon: <FiMessageSquare size={20} />,
+    title: { en: "Peer Forum", am: "የእኩዮች መድረክ", om: "Waltajjii Hiriyootaa" },
+    body: {
+      en: "A shared space for teams to discuss cases and learn from one another day to day.",
+      am: "ቡድኖች ጉዳዮችን ለመወያየትና በየቀኑ ከእርስ በርስ ለመማር የሚጠቀሙበት የጋራ ቦታ።",
+      om: "Bakka waloo garee waliin haala dubbachuuf fi guyyaa guyyaan waliin baruuf.",
+    },
+  },
+  {
+    icon: <FiStar size={20} />,
+    title: { en: "Evaluation", am: "ግምገማ", om: "Madaallii" },
+    body: {
+      en: "Structured, criteria-based staff evaluation that feeds directly into recognition and growth planning.",
+      am: "በተዋቀሩ መስፈርቶች ላይ የተመሰረተ የሰራተኛ ግምገማ ለእውቅናና ለእድገት እቅድ በቀጥታ ግብዓት የሚሆን።",
+      om: "Madaallii hojjetaa ulaagaa irratti hundaa'e kan beekamtii fi karoora guddinaatiif kallattiin galtee ta'u.",
+    },
+  },
+  {
+    icon: <FiFileText size={20} />,
+    title: {
+      en: "Daily & Forum Reports",
+      am: "ዕለታዊና የመድረክ ሪፖርት",
+      om: "Gabaasa Guyyaa fi Waltajjii",
+    },
+    body: {
+      en: "Team leaders log activity once — it flows into analytics, PDFs, and leadership reviews automatically.",
+      am: "ቡድን መሪዎች እንቅስቃሴን አንዴ ይመዘግባሉ — ወደ ትንተና፣ PDFና ግምገማ ራሱ በራሱ ይፈስሳል።",
+      om: "Hoogganoonni garee sochii yeroo tokko galmeessu — gara xiinxalaa fi PDF ofumaan dabra.",
+    },
+  },
+  {
+    icon: <FiShield size={20} />,
+    title: { en: "Document Vault", am: "የሰነድ ማከማቻ", om: "Kuusaa Ragaa" },
+    body: {
+      en: "Secure, traceable storage with AI auto-fill that reads scanned forms and populates them for you.",
+      am: "ደህንነቱ የተጠበቀ የሰነድ ማከማቻ፣ የተቃኙ ቅጾችን በራስ-ሰር በሚሞላ AI የተደገፈ።",
+      om: "Kuusaa ragaa nageenya qabu, dandeettii AI-tiin unka sikaanamee ofumaan guutu.",
+    },
+  },
+  {
+    icon: <FiCpu size={20} />,
+    title: {
+      en: "AI Assistant, everywhere",
+      am: "የAI ረዳት፣ በየትም",
+      om: "Deeggartuu AI, Bakka Hundatti",
+    },
+    body: {
+      en: "A floating assistant and inline AI summaries across dashboards and reports.",
+      am: "በዳሽቦርድና ሪፖርቶች ላይ ተንሳፋፊ ረዳትና በውስጥ የተካተቱ የAI ማጠቃለያዎች።",
+      om: "Deeggartuu dafqee fi cuunfaa AI dashboard fi gabaasaa keessatti.",
+    },
+  },
+  {
+    icon: <FiUsers size={20} />,
     title: {
       en: "Team & User Management",
       am: "የቡድንና ተጠቃሚ አስተዳደር",
       om: "Bulchiinsa Garee fi Fayyadamaa",
     },
     body: {
-      en: "Admins and super admins manage teams, roles, and access from one control center — no spreadsheets required.",
-      am: "አድሚኖችና ሱፐር አድሚኖች ቡድኖችን፣ ሚናዎችንና ተደራሽነትን ከአንድ መቆጣጠሪያ ማዕከል ያስተዳድራሉ — ስፕሬድሺት አያስፈልግም።",
-      om: "Admin-oonni fi super admin-oonni garee, gahee, fi dhaqqabamummaa bakka bulchiinsaa tokko irraa bulchu — spreadsheet hin barbaachisu.",
+      en: "Admins manage teams, roles, and access from one control center — no spreadsheets required.",
+      am: "አድሚኖች ቡድኖችን፣ ሚናዎችንና ተደራሽነትን ከአንድ ማዕከል ያስተዳድራሉ።",
+      om: "Admin-oonni garee, gahee, fi dhaqqabamummaa bakka tokko irraa bulchu.",
     },
   },
   {
-    icon: <FiGlobe size={22} />,
+    icon: <FiGlobe size={20} />,
     title: {
-      en: "Built for three languages",
+      en: "Three languages, natively",
       am: "ለሶስት ቋንቋዎች የተገነባ",
       om: "Afaan Sadiif Ijaarame",
     },
     body: {
-      en: "Every screen works in English, Amharic, and Afaan Oromo, switchable at any time from the sidebar.",
-      am: "እያንዳንዱ ገጽ በእንግሊዝኛ፣ በአማርኛና በአፋን ኦሮሞ ይሰራል፣ በማንኛውም ጊዜ ከጎን አሞሌ ሊቀየር ይችላል።",
-      om: "Fuulli hundi Ingiliffaan, Amaariffaan, fi Afaan Oromootiin hojjeta, yeroo kamiyyuu sidebaar irraa jijjiiramuu danda'a.",
+      en: "Every screen works in English, Amharic, and Afaan Oromo, switchable anytime.",
+      am: "እያንዳንዱ ገጽ በእንግሊዝኛ፣ በአማርኛና በአፋን ኦሮሞ ይሰራል፣ በማንኛውም ጊዜ ሊቀየር ይችላል።",
+      om: "Fuulli hundi Ingiliffaan, Amaariffaan, fi Afaan Oromootiin hojjeta.",
     },
   },
 ];
@@ -262,22 +262,22 @@ const STEPS = [
       om: "Herrega Dhaabbilee Keetiin Seeni",
     },
     body: {
-      en: "Your organization admin creates your account; you sign in and land straight on your dashboard.",
+      en: "Your admin creates your account; you sign in and land straight on your dashboard.",
       am: "የድርጅትዎ አድሚን መለያዎን ይፈጥራል፤ ይግቡና በቀጥታ ወደ ዳሽቦርድዎ ይደርሳሉ።",
       om: "Admin-iin dhaabbilee keetii herrega siif uuma; seentee kallattiin gara daashboordii keetiitti geessa.",
     },
   },
   {
-    icon: <FiZap size={20} />,
+    icon: <FiUsers size={20} />,
     title: {
       en: "Your role decides what you see",
       am: "ሚናዎ የሚያዩትን ይወስናል",
       om: "Gaheen Kee Waan Argitu Murteessa",
     },
     body: {
-      en: "Employees, team leaders, admins, and super admins each get exactly the tools their role needs — nothing more, nothing less.",
-      am: "ሰራተኞች፣ ቡድን መሪዎች፣ አድሚኖችና ሱፐር አድሚኖች እያንዳንዳቸው ለሚናቸው የሚያስፈልጋቸውን መሳሪያ በትክክል ያገኛሉ።",
-      om: "Hojjettoonni, hoogganoonni garee, admin-oonni, fi super admin-oonni tokkoon tokkoon isaanii meeshaa gaheen isaanii barbaadu qofa argatu.",
+      en: "Employees, team leaders, admins, and super admins each get exactly the tools their role needs.",
+      am: "ሰራተኞች፣ ቡድን መሪዎች፣ አድሚኖችና ሱፐር አድሚኖች ለሚናቸው የሚያስፈልጋቸውን መሳሪያ በትክክል ያገኛሉ።",
+      om: "Hojjettoonni, hoogganoonni garee, admin-oonni, fi super admin-oonni meeshaa gaheen isaanii barbaadu qofa argatu.",
     },
   },
   {
@@ -288,15 +288,142 @@ const STEPS = [
       om: "Hojjedhu, Gabaasi, AI-nis si Gargaaru",
     },
     body: {
-      en: "Log activity, evaluate staff, upload documents — AI summaries and the chatbot are one click away the whole time.",
-      am: "እንቅስቃሴ ይመዝግቡ፣ ሰራተኛ ይገምግሙ፣ ሰነድ ይስቀሉ — የAI ማጠቃለያና ቻትቦት ሁልጊዜ በአንድ ጠቅታ ርቀት ላይ ናቸው።",
-      om: "Sochii galmeessi, hojjetaa madaali, ragaa fe'i — cuunfaan AI fi chatbot-ni yeroo hunda tuqaa tokko fagaatu.",
+      en: "Log activity, evaluate staff, upload documents — AI summaries are one click away the whole time.",
+      am: "እንቅስቃሴ ይመዝግቡ፣ ሰራተኛ ይገምግሙ፣ ሰነድ ይስቀሉ — የAI ማጠቃለያ ሁልጊዜ በአንድ ጠቅታ ርቀት ላይ ነው።",
+      om: "Sochii galmeessi, hojjetaa madaali, ragaa fe'i — cuunfaan AI yeroo hunda tuqaa tokko fagaatu.",
     },
   },
 ];
 
 // ─────────────────────────────────────────────────────────────
-// SECTION HEADING (shared visual language with in-app pages)
+// SIGNATURE VISUAL — "Digital Mesob": woven basket core with
+// orbiting service icons. Pure SVG + CSS, no external image asset.
+// ─────────────────────────────────────────────────────────────
+function DigitalMesob() {
+  const radius = 150;
+  return (
+    <div
+      style={{
+        position: "relative",
+        width: 340,
+        height: 340,
+        maxWidth: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {/* Woven ring pattern */}
+      <svg
+        viewBox="0 0 340 340"
+        width="340"
+        height="340"
+        style={{ position: "absolute", inset: 0 }}
+        aria-hidden
+      >
+        <defs>
+          <linearGradient id="weaveGold" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor={C.gold} stopOpacity="0.9" />
+            <stop offset="100%" stopColor={C.goldLight} stopOpacity="0.5" />
+          </linearGradient>
+        </defs>
+        {[0, 1, 2].map((ring) => (
+          <circle
+            key={ring}
+            cx="170"
+            cy="170"
+            r={70 + ring * 40}
+            fill="none"
+            stroke={ring === 1 ? "url(#weaveGold)" : "rgba(255,255,255,0.14)"}
+            strokeWidth={ring === 1 ? 2 : 1}
+            strokeDasharray={ring % 2 === 0 ? "3 7" : "1 5"}
+          />
+        ))}
+        {/* Basket weave crosshatch at the core */}
+        {Array.from({ length: 10 }).map((_, i) => {
+          const angle = (i / 10) * Math.PI * 2;
+          const x1 = 170 + Math.cos(angle) * 34;
+          const y1 = 170 + Math.sin(angle) * 34;
+          const x2 = 170 + Math.cos(angle + Math.PI) * 34;
+          const y2 = 170 + Math.sin(angle + Math.PI) * 34;
+          return (
+            <line
+              key={i}
+              x1={x1}
+              y1={y1}
+              x2={x2}
+              y2={y2}
+              stroke={C.goldLight}
+              strokeOpacity="0.35"
+              strokeWidth="1"
+            />
+          );
+        })}
+      </svg>
+
+      {/* Central basket glyph */}
+      <div
+        style={{
+          width: 92,
+          height: 92,
+          borderRadius: "50%",
+          background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: `0 0 0 8px rgba(245,197,24,0.12), 0 12px 32px rgba(0,0,0,0.35)`,
+          zIndex: 2,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: F.serif,
+            fontSize: 38,
+            fontWeight: 900,
+            color: C.dark,
+          }}
+        >
+          አ
+        </span>
+      </div>
+
+      {/* Orbiting service nodes */}
+      {ORBIT_ICONS.map((item, i) => {
+        const angle = (i / ORBIT_ICONS.length) * Math.PI * 2 - Math.PI / 2;
+        const x = 170 + Math.cos(angle) * radius;
+        const y = 170 + Math.sin(angle) * radius;
+        return (
+          <div
+            key={item.label}
+            title={item.label}
+            className="mesob-node"
+            style={{
+              position: "absolute",
+              left: x - 20,
+              top: y - 20,
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.18)",
+              backdropFilter: "blur(4px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: C.goldLight,
+              animation: `mesob-float 5s ease-in-out ${i * 0.35}s infinite`,
+            }}
+          >
+            {item.icon}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// SECTION HEADING
 // ─────────────────────────────────────────────────────────────
 function SectionHeading({ eyebrow, title, sub, dark, center }) {
   return (
@@ -308,10 +435,10 @@ function SectionHeading({ eyebrow, title, sub, dark, center }) {
           gap: 6,
           fontSize: 11,
           fontWeight: 800,
-          letterSpacing: 1,
+          letterSpacing: 1.2,
           textTransform: "uppercase",
           color: dark ? C.gold : C.primary,
-          marginBottom: 10,
+          marginBottom: 12,
         }}
       >
         {eyebrow}
@@ -319,7 +446,9 @@ function SectionHeading({ eyebrow, title, sub, dark, center }) {
       <h2
         style={{
           fontFamily: F.serif,
-          fontSize: "clamp(24px, 4vw, 32px)",
+          fontSize: "clamp(24px, 4vw, 34px)",
+          fontWeight: 800,
+          letterSpacing: "-0.01em",
           margin: 0,
           color: dark ? "#fff" : C.dark,
         }}
@@ -329,12 +458,12 @@ function SectionHeading({ eyebrow, title, sub, dark, center }) {
       {sub && (
         <p
           style={{
-            marginTop: 10,
-            fontSize: 14.5,
-            lineHeight: 1.6,
+            marginTop: 12,
+            fontSize: 15,
+            lineHeight: 1.65,
             color: dark ? "#a9b3e0" : C.muted,
             maxWidth: 580,
-            margin: center ? "10px auto 0" : "10px 0 0",
+            margin: center ? "12px auto 0" : "12px 0 0",
           }}
         >
           {sub}
@@ -351,14 +480,24 @@ export default function Landing() {
   const { language, changeLanguage } = useLanguage();
   const navigate = useNavigate();
   const [visible, setVisible] = useState({});
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const sectionRefs = useRef({});
 
   const stats = useMemo(() => {
-    const agencies = new Set(SERVICES.map((s) => s.deptEn)).size;
-    return {
-      services: SERVICES.length,
-      agencies,
-    };
+    const agencies = new Set((SERVICES || []).map((s) => s.deptEn)).size;
+    return { services: (SERVICES || []).length, agencies };
+  }, []);
+
+  const departments = useMemo(() => {
+    const seen = new Set();
+    const list = [];
+    (SERVICES || []).forEach((s) => {
+      if (s.deptEn && !seen.has(s.deptEn)) {
+        seen.add(s.deptEn);
+        list.push(s.deptEn);
+      }
+    });
+    return list;
   }, []);
 
   const registerRef = useCallback(
@@ -392,29 +531,55 @@ export default function Landing() {
   });
 
   const goLogin = () => navigate("/login");
-
-  // Get translated text helper
   const getText = (obj) => obj[language] || obj.en;
 
   return (
-    <div style={{ fontFamily: F.sans, background: C.gray, minHeight: "100vh" }}>
+    <div
+      style={{ fontFamily: F.sans, background: T.paper, minHeight: "100vh" }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700;800&family=Noto+Serif+Ethiopic:wght@700;900&display=swap');
         * { box-sizing: border-box; }
         html, body, #root { margin: 0; padding: 0; }
-        @keyframes lp-rise {
-          0% { transform: translateY(6px); opacity: 0.85; }
-          50% { transform: translateY(-6px); opacity: 1; }
-          100% { transform: translateY(6px); opacity: 0.85; }
-        }
+
         @keyframes lp-sweep {
           0% { background-position: 0% 50%; }
           100% { background-position: 200% 50%; }
         }
-        .lp-card:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(13,26,94,0.14); }
-        .lp-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 26px ${C.primary}55; }
-        .lp-nav-link:hover { opacity: 0.75; }
+        @keyframes mesob-float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+        @keyframes marquee-scroll {
+          from { transform: translateX(0); }
+          to { transform: translateX(-50%); }
+        }
+
+        .lp-card { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
+        .lp-card:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(6,11,46,0.12); border-color: ${C.primary}55; }
+        .lp-cta { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .lp-cta:hover { transform: translateY(-2px); box-shadow: 0 12px 28px ${C.primary}4d; }
+        .lp-nav-link { transition: opacity 0.15s ease; }
+        .lp-nav-link:hover { opacity: 0.72; }
+        .lp-lang-btn { transition: opacity 0.15s ease, transform 0.15s ease; }
         .lp-lang-btn:hover { opacity: 0.85; }
+        a, button { -webkit-tap-highlight-color: transparent; }
+
+        a:focus-visible, button:focus-visible {
+          outline: 2px solid ${C.gold};
+          outline-offset: 2px;
+        }
+
+        .lp-desktop-only { display: flex; }
+        .lp-mobile-toggle { display: none; }
+        @media (max-width: 720px) {
+          .lp-desktop-only { display: none !important; }
+          .lp-mobile-toggle { display: inline-flex !important; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+        }
       `}</style>
 
       {/* ── TOP NAV ─────────────────────────────────────── */}
@@ -422,10 +587,10 @@ export default function Landing() {
         style={{
           position: "sticky",
           top: 0,
-          zIndex: 20,
-          background: "rgba(13,26,94,0.92)",
-          backdropFilter: "blur(8px)",
-          borderBottom: `1px solid ${C.primary}55`,
+          zIndex: 30,
+          background: "rgba(6,11,46,0.9)",
+          backdropFilter: "blur(10px)",
+          borderBottom: `1px solid rgba(255,255,255,0.08)`,
           padding: "12px clamp(16px, 5vw, 48px)",
           display: "flex",
           alignItems: "center",
@@ -451,7 +616,10 @@ export default function Landing() {
           </span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+        <div
+          className="lp-desktop-only"
+          style={{ alignItems: "center", gap: 20 }}
+        >
           <a
             href="#features"
             className="lp-nav-link"
@@ -460,10 +628,21 @@ export default function Landing() {
               textDecoration: "none",
               fontSize: 13,
               fontWeight: 600,
-              display: window.innerWidth < 560 ? "none" : "inline",
             }}
           >
             Features
+          </a>
+          <a
+            href="#how"
+            className="lp-nav-link"
+            style={{
+              color: "#c9d0f0",
+              textDecoration: "none",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            How it works
           </a>
           <div style={{ display: "flex", gap: 4 }}>
             {LANGUAGES.map((l) => (
@@ -505,48 +684,116 @@ export default function Landing() {
               fontSize: 13,
               cursor: "pointer",
               fontFamily: F.sans,
-              transition: "transform 0.2s ease, box-shadow 0.2s ease",
             }}
           >
             <FiLogIn size={14} />
             {getText(LANDING_COPY.ctaPrimary)}
           </button>
         </div>
+
+        <button
+          className="lp-mobile-toggle"
+          onClick={() => setMobileNavOpen((v) => !v)}
+          aria-label="Toggle menu"
+          style={{
+            background: "rgba(255,255,255,0.08)",
+            border: "none",
+            borderRadius: 8,
+            width: 38,
+            height: 38,
+            color: "#fff",
+            cursor: "pointer",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {mobileNavOpen ? <FiX size={18} /> : <FiMenu size={18} />}
+        </button>
       </header>
+
+      {mobileNavOpen && (
+        <div
+          style={{
+            background: T.ink,
+            padding: "16px clamp(16px, 5vw, 48px) 24px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 14,
+            borderBottom: `1px solid rgba(255,255,255,0.08)`,
+          }}
+        >
+          <a
+            href="#features"
+            style={{ color: "#c9d0f0", fontSize: 14, fontWeight: 600 }}
+            onClick={() => setMobileNavOpen(false)}
+          >
+            Features
+          </a>
+          <a
+            href="#how"
+            style={{ color: "#c9d0f0", fontSize: 14, fontWeight: 600 }}
+            onClick={() => setMobileNavOpen(false)}
+          >
+            How it works
+          </a>
+          <div style={{ display: "flex", gap: 6 }}>
+            {LANGUAGES.map((l) => (
+              <button
+                key={l.code}
+                onClick={() => changeLanguage(l.code)}
+                style={{
+                  background:
+                    language === l.code ? C.gold : "rgba(255,255,255,0.08)",
+                  color: language === l.code ? C.dark : "#c9d0f0",
+                  border: "none",
+                  borderRadius: 6,
+                  padding: "6px 10px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {l.flag}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={goLogin}
+            style={{
+              background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
+              color: C.dark,
+              border: "none",
+              borderRadius: 8,
+              padding: "10px 16px",
+              fontWeight: 800,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            {getText(LANDING_COPY.ctaPrimary)}
+          </button>
+        </div>
+      )}
 
       {/* ── HERO ─────────────────────────────────────────── */}
       <section
         style={{
           position: "relative",
           overflow: "hidden",
-          background: `linear-gradient(120deg, ${C.dark} 0%, ${C.primary} 45%, #b8860b 100%)`,
+          background: `linear-gradient(120deg, ${T.ink} 0%, ${C.dark} 40%, ${C.primary} 75%, #8a6a10 100%)`,
           backgroundSize: "220% 220%",
-          animation: "lp-sweep 16s ease infinite alternate",
+          animation: "lp-sweep 18s ease infinite alternate",
           padding:
-            "clamp(48px, 8vw, 80px) clamp(20px, 6vw, 64px) clamp(56px, 8vw, 80px)",
+            "clamp(48px, 8vw, 80px) clamp(20px, 6vw, 64px) clamp(56px, 8vw, 88px)",
           color: "#fff",
         }}
       >
-        <div
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: "-120px",
-            right: "-80px",
-            width: 340,
-            height: 340,
-            borderRadius: "50%",
-            background: `radial-gradient(circle, ${C.gold}88 0%, ${C.gold}22 55%, transparent 75%)`,
-            filter: "blur(2px)",
-            animation: "lp-rise 6s ease-in-out infinite",
-          }}
-        />
         <div
           style={{
             maxWidth: 1200,
             margin: "0 auto",
             display: "flex",
-            gap: 40,
+            gap: 48,
             alignItems: "center",
             flexWrap: "wrap",
             position: "relative",
@@ -567,7 +814,7 @@ export default function Landing() {
                 fontSize: 12,
                 fontWeight: 700,
                 letterSpacing: 0.4,
-                marginBottom: 22,
+                marginBottom: 24,
               }}
             >
               <FiMapPin size={13} />
@@ -577,9 +824,10 @@ export default function Landing() {
             <h1
               style={{
                 fontFamily: F.serif,
-                fontSize: "clamp(32px, 6vw, 54px)",
+                fontSize: "clamp(34px, 6vw, 58px)",
                 fontWeight: 900,
-                lineHeight: 1.12,
+                lineHeight: 1.08,
+                letterSpacing: "-0.015em",
                 margin: 0,
               }}
             >
@@ -589,9 +837,9 @@ export default function Landing() {
             <p
               style={{
                 fontSize: "clamp(15px, 2.2vw, 18px)",
-                lineHeight: 1.65,
-                color: "#eaeeff",
-                maxWidth: 620,
+                lineHeight: 1.7,
+                color: "#dfe4ff",
+                maxWidth: 600,
                 marginTop: 22,
               }}
             >
@@ -622,7 +870,6 @@ export default function Landing() {
                   fontSize: 14,
                   cursor: "pointer",
                   fontFamily: F.sans,
-                  transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               >
                 {getText(LANDING_COPY.ctaPrimary)}
@@ -638,7 +885,7 @@ export default function Landing() {
                   textDecoration: "none",
                   fontWeight: 700,
                   fontSize: 14,
-                  border: "1.5px solid rgba(255,255,255,0.35)",
+                  border: "1.5px solid rgba(255,255,255,0.3)",
                   padding: "13px 22px",
                   borderRadius: 10,
                 }}
@@ -648,26 +895,25 @@ export default function Landing() {
               </a>
             </div>
 
-            {/* Quick stats */}
             <div
               style={{
                 display: "flex",
-                gap: 28,
-                marginTop: 44,
+                gap: 30,
+                marginTop: 48,
                 flexWrap: "wrap",
               }}
             >
               {[
                 [stats.services + "+", LANDING_COPY.statServices],
-                [stats.agencies, LANDING_COPY.statAgencies],
+                [stats.agencies || "—", LANDING_COPY.statAgencies],
                 ["3", LANDING_COPY.statLanguages],
-                ["AI", LANDING_COPY.statAI],
+                ["24/7", LANDING_COPY.statAI],
               ].map(([num, label], i) => (
                 <div key={i}>
                   <div
                     style={{
                       fontFamily: F.serif,
-                      fontSize: 28,
+                      fontSize: 26,
                       fontWeight: 900,
                       color: C.goldLight,
                     }}
@@ -677,7 +923,7 @@ export default function Landing() {
                   <div
                     style={{
                       fontSize: 11.5,
-                      color: "#c9d0f0",
+                      color: "#a9b3e0",
                       fontWeight: 600,
                       marginTop: 2,
                     }}
@@ -691,26 +937,67 @@ export default function Landing() {
 
           <div
             style={{
-              flex: "1 1 320px",
+              flex: "1 1 340px",
               display: "flex",
               justifyContent: "center",
             }}
           >
-            <img
-              src={heroArt}
-              alt=""
-              style={{
-                width: "100%",
-                maxWidth: 420,
-                borderRadius: 20,
-                boxShadow: "0 24px 60px rgba(0,0,0,0.35)",
-              }}
-            />
+            <DigitalMesob />
           </div>
         </div>
       </section>
 
-      {/* ── FEATURES ─────────────────────────────────────── */}
+      {/* ── DEPARTMENTS MARQUEE ──────────────────────────── */}
+      {departments.length > 0 && (
+        <section
+          style={{
+            background: C.dark,
+            padding: "18px 0",
+            overflow: "hidden",
+            borderBottom: `1px solid rgba(255,255,255,0.08)`,
+          }}
+        >
+          <div
+            style={{
+              textAlign: "center",
+              fontSize: 10.5,
+              fontWeight: 800,
+              letterSpacing: 1.4,
+              textTransform: "uppercase",
+              color: C.gold,
+              marginBottom: 10,
+            }}
+          >
+            {getText(LANDING_COPY.deptsEyebrow)}
+          </div>
+          <div style={{ display: "flex", width: "max-content" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 32,
+                paddingRight: 32,
+                animation: "marquee-scroll 32s linear infinite",
+              }}
+            >
+              {[...departments, ...departments].map((d, i) => (
+                <span
+                  key={i}
+                  style={{
+                    color: "#c9d0f0",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {d}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── FEATURES (bento-style asymmetric grid) ───────── */}
       <section
         id="features"
         ref={registerRef("features")}
@@ -718,7 +1005,7 @@ export default function Landing() {
         style={{
           maxWidth: 1200,
           margin: "0 auto",
-          padding: "clamp(48px, 8vw, 76px) clamp(20px, 6vw, 40px) 12px",
+          padding: "clamp(56px, 8vw, 84px) clamp(20px, 6vw, 40px) 12px",
           ...revealStyle("features"),
         }}
       >
@@ -731,9 +1018,9 @@ export default function Landing() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: 20,
-            marginTop: 36,
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 18,
+            marginTop: 40,
           }}
         >
           {FEATURES.map((f, i) => (
@@ -741,17 +1028,33 @@ export default function Landing() {
               key={i}
               className="lp-card"
               style={{
+                gridColumn: f.big ? "span 2" : "span 2",
                 background: C.white,
-                borderRadius: 16,
-                padding: 24,
+                borderRadius: 18,
+                padding: f.big ? 30 : 22,
                 border: `1px solid ${C.border}`,
-                transition: "transform 0.25s ease, box-shadow 0.25s ease",
+                position: "relative",
+                overflow: "hidden",
               }}
             >
+              {f.big && (
+                <div
+                  aria-hidden
+                  style={{
+                    position: "absolute",
+                    top: -30,
+                    right: -30,
+                    width: 100,
+                    height: 100,
+                    borderRadius: "50%",
+                    background: T.weave,
+                  }}
+                />
+              )}
               <div
                 style={{
-                  width: 42,
-                  height: 42,
+                  width: f.big ? 48 : 40,
+                  height: f.big ? 48 : 40,
                   borderRadius: 12,
                   background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
                   color: "#fff",
@@ -759,6 +1062,8 @@ export default function Landing() {
                   alignItems: "center",
                   justifyContent: "center",
                   marginBottom: 16,
+                  position: "relative",
+                  zIndex: 1,
                 }}
               >
                 {f.icon}
@@ -766,9 +1071,10 @@ export default function Landing() {
               <h3
                 style={{
                   margin: "0 0 8px",
-                  fontSize: 16,
+                  fontSize: f.big ? 18 : 15.5,
                   color: C.dark,
                   fontFamily: F.serif,
+                  fontWeight: 800,
                 }}
               >
                 {getText(f.title)}
@@ -786,16 +1092,26 @@ export default function Landing() {
             </div>
           ))}
         </div>
+        <style>{`
+          @media (max-width: 900px) {
+            #features > div:last-child { grid-template-columns: repeat(2, 1fr) !important; }
+          }
+          @media (max-width: 560px) {
+            #features > div:last-child { grid-template-columns: 1fr !important; }
+            #features > div:last-child > div { grid-column: span 1 !important; }
+          }
+        `}</style>
       </section>
 
       {/* ── HOW IT WORKS ─────────────────────────────────── */}
       <section
+        id="how"
         ref={registerRef("how")}
         data-reveal="how"
         style={{
           maxWidth: 1000,
           margin: "0 auto",
-          padding: "clamp(48px, 8vw, 76px) clamp(20px, 6vw, 40px) 12px",
+          padding: "clamp(56px, 8vw, 84px) clamp(20px, 6vw, 40px) 12px",
           ...revealStyle("how"),
         }}
       >
@@ -809,7 +1125,7 @@ export default function Landing() {
             display: "grid",
             gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
             gap: 20,
-            marginTop: 32,
+            marginTop: 36,
           }}
         >
           {STEPS.map((s, i) => (
@@ -818,7 +1134,7 @@ export default function Landing() {
               style={{
                 background: C.white,
                 borderRadius: 16,
-                padding: 22,
+                padding: 24,
                 border: `1px solid ${C.border}`,
                 position: "relative",
               }}
@@ -827,7 +1143,7 @@ export default function Landing() {
                 style={{
                   position: "absolute",
                   top: -14,
-                  left: 20,
+                  left: 22,
                   width: 28,
                   height: 28,
                   borderRadius: "50%",
@@ -844,16 +1160,16 @@ export default function Landing() {
               </div>
               <div
                 style={{
-                  width: 38,
-                  height: 38,
+                  width: 40,
+                  height: 40,
                   borderRadius: 10,
                   background: C.bg,
                   color: C.primary,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  marginBottom: 14,
-                  marginTop: 6,
+                  marginBottom: 16,
+                  marginTop: 8,
                 }}
               >
                 {s.icon}
@@ -861,9 +1177,10 @@ export default function Landing() {
               <h3
                 style={{
                   margin: "0 0 8px",
-                  fontSize: 15,
+                  fontSize: 15.5,
                   color: C.dark,
                   fontFamily: F.serif,
+                  fontWeight: 800,
                 }}
               >
                 {getText(s.title)}
@@ -888,10 +1205,10 @@ export default function Landing() {
         ref={registerRef("gm")}
         data-reveal="gm"
         style={{
-          background: C.dark,
+          background: T.ink,
           color: "#fff",
-          marginTop: 24,
-          padding: "clamp(48px, 8vw, 76px) clamp(20px, 6vw, 40px)",
+          marginTop: 40,
+          padding: "clamp(56px, 8vw, 84px) clamp(20px, 6vw, 40px)",
           ...revealStyle("gm"),
         }}
       >
@@ -900,7 +1217,7 @@ export default function Landing() {
             maxWidth: 1000,
             margin: "0 auto",
             display: "flex",
-            gap: 32,
+            gap: 36,
             alignItems: "center",
             flexWrap: "wrap",
           }}
@@ -944,7 +1261,6 @@ export default function Landing() {
                 fontSize: 14,
                 cursor: "pointer",
                 fontFamily: F.sans,
-                transition: "transform 0.2s ease, box-shadow 0.2s ease",
               }}
             >
               {getText(LANDING_COPY.gmCta)}
@@ -957,34 +1273,53 @@ export default function Landing() {
       {/* ── FOOTER ───────────────────────────────────────── */}
       <footer
         style={{
-          background: "#091350",
-          color: "#c9d0f0",
-          padding: "32px clamp(20px, 6vw, 40px)",
-          textAlign: "center",
+          background: "#04081f",
+          color: "#8892c0",
+          padding: "40px clamp(20px, 6vw, 40px) 28px",
         }}
       >
         <div
           style={{
+            maxWidth: 1000,
+            margin: "0 auto",
             display: "flex",
+            justifyContent: "space-between",
             alignItems: "center",
-            justifyContent: "center",
-            gap: 10,
-            marginBottom: 10,
+            flexWrap: "wrap",
+            gap: 20,
+            paddingBottom: 24,
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
           }}
         >
-          <img
-            src={mesobLogo}
-            alt="Addis MESOB"
-            style={{ width: 26, height: 26, borderRadius: 6 }}
-          />
-          <span style={{ fontFamily: F.serif, fontWeight: 800, color: "#fff" }}>
-            Addis MESOB
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img
+              src={mesobLogo}
+              alt="Addis MESOB"
+              style={{ width: 28, height: 28, borderRadius: 6 }}
+            />
+            <span
+              style={{
+                fontFamily: F.serif,
+                fontWeight: 800,
+                color: "#fff",
+                fontSize: 15,
+              }}
+            >
+              Addis MESOB
+            </span>
+          </div>
+          <p
+            style={{
+              fontSize: 12.5,
+              margin: 0,
+              maxWidth: 360,
+              textAlign: "right",
+            }}
+          >
+            {getText(LANDING_COPY.footerTagline)}
+          </p>
         </div>
-        <p style={{ fontSize: 12.5, margin: "0 0 6px" }}>
-          {getText(LANDING_COPY.footerTagline)}
-        </p>
-        <p style={{ fontSize: 11, color: "#7a8fc8", margin: 0 }}>
+        <p style={{ fontSize: 11, margin: "18px 0 0", textAlign: "center" }}>
           © {new Date().getFullYear()} Digital Ethiopia · Addis MESOB
         </p>
       </footer>
