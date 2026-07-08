@@ -64,7 +64,11 @@ const FALLBACK_PILLARS = [
     body: "The stated goal is to push every employee beyond a single fixed skill set — technology literacy, service standards, and adaptability all get airtime over time.",
   },
 ];
-
+const PILLAR_ICONS = {
+  FiSunrise: <FiSunrise size={22} />,
+  FiUsers: <FiUsers size={22} />,
+  FiTrendingUp: <FiTrendingUp size={22} />,
+};
 const FALLBACK_MESOB_POINTS = [
   {
     icon: <FiGrid size={20} />,
@@ -1386,28 +1390,11 @@ export default function GoldenMonday() {
                   marginBottom: 16,
                 }}
               >
-                {pillar.icon}
+                {/* {pillar.icon} */}
+                {typeof pillar.icon === "string"
+                  ? PILLAR_ICONS[pillar.icon] || <FiCompass size={22} />
+                  : pillar.icon}
               </div>
-              <h3
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: 16,
-                  color: C.dark,
-                  fontFamily: F.serif,
-                }}
-              >
-                {pillar.title}
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13.5,
-                  lineHeight: 1.6,
-                  color: C.muted,
-                }}
-              >
-                {pillar.body}
-              </p>
             </div>
           ))}
         </div>
