@@ -318,7 +318,7 @@ function DigitalMesob() {
         viewBox="0 0 340 340"
         width="340"
         height="340"
-        style={{ position: "absolute", inset: 0 }}
+        style={{ position: "absolute", inset: 0, zIndex: 3 }}
         aria-hidden
       >
         <defs>
