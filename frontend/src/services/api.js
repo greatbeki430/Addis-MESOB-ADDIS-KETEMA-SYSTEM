@@ -207,6 +207,18 @@ export const documentAPI = {
 };
 
 // ============================================================
+// UPLOAD API - For file uploads (employee photos, etc.)
+// ============================================================
+export const uploadAPI = {
+  uploadEmployeePhoto: (formData) =>
+    api.post("/upload/employee-photo", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
+};
+
+// ============================================================
 // GOLDEN MONDAY API — COMPLETE
 // ============================================================
 export const goldenMondayAPI = {

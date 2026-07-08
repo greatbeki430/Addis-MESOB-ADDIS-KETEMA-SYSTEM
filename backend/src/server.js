@@ -24,6 +24,7 @@ const { startGoldenMondayScheduler } = require("./jobs/goldenMondayScheduler");
 
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 const telegramRoutes = require("./routes/telegramRoutes");
+const uploadRoutes = require("./routes/uploadRoutes");
 
 const app = express();
 
@@ -125,6 +126,7 @@ app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/golden-monday", goldenMondayRoutes);
 app.use("/api/telegram", telegramRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // =============================================
 // ✅ HEALTH CHECK

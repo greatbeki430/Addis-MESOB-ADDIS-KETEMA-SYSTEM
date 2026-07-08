@@ -10,7 +10,7 @@ import { createPortal } from "react-dom";
 import { C, F } from "../styles/theme";
 import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../hooks/useLanguage";
-import { goldenMondayAPI, authAPI } from "../services/api";
+import { goldenMondayAPI, authAPI, uploadAPI } from "../services/api";
 import { showToast } from "../utils/toastHelper";
 import { ROLES, hasMinRole } from "../utils/roles";
 import GoldenMondayRotationPanel from "../components/golden-monday/GoldenMondayRotationPanel";
@@ -49,26 +49,28 @@ import {
 // ─────────────────────────────────────────────────────────────
 const FALLBACK_PILLARS = [
   {
-    icon: <FiSunrise size={22} />,
+    icon: "FiSunrise",
     title: "A weekly reset",
     body: "Every Monday morning, offices across the organization pause the routine for shared learning — a deliberate start to the work week instead of a rushed one.",
   },
   {
-    icon: <FiUsers size={22} />,
+    icon: "FiUsers",
     title: "Peer-led, not top-down",
     body: "Sessions are usually carried by colleagues themselves — department heads, team leaders, and long-serving staff sharing real experience, not scripted lectures.",
   },
   {
-    icon: <FiTrendingUp size={22} />,
+    icon: "FiTrendingUp",
     title: "Built for multiskilling",
     body: "The stated goal is to push every employee beyond a single fixed skill set — technology literacy, service standards, and adaptability all get airtime over time.",
   },
 ];
+
 const PILLAR_ICONS = {
   FiSunrise: <FiSunrise size={22} />,
   FiUsers: <FiUsers size={22} />,
   FiTrendingUp: <FiTrendingUp size={22} />,
 };
+
 const FALLBACK_MESOB_POINTS = [
   {
     icon: <FiGrid size={20} />,
@@ -349,16 +351,18 @@ function TelegramPostButton({ sessionId, onPosted }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SESSION CARD COMPONENT - FIXED: Removed unused 'translate'
+// SESSION CARD COMPONENT - FIXED: Now uses language properly
 // ─────────────────────────────────────────────────────────────
 function SessionCard({ session, language, isAdmin, onRefresh }) {
   const [expanded, setExpanded] = useState(false);
   const date = new Date(session.date);
   const isUpcoming = session.status === "scheduled" || date > new Date();
 
-  // Helper to get translated text
-  // eslint-disable-next-line no-unused-vars
-  const getText = (obj) => obj?.[language] || obj?.en || obj;
+  // Helper to get translated text - NOW ACTUALLY USED
+  const getTranslatedText = (obj) => {
+    if (!obj) return "";
+    return obj[language] || obj.en || obj;
+  };
 
   return (
     <div
@@ -401,10 +405,12 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
           </div>
           <div>
             <div style={{ fontWeight: 600, color: C.dark }}>
-              {session.presentationTitle || session.title || "Untitled Session"}
+              {getTranslatedText(session.presentationTitle) ||
+                session.title ||
+                "Untitled Session"}
             </div>
             <div style={{ fontSize: 12, color: C.muted }}>
-              {session.presenterName || "No presenter"} ·{" "}
+              {getTranslatedText(session.presenterName) || "No presenter"} ·{" "}
               {date.toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -422,7 +428,7 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
                     color: C.gold,
                   }}
                 >
-                  Upcoming
+                  {getTranslatedText({ en: "Upcoming" })}
                 </span>
               )}
               {session.averageRating > 0 && (
@@ -449,7 +455,7 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
                 fontWeight: 600,
               }}
             >
-              <FiVideo size={14} /> Watch
+              <FiVideo size={14} /> {getTranslatedText({ en: "Watch" })}
             </a>
           )}
           {isAdmin && isUpcoming && (
@@ -483,13 +489,13 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
         >
           {session.presentationDescription && (
             <p style={{ fontSize: 13, color: C.dark, marginBottom: 8 }}>
-              {session.presentationDescription}
+              {getTranslatedText(session.presentationDescription)}
             </p>
           )}
           {session.suggestedTopics && session.suggestedTopics.length > 0 && (
             <div style={{ marginBottom: 8 }}>
               <span style={{ fontSize: 11, color: C.muted }}>
-                AI Suggested:
+                {getTranslatedText({ en: "AI Suggested:" })}
               </span>
               <div
                 style={{
@@ -521,7 +527,8 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
               <summary
                 style={{ fontSize: 12, color: C.primary, cursor: "pointer" }}
               >
-                <FiInfo size={12} style={{ marginRight: 4 }} /> View AI Recap
+                <FiInfo size={12} style={{ marginRight: 4 }} />
+                {getTranslatedText({ en: "View AI Recap" })}
               </summary>
               <p
                 style={{
@@ -533,7 +540,7 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
                   borderRadius: 8,
                 }}
               >
-                {session.recapEn}
+                {getTranslatedText(session.recapEn)}
               </p>
             </details>
           )}
@@ -568,7 +575,7 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// MODAL COMPONENT
+// MODAL COMPONENT WITH PHOTO UPLOAD - FIXED
 // ─────────────────────────────────────────────────────────────
 function EmployeeRegistrationModal({
   show,
@@ -583,6 +590,12 @@ function EmployeeRegistrationModal({
   userSearch,
   setUserSearch,
   handleSelectUser,
+  // photoFile,
+  setPhotoFile,
+  photoPreview,
+  setPhotoPreview,
+  handlePhotoChange,
+  uploadingPhoto,
 }) {
   if (!show) return null;
 
@@ -640,6 +653,7 @@ function EmployeeRegistrationModal({
         </div>
 
         <div style={{ display: "grid", gap: 14 }}>
+          {/* Employee Selection */}
           <div>
             <label
               style={{
@@ -651,7 +665,6 @@ function EmployeeRegistrationModal({
             >
               Employee *
             </label>
-
             {selectedUser ? (
               <div
                 style={{
@@ -755,6 +768,7 @@ function EmployeeRegistrationModal({
             )}
           </div>
 
+          {/* Department */}
           <div>
             <label
               style={{
@@ -776,6 +790,7 @@ function EmployeeRegistrationModal({
             />
           </div>
 
+          {/* Position */}
           <div>
             <label
               style={{
@@ -797,6 +812,7 @@ function EmployeeRegistrationModal({
             />
           </div>
 
+          {/* Photo Upload with Preview - NOW PROPERLY USING photoFile and photoPreview */}
           <div>
             <label
               style={{
@@ -806,7 +822,91 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              Profile Photo URL (optional)
+              Profile Photo
+            </label>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+              }}
+            >
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                style={{
+                  ...inputStyle,
+                  padding: "8px",
+                  cursor: "pointer",
+                  flex: 1,
+                }}
+                disabled={uploadingPhoto}
+              />
+              {uploadingPhoto && (
+                <FiLoader
+                  size={20}
+                  style={{
+                    animation: "spin 1s linear infinite",
+                    color: C.primary,
+                  }}
+                />
+              )}
+            </div>
+            {/* Show preview if photoFile exists */}
+            {photoPreview && (
+              <div
+                style={{
+                  marginTop: 8,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                }}
+              >
+                <img
+                  src={photoPreview}
+                  alt="Preview"
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    border: `2px solid ${C.border}`,
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    setPhotoFile(null);
+                    setPhotoPreview(null);
+                  }}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    color: "#ef4444",
+                    cursor: "pointer",
+                    fontSize: 12,
+                  }}
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+              Upload a photo from your computer (JPG, PNG, GIF) - Max 5MB
+            </div>
+          </div>
+
+          {/* OR: Keep URL option as fallback */}
+          <div>
+            <label
+              style={{
+                fontSize: 13,
+                color: C.muted,
+                display: "block",
+                marginBottom: 4,
+              }}
+            >
+              Photo URL (optional, or use upload above)
             </label>
             <input
               placeholder="https://example.com/photo.jpg"
@@ -821,6 +921,7 @@ function EmployeeRegistrationModal({
             />
           </div>
 
+          {/* Action Buttons */}
           <div
             style={{
               display: "flex",
@@ -836,13 +937,18 @@ function EmployeeRegistrationModal({
             </button>
             <button
               onClick={onRegister}
-              disabled={registering || !employeeForm.userId}
+              disabled={registering || !employeeForm.userId || uploadingPhoto}
               style={{
                 ...btnStyle(C.primary),
-                opacity: registering || !employeeForm.userId ? 0.6 : 1,
+                opacity:
+                  registering || !employeeForm.userId || uploadingPhoto
+                    ? 0.6
+                    : 1,
               }}
             >
-              {registering ? "Registering..." : "Register Employee"}
+              {registering || uploadingPhoto
+                ? "Processing..."
+                : "Register Employee"}
             </button>
           </div>
         </div>
@@ -903,11 +1009,16 @@ export default function GoldenMonday() {
     profilePhotoUrl: "",
   });
   const [registering, setRegistering] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [allUsers, setAllUsers] = useState([]);
   const [userSearch, setUserSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
 
-  // ── Translation helper - USED EVERYWHERE in JSX via `t` alias ──
+  // ── Photo Upload State ──
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+
+  // ── Translation helper ──
   const getTranslatedText = (obj) => {
     if (!obj) return "";
     return obj[language] || obj.en || obj;
@@ -1001,6 +1112,7 @@ export default function GoldenMonday() {
     return () => elements.forEach((el) => observer.unobserve(el));
   }, []);
 
+  // ── Load users when modal opens ──
   useEffect(() => {
     if (!showEmployeeModal) return;
     authAPI
@@ -1026,6 +1138,23 @@ export default function GoldenMonday() {
   const handleSelectUser = (u) => {
     setSelectedUser(u);
     setEmployeeForm((f) => ({ ...f, userId: u._id }));
+  };
+
+  // ── Photo Upload Handler ──
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        showToast("Photo must be less than 5MB", "error");
+        e.target.value = "";
+        return;
+      }
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onload = () => setPhotoPreview(reader.result);
+      reader.readAsDataURL(file);
+    }
   };
 
   const revealStyle = (key) => ({
@@ -1082,12 +1211,29 @@ export default function GoldenMonday() {
   // ── Admin Handlers ──
   const handleRegisterEmployee = async () => {
     if (!employeeForm.userId) {
-      showToast("Please enter a User ID", "warning");
+      showToast("Please select an employee", "warning");
       return;
     }
     setRegistering(true);
     try {
-      await goldenMondayAPI.registerEmployee(employeeForm);
+      let profilePhotoUrl = employeeForm.profilePhotoUrl;
+
+      // If a photo was uploaded, upload it first
+      if (photoFile) {
+        setUploadingPhoto(true);
+        const formData = new FormData();
+        formData.append("photo", photoFile);
+        const response = await uploadAPI.uploadEmployeePhoto(formData);
+        profilePhotoUrl = response.data.url;
+        setUploadingPhoto(false);
+      }
+
+      // Register employee with the photo URL
+      await goldenMondayAPI.registerEmployee({
+        ...employeeForm,
+        profilePhotoUrl,
+      });
+
       showToast("Employee registered successfully!", "success");
       setShowEmployeeModal(false);
       setEmployeeForm({
@@ -1098,6 +1244,8 @@ export default function GoldenMonday() {
       });
       setSelectedUser(null);
       setUserSearch("");
+      setPhotoFile(null);
+      setPhotoPreview(null);
       await refreshData();
     } catch (error) {
       showToast(
@@ -1106,6 +1254,7 @@ export default function GoldenMonday() {
       );
     } finally {
       setRegistering(false);
+      setUploadingPhoto(false);
     }
   };
 
@@ -1133,11 +1282,9 @@ export default function GoldenMonday() {
     }
   };
 
-  // ── Create `t` alias so getTranslatedText is actually used ──
+  // ── Create `t` alias ──
   const t = getTranslatedText;
 
-  // ── Render ──
-  // All text uses `t()` which calls getTranslatedText
   return (
     <div style={{ fontFamily: F.sans, background: C.gray }}>
       <style>{`
@@ -1365,38 +1512,61 @@ export default function GoldenMonday() {
             marginTop: 28,
           }}
         >
-          {pillars.map((pillar, i) => (
-            <div
-              key={i}
-              className="gm-card"
-              style={{
-                background: C.white,
-                borderRadius: 16,
-                padding: 24,
-                border: `1px solid ${C.border}`,
-                transition: "transform 0.25s ease, box-shadow 0.25s ease",
-              }}
-            >
+          {pillars.map((pillar, i) => {
+            // Get the icon component from PILLAR_ICONS map
+            const IconComponent = PILLAR_ICONS[pillar.icon] || (
+              <FiCompass size={22} />
+            );
+            return (
               <div
+                key={i}
+                className="gm-card"
                 style={{
-                  width: 42,
-                  height: 42,
-                  borderRadius: 12,
-                  background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 16,
+                  background: C.white,
+                  borderRadius: 16,
+                  padding: 24,
+                  border: `1px solid ${C.border}`,
+                  transition: "transform 0.25s ease, box-shadow 0.25s ease",
                 }}
               >
-                {/* {pillar.icon} */}
-                {typeof pillar.icon === "string"
-                  ? PILLAR_ICONS[pillar.icon] || <FiCompass size={22} />
-                  : pillar.icon}
+                <div
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 12,
+                    background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  {IconComponent}
+                </div>
+                <h3
+                  style={{
+                    margin: "0 0 8px",
+                    fontSize: 16,
+                    color: C.dark,
+                    fontFamily: F.serif,
+                  }}
+                >
+                  {t(pillar.title) || pillar.title}
+                </h3>
+                <p
+                  style={{
+                    margin: 0,
+                    fontSize: 13.5,
+                    lineHeight: 1.6,
+                    color: C.muted,
+                  }}
+                >
+                  {t(pillar.body) || pillar.body}
+                </p>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -2104,11 +2274,12 @@ export default function GoldenMonday() {
       {/* ── REGISTER EMPLOYEE MODAL ── */}
       <EmployeeRegistrationModal
         show={showEmployeeModal}
-        // onClose={() => setShowEmployeeModal(false)}
         onClose={() => {
           setShowEmployeeModal(false);
           setSelectedUser(null);
           setUserSearch("");
+          setPhotoFile(null);
+          setPhotoPreview(null);
         }}
         onRegister={handleRegisterEmployee}
         employeeForm={employeeForm}
@@ -2120,6 +2291,12 @@ export default function GoldenMonday() {
         userSearch={userSearch}
         setUserSearch={setUserSearch}
         handleSelectUser={handleSelectUser}
+        photoFile={photoFile}
+        setPhotoFile={setPhotoFile}
+        photoPreview={photoPreview}
+        setPhotoPreview={setPhotoPreview}
+        handlePhotoChange={handlePhotoChange}
+        uploadingPhoto={uploadingPhoto}
       />
     </div>
   );
