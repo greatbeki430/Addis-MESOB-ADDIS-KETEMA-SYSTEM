@@ -1,3 +1,4 @@
+// frontend/src/components/layout/Header.jsx
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { useAuth } from "../../hooks/useAuth";
@@ -40,7 +41,6 @@ export default function Header({ tab, t, lang, setLang }) {
     day: "numeric",
   });
 
-  // ✅ FALLBACK: Safe access to translations
   const safeT = t || {};
   const safeNav = safeT.nav || {};
   const safeAuth = safeT.auth || {};
@@ -137,17 +137,17 @@ export default function Header({ tab, t, lang, setLang }) {
         </span>
       </div>
 
-      {/* RIGHT SECTION */}
+      {/* RIGHT SECTION - FIXED LAYOUT */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           gap: "clamp(6px, 2vw, 14px)",
           flexShrink: 0,
-          flexWrap: "wrap",
-          justifyContent: "flex-end",
+          flexWrap: "nowrap",
         }}
       >
+        {/* Date - hidden on mobile */}
         <span
           className="header-date"
           style={{
@@ -164,7 +164,7 @@ export default function Header({ tab, t, lang, setLang }) {
           {dateStr}
         </span>
 
-        {/* Language Buttons — desktop */}
+        {/* Language Buttons - fixed width */}
         <div
           style={{
             display: "flex",
@@ -172,76 +172,51 @@ export default function Header({ tab, t, lang, setLang }) {
             flexShrink: 0,
           }}
         >
-          <div style={{ display: "flex", gap: "clamp(2px, 1.5vw, 6px)" }}>
-            {LANGUAGES.map((l) => (
-              <button
-                key={l.code}
-                className="header-lang-btn"
-                onClick={() => setLang(l.code)}
-                title={l.label}
-                style={{
-                  background: lang === l.code ? C.primary : "#f0f3ff",
-                  color: lang === l.code ? C.gold : C.primary,
-                  border: `1px solid ${lang === l.code ? C.primary : C.border}`,
-                  borderRadius: 5,
-                  padding: "clamp(2px, 1.5vw, 4px) clamp(4px, 2vw, 8px)",
-                  fontSize: "clamp(9px, 2.5vw, 11px)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: F.sans,
-                  transition: "all 0.2s ease",
-                  whiteSpace: "nowrap",
-                  minWidth: "clamp(24px, 6vw, 32px)",
-                  transform: lang === l.code ? "scale(1.05)" : "scale(1)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2,
-                }}
-                onMouseEnter={(e) => {
-                  if (lang !== l.code) {
-                    e.currentTarget.style.background = C.primary + "22";
-                    e.currentTarget.style.transform = "scale(1.05)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (lang !== l.code) {
-                    e.currentTarget.style.background = "#f0f3ff";
-                    e.currentTarget.style.transform = "scale(1)";
-                  }
-                }}
-              >
-                <FiGlobe size={10} />
-                {l.flag}
-              </button>
-            ))}
-          </div>
-
-          {/* Mobile Language Selector */}
-          <select
-            value={lang}
-            onChange={(e) => setLang(e.target.value)}
-            style={{
-              background: C.primary,
-              color: C.gold,
-              border: `1px solid ${C.primary}`,
-              borderRadius: 5,
-              padding: "clamp(2px, 1.5vw, 4px) clamp(4px, 2vw, 8px)",
-              fontSize: "clamp(9px, 2.5vw, 11px)",
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: F.sans,
-              display: "none",
-            }}
-          >
-            {LANGUAGES.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.flag} {l.label}
-              </option>
-            ))}
-          </select>
+          {LANGUAGES.map((l) => (
+            <button
+              key={l.code}
+              className="header-lang-btn"
+              onClick={() => setLang(l.code)}
+              title={l.label}
+              style={{
+                background: lang === l.code ? C.primary : "#f0f3ff",
+                color: lang === l.code ? C.gold : C.primary,
+                border: `1px solid ${lang === l.code ? C.primary : C.border}`,
+                borderRadius: 5,
+                padding: "clamp(2px, 1.5vw, 4px) clamp(4px, 2vw, 8px)",
+                fontSize: "clamp(9px, 2.5vw, 11px)",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: F.sans,
+                transition: "all 0.2s ease",
+                whiteSpace: "nowrap",
+                minWidth: "clamp(24px, 6vw, 32px)",
+                transform: lang === l.code ? "scale(1.05)" : "scale(1)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 2,
+              }}
+              onMouseEnter={(e) => {
+                if (lang !== l.code) {
+                  e.currentTarget.style.background = C.primary + "22";
+                  e.currentTarget.style.transform = "scale(1.05)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (lang !== l.code) {
+                  e.currentTarget.style.background = "#f0f3ff";
+                  e.currentTarget.style.transform = "scale(1)";
+                }
+              }}
+            >
+              <FiGlobe size={10} />
+              {l.flag}
+            </button>
+          ))}
         </div>
 
-        {/* Logout Button */}
+        {/* Logout Button - FIXED WIDTH */}
         <button
           onClick={logout}
           className="header-logout-btn"
@@ -249,22 +224,32 @@ export default function Header({ tab, t, lang, setLang }) {
             background: isLogoutHovered ? "#dc2626" : "transparent",
             border: `1px solid ${isLogoutHovered ? "#dc2626" : C.border}`,
             borderRadius: 5,
-            padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 2vw, 12px)",
+            padding: "clamp(2px, 1.5vw, 4px) clamp(8px, 2vw, 14px)",
+            minWidth: "clamp(70px, 10vw, 90px)",
             fontSize: "clamp(10px, 2.5vw, 12px)",
             fontWeight: 600,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
+            justifyContent: "center",
             gap: 6,
             color: isLogoutHovered ? "#fff" : C.muted,
             transition: "all 0.3s ease",
             whiteSpace: "nowrap",
+            height: "clamp(30px, 4vh, 36px)",
           }}
           onMouseEnter={() => setIsLogoutHovered(true)}
           onMouseLeave={() => setIsLogoutHovered(false)}
         >
-          <FiLogOut size={14} />
-          <span style={{ display: "inline-block" }}>
+          <FiLogOut size={14} style={{ flexShrink: 0 }} />
+          <span
+            style={{
+              display: "inline-block",
+              // ✅ Fixed width for the text to prevent layout shift
+              minWidth: "clamp(38px, 5vw, 50px)",
+              textAlign: "center",
+            }}
+          >
             {safeAuth.logout || "Logout"}
           </span>
         </button>
@@ -303,23 +288,24 @@ export default function Header({ tab, t, lang, setLang }) {
         </div>
       </div>
 
-      {/* ✅ Add responsive CSS for mobile language selector */}
+      {/* ✅ Responsive CSS */}
       <style>{`
         @media (max-width: 500px) {
           .header-lang-btn {
             display: none !important;
           }
-          .header-logout-btn span:last-child {
+          .header-logout-btn span {
             display: none !important;
+          }
+          .header-logout-btn {
+            min-width: unset !important;
+            padding: 6px 10px !important;
           }
           .header-date {
             display: none !important;
           }
           .header-appname {
             display: none !important;
-          }
-          header select {
-            display: block !important;
           }
         }
       `}</style>

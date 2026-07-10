@@ -703,7 +703,9 @@ export default function Landing() {
             style={{
               display: "flex",
               alignItems: "center",
+              justifyContent: "center",
               gap: 6,
+              minWidth: "clamp(140px, 15vw, 180px)",
               background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
               color: C.dark,
               border: "none",
@@ -713,6 +715,7 @@ export default function Landing() {
               fontSize: 13,
               cursor: "pointer",
               fontFamily: F.sans,
+              whiteSpace: "nowrap",
             }}
           >
             <FiLogIn size={14} />
