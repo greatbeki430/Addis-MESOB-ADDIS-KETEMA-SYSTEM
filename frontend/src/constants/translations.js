@@ -18,6 +18,7 @@ export const translations = {
       "admin/services": "Service Manager",
       documents: "Document Vault",
       "golden-monday": "Golden Monday",
+      employees: "Employee Management",
     },
     sidebar: {
       main: "Main Menu",
@@ -376,6 +377,7 @@ export const translations = {
       "admin/services": "የአገልግሎት አስተዳዳሪ",
       documents: "ሰነድ ቋት",
       "golden-monday": "ወርቃማ ሰኞ",
+      employees: "የሰራተኞች አስተዳደር",
     },
     sidebar: {
       main: "ዋና ምናሌ",
@@ -727,6 +729,7 @@ export const translations = {
       "admin/services": "Bulchiinsa Tajaajilaa",
       documents: "Kuusaa Dookumentiiwwani",
       "golden-monday": "Wiixata Warqee",
+      employees: "Bulchiinsa Hojjattootaa",
     },
     sidebar: {
       main: "Mana Galmee",
