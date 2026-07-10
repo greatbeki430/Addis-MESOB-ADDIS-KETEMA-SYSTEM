@@ -16,6 +16,7 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import UserManagement from "./pages/admin/UserManagement";
 import TeamManagement from "./pages/admin/TeamManagement";
+import EmployeeManagement from "./pages/admin/EmployeeManagement";
 import Report from "./pages/Report";
 import { setToastFunction } from "./utils/toastHelper";
 import { ToastContainer } from "./components/ui/Modal";
@@ -366,7 +367,7 @@ function AuthenticatedApp() {
                 element={<Dashboard t={t} lang={language} />}
               />
 
-              {/* Golden Monday - Public landing page */}
+              {/* Golden Monday */}
               <Route
                 path="/golden-monday"
                 element={<GoldenMonday lang={language} />}
@@ -456,6 +457,18 @@ function AuthenticatedApp() {
                       isSuperAdmin={isSuperAdmin}
                       lang={language}
                     />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+
+              {/* ✅ Employee Management - Only Admins and Super Admins */}
+              <Route
+                path="/employees"
+                element={
+                  isAdminOrSuperAdmin ? (
+                    <EmployeeManagement t={t} />
                   ) : (
                     <Navigate to="/dashboard" replace />
                   )

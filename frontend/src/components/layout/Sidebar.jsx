@@ -26,11 +26,11 @@ import {
   FiCheck,
   FiLoader,
   FiMenu,
-  FiSunrise, // ✅ Added for Golden Monday
+  FiSunrise,
 } from "react-icons/fi";
 
 // =============================================
-// ANIMATED LOGO COMPONENT - Alternating "A" ↔ "አ"
+// ANIMATED LOGO COMPONENT
 // =============================================
 const AnimatedLogo = ({ collapsed }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -222,10 +222,9 @@ export default function Sidebar({
   const { user, isAdminOrSuperAdmin, isLeader, isEmployee } = useAuth();
   const filteredNavItems = getFilteredNavItems(user?.role || "employee");
 
-  // ✅ Add Golden Monday to nav items if user is leader or above
+  // Add Golden Monday to nav items if user is leader or above
   const navItemsWithGoldenMonday = [...filteredNavItems];
   if (user && (isLeader || isAdminOrSuperAdmin)) {
-    // Check if golden-monday already exists
     const hasGoldenMonday = navItemsWithGoldenMonday.some(
       (item) => item.id === "golden-monday",
     );
@@ -254,6 +253,16 @@ export default function Sidebar({
   const MUTED_TEXT = "#7a8fc8";
   const SECTION_BG = "#0f2070";
   const HOVER_BG = "#1a3aad22";
+
+  const languageSectionStyle = {
+    flexShrink: 0,
+    borderTop: `1px solid ${BORDER_COLOR}33`,
+    padding: collapsed ? "12px 0" : "14px 16px",
+    background: DARK_BG,
+    position: "sticky",
+    bottom: 0,
+    zIndex: 5,
+  };
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -376,12 +385,30 @@ export default function Sidebar({
       "admin/services": <FiSettings size={20} />,
       users: <FiUsersIcon size={20} />,
       teams: <FiUsers size={20} />,
+      employees: <FiUsers size={20} />, // ← ADDED: Employee Management
       analytics: <FiBarChart2 size={20} />,
       documents: <FiFileText size={20} />,
-      "golden-monday": <FiSunrise size={20} />, // ✅ Added Golden Monday icon
+      "golden-monday": <FiSunrise size={20} />,
     };
     return icons[id] || <FiMenu size={20} />;
   };
+
+  // Add custom scrollbar styles
+  const scrollbarStyles = `
+    .sidebar-nav::-webkit-scrollbar {
+      width: 4px;
+    }
+    .sidebar-nav::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .sidebar-nav::-webkit-scrollbar-thumb {
+      background: ${BORDER_COLOR}55;
+      border-radius: 4px;
+    }
+    .sidebar-nav::-webkit-scrollbar-thumb:hover {
+      background: ${BORDER_COLOR}88;
+    }
+  `;
 
   const sidebarWidth = collapsed ? 64 : isMobile ? 200 : 260;
 
@@ -389,14 +416,17 @@ export default function Sidebar({
     <aside
       style={{
         width: sidebarWidth,
-        minHeight: "100vh",
-        background: DARK_BG,
+        height: "100vh",
         display: "flex",
         flexDirection: "column",
+        background: DARK_BG,
         transition: "width 0.25s ease",
         borderRight: `2px solid ${BORDER_COLOR}`,
         flexShrink: 0,
         zIndex: 50,
+        overflow: "hidden",
+        position: "sticky",
+        top: 0,
       }}
     >
       <style>{`
@@ -417,9 +447,10 @@ export default function Sidebar({
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
+        ${scrollbarStyles}
       `}</style>
 
-      {/* Collapse Toggle */}
+      {/* Collapse Toggle - Fixed at top */}
       <button
         onClick={() => setCollapsed(!collapsed)}
         style={{
@@ -434,6 +465,7 @@ export default function Sidebar({
           alignItems: "center",
           justifyContent: "center",
           width: "100%",
+          flexShrink: 0,
           transition: "all 0.2s",
         }}
         onMouseEnter={(e) => (e.currentTarget.style.background = "#1a3aad44")}
@@ -442,7 +474,7 @@ export default function Sidebar({
         {collapsed ? <FiChevronRight size={18} /> : <FiChevronLeft size={18} />}
       </button>
 
-      {/* Animated Logo */}
+      {/* Animated Logo - Fixed at top */}
       <div
         style={{
           padding: collapsed ? "18px 0" : "16px",
@@ -450,6 +482,7 @@ export default function Sidebar({
           alignItems: "center",
           justifyContent: collapsed ? "center" : "flex-start",
           borderBottom: `1px solid ${BORDER_COLOR}33`,
+          flexShrink: 0,
         }}
       >
         <AnimatedLogo collapsed={collapsed} />
@@ -465,14 +498,25 @@ export default function Sidebar({
             fontWeight: 700,
             letterSpacing: 1,
             textTransform: "uppercase",
+            flexShrink: 0,
           }}
         >
           {safeT("sidebar.main", "Main Menu")}
         </div>
       )}
 
-      {/* Nav Items */}
-      <nav style={{ flex: 1, padding: "6px 0" }}>
+      {/* Nav Items - Scrollable */}
+      <nav
+        className="sidebar-nav"
+        style={{
+          flex: "1 1 auto",
+          overflowY: "auto",
+          overflowX: "hidden",
+          padding: "6px 0",
+          scrollbarWidth: "thin",
+          scrollbarColor: `${BORDER_COLOR}44 transparent`,
+        }}
+      >
         {navItemsWithGoldenMonday.map((n) => {
           const isActive = location.pathname === `/${n.id}`;
           const isForum = n.id === "forum";
@@ -700,13 +744,8 @@ export default function Sidebar({
         })}
       </nav>
 
-      {/* Language Switcher */}
-      <div
-        style={{
-          borderTop: `1px solid ${BORDER_COLOR}33`,
-          padding: collapsed ? "12px 0" : "14px 16px",
-        }}
-      >
+      {/* Language Switcher - Fixed at bottom */}
+      <div style={languageSectionStyle}>
         {!collapsed && (
           <div
             style={{
@@ -755,6 +794,7 @@ export default function Sidebar({
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 4,
+                minWidth: collapsed ? "32px" : "auto",
               }}
             >
               {!collapsed ? (
@@ -769,7 +809,7 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Add Team Modal */}
+      {/* Add Team Modal - unchanged */}
       {showAddTeamModal && (
         <div
           style={{

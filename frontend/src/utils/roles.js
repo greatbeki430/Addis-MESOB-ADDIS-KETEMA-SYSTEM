@@ -1,3 +1,4 @@
+// frontend/src/utils/roles.js
 // Role definitions and permissions
 export const ROLES = {
   SUPER_ADMIN: "superadmin",
@@ -87,7 +88,7 @@ export const NAV_ITEMS = [
   {
     id: "admin/services",
     icon: "🔧",
-    label: "Service Manager", // ✅ This will be translated via t('nav.admin/services')
+    label: "Service Manager",
     roles: [ROLES.SUPER_ADMIN],
   },
   {
@@ -103,6 +104,12 @@ export const NAV_ITEMS = [
     roles: [ROLES.SUPER_ADMIN],
   },
   {
+    id: "employees",
+    icon: "👤",
+    label: "Employee Management",
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
     id: "analytics",
     icon: "📊",
     label: "Analytics",
@@ -113,6 +120,12 @@ export const NAV_ITEMS = [
     icon: "📁",
     label: "Document Vault",
     roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
+    id: "golden-monday",
+    icon: "🌅",
+    label: "Golden Monday",
+    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
 ];
 
