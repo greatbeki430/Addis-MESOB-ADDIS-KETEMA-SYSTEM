@@ -1,7 +1,7 @@
 // frontend/src/pages/admin/EmployeeManagement.jsx
 // Employee Management - Full CRUD for Golden Monday rotation roster
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { C, F, btn } from "../../styles/theme";
 import { goldenMondayAPI, authAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
@@ -52,6 +52,9 @@ export default function EmployeeManagement({ t }) {
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  // ✅ Use ref to prevent multiple initial loads
+  const initialLoadRef = useRef(true);
+
   // Translations fallback
   const getTranslation = (key) => {
     const fallback = {
@@ -101,7 +104,7 @@ export default function EmployeeManagement({ t }) {
     return te[key] || fallback[key] || key;
   };
 
-  // Load employees
+  // Load employees - no dependencies
   const loadEmployees = useCallback(async () => {
     try {
       setLoading(true);
@@ -126,9 +129,12 @@ export default function EmployeeManagement({ t }) {
     }
   }, [showToast]);
 
+  // ✅ Only load on initial mount
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadEmployees();
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      loadEmployees();
+    }
   }, [loadEmployees]);
 
   // Refresh data
@@ -362,7 +368,7 @@ export default function EmployeeManagement({ t }) {
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - unchanged */}
       <div
         style={{
           display: "grid",
@@ -477,7 +483,7 @@ export default function EmployeeManagement({ t }) {
         </div>
       </div>
 
-      {/* Search and Filter */}
+      {/* Search and Filter - unchanged */}
       <div
         style={{
           display: "flex",
@@ -875,7 +881,7 @@ export default function EmployeeManagement({ t }) {
         </div>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal - unchanged */}
       {showAddModal && (
         <div
           style={{
