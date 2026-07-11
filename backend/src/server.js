@@ -22,6 +22,9 @@ const documentRoutes = require("./routes/documentRoutes");
 const goldenMondayRoutes = require("./routes/goldenMondayRoutes");
 const { startGoldenMondayScheduler } = require("./jobs/goldenMondayScheduler");
 
+// Departments — NEW
+const departmentRoutes = require("./routes/departmentRoutes");
+
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 const telegramRoutes = require("./routes/telegramRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
@@ -128,6 +131,9 @@ app.use("/api/golden-monday", goldenMondayRoutes);
 app.use("/api/telegram", telegramRoutes);
 app.use("/api/upload", uploadRoutes);
 
+// Departments — NEW
+app.use("/api/departments", departmentRoutes);
+
 // =============================================
 // ✅ HEALTH CHECK
 // =============================================
@@ -153,6 +159,7 @@ app.get("/", (req, res) => {
       chatbot: "/api/chatbot",
       documents: "/api/documents",
       "golden-monday": "/api/golden-monday",
+      departments: "/api/departments",
     },
   });
 });

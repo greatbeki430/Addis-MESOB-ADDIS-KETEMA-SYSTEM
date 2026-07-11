@@ -219,6 +219,33 @@ export const uploadAPI = {
 };
 
 // ============================================================
+// DEPARTMENTS API — NEW
+// Standalone department registry: create/manage departments
+// independent of employee assignment, see live headcounts, rename
+// safely (existing employee records get updated to match).
+// ============================================================
+export const departmentAPI = {
+  // GET /api/departments - list all departments with employee counts
+  getAll: () => api.get("/departments"),
+  getDepartments: () => api.get("/departments"),
+
+  // GET /api/departments/:id
+  getById: (id) => api.get(`/departments/${id}`),
+
+  // POST /api/departments  { name, description?, head?, headName? }
+  create: (data) => api.post("/departments", data),
+  createDepartment: (data) => api.post("/departments", data),
+
+  // PUT /api/departments/:id  { name?, description?, head?, headName?, isActive? }
+  update: (id, data) => api.put(`/departments/${id}`, data),
+  updateDepartment: (id, data) => api.put(`/departments/${id}`, data),
+
+  // DELETE /api/departments/:id - refuses if employees are still assigned
+  delete: (id) => api.delete(`/departments/${id}`),
+  deleteDepartment: (id) => api.delete(`/departments/${id}`),
+};
+
+// ============================================================
 // GOLDEN MONDAY API — COMPLETE
 // ============================================================
 export const goldenMondayAPI = {
@@ -262,11 +289,15 @@ export const goldenMondayAPI = {
   getEmployees: () => api.get("/golden-monday/roster"),
 
   // POST /api/golden-monday/roster - Add to roster
+  // Accepts: userId, department, position, profilePhotoUrl, phone,
+  // hireDate, skills, notes, emergencyContact, address, and (for
+  // admin/superadmin callers only — enforced server-side) salary.
   addToRoster: (userId, department) =>
     api.post("/golden-monday/roster", { userId, department }),
   registerEmployee: (data) => api.post("/golden-monday/roster", data),
 
   // PUT /api/golden-monday/roster/:id - Update roster entry
+  // Same field set as addToRoster/registerEmployee above.
   updateRosterEntry: (id, updates) =>
     api.put(`/golden-monday/roster/${id}`, updates),
   updateEmployeeEligibility: (userId, isEligible) =>

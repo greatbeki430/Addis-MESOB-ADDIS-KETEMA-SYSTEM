@@ -53,6 +53,11 @@ const handleServiceError = (res, error, fallbackMessage) => {
     .json({ message: error.message || fallbackMessage, code: error.code });
 };
 
+// Only admin/superadmin may read or write salary. Called before
+// returning roster data and before applying updates.
+const canSeeSalary = (user) =>
+  user && ["admin", "superadmin"].includes(user.role);
+
 // ============================================================
 // GET /api/golden-monday
 // List saved sessions, most recent first.
@@ -203,9 +208,15 @@ const suggestTopics = async (req, res) => {
 // ============================================================
 
 // GET /api/golden-monday/roster
+// Salary is select:false at the schema level, so it's excluded by
+// default. Only pull it in explicitly for admin/superadmin callers.
 const getRoster = async (req, res) => {
   try {
-    const roster = await GoldenMondayPresenter.find().sort({ name: 1 });
+    let query = GoldenMondayPresenter.find().sort({ name: 1 });
+    if (canSeeSalary(req.user)) {
+      query = query.select("+salary");
+    }
+    const roster = await query;
     res.json(roster);
   } catch (error) {
     res
@@ -214,10 +225,33 @@ const getRoster = async (req, res) => {
   }
 };
 
-// POST /api/golden-monday/roster  { userId }
+// POST /api/golden-monday/roster
+// { userId, department, position, profilePhotoUrl, phone, hireDate,
+//   skills, notes, emergencyContact, address, salary? }
+//
+// FIX (previous bug): this used to create the GoldenMondayPresenter
+// document without setting `email`, but the schema has
+// `email: { type: String, required: true }`. That caused a Mongoose
+// validation error on every call, surfaced to the frontend as
+// "Failed to add to roster." Also now persists the HR-lite fields the
+// Employee Management UI collects, which were previously silently
+// dropped since the controller never read them from req.body.
 const addToRoster = async (req, res) => {
   try {
-    const { userId, department, position, profilePhotoUrl } = req.body;
+    const {
+      userId,
+      department,
+      position,
+      profilePhotoUrl,
+      phone,
+      hireDate,
+      skills,
+      notes,
+      emergencyContact,
+      address,
+      salary,
+    } = req.body;
+
     const user = await User.findById(userId);
     if (!user) return res.status(404).json({ message: "User not found" });
 
@@ -228,15 +262,35 @@ const addToRoster = async (req, res) => {
         .json({ message: "User is already on the rotation roster" });
     }
 
-    const entry = await GoldenMondayPresenter.create({
+    const doc = {
       user: user._id,
       name: user.name,
-      email: user.email, // was missing -> caused the required-field validation error
+      email: user.email, // required by schema — this was the missing field
       department: department || "",
       position: position || "",
       profilePhotoUrl: profilePhotoUrl || "",
+      phone: phone || "",
+      hireDate: hireDate || null,
+      skills: Array.isArray(skills) ? skills : [],
+      notes: notes || "",
+      emergencyContact: emergencyContact || "",
+      address: address || "",
       registeredBy: req.user._id,
-    });
+    };
+
+    // Only admin/superadmin can set salary at creation time.
+    if (canSeeSalary(req.user) && salary !== undefined && salary !== "") {
+      doc.salary = Number(salary);
+    }
+
+    let entry = await GoldenMondayPresenter.create(doc);
+
+    // Re-fetch with salary included if the caller is allowed to see it,
+    // since select:false hides it on the object returned by .create().
+    if (canSeeSalary(req.user)) {
+      entry = await GoldenMondayPresenter.findById(entry._id).select("+salary");
+    }
+
     res.status(201).json(entry);
   } catch (error) {
     res
@@ -245,20 +299,56 @@ const addToRoster = async (req, res) => {
   }
 };
 
-// PUT /api/golden-monday/roster/:id  { isEligible, onLeaveUntil, department }
+// PUT /api/golden-monday/roster/:id
+// { isEligible, onLeaveUntil, department, position, profilePhotoUrl,
+//   phone, hireDate, skills, notes, emergencyContact, address, salary? }
 const updateRosterEntry = async (req, res) => {
   try {
-    const { isEligible, onLeaveUntil, department } = req.body;
+    const {
+      isEligible,
+      onLeaveUntil,
+      department,
+      position,
+      profilePhotoUrl,
+      phone,
+      hireDate,
+      skills,
+      notes,
+      emergencyContact,
+      address,
+      salary,
+    } = req.body;
+
     const update = {};
     if (isEligible !== undefined) update.isEligible = isEligible;
     if (onLeaveUntil !== undefined) update.onLeaveUntil = onLeaveUntil;
     if (department !== undefined) update.department = department;
+    if (position !== undefined) update.position = position;
+    if (profilePhotoUrl !== undefined) update.profilePhotoUrl = profilePhotoUrl;
+    if (phone !== undefined) update.phone = phone;
+    if (hireDate !== undefined) update.hireDate = hireDate || null;
+    if (skills !== undefined)
+      update.skills = Array.isArray(skills) ? skills : [];
+    if (notes !== undefined) update.notes = notes;
+    if (emergencyContact !== undefined)
+      update.emergencyContact = emergencyContact;
+    if (address !== undefined) update.address = address;
 
-    const entry = await GoldenMondayPresenter.findByIdAndUpdate(
-      req.params.id,
-      update,
-      { new: true },
-    );
+    // Salary: only admin/superadmin may change it. Non-privileged
+    // callers silently have this field ignored rather than erroring,
+    // so the same form can be reused across roles without special-casing.
+    if (salary !== undefined && canSeeSalary(req.user)) {
+      update.salary = salary === "" ? null : Number(salary);
+    }
+
+    let query = GoldenMondayPresenter.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+    });
+    if (canSeeSalary(req.user)) {
+      query = query.select("+salary");
+    }
+    const entry = await query;
+
     if (!entry)
       return res.status(404).json({ message: "Roster entry not found" });
     res.json(entry);

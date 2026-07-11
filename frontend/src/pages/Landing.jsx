@@ -10,6 +10,19 @@
 // dishes from one vessel; that's a literal, specific metaphor for
 // "one platform, many services," so it replaces a generic stock
 // hero image rather than decorating around one.
+//
+// v2 CHANGES:
+// - Fixed the "bento-style asymmetric grid" claim in FEATURES: every
+//   card previously got the same gridColumn span regardless of the
+//   `big` flag, so the layout was actually uniform, not asymmetric.
+//   Big cards now genuinely span more width than small ones.
+// - Added scrollspy nav highlighting, a back-to-top button, an FAQ
+//   section, animated stat counters, marquee pause-on-hover, mobile
+//   nav Escape-to-close + scroll lock, a skip-to-content link, and a
+//   footer with real link slots (Privacy/Terms/Contact — point these
+//   at real routes/emails when ready).
+// - No fabricated testimonials/quotes were added — wire up real ones
+//   when available rather than inventing attributed content.
 // ════════════════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -35,6 +48,9 @@ import {
   FiMapPin,
   FiMenu,
   FiX,
+  FiArrowUp,
+  FiHelpCircle,
+  FiMail,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
@@ -129,12 +145,95 @@ const LANDING_COPY = {
     am: "የዚህ ሳምንት ስብሰባን ለማየት ይግቡ",
     om: "Walga'ii Torban Kanaa Ilaaluuf Seeni",
   },
+  faqEyebrow: {
+    en: "Questions",
+    am: "ጥያቄዎች",
+    om: "Gaaffilee",
+  },
+  faqTitle: {
+    en: "Frequently asked questions",
+    am: "በተደጋጋሚ የሚነሱ ጥያቄዎች",
+    om: "Gaaffilee Yeroo Baay'ee Gaafataman",
+  },
   footerTagline: {
     en: "A one-stop digital service platform for Digital Ethiopia.",
     am: "ለዲጂታል ኢትዮጵያ የአንድ ማዕከል ዲጂታል አገልግሎት መድረክ።",
     om: "Waltajjii tajaajila dijitaalaa bakka tokkotti Itoophiyaa Dijitaalaatiif.",
   },
+  footerPrivacy: {
+    en: "Privacy Policy",
+    am: "የግላዊነት ፖሊሲ",
+    om: "Imaammata Dhuunfaa",
+  },
+  footerTerms: {
+    en: "Terms of Service",
+    am: "የአገልግሎት ውሎች",
+    om: "Haala Tajaajilaa",
+  },
+  footerContact: { en: "Contact Us", am: "ያግኙን", om: "Nu Qunnamaa" },
+  skipToContent: {
+    en: "Skip to content",
+    am: "ወደ ይዘቱ ዝለል",
+    om: "Gara Qabiyyeetti Utaali",
+  },
+  backToTop: { en: "Back to top", am: "ወደ ላይ ተመለስ", om: "Gara Olii Deebi'i" },
 };
+
+// FAQ content — plain, non-fabricated answers about the platform's own
+// mechanics (role-based access, languages, login). Amharic/Oromo copy
+// here is a first pass; have a native speaker on the team review before
+// treating it as final, the same way the rest of this file's copy was
+// presumably reviewed.
+const FAQ_ITEMS = [
+  {
+    q: {
+      en: "Do I need a separate account for each service?",
+      am: "ለእያንዳንዱ አገልግሎት የተለየ መለያ ያስፈልገኛል?",
+      om: "Tajaajila hundaaf herrega addaa naa barbaachisaa?",
+    },
+    a: {
+      en: "No. One organization account signs you into every module — dashboard, evaluations, reports, documents, and Golden Monday — with access automatically scoped to your role.",
+      am: "አያስፈልግም። አንድ የድርጅት መለያ ወደ ሁሉም ክፍሎች — ዳሽቦርድ፣ ግምገማ፣ ሪፖርት፣ ሰነድ እና ወርቃማ ሰኞ — ያስገባዎታል፣ ተደራሽነትም በራስ-ሰር በሚናዎ መሰረት ይወሰናል።",
+      om: "Lakki. Herregni dhaabbilee tokko moduulii hunda keessatti si seensisa — daashboordii, madaallii, gabaasa, ragaa, fi Wiixata Warqee — dhaqqabamummaanis akkaataa gahee keetiitiin ofumaan murtaa'a.",
+    },
+  },
+  {
+    q: {
+      en: "Who can register new employees or create teams?",
+      am: "አዲስ ሰራተኞችን መመዝገብ ወይም ቡድን መፍጠር የሚችለው ማን ነው?",
+      om: "Hojjetoota haaraa galmeessuu ykn garee uumuu kan danda'u eenyu?",
+    },
+    a: {
+      en: "Team leaders and admins can register employees and manage rosters. Creating and renaming departments, and full user management, is reserved for admins and super admins.",
+      am: "ቡድን መሪዎችና አድሚኖች ሰራተኞችን መመዝገብና ዝርዝሮችን ማስተዳደር ይችላሉ። ክፍል መፍጠርና እንደገና መሰየም እንዲሁም ሙሉ የተጠቃሚ አስተዳደር ለአድሚኖችና ለሱፐር አድሚኖች ብቻ የተከለለ ነው።",
+      om: "Hoogganoonni garee fi admin-oonni hojjetoota galmeessuu fi tarree bulchuu ni danda'u. Kutaa uumuu fi maqaa jijjiiruu, akkasumas bulchiinsa fayyadamaa guutuu, admin-oota fi super admin-ootaaf qofa kan qophaa'edha.",
+    },
+  },
+  {
+    q: {
+      en: "Can I use the platform in Amharic or Afaan Oromo?",
+      am: "መድረኩን በአማርኛ ወይም በአፋን ኦሮሞ መጠቀም እችላለሁ?",
+      om: "Waltajjicha Afaan Amaaraa ykn Afaan Oromootiin fayyadamuu danda'aa?",
+    },
+    a: {
+      en: "Yes — every screen works in English, Amharic, and Afaan Oromo. Switch anytime using the language selector in the top navigation.",
+      am: "አዎ — እያንዳንዱ ገጽ በእንግሊዝኛ፣ በአማርኛና በአፋን ኦሮሞ ይሰራል። በላይኛው ዳሰሳ ውስጥ ባለው የቋንቋ መራጭ በማንኛውም ጊዜ መቀየር ይችላሉ።",
+      om: "Eeyyee — fuulli hundi Ingiliffaan, Amaariffaan, fi Afaan Oromootiin hojjeta. Filannoo afaanii kan gubbaa jiru fayyadamuun yeroo barbaadanitti jijjiiruu ni dandeessu.",
+    },
+  },
+  {
+    q: {
+      en: "What does the AI assistant actually do?",
+      am: "የAI ረዳቱ በትክክል ምን ያደርጋል?",
+      om: "Deeggartuun AI dhugumaan maal godha?",
+    },
+    a: {
+      en: "It drafts recap summaries for Golden Monday sessions, suggests presentation topics, auto-fills scanned document fields, and answers questions inline across dashboards and reports.",
+      am: "ለወርቃማ ሰኞ ስብሰባዎች ማጠቃለያ ረቂቅ ያዘጋጃል፣ የአቀራረብ ርዕሶችን ይጠቁማል፣ የተቃኙ ሰነድ መስኮችን በራስ-ሰር ይሞላል፣ እንዲሁም በዳሽቦርድና ሪፖርቶች ላይ ጥያቄዎችን በቀጥታ ይመልሳል።",
+      om: "Cuunfaa walga'ii Wiixata Warqeetiif qopheessa, mata duree dhiyeessii ni yaada, unka ragaa sikaanamee ofumaan guuta, gaaffiiwwan dashboard fi gabaasa keessattis kallattiin ni deebisa.",
+    },
+  },
+];
 
 // Orbiting service icons for the signature hero graphic — each one
 // maps to a real in-app module, not decorative filler.
@@ -294,6 +393,123 @@ const STEPS = [
     },
   },
 ];
+
+// ─────────────────────────────────────────────────────────────
+// ANIMATED COUNTER — counts up from 0 once its wrapper scrolls into
+// view. Numeric prefix/suffix (e.g. "+" or "/7") passed through as-is;
+// non-numeric values (like "24/7") render statically without animating.
+// ─────────────────────────────────────────────────────────────
+function AnimatedStat({ value, active }) {
+  const match = /^(\d+)(.*)$/.exec(String(value));
+  const numeric = match ? parseInt(match[1], 10) : null;
+  const suffix = match ? match[2] : "";
+  const [display, setDisplay] = useState(numeric === null ? value : 0);
+  const hasRun = useRef(false);
+
+  useEffect(() => {
+    if (!active || numeric === null || hasRun.current) return;
+    hasRun.current = true;
+    const duration = 900;
+    const steps = 24;
+    const increment = numeric / steps;
+    let current = 0;
+    let step = 0;
+    const timer = setInterval(() => {
+      step++;
+      current += increment;
+      if (step >= steps) {
+        current = numeric;
+        clearInterval(timer);
+      }
+      setDisplay(Math.round(current));
+    }, duration / steps);
+    return () => clearInterval(timer);
+  }, [active, numeric]);
+
+  return <>{numeric === null ? value : display + suffix}</>;
+}
+
+// ─────────────────────────────────────────────────────────────
+// FAQ ACCORDION
+// ─────────────────────────────────────────────────────────────
+function FAQAccordion({ items, getText }) {
+  const [openIndex, setOpenIndex] = useState(0);
+
+  return (
+    <div style={{ display: "grid", gap: 10 }}>
+      {items.map((item, i) => {
+        const isOpen = openIndex === i;
+        return (
+          <div
+            key={i}
+            style={{
+              background: C.white,
+              border: `1px solid ${C.border}`,
+              borderRadius: 14,
+              overflow: "hidden",
+            }}
+          >
+            <button
+              onClick={() => setOpenIndex(isOpen ? -1 : i)}
+              aria-expanded={isOpen}
+              style={{
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "16px 20px",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                textAlign: "left",
+                fontFamily: F.sans,
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 14.5,
+                  fontWeight: 700,
+                  color: C.dark,
+                }}
+              >
+                {getText(item.q)}
+              </span>
+              <FiChevronDown
+                size={18}
+                color={C.muted}
+                style={{
+                  flexShrink: 0,
+                  transform: isOpen ? "rotate(180deg)" : "none",
+                  transition: "transform 0.2s ease",
+                }}
+              />
+            </button>
+            <div
+              style={{
+                maxHeight: isOpen ? 200 : 0,
+                overflow: "hidden",
+                transition: "max-height 0.25s ease",
+              }}
+            >
+              <p
+                style={{
+                  margin: 0,
+                  padding: "0 20px 16px",
+                  fontSize: 13.5,
+                  lineHeight: 1.65,
+                  color: C.muted,
+                }}
+              >
+                {getText(item.a)}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────
 // SIGNATURE VISUAL — "Digital Mesob": woven basket core with
@@ -500,6 +716,8 @@ export default function Landing() {
   const navigate = useNavigate();
   const [visible, setVisible] = useState({});
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [activeSection, setActiveSection] = useState("");
+  const [showBackToTop, setShowBackToTop] = useState(false);
   const sectionRefs = useRef({});
 
   const stats = useMemo(() => {
@@ -526,22 +744,49 @@ export default function Landing() {
     [],
   );
 
+  // Reveal-on-scroll + scrollspy (nav active-state) share one observer.
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
+          const key = entry.target.dataset.reveal;
           if (entry.isIntersecting) {
-            setVisible((v) => ({ ...v, [entry.target.dataset.reveal]: true }));
+            setVisible((v) => ({ ...v, [key]: true }));
+            if (key === "features" || key === "how") {
+              setActiveSection(key);
+            }
           }
         });
       },
-      { threshold: 0.12 },
+      { threshold: 0.12, rootMargin: "-72px 0px -60% 0px" },
     );
     const currentRefs = { ...sectionRefs.current };
     const elements = Object.values(currentRefs).filter(Boolean);
     elements.forEach((el) => observer.observe(el));
     return () => elements.forEach((el) => observer.unobserve(el));
   }, []);
+
+  // Back-to-top visibility.
+  useEffect(() => {
+    const onScroll = () => setShowBackToTop(window.scrollY > 640);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Mobile nav: close on Escape, lock body scroll while open.
+  useEffect(() => {
+    if (!mobileNavOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") setMobileNavOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [mobileNavOpen]);
 
   const revealStyle = (key) => ({
     opacity: visible[key] ? 1 : 0,
@@ -551,6 +796,7 @@ export default function Landing() {
 
   const goLogin = () => navigate("/login");
   const getText = (obj) => obj[language] || obj.en;
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
   return (
     <div
@@ -577,6 +823,10 @@ export default function Landing() {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+        @keyframes lp-fade-in {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
 
         .mesob-orbit-text {
           transform-origin: 170px 170px;
@@ -588,16 +838,45 @@ export default function Landing() {
         .lp-card:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(6,11,46,0.12); border-color: ${C.primary}55; }
         .lp-cta { transition: transform 0.2s ease, box-shadow 0.2s ease; }
         .lp-cta:hover { transform: translateY(-2px); box-shadow: 0 12px 28px ${C.primary}4d; }
-        .lp-nav-link { transition: opacity 0.15s ease; }
+        .lp-nav-link { transition: opacity 0.15s ease, color 0.15s ease; position: relative; }
         .lp-nav-link:hover { opacity: 0.72; }
+        .lp-nav-link.active { color: ${C.gold} !important; }
+        .lp-nav-link.active::after {
+          content: "";
+          position: absolute;
+          left: 0; right: 0; bottom: -6px;
+          height: 2px;
+          background: ${C.gold};
+          border-radius: 2px;
+        }
         .lp-lang-btn { transition: opacity 0.15s ease, transform 0.15s ease; }
         .lp-lang-btn:hover { opacity: 0.85; }
+        .lp-marquee-track:hover { animation-play-state: paused; }
+        .lp-back-to-top { transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease; }
+        .lp-back-to-top:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(6,11,46,0.35); }
         a, button { -webkit-tap-highlight-color: transparent; }
 
         a:focus-visible, button:focus-visible {
           outline: 2px solid ${C.gold};
           outline-offset: 2px;
         }
+
+        .lp-skip-link {
+          position: absolute;
+          top: -48px;
+          left: 12px;
+          background: ${C.gold};
+          color: ${C.dark};
+          padding: 10px 16px;
+          borderRadius: 8px;
+          border-radius: 8px;
+          font-weight: 700;
+          font-size: 13px;
+          text-decoration: none;
+          z-index: 100;
+          transition: top 0.2s ease;
+        }
+        .lp-skip-link:focus { top: 12px; }
 
         .lp-desktop-only { display: flex; }
         .lp-mobile-toggle { display: none; }
@@ -610,6 +889,11 @@ export default function Landing() {
           * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
         }
       `}</style>
+
+      {/* ── SKIP LINK (accessibility) ───────────────────── */}
+      <a href="#main-content" className="lp-skip-link">
+        {getText(LANDING_COPY.skipToContent)}
+      </a>
 
       {/* ── TOP NAV ─────────────────────────────────────── */}
       <header
@@ -651,9 +935,10 @@ export default function Landing() {
         >
           <a
             href="#features"
-            className="lp-nav-link"
+            className={`lp-nav-link${activeSection === "features" ? " active" : ""}`}
+            aria-current={activeSection === "features" ? "true" : undefined}
             style={{
-              color: "#c9d0f0",
+              color: activeSection === "features" ? C.gold : "#c9d0f0",
               textDecoration: "none",
               fontSize: 13,
               fontWeight: 600,
@@ -663,6 +948,19 @@ export default function Landing() {
           </a>
           <a
             href="#how"
+            className={`lp-nav-link${activeSection === "how" ? " active" : ""}`}
+            aria-current={activeSection === "how" ? "true" : undefined}
+            style={{
+              color: activeSection === "how" ? C.gold : "#c9d0f0",
+              textDecoration: "none",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            How it works
+          </a>
+          <a
+            href="#faq"
             className="lp-nav-link"
             style={{
               color: "#c9d0f0",
@@ -671,7 +969,7 @@ export default function Landing() {
               fontWeight: 600,
             }}
           >
-            How it works
+            FAQ
           </a>
           <div style={{ display: "flex", gap: 4 }}>
             {LANGUAGES.map((l) => (
@@ -680,6 +978,7 @@ export default function Landing() {
                 className="lp-lang-btn"
                 onClick={() => changeLanguage(l.code)}
                 title={l.label}
+                aria-label={`Switch to ${l.label}`}
                 style={{
                   background:
                     language === l.code ? C.gold : "rgba(255,255,255,0.08)",
@@ -727,6 +1026,7 @@ export default function Landing() {
           className="lp-mobile-toggle"
           onClick={() => setMobileNavOpen((v) => !v)}
           aria-label="Toggle menu"
+          aria-expanded={mobileNavOpen}
           style={{
             background: "rgba(255,255,255,0.08)",
             border: "none",
@@ -752,6 +1052,7 @@ export default function Landing() {
             flexDirection: "column",
             gap: 14,
             borderBottom: `1px solid rgba(255,255,255,0.08)`,
+            animation: "lp-fade-in 0.2s ease",
           }}
         >
           <a
@@ -768,11 +1069,19 @@ export default function Landing() {
           >
             How it works
           </a>
+          <a
+            href="#faq"
+            style={{ color: "#c9d0f0", fontSize: 14, fontWeight: 600 }}
+            onClick={() => setMobileNavOpen(false)}
+          >
+            FAQ
+          </a>
           <div style={{ display: "flex", gap: 6 }}>
             {LANGUAGES.map((l) => (
               <button
                 key={l.code}
                 onClick={() => changeLanguage(l.code)}
+                aria-label={`Switch to ${l.label}`}
                 style={{
                   background:
                     language === l.code ? C.gold : "rgba(255,255,255,0.08)",
@@ -809,6 +1118,7 @@ export default function Landing() {
 
       {/* ── HERO ─────────────────────────────────────────── */}
       <section
+        id="main-content"
         style={{
           position: "relative",
           overflow: "hidden",
@@ -928,6 +1238,8 @@ export default function Landing() {
             </div>
 
             <div
+              ref={registerRef("stats")}
+              data-reveal="stats"
               style={{
                 display: "flex",
                 gap: 30,
@@ -937,7 +1249,7 @@ export default function Landing() {
             >
               {[
                 [stats.services + "+", LANDING_COPY.statServices],
-                [stats.agencies || "—", LANDING_COPY.statAgencies],
+                [(stats.agencies || 0) + "", LANDING_COPY.statAgencies],
                 ["3", LANDING_COPY.statLanguages],
                 ["24/7", LANDING_COPY.statAI],
               ].map(([num, label], i) => (
@@ -950,7 +1262,7 @@ export default function Landing() {
                       color: C.goldLight,
                     }}
                   >
-                    {num}
+                    <AnimatedStat value={num} active={!!visible.stats} />
                   </div>
                   <div
                     style={{
@@ -1004,6 +1316,7 @@ export default function Landing() {
           </div>
           <div style={{ display: "flex", width: "max-content" }}>
             <div
+              className="lp-marquee-track"
               style={{
                 display: "flex",
                 gap: 32,
@@ -1029,7 +1342,7 @@ export default function Landing() {
         </section>
       )}
 
-      {/* ── FEATURES (bento-style asymmetric grid) ───────── */}
+      {/* ── FEATURES (bento-style asymmetric grid — now actually asymmetric) ── */}
       <section
         id="features"
         ref={registerRef("features")}
@@ -1048,6 +1361,7 @@ export default function Landing() {
           center
         />
         <div
+          id="lp-features-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "repeat(4, 1fr)",
@@ -1060,7 +1374,11 @@ export default function Landing() {
               key={i}
               className="lp-card"
               style={{
-                gridColumn: f.big ? "span 2" : "span 2",
+                // FIX: big cards now span 2 columns (paired full-width on
+                // row one), small cards span 1 (four per row below) —
+                // previously both spanned 2, so "big" never looked
+                // different from "small" in layout, only in padding.
+                gridColumn: f.big ? "span 2" : "span 1",
                 background: C.white,
                 borderRadius: 18,
                 padding: f.big ? 30 : 22,
@@ -1126,11 +1444,11 @@ export default function Landing() {
         </div>
         <style>{`
           @media (max-width: 900px) {
-            #features > div:last-child { grid-template-columns: repeat(2, 1fr) !important; }
+            #lp-features-grid { grid-template-columns: repeat(2, 1fr) !important; }
+            #lp-features-grid > div { grid-column: span 1 !important; }
           }
           @media (max-width: 560px) {
-            #features > div:last-child { grid-template-columns: 1fr !important; }
-            #features > div:last-child > div { grid-column: span 1 !important; }
+            #lp-features-grid { grid-template-columns: 1fr !important; }
           }
         `}</style>
       </section>
@@ -1302,6 +1620,34 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ── FAQ ──────────────────────────────────────────── */}
+      <section
+        id="faq"
+        ref={registerRef("faq")}
+        data-reveal="faq"
+        style={{
+          maxWidth: 760,
+          margin: "0 auto",
+          padding:
+            "clamp(56px, 8vw, 84px) clamp(20px, 6vw, 40px) clamp(40px, 6vw, 60px)",
+          ...revealStyle("faq"),
+        }}
+      >
+        <SectionHeading
+          eyebrow={
+            <>
+              <FiHelpCircle size={14} style={{ marginRight: 4 }} />
+              {getText(LANDING_COPY.faqEyebrow)}
+            </>
+          }
+          title={getText(LANDING_COPY.faqTitle)}
+          center
+        />
+        <div style={{ marginTop: 32 }}>
+          <FAQAccordion items={FAQ_ITEMS} getText={getText} />
+        </div>
+      </section>
+
       {/* ── FOOTER ───────────────────────────────────────── */}
       <footer
         style={{
@@ -1316,45 +1662,105 @@ export default function Landing() {
             margin: "0 auto",
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: "flex-start",
             flexWrap: "wrap",
-            gap: 20,
+            gap: 24,
             paddingBottom: 24,
             borderBottom: "1px solid rgba(255,255,255,0.08)",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img
-              src={mesobLogo}
-              alt="Addis MESOB"
-              style={{ width: 28, height: 28, borderRadius: 6 }}
-            />
-            <span
-              style={{
-                fontFamily: F.serif,
-                fontWeight: 800,
-                color: "#fff",
-                fontSize: 15,
-              }}
-            >
-              Addis MESOB
-            </span>
+          <div style={{ maxWidth: 320 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <img
+                src={mesobLogo}
+                alt="Addis MESOB"
+                style={{ width: 28, height: 28, borderRadius: 6 }}
+              />
+              <span
+                style={{
+                  fontFamily: F.serif,
+                  fontWeight: 800,
+                  color: "#fff",
+                  fontSize: 15,
+                }}
+              >
+                Addis MESOB
+              </span>
+            </div>
+            <p style={{ fontSize: 12.5, margin: "12px 0 0" }}>
+              {getText(LANDING_COPY.footerTagline)}
+            </p>
           </div>
-          <p
+
+          <nav
+            aria-label="Footer"
             style={{
+              display: "flex",
+              gap: 20,
+              flexWrap: "wrap",
               fontSize: 12.5,
-              margin: 0,
-              maxWidth: 360,
-              textAlign: "right",
             }}
           >
-            {getText(LANDING_COPY.footerTagline)}
-          </p>
+            {/* Point these at real routes once they exist. */}
+            <a
+              href="/privacy"
+              style={{ color: "#8892c0", textDecoration: "none" }}
+            >
+              {getText(LANDING_COPY.footerPrivacy)}
+            </a>
+            <a
+              href="/terms"
+              style={{ color: "#8892c0", textDecoration: "none" }}
+            >
+              {getText(LANDING_COPY.footerTerms)}
+            </a>
+            <a
+              href="mailto:support@addismesob.example"
+              style={{
+                color: "#8892c0",
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+              }}
+            >
+              <FiMail size={12} />
+              {getText(LANDING_COPY.footerContact)}
+            </a>
+          </nav>
         </div>
         <p style={{ fontSize: 11, margin: "18px 0 0", textAlign: "center" }}>
           © {new Date().getFullYear()} Digital Ethiopia · Addis MESOB
         </p>
       </footer>
+
+      {/* ── BACK TO TOP ──────────────────────────────────── */}
+      <button
+        onClick={scrollToTop}
+        aria-label={getText(LANDING_COPY.backToTop)}
+        className="lp-back-to-top"
+        style={{
+          position: "fixed",
+          bottom: 24,
+          right: 24,
+          width: 44,
+          height: 44,
+          borderRadius: "50%",
+          background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
+          color: C.dark,
+          border: "none",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          boxShadow: "0 6px 18px rgba(6,11,46,0.3)",
+          zIndex: 40,
+          opacity: showBackToTop ? 1 : 0,
+          pointerEvents: showBackToTop ? "auto" : "none",
+        }}
+      >
+        <FiArrowUp size={18} />
+      </button>
     </div>
   );
 }

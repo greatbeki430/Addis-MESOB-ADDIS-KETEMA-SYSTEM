@@ -80,6 +80,10 @@ router.get("/sessions/past", protect, anyRole, async (req, res) => {
 router.get("/recordings/live", protect, anyRole, getLiveRecordings);
 
 // ── Rotation roster ─────────────────────────────────────────
+// NOTE: addToRoster/updateRosterEntry now accept a larger payload
+// (phone, hireDate, skills, notes, emergencyContact, address, and a
+// role-gated salary) — that's all handled inside the controller, so
+// no route-level changes were needed here.
 router.get("/roster", protect, anyRole, getRoster);
 router.post("/roster", protect, leaderOrAdmin, addToRoster);
 router.put("/roster/:id", protect, leaderOrAdmin, updateRosterEntry);
