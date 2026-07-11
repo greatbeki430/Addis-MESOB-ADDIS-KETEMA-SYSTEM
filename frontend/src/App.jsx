@@ -497,12 +497,12 @@ function AuthenticatedApp() {
         </main>
       </div>
 
-      {/* Floating User Badge with PDF Status */}
+      {/* ✅ FIXED: Floating User Badge moved to bottom-left to avoid overlapping with Chatbot */}
       <div
         style={{
           position: "fixed",
-          bottom: 80,
-          right: 20,
+          bottom: 20,
+          left: 20,
           background: C.white,
           borderRadius: 12,
           padding: "10px 16px",
