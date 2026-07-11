@@ -3,6 +3,7 @@ import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { useAuth } from "../../hooks/useAuth";
 import { useState, useMemo, useRef, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FiHome,
   FiMessageSquare,
@@ -24,6 +25,8 @@ import {
 } from "react-icons/fi";
 
 export default function Header({ tab, t, lang, setLang }) {
+  const navigate = useNavigate();
+
   const icons = {
     dashboard: <FiHome size={18} />,
     forum: <FiMessageSquare size={18} />,
@@ -88,6 +91,11 @@ export default function Header({ tab, t, lang, setLang }) {
 
   const tabLabel = safeNav[tab] || displayNames[tab] || tab;
 
+  // Get user profile photo
+  const getUserProfilePhoto = () => {
+    return user?.profilePhotoUrl || null;
+  };
+
   // Get user initials
   const getUserInitials = () => {
     if (!user?.name) return "U";
@@ -127,6 +135,8 @@ export default function Header({ tab, t, lang, setLang }) {
   const toggleDropdown = () => {
     setIsDropdownOpen(!isDropdownOpen);
   };
+
+  const userProfilePhoto = getUserProfilePhoto();
 
   return (
     <header
@@ -362,27 +372,42 @@ export default function Header({ tab, t, lang, setLang }) {
               }
             }}
           >
-            <div
-              style={{
-                width: "clamp(28px, 6vw, 36px)",
-                height: "clamp(28px, 6vw, 36px)",
-                background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
-                borderRadius: "50%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "clamp(12px, 3vw, 16px)",
-                color: "#fff",
-                fontWeight: 900,
-                fontFamily: F.serif,
-                boxShadow: `0 2px 8px rgba(26,58,173,0.35)`,
-                flexShrink: 0,
-                transition: "transform 0.3s ease, box-shadow 0.3s ease",
-              }}
-              title={user?.name || "User"}
-            >
-              {getUserInitials()}
-            </div>
+            {userProfilePhoto ? (
+              <img
+                src={userProfilePhoto}
+                alt={user?.name || "User"}
+                style={{
+                  width: "clamp(28px, 6vw, 36px)",
+                  height: "clamp(28px, 6vw, 36px)",
+                  borderRadius: "50%",
+                  objectFit: "cover",
+                  border: `2px solid ${C.primary}`,
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: "clamp(28px, 6vw, 36px)",
+                  height: "clamp(28px, 6vw, 36px)",
+                  background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "clamp(12px, 3vw, 16px)",
+                  color: "#fff",
+                  fontWeight: 900,
+                  fontFamily: F.serif,
+                  boxShadow: `0 2px 8px rgba(26,58,173,0.35)`,
+                  flexShrink: 0,
+                  transition: "transform 0.3s ease, box-shadow 0.3s ease",
+                }}
+                title={user?.name || "User"}
+              >
+                {getUserInitials()}
+              </div>
+            )}
             <FiChevronDown
               size={14}
               style={{
@@ -425,24 +450,39 @@ export default function Header({ tab, t, lang, setLang }) {
                     gap: 12,
                   }}
                 >
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
-                      borderRadius: "50%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 16,
-                      color: "#fff",
-                      fontWeight: 900,
-                      fontFamily: F.serif,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {getUserInitials()}
-                  </div>
+                  {userProfilePhoto ? (
+                    <img
+                      src={userProfilePhoto}
+                      alt={user?.name || "User"}
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: "50%",
+                        objectFit: "cover",
+                        border: `2px solid ${C.primary}`,
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 16,
+                        color: "#fff",
+                        fontWeight: 900,
+                        fontFamily: F.serif,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {getUserInitials()}
+                    </div>
+                  )}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
                       style={{
@@ -501,7 +541,7 @@ export default function Header({ tab, t, lang, setLang }) {
                 <button
                   onClick={() => {
                     setIsDropdownOpen(false);
-                    // Navigate to profile or settings
+                    navigate("/profile");
                   }}
                   style={{
                     display: "flex",
@@ -530,7 +570,7 @@ export default function Header({ tab, t, lang, setLang }) {
                 <button
                   onClick={() => {
                     setIsDropdownOpen(false);
-                    // Navigate to settings
+                    navigate("/settings");
                   }}
                   style={{
                     display: "flex",
