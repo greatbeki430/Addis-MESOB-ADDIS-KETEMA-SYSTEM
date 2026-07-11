@@ -2,7 +2,7 @@
 import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { useAuth } from "../../hooks/useAuth";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   FiHome,
   FiMessageSquare,
@@ -33,13 +33,16 @@ export default function Header({ tab, t, lang, setLang }) {
   const { logout, user } = useAuth();
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
 
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("en-GB", {
-    weekday: "short",
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
+  // ✅ Use useMemo to prevent date from recalculating on every render
+  const dateStr = useMemo(() => {
+    const now = new Date();
+    return now.toLocaleDateString("en-GB", {
+      weekday: "short",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  }, []);
 
   const safeT = t || {};
   const safeNav = safeT.nav || {};
@@ -137,7 +140,7 @@ export default function Header({ tab, t, lang, setLang }) {
         </span>
       </div>
 
-      {/* RIGHT SECTION - FIXED LAYOUT */}
+      {/* RIGHT SECTION */}
       <div
         style={{
           display: "flex",
@@ -147,7 +150,6 @@ export default function Header({ tab, t, lang, setLang }) {
           flexWrap: "nowrap",
         }}
       >
-        {/* Date - hidden on mobile */}
         <span
           className="header-date"
           style={{
@@ -164,7 +166,6 @@ export default function Header({ tab, t, lang, setLang }) {
           {dateStr}
         </span>
 
-        {/* Language Buttons - fixed width */}
         <div
           style={{
             display: "flex",
@@ -216,7 +217,6 @@ export default function Header({ tab, t, lang, setLang }) {
           ))}
         </div>
 
-        {/* Logout Button - FIXED WIDTH */}
         <button
           onClick={logout}
           className="header-logout-btn"
@@ -245,7 +245,6 @@ export default function Header({ tab, t, lang, setLang }) {
           <span
             style={{
               display: "inline-block",
-              // ✅ Fixed width for the text to prevent layout shift
               minWidth: "clamp(38px, 5vw, 50px)",
               textAlign: "center",
             }}
@@ -254,7 +253,6 @@ export default function Header({ tab, t, lang, setLang }) {
           </span>
         </button>
 
-        {/* Profile Avatar */}
         <div
           className="header-avatar"
           style={{
@@ -288,7 +286,6 @@ export default function Header({ tab, t, lang, setLang }) {
         </div>
       </div>
 
-      {/* ✅ Responsive CSS */}
       <style>{`
         @media (max-width: 500px) {
           .header-lang-btn {

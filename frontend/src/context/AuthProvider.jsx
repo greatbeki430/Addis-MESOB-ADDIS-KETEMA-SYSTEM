@@ -1,5 +1,5 @@
-// src/context/AuthProvider.jsx
-import { useState, useEffect, useCallback } from "react";
+// frontend/src/context/AuthProvider.jsx
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { AuthContext } from "./AuthContext";
 import { authAPI } from "../services/api";
 
@@ -109,21 +109,38 @@ export const AuthProvider = ({ children }) => {
   const isAdminOrSuperAdmin = isAdmin || isSuperAdmin;
   const isLeaderOrAbove = isLeader || isAdmin || isSuperAdmin;
 
-  const value = {
-    user,
-    loading,
-    token,
-    isAuthenticated: !!user,
-    isAdmin,
-    isSuperAdmin,
-    isLeader,
-    isEmployee,
-    isAdminOrSuperAdmin,
-    isLeaderOrAbove,
-    register,
-    login,
-    logout,
-  };
+  // ✅ Memoize context value to prevent unnecessary re-renders
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      token,
+      isAuthenticated: !!user,
+      isAdmin,
+      isSuperAdmin,
+      isLeader,
+      isEmployee,
+      isAdminOrSuperAdmin,
+      isLeaderOrAbove,
+      register,
+      login,
+      logout,
+    }),
+    [
+      user,
+      loading,
+      token,
+      isAdmin,
+      isSuperAdmin,
+      isLeader,
+      isEmployee,
+      isAdminOrSuperAdmin,
+      isLeaderOrAbove,
+      register,
+      login,
+      logout,
+    ],
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
