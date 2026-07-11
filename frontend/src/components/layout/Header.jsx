@@ -29,7 +29,26 @@ export default function Header({ tab, t, lang, setLang }) {
     teams: <FiUsers size={18} />,
     analytics: <FiBarChart2 size={18} />,
     "golden-monday": <FiCalendar size={18} />,
+    employees: <FiUsers size={18} />,
   };
+
+  // ✅ DISPLAY NAME MAPPING - Fixes the breadcrumb capitalization issue
+  // This ensures all tab names display with proper capitalization
+  const displayNames = {
+    dashboard: "Dashboard",
+    forum: "Peer Forum",
+    evaluation: "Evaluation",
+    report: "Daily Report",
+    services: "Services",
+    analytics: "Analytics",
+    users: "User Management",
+    teams: "Team Management",
+    "admin/services": "Service Manager",
+    documents: "Document Vault",
+    "golden-monday": "Golden Monday", // ← This fixes the lowercase issue
+    employees: "Employee Management",
+  };
+
   const { logout, user } = useAuth();
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
 
@@ -49,7 +68,9 @@ export default function Header({ tab, t, lang, setLang }) {
   const safeAuth = safeT.auth || {};
   const safeAppName = safeT.appName || "A-MESOB";
 
-  const tabLabel = safeNav[tab] || tab;
+  // ✅ Use translation if available, fallback to display name, then tab as last resort
+  // This ensures proper capitalization even if translation is missing
+  const tabLabel = safeNav[tab] || displayNames[tab] || tab;
 
   return (
     <header
@@ -71,7 +92,7 @@ export default function Header({ tab, t, lang, setLang }) {
         flexWrap: "wrap",
       }}
     >
-      {/* LEFT SECTION */}
+      {/* LEFT SECTION - Breadcrumb */}
       <div
         style={{
           display: "flex",
@@ -82,6 +103,7 @@ export default function Header({ tab, t, lang, setLang }) {
           minWidth: 0,
         }}
       >
+        {/* Icon */}
         <span
           style={{
             fontSize: "clamp(16px, 4vw, 20px)",
@@ -95,6 +117,7 @@ export default function Header({ tab, t, lang, setLang }) {
           {icons[tab] || <FiGrid size={18} />}
         </span>
 
+        {/* App Name */}
         <span
           className="header-appname"
           style={{
@@ -109,6 +132,7 @@ export default function Header({ tab, t, lang, setLang }) {
           {safeAppName}
         </span>
 
+        {/* Chevron Separator */}
         <span
           style={{
             color: C.gold,
@@ -121,6 +145,7 @@ export default function Header({ tab, t, lang, setLang }) {
           <FiChevronRight size={14} />
         </span>
 
+        {/* Page Name - This is where "Golden Monday" displays with proper capitalization */}
         <span
           style={{
             fontWeight: 700,
@@ -150,6 +175,7 @@ export default function Header({ tab, t, lang, setLang }) {
           flexWrap: "nowrap",
         }}
       >
+        {/* Date */}
         <span
           className="header-date"
           style={{
@@ -166,6 +192,7 @@ export default function Header({ tab, t, lang, setLang }) {
           {dateStr}
         </span>
 
+        {/* Language Buttons */}
         <div
           style={{
             display: "flex",
@@ -217,6 +244,7 @@ export default function Header({ tab, t, lang, setLang }) {
           ))}
         </div>
 
+        {/* Logout Button */}
         <button
           onClick={logout}
           className="header-logout-btn"
@@ -253,6 +281,7 @@ export default function Header({ tab, t, lang, setLang }) {
           </span>
         </button>
 
+        {/* User Avatar */}
         <div
           className="header-avatar"
           style={{

@@ -61,9 +61,18 @@ export default function Dashboard({ t }) {
           value,
         }));
         setStats({ total, male, female, departments });
-        animateNumber(0, total, setAnimatedStats, "total");
-        animateNumber(0, male, setAnimatedStats, "male");
-        animateNumber(0, female, setAnimatedStats, "female");
+
+        // Start animations
+        const timer1 = animateNumber(0, total, setAnimatedStats, "total");
+        const timer2 = animateNumber(0, male, setAnimatedStats, "male");
+        const timer3 = animateNumber(0, female, setAnimatedStats, "female");
+
+        // Clean up timers on unmount or when data changes
+        return () => {
+          clearInterval(timer1);
+          clearInterval(timer2);
+          clearInterval(timer3);
+        };
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
       } finally {
