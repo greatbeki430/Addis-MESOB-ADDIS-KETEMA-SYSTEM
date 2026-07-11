@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { C, F, btn } from "../../styles/theme";
-import { goldenMondayAPI, authAPI } from "../../services/api";
+import { goldenMondayAPI, authAPI, uploadAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
 import {
@@ -22,6 +22,7 @@ import {
   FiStar,
   FiClock,
   FiSave,
+  FiUpload,
 } from "react-icons/fi";
 
 export default function EmployeeManagement({ t }) {
@@ -51,6 +52,11 @@ export default function EmployeeManagement({ t }) {
   });
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  // ── Photo Upload State ──
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   // ✅ Use ref to prevent multiple initial loads
   const initialLoadRef = useRef(true);
@@ -102,6 +108,29 @@ export default function EmployeeManagement({ t }) {
       selectUser: "Select a user to add to the rotation roster",
     };
     return te[key] || fallback[key] || key;
+  };
+
+  // ── Photo Upload Handler ──
+  const handlePhotoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        showToast("Photo must be less than 5MB", "error");
+        e.target.value = "";
+        return;
+      }
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onload = () => setPhotoPreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removePhoto = () => {
+    setPhotoFile(null);
+    setPhotoPreview(null);
+    setFormData((f) => ({ ...f, profilePhotoUrl: "" }));
   };
 
   // Load employees - no dependencies
@@ -185,7 +214,7 @@ export default function EmployeeManagement({ t }) {
     setFormData((f) => ({ ...f, [field]: value }));
   };
 
-  // Handle add/edit submit
+  // Handle add/edit submit with photo upload
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -196,19 +225,35 @@ export default function EmployeeManagement({ t }) {
 
     try {
       setSaving(true);
+      let profilePhotoUrl = formData.profilePhotoUrl;
+
+      // If a photo was uploaded, upload it first
+      if (photoFile) {
+        setUploadingPhoto(true);
+        const formDataObj = new FormData();
+        formDataObj.append("photo", photoFile);
+        const response = await uploadAPI.uploadEmployeePhoto(formDataObj);
+        profilePhotoUrl = response.data.url;
+        setUploadingPhoto(false);
+      }
 
       if (editingEmployee) {
         await goldenMondayAPI.updateEmployeeEligibility(
           editingEmployee.user?._id || editingEmployee.user,
           formData.isEligible,
         );
+        // Also update profile photo if changed
+        if (profilePhotoUrl) {
+          const userId = editingEmployee.user?._id || editingEmployee.user;
+          await goldenMondayAPI.updateRosterEntry(userId, { profilePhotoUrl });
+        }
         showToast(getTranslation("updateSuccess"), "success");
       } else {
         await goldenMondayAPI.registerEmployee({
           userId: formData.userId,
           department: formData.department,
           position: formData.position,
-          profilePhotoUrl: formData.profilePhotoUrl || "",
+          profilePhotoUrl: profilePhotoUrl || "",
         });
         showToast(getTranslation("createSuccess"), "success");
       }
@@ -216,6 +261,8 @@ export default function EmployeeManagement({ t }) {
       setShowAddModal(false);
       setEditingEmployee(null);
       setSelectedUser(null);
+      setPhotoFile(null);
+      setPhotoPreview(null);
       setFormData({
         userId: "",
         department: "",
@@ -229,6 +276,7 @@ export default function EmployeeManagement({ t }) {
       showToast(error.response?.data?.message || "Operation failed", "error");
     } finally {
       setSaving(false);
+      setUploadingPhoto(false);
     }
   };
 
@@ -273,6 +321,8 @@ export default function EmployeeManagement({ t }) {
       isEligible: emp.isEligible !== undefined ? emp.isEligible : true,
     });
     setSelectedUser(emp);
+    setPhotoPreview(emp.profilePhotoUrl || null);
+    setPhotoFile(null);
     setShowAddModal(true);
   };
 
@@ -281,6 +331,8 @@ export default function EmployeeManagement({ t }) {
     await loadUsers();
     setEditingEmployee(null);
     setSelectedUser(null);
+    setPhotoFile(null);
+    setPhotoPreview(null);
     setFormData({
       userId: "",
       department: "",
@@ -368,7 +420,7 @@ export default function EmployeeManagement({ t }) {
         </div>
       </div>
 
-      {/* Stats Cards - unchanged */}
+      {/* Stats Cards */}
       <div
         style={{
           display: "grid",
@@ -483,7 +535,7 @@ export default function EmployeeManagement({ t }) {
         </div>
       </div>
 
-      {/* Search and Filter - unchanged */}
+      {/* Search and Filter */}
       <div
         style={{
           display: "flex",
@@ -881,7 +933,7 @@ export default function EmployeeManagement({ t }) {
         </div>
       )}
 
-      {/* Add/Edit Modal - unchanged */}
+      {/* Add/Edit Modal with Photo Upload */}
       {showAddModal && (
         <div
           style={{
@@ -900,6 +952,8 @@ export default function EmployeeManagement({ t }) {
               setShowAddModal(false);
               setEditingEmployee(null);
               setSelectedUser(null);
+              setPhotoFile(null);
+              setPhotoPreview(null);
             }
           }}
         >
@@ -909,7 +963,7 @@ export default function EmployeeManagement({ t }) {
               borderRadius: 16,
               padding: 28,
               width: "90%",
-              maxWidth: 500,
+              maxWidth: 550,
               maxHeight: "90vh",
               overflow: "auto",
               boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
@@ -1170,6 +1224,7 @@ export default function EmployeeManagement({ t }) {
                 />
               </div>
 
+              {/* Photo Upload Section */}
               <div style={{ marginBottom: 14 }}>
                 <label
                   style={{
@@ -1182,27 +1237,107 @@ export default function EmployeeManagement({ t }) {
                 >
                   {getTranslation("photoUrl")}
                 </label>
-                <input
-                  type="text"
-                  value={formData.profilePhotoUrl}
-                  onChange={(e) =>
-                    handleFormChange("profilePhotoUrl", e.target.value)
-                  }
+                <div
                   style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 14,
-                    outline: "none",
-                    transition: "border-color 0.2s",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    flexWrap: "wrap",
                   }}
-                  placeholder="https://example.com/photo.jpg"
-                  onFocus={(e) =>
-                    (e.currentTarget.style.borderColor = C.primary)
-                  }
-                  onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
-                />
+                >
+                  <label
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 16px",
+                      background: "#f3f4f6",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      border: `1px dashed ${C.border}`,
+                      transition: "all 0.3s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "#e5e7eb";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#f3f4f6";
+                    }}
+                  >
+                    <FiUpload size={16} />
+                    <span style={{ fontSize: 13 }}>Upload Photo</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      style={{ display: "none" }}
+                      disabled={uploadingPhoto}
+                    />
+                  </label>
+                  {uploadingPhoto && (
+                    <FiLoader
+                      size={20}
+                      style={{
+                        animation: "spin 1s linear infinite",
+                        color: C.primary,
+                      }}
+                    />
+                  )}
+                  {photoPreview && (
+                    <div
+                      style={{
+                        position: "relative",
+                        display: "inline-block",
+                        width: 60,
+                        height: 60,
+                        borderRadius: "50%",
+                        overflow: "hidden",
+                        border: `2px solid ${C.border}`,
+                      }}
+                    >
+                      <img
+                        src={photoPreview}
+                        alt="Preview"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={removePhoto}
+                        style={{
+                          position: "absolute",
+                          top: -4,
+                          right: -4,
+                          background: "#ef4444",
+                          color: "white",
+                          border: "none",
+                          borderRadius: "50%",
+                          width: 18,
+                          height: 18,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 10,
+                        }}
+                      >
+                        <FiX size={10} />
+                      </button>
+                    </div>
+                  )}
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: C.muted,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    Max 5MB • JPG, PNG, GIF
+                  </span>
+                </div>
               </div>
 
               {editingEmployee && (
@@ -1258,6 +1393,8 @@ export default function EmployeeManagement({ t }) {
                     setShowAddModal(false);
                     setEditingEmployee(null);
                     setSelectedUser(null);
+                    setPhotoFile(null);
+                    setPhotoPreview(null);
                   }}
                   style={btn.secondary}
                   disabled={saving}
@@ -1274,15 +1411,15 @@ export default function EmployeeManagement({ t }) {
                     alignItems: "center",
                     gap: 6,
                   }}
-                  disabled={saving}
+                  disabled={saving || uploadingPhoto}
                 >
-                  {saving ? (
+                  {saving || uploadingPhoto ? (
                     <>
                       <FiLoader
                         size={16}
                         style={{ animation: "spin 0.8s linear infinite" }}
                       />
-                      Saving...
+                      {uploadingPhoto ? "Uploading Photo..." : "Saving..."}
                     </>
                   ) : editingEmployee ? (
                     <>
