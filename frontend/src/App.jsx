@@ -142,11 +142,11 @@ function AuthenticatedApp() {
   const { showToast, toasts, removeToast } = useToast();
   const location = useLocation();
   const {
-    user,
+    // user, // ❌ Removed - not used directly in App.jsx (used in Header)
     isAdmin,
     isSuperAdmin,
-    isLeader,
-    isEmployee,
+    // isLeader, // ❌ Removed - not used directly
+    // isEmployee, // ❌ Removed - not used directly
     isAdminOrSuperAdmin,
     isLeaderOrAbove,
   } = useAuth();
@@ -182,31 +182,6 @@ function AuthenticatedApp() {
   useEffect(() => {
     setToastFunction(showToast);
   }, [showToast]);
-
-  const getRoleDisplay = () => {
-    if (isSuperAdmin) return "Super Admin 👑";
-    if (isAdmin) return "Admin ⚙️";
-    if (isLeader) return "Team Leader ⭐";
-    return "Employee 👤";
-  };
-
-  const getUserInitials = () => {
-    if (!user?.name) return "U";
-    return user.name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
-  };
-
-  const getUserRoleName = () => {
-    if (isSuperAdmin) return "Super Admin";
-    if (isAdmin) return "Admin";
-    if (isLeader) return "Leader";
-    if (isEmployee) return "Employee";
-    return "User";
-  };
 
   if (!t || typeof t !== "function") {
     return (
@@ -495,63 +470,6 @@ function AuthenticatedApp() {
             </Routes>
           </div>
         </main>
-      </div>
-
-      {/* ✅ FIXED: Floating User Badge moved to bottom-left to avoid overlapping with Chatbot */}
-      <div
-        style={{
-          position: "fixed",
-          bottom: 20,
-          left: 20,
-          background: C.white,
-          borderRadius: 12,
-          padding: "10px 16px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-          fontSize: 11,
-          zIndex: 99,
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          border: `1px solid ${C.border}`,
-          animation: "fadeInUp 0.5s ease",
-        }}
-      >
-        <div
-          style={{
-            width: 28,
-            height: 28,
-            background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#fff",
-            fontWeight: 700,
-            fontSize: 12,
-          }}
-        >
-          {getUserInitials()}
-        </div>
-        <div>
-          <div style={{ fontWeight: 600, color: C.dark, fontSize: 12 }}>
-            {user?.name || "User"}
-          </div>
-          <div style={{ color: C.muted, fontSize: 10 }}>
-            {getRoleDisplay()} • {getUserRoleName()}
-          </div>
-        </div>
-        {/* PDF Status Indicator */}
-        <div
-          className="pdf-status"
-          title={
-            pdfReady
-              ? "PDF system ready with fonts"
-              : "PDF system running with fallback fonts"
-          }
-        >
-          <span className="pdf-status-dot"></span>
-          {pdfReady ? "PDF Ready" : "PDF (Fallback)"}
-        </div>
       </div>
 
       {/* Register Modal */}
