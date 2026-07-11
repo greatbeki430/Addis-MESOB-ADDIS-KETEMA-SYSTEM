@@ -428,10 +428,32 @@ export default function EmployeeManagement({ t }) {
       };
 
       if (editingEmployee) {
-        await goldenMondayAPI.updateRosterEntry(
-          editingEmployee.user?._id || editingEmployee.user,
-          employeeData,
-        );
+        // ✅ DEBUG: Log the editingEmployee object
+        console.log("Editing employee:", editingEmployee);
+        console.log("Available IDs:", {
+          _id: editingEmployee._id,
+          userId: editingEmployee.userId,
+          user: editingEmployee.user,
+          user_id: editingEmployee.user?._id,
+        });
+
+        // Get the correct ID - try _id first, then user._id, then user
+        const employeeId =
+          editingEmployee._id ||
+          editingEmployee.user?._id ||
+          editingEmployee.user;
+
+        if (!employeeId) {
+          console.error("No valid employee ID found in:", editingEmployee);
+          showToast(
+            "Error: Could not find employee ID. Please refresh and try again.",
+            "error",
+          );
+          return;
+        }
+
+        console.log("Updating roster entry with ID:", employeeId);
+        await goldenMondayAPI.updateRosterEntry(employeeId, employeeData);
         showToast(getTranslation("updateSuccess"), "success");
       } else {
         await goldenMondayAPI.registerEmployee(employeeData);
