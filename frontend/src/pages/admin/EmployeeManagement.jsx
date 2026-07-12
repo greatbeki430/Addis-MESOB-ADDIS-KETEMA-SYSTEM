@@ -49,6 +49,7 @@ import {
   // FiSliders,
   FiGrid,
   FiList,
+  FiPlus,
 } from "react-icons/fi";
 
 export default function EmployeeManagement({ t }) {
@@ -79,6 +80,11 @@ export default function EmployeeManagement({ t }) {
   const [addingDepartment, setAddingDepartment] = useState(false);
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
+
+  // ── Department Modal State ──
+  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
+  const [newDepartmentName, setNewDepartmentName] = useState("");
+  const [departmentModalError, setDepartmentModalError] = useState("");
 
   // ── AI State ──
   const [aiSuggestions, setAiSuggestions] = useState(null);
@@ -123,7 +129,6 @@ export default function EmployeeManagement({ t }) {
 
   const initialLoadRef = useRef(true);
 
-  // ── Translations ──
   // ── Translations ──
   const getTranslation = useCallback(
     (key) => {
@@ -189,11 +194,20 @@ export default function EmployeeManagement({ t }) {
         clearSelection: "Clear Selection",
         activateSelected: "Activate Selected",
         deactivateSelected: "Deactivate Selected",
+        addDepartment: "Add Department",
+        departmentName: "Department Name",
+        departmentNamePlaceholder: "Enter department name...",
+        departmentExists: "That department already exists",
+        departmentAdded: "Department added successfully",
+        departmentError: "Failed to create department. Please try again.",
+        departmentWarning:
+          "Couldn't save the department to the registry, but it's set for this employee",
       };
       return te[key] || fallback[key] || key;
     },
     [te],
-  ); // ✅ Added dependency array with te
+  );
+
   // ── Load Data ──
   const loadEmployees = useCallback(async () => {
     try {
@@ -238,7 +252,7 @@ export default function EmployeeManagement({ t }) {
     } finally {
       setLoading(false);
     }
-  }, [showToast, getTranslation]); // ✅ Added getTranslation
+  }, [showToast, getTranslation]);
 
   const loadUsers = useCallback(async () => {
     try {
@@ -249,6 +263,7 @@ export default function EmployeeManagement({ t }) {
       showToast("Failed to load users", "error");
     }
   }, [showToast]);
+
   // ── Refresh Data ──
   const refreshData = async () => {
     setRefreshing(true);
@@ -399,6 +414,58 @@ export default function EmployeeManagement({ t }) {
     }));
   };
 
+  // ── Department Modal Handlers ──
+  const openDepartmentModal = () => {
+    setNewDepartmentName("");
+    setDepartmentModalError("");
+    setShowDepartmentModal(true);
+  };
+
+  const closeDepartmentModal = () => {
+    setShowDepartmentModal(false);
+    setNewDepartmentName("");
+    setDepartmentModalError("");
+  };
+
+  const handleCreateDepartment = async () => {
+    const trimmed = newDepartmentName.trim();
+
+    if (!trimmed) {
+      setDepartmentModalError("Department name is required");
+      return;
+    }
+
+    // Check if department already exists (case-insensitive)
+    if (departments.some((d) => d.toLowerCase() === trimmed.toLowerCase())) {
+      setDepartmentModalError(getTranslation("departmentExists"));
+      return;
+    }
+
+    setAddingDepartment(true);
+    try {
+      await departmentAPI.create({ name: trimmed });
+      setDepartments((prev) => [...prev, trimmed]);
+      handleFormChange("department", trimmed);
+      showToast(
+        `${getTranslation("departmentAdded")}: "${trimmed}"`,
+        "success",
+      );
+      closeDepartmentModal();
+    } catch (error) {
+      console.error("Failed to create department:", error);
+      // Still let the admin use the typed name for this employee even if
+      // the standalone department registry call failed (e.g. backend down).
+      setDepartments((prev) =>
+        prev.includes(trimmed) ? prev : [...prev, trimmed],
+      );
+      handleFormChange("department", trimmed);
+      showToast(getTranslation("departmentWarning"), "warning");
+      closeDepartmentModal();
+    } finally {
+      setAddingDepartment(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -525,40 +592,6 @@ export default function EmployeeManagement({ t }) {
     setShowAddModal(true);
     // Load the user list in the background — don't block the modal on it.
     loadUsers();
-  };
-
-  const handleAddDepartment = async () => {
-    const name = window.prompt("New department name:");
-    if (!name || !name.trim()) return;
-    const trimmed = name.trim();
-
-    if (departments.some((d) => d.toLowerCase() === trimmed.toLowerCase())) {
-      showToast("That department already exists", "warning");
-      handleFormChange("department", trimmed);
-      return;
-    }
-
-    setAddingDepartment(true);
-    try {
-      await departmentAPI.create({ name: trimmed });
-      setDepartments((prev) => [...prev, trimmed]);
-      handleFormChange("department", trimmed);
-      showToast(`Department "${trimmed}" added`, "success");
-    } catch (error) {
-      console.error("Failed to create department:", error);
-      // Still let the admin use the typed name for this employee even if
-      // the standalone department registry call failed (e.g. backend down).
-      setDepartments((prev) =>
-        prev.includes(trimmed) ? prev : [...prev, trimmed],
-      );
-      handleFormChange("department", trimmed);
-      showToast(
-        "Couldn't save the department to the registry, but it's set for this employee",
-        "warning",
-      );
-    } finally {
-      setAddingDepartment(false);
-    }
   };
 
   const openEditModal = (emp) => {
@@ -1958,21 +1991,25 @@ export default function EmployeeManagement({ t }) {
                     </datalist>
                     <button
                       type="button"
-                      onClick={handleAddDepartment}
+                      onClick={openDepartmentModal}
                       disabled={addingDepartment}
-                      title="Add a new department"
+                      title={getTranslation("addDepartment")}
                       style={{
                         padding: "0 14px",
                         border: `1.5px solid ${C.border}`,
                         borderRadius: 8,
-                        background: C.gray,
-                        color: C.dark,
+                        background: C.primary,
+                        color: "#fff",
                         fontWeight: 700,
                         cursor: addingDepartment ? "default" : "pointer",
                         opacity: addingDepartment ? 0.6 : 1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}
                     >
-                      {addingDepartment ? "…" : "+ New"}
+                      <FiPlus size={14} />
+                      {getTranslation("addDepartment")}
                     </button>
                   </div>
                 </div>
@@ -2436,6 +2473,184 @@ export default function EmployeeManagement({ t }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Department Creation Modal */}
+      {showDepartmentModal && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1100,
+            padding: 16,
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={closeDepartmentModal}
+        >
+          <div
+            style={{
+              background: C.white,
+              borderRadius: 16,
+              padding: 28,
+              width: "90%",
+              maxWidth: 450,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 16,
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: "clamp(18px, 4vw, 22px)",
+                  fontWeight: 800,
+                  color: C.dark,
+                  fontFamily: F.serif,
+                  margin: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <FiBriefcase size={22} color={C.primary} />
+                {getTranslation("addDepartment")}
+              </h2>
+              <button
+                onClick={closeDepartmentModal}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 20,
+                  cursor: "pointer",
+                  color: "#999",
+                  padding: "4px",
+                }}
+              >
+                <FiX size={20} />
+              </button>
+            </div>
+
+            <p
+              style={{
+                fontSize: "clamp(12px, 3vw, 13px)",
+                color: C.muted,
+                marginBottom: 20,
+                fontFamily: F.sans,
+              }}
+            >
+              Create a new department to organize employees more effectively.
+            </p>
+
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: 6,
+                  fontWeight: 600,
+                  fontSize: 13,
+                  color: C.dark,
+                }}
+              >
+                {getTranslation("departmentName")} *
+              </label>
+              <input
+                type="text"
+                value={newDepartmentName}
+                onChange={(e) => {
+                  setNewDepartmentName(e.target.value);
+                  if (departmentModalError) setDepartmentModalError("");
+                }}
+                onKeyPress={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreateDepartment();
+                  }
+                }}
+                placeholder={getTranslation("departmentNamePlaceholder")}
+                style={{
+                  width: "100%",
+                  padding: "10px 14px",
+                  border: `1.5px solid ${departmentModalError ? "#ef4444" : C.border}`,
+                  borderRadius: 8,
+                  fontSize: 14,
+                  outline: "none",
+                  transition: "border-color 0.2s",
+                }}
+                autoFocus
+              />
+              {departmentModalError && (
+                <div
+                  style={{
+                    marginTop: 6,
+                    fontSize: 12,
+                    color: "#ef4444",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <FiInfo size={14} />
+                  {departmentModalError}
+                </div>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                justifyContent: "flex-end",
+                borderTop: `1px solid ${C.border}`,
+                paddingTop: 20,
+              }}
+            >
+              <button
+                onClick={closeDepartmentModal}
+                style={btn.secondary}
+                disabled={addingDepartment}
+              >
+                {getTranslation("cancel")}
+              </button>
+              <button
+                onClick={handleCreateDepartment}
+                style={{
+                  ...btn.primary,
+                  opacity: addingDepartment ? 0.7 : 1,
+                  cursor: addingDepartment ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+                disabled={addingDepartment}
+              >
+                {addingDepartment ? (
+                  <>
+                    <FiLoader
+                      size={16}
+                      style={{ animation: "spin 0.8s linear infinite" }}
+                    />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <FiPlus size={16} />
+                    {getTranslation("addDepartment")}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
