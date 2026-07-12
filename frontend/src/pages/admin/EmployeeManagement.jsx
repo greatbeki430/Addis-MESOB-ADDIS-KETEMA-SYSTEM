@@ -1,5 +1,5 @@
 // frontend/src/pages/admin/EmployeeManagement.jsx
-// Complete Employee Management System - Full CRUD + AI Integration
+// Complete Employee Management System - Full CRUD + AI Integration with AI Auto-Fill
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { C, F, btn } from "../../styles/theme";
@@ -10,7 +10,6 @@ import {
   aiAPI,
   departmentAPI,
 } from "../../services/api";
-// import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
 import {
   FiUsers,
@@ -32,32 +31,20 @@ import {
   FiUpload,
   FiAward,
   FiTrendingUp,
-  // FiTrendingDown,
   FiCalendar,
   FiPhone,
-  // FiMapPin,
-  // FiFileText,
-  // FiBarChart2,
-  // FiZap,
   FiCpu,
-  // FiCheckCircle,
-  // FiAlertCircle,
   FiInfo,
-  // FiDownload,
-  // FiPrinter,
-  // FiFilter,
-  // FiSliders,
   FiGrid,
   FiList,
   FiPlus,
+  FiCpu as FiAi,
+  FiCheck,
+  FiAlertCircle,
 } from "react-icons/fi";
 
 export default function EmployeeManagement({ t }) {
   const { showToast } = useToast();
-  // const { user, isAdminOrSuperAdmin } = useAuth();
-  // const { user } = useAuth();
-  // const { user: _user } = useAuth(); // or simply
-  // const { user: _ } = useAuth();
   const safeT = t || {};
   const te = safeT.employeeManagement || {};
   const safeCommon = safeT.common || {};
@@ -73,9 +60,7 @@ export default function EmployeeManagement({ t }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [allUsers, setAllUsers] = useState([]);
   const [userSearch, setUserSearch] = useState("");
-  const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'list'
-  // const [selectedEmployees, setSelectedEmployees] = useState([]);
-  // const [showBulkActions, setShowBulkActions] = useState(false);
+  const [viewMode, setViewMode] = useState("grid");
   const [departments, setDepartments] = useState([]);
   const [addingDepartment, setAddingDepartment] = useState(false);
   const [sortField, setSortField] = useState("name");
@@ -86,7 +71,12 @@ export default function EmployeeManagement({ t }) {
   const [newDepartmentName, setNewDepartmentName] = useState("");
   const [departmentModalError, setDepartmentModalError] = useState("");
 
-  // ── AI State ──
+  // ── AI Auto-Fill State ──
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiFilledFields, setAiFilledFields] = useState({});
+  const [aiConfidence, setAiConfidence] = useState(null);
+  const [aiNotes, setAiNotes] = useState("");
+  const [showAIAnalysis, setShowAIAnalysis] = useState(false);
   const [aiSuggestions, setAiSuggestions] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [showAIInsights, setShowAIInsights] = useState(false);
@@ -202,6 +192,15 @@ export default function EmployeeManagement({ t }) {
         departmentError: "Failed to create department. Please try again.",
         departmentWarning:
           "Couldn't save the department to the registry, but it's set for this employee",
+        aiAutoFill: "AI Auto-Fill",
+        analyzeWithAI: "Analyze with AI",
+        aiAnalysisComplete: "AI analysis complete",
+        aiFilledFields: "fields filled by AI",
+        highConfidence: "High confidence",
+        mediumConfidence: "Medium confidence",
+        lowConfidence: "Low confidence",
+        reviewFields: "Please review the AI-filled fields before submitting",
+        aiAnalysisFailed: "AI analysis failed. Please fill in fields manually.",
       };
       return te[key] || fallback[key] || key;
     },
@@ -215,7 +214,6 @@ export default function EmployeeManagement({ t }) {
       const response = await goldenMondayAPI.getEmployees();
       const employeesData = response.data || [];
 
-      // Enrich with additional data
       const enriched = employeesData.map((emp) => ({
         ...emp,
         performanceRating:
@@ -241,7 +239,6 @@ export default function EmployeeManagement({ t }) {
 
       setEmployees(enriched);
 
-      // Extract unique departments
       const depts = [
         ...new Set(enriched.map((e) => e.department).filter(Boolean)),
       ];
@@ -278,6 +275,94 @@ export default function EmployeeManagement({ t }) {
       loadEmployees();
     }
   }, [loadEmployees]);
+
+  // ── AI Auto-Fill Function ──
+  const runAIAnalysis = async (userData) => {
+    setIsAnalyzing(true);
+    setShowAIAnalysis(false);
+    setAiFilledFields({});
+    setAiConfidence(null);
+    setAiNotes("");
+
+    try {
+      // Call AI API to analyze user data and suggest employee fields
+      const response = await aiAPI.suggestEmployeeFields({
+        name: userData.name,
+        email: userData.email,
+        department: userData.department || "",
+        position: userData.position || "",
+        userRole: userData.role || "employee",
+      });
+
+      const analysis = response.data || {};
+
+      // Auto-fill form fields
+      const filled = {};
+      setFormData((prev) => {
+        const next = { ...prev };
+
+        if (analysis.suggestedDepartment) {
+          next.department = analysis.suggestedDepartment;
+          filled.department = true;
+        }
+        if (analysis.suggestedPosition) {
+          next.position = analysis.suggestedPosition;
+          filled.position = true;
+        }
+        if (analysis.suggestedPhone) {
+          next.phone = analysis.suggestedPhone;
+          filled.phone = true;
+        }
+        if (
+          analysis.suggestedSkills &&
+          Array.isArray(analysis.suggestedSkills)
+        ) {
+          next.skills = analysis.suggestedSkills;
+          filled.skills = true;
+        }
+        if (analysis.suggestedPerformanceRating) {
+          next.performanceRating = analysis.suggestedPerformanceRating;
+          filled.performanceRating = true;
+        }
+        if (analysis.suggestedNotes) {
+          next.notes = analysis.suggestedNotes;
+          filled.notes = true;
+        }
+        if (analysis.suggestedHireDate) {
+          next.hireDate = analysis.suggestedHireDate;
+          filled.hireDate = true;
+        }
+
+        return next;
+      });
+
+      setAiFilledFields(filled);
+      setAiConfidence(analysis.confidence || "medium");
+      setAiNotes(
+        analysis.notes || `AI filled ${Object.keys(filled).length} field(s)`,
+      );
+      setShowAIAnalysis(true);
+
+      // Store full AI suggestions for reference
+      setAiSuggestions(analysis);
+
+      showToast(
+        `AI analysis complete: ${Object.keys(filled).length} fields filled`,
+        "success",
+      );
+    } catch (error) {
+      console.error("AI analysis failed:", error);
+      setAiNotes("AI analysis failed. Please fill in fields manually.");
+      setAiConfidence("low");
+      setShowAIAnalysis(true);
+      showToast(
+        "AI analysis failed. Please fill in fields manually.",
+        "warning",
+      );
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   // ── AI Insights ──
   const generateAIInsights = useCallback(async () => {
@@ -323,7 +408,6 @@ export default function EmployeeManagement({ t }) {
       const response = await aiAPI.getDashboardDigest({ stats });
       setAiSuggestions(response.data);
 
-      // Generate recommendations
       const recommendations = [];
       const inactiveCount = employees.filter((e) => !e.isEligible).length;
       if (inactiveCount > 0) {
@@ -391,10 +475,19 @@ export default function EmployeeManagement({ t }) {
       department: u.department || f.department,
       position: u.position || f.position,
     }));
+
+    // Trigger AI analysis when a user is selected (for new employees only)
+    if (!editingEmployee) {
+      runAIAnalysis(u);
+    }
   };
 
   const handleFormChange = (field, value) => {
     setFormData((f) => ({ ...f, [field]: value }));
+    // Clear AI filled flag for this field if user manually changes it
+    if (aiFilledFields[field]) {
+      setAiFilledFields((prev) => ({ ...prev, [field]: false }));
+    }
   };
 
   const addSkill = () => {
@@ -435,7 +528,6 @@ export default function EmployeeManagement({ t }) {
       return;
     }
 
-    // Check if department already exists (case-insensitive)
     if (departments.some((d) => d.toLowerCase() === trimmed.toLowerCase())) {
       setDepartmentModalError(getTranslation("departmentExists"));
       return;
@@ -453,8 +545,6 @@ export default function EmployeeManagement({ t }) {
       closeDepartmentModal();
     } catch (error) {
       console.error("Failed to create department:", error);
-      // Still let the admin use the typed name for this employee even if
-      // the standalone department registry call failed (e.g. backend down).
       setDepartments((prev) =>
         prev.includes(trimmed) ? prev : [...prev, trimmed],
       );
@@ -469,7 +559,25 @@ export default function EmployeeManagement({ t }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    console.log("=== SUBMIT FORM START ===");
+    console.log("Form Data:", formData);
+    console.log("Editing Employee:", editingEmployee);
+    console.log("Selected User:", selectedUser);
+
     try {
+      if (!formData.userId && !editingEmployee) {
+        showToast("Please select a user first", "error");
+        return;
+      }
+
+      if (!formData.name || !formData.email || !formData.department) {
+        showToast(
+          "Please fill in all required fields (Name, Email, Department)",
+          "error",
+        );
+        return;
+      }
+
       setSaving(true);
       let profilePhotoUrl = formData.profilePhotoUrl;
 
@@ -487,46 +595,46 @@ export default function EmployeeManagement({ t }) {
         name: formData.name,
         email: formData.email,
         department: formData.department,
-        position: formData.position,
+        position: formData.position || "",
         profilePhotoUrl: profilePhotoUrl || "",
-        phone: formData.phone,
-        hireDate: formData.hireDate,
-        salary: formData.salary,
+        phone: formData.phone || "",
+        hireDate: formData.hireDate || "",
+        salary: formData.salary || "",
         status: formData.status,
         isEligible: formData.status === "active",
-        emergencyContact: formData.emergencyContact,
-        address: formData.address,
-        skills: formData.skills,
-        performanceRating: formData.performanceRating,
-        notes: formData.notes,
+        emergencyContact: formData.emergencyContact || "",
+        address: formData.address || "",
+        skills: formData.skills || [],
+        performanceRating: formData.performanceRating || 0,
+        notes: formData.notes || "",
       };
 
-      if (editingEmployee) {
-        // ✅ DEBUG: Log the editingEmployee object
-        console.log("Editing employee:", editingEmployee);
-        console.log("Available IDs:", {
-          _id: editingEmployee._id,
-          userId: editingEmployee.userId,
-          user: editingEmployee.user,
-          user_id: editingEmployee.user?._id,
-        });
+      console.log(
+        "Employee Data to send:",
+        JSON.stringify(employeeData, null, 2),
+      );
 
-        // Get the correct ID - try _id first, then user._id, then user
+      if (!editingEmployee) {
+        const userAlreadyEmployee = employees.some(
+          (e) =>
+            e.userId === formData.userId || e.user?._id === formData.userId,
+        );
+        if (userAlreadyEmployee) {
+          showToast("This user is already an employee", "error");
+          setSaving(false);
+          return;
+        }
+      }
+
+      if (editingEmployee) {
         const employeeId =
           editingEmployee._id ||
           editingEmployee.user?._id ||
           editingEmployee.user;
-
+        console.log("Updating employee with ID:", employeeId);
         if (!employeeId) {
-          console.error("No valid employee ID found in:", editingEmployee);
-          showToast(
-            "Error: Could not find employee ID. Please refresh and try again.",
-            "error",
-          );
-          return;
+          throw new Error("No valid employee ID found");
         }
-
-        console.log("Updating roster entry with ID:", employeeId);
         await goldenMondayAPI.updateRosterEntry(employeeId, employeeData);
         showToast(getTranslation("updateSuccess"), "success");
       } else {
@@ -537,8 +645,38 @@ export default function EmployeeManagement({ t }) {
       resetModal();
       await loadEmployees();
     } catch (error) {
-      console.error("Failed to save employee:", error);
-      showToast(error.response?.data?.message || "Operation failed", "error");
+      console.error("=== ERROR IN SUBMIT ===");
+      console.error("Error object:", error);
+
+      let errorDetails = "";
+      if (error.response) {
+        console.error("Error response status:", error.response.status);
+        console.error("Error response data:", error.response.data);
+
+        if (error.response.data) {
+          if (typeof error.response.data === "string") {
+            errorDetails = error.response.data;
+          } else if (error.response.data.message) {
+            errorDetails = error.response.data.message;
+          } else if (error.response.data.error) {
+            errorDetails = error.response.data.error;
+          } else {
+            errorDetails = JSON.stringify(error.response.data);
+          }
+        }
+
+        const errorMessage = `Server Error (${error.response.status}): ${errorDetails}`;
+        showToast(errorMessage, "error");
+      } else if (error.request) {
+        console.error("No response received:", error.request);
+        showToast(
+          "No response from server. Please check your connection.",
+          "error",
+        );
+      } else {
+        console.error("Error message:", error.message);
+        showToast(error.message || "An unexpected error occurred", "error");
+      }
     } finally {
       setSaving(false);
       setUploadingPhoto(false);
@@ -585,12 +723,16 @@ export default function EmployeeManagement({ t }) {
       notes: "",
     });
     setNewSkill("");
+    setAiFilledFields({});
+    setAiConfidence(null);
+    setAiNotes("");
+    setShowAIAnalysis(false);
+    setAiSuggestions(null);
   };
 
   const openAddModal = () => {
     resetModal();
     setShowAddModal(true);
-    // Load the user list in the background — don't block the modal on it.
     loadUsers();
   };
 
@@ -1150,10 +1292,7 @@ export default function EmployeeManagement({ t }) {
           </p>
           <button
             onClick={openAddModal}
-            style={{
-              ...btn.primary,
-              marginTop: 16,
-            }}
+            style={{ ...btn.primary, marginTop: 16 }}
           >
             <FiUserPlus size={16} style={{ marginRight: 6 }} />
             {getTranslation("addEmployee")}
@@ -1190,7 +1329,6 @@ export default function EmployeeManagement({ t }) {
                   e.currentTarget.style.transform = "translateY(0)";
                 }}
               >
-                {/* Status Badge */}
                 <div
                   style={{
                     position: "absolute",
@@ -1207,7 +1345,6 @@ export default function EmployeeManagement({ t }) {
                   {isActive ? "✅ Active" : "❌ Inactive"}
                 </div>
 
-                {/* Photo and Name */}
                 <div
                   style={{
                     display: "flex",
@@ -1259,7 +1396,6 @@ export default function EmployeeManagement({ t }) {
                   </div>
                 </div>
 
-                {/* Details */}
                 <div style={{ fontSize: 12, color: C.muted, marginBottom: 12 }}>
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                     <span>
@@ -1315,7 +1451,6 @@ export default function EmployeeManagement({ t }) {
                   )}
                 </div>
 
-                {/* Actions */}
                 <div
                   style={{
                     display: "flex",
@@ -1656,7 +1791,7 @@ export default function EmployeeManagement({ t }) {
         </div>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal with AI Auto-Fill */}
       {showAddModal && (
         <div
           style={{
@@ -1792,6 +1927,7 @@ export default function EmployeeManagement({ t }) {
                             name: "",
                             email: "",
                           }));
+                          setShowAIAnalysis(false);
                         }}
                         style={{
                           background: "none",
@@ -1878,6 +2014,129 @@ export default function EmployeeManagement({ t }) {
                 </div>
               )}
 
+              {/* AI Auto-Fill Status Banner */}
+              {!editingEmployee && selectedUser && (
+                <>
+                  {isAnalyzing ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                        background: "#EFF6FF",
+                        border: "1px solid #BFDBFE",
+                        borderRadius: "8px",
+                        padding: "10px 14px",
+                        marginBottom: "16px",
+                        fontSize: "13px",
+                        color: "#1D4ED8",
+                      }}
+                    >
+                      <span style={{ animation: "spin 1s linear infinite" }}>
+                        <FiLoader size={16} />
+                      </span>
+                      <div>
+                        <div>AI is analyzing employee data...</div>
+                      </div>
+                    </div>
+                  ) : (
+                    showAIAnalysis && (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "10px",
+                          background:
+                            aiConfidence === "high"
+                              ? "#F0FDF4"
+                              : aiConfidence === "medium"
+                                ? "#FFFBEB"
+                                : "#FEF2F2",
+                          border: `1px solid ${
+                            aiConfidence === "high"
+                              ? "#86EFAC"
+                              : aiConfidence === "medium"
+                                ? "#FDE68A"
+                                : "#FECACA"
+                          }`,
+                          borderRadius: "8px",
+                          padding: "12px 14px",
+                          marginBottom: "16px",
+                        }}
+                      >
+                        {aiConfidence === "high" ? (
+                          <FiCheck
+                            size={18}
+                            color="#15803D"
+                            style={{ flexShrink: 0, marginTop: "1px" }}
+                          />
+                        ) : aiConfidence === "medium" ? (
+                          <FiInfo
+                            size={18}
+                            color="#B45309"
+                            style={{ flexShrink: 0, marginTop: "1px" }}
+                          />
+                        ) : (
+                          <FiAlertCircle
+                            size={18}
+                            color="#B91C1C"
+                            style={{ flexShrink: 0, marginTop: "1px" }}
+                          />
+                        )}
+                        <div>
+                          <div
+                            style={{
+                              fontWeight: 600,
+                              color:
+                                aiConfidence === "high"
+                                  ? "#15803D"
+                                  : aiConfidence === "medium"
+                                    ? "#B45309"
+                                    : "#B91C1C",
+                            }}
+                          >
+                            {aiConfidence === "high"
+                              ? getTranslation("highConfidence")
+                              : aiConfidence === "medium"
+                                ? getTranslation("mediumConfidence")
+                                : getTranslation("lowConfidence")}{" "}
+                            <span style={{ fontWeight: 400, fontSize: "12px" }}>
+                              ({Object.keys(aiFilledFields).length}{" "}
+                              {getTranslation("aiFilledFields")})
+                            </span>
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "13px",
+                              color:
+                                aiConfidence === "high"
+                                  ? "#15803D"
+                                  : aiConfidence === "medium"
+                                    ? "#B45309"
+                                    : "#B91C1C",
+                              marginTop: "2px",
+                            }}
+                          >
+                            {aiNotes || getTranslation("reviewFields")}
+                          </div>
+                          {aiConfidence === "low" && (
+                            <div
+                              style={{
+                                fontSize: "12px",
+                                color: "#B91C1C",
+                                marginTop: "4px",
+                              }}
+                            >
+                              {getTranslation("aiAnalysisFailed")}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  )}
+                </>
+              )}
+
               <div
                 style={{
                   display: "grid",
@@ -1905,14 +2164,29 @@ export default function EmployeeManagement({ t }) {
                     style={{
                       width: "100%",
                       padding: "10px 14px",
-                      border: `1.5px solid ${C.border}`,
+                      border: `1.5px solid ${aiFilledFields.name ? C.primary : C.border}`,
                       borderRadius: 8,
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
+                      background: aiFilledFields.name ? "#F0F9FF" : "white",
                     }}
                     placeholder="Full name"
                   />
+                  {aiFilledFields.name && (
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.primary,
+                        marginTop: "2px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <FiAi size={10} /> AI filled
+                    </div>
+                  )}
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -1934,14 +2208,29 @@ export default function EmployeeManagement({ t }) {
                     style={{
                       width: "100%",
                       padding: "10px 14px",
-                      border: `1.5px solid ${C.border}`,
+                      border: `1.5px solid ${aiFilledFields.email ? C.primary : C.border}`,
                       borderRadius: 8,
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
+                      background: aiFilledFields.email ? "#F0F9FF" : "white",
                     }}
                     placeholder="email@example.com"
                   />
+                  {aiFilledFields.email && (
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.primary,
+                        marginTop: "2px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <FiAi size={10} /> AI filled
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1976,11 +2265,14 @@ export default function EmployeeManagement({ t }) {
                       style={{
                         flex: 1,
                         padding: "10px 14px",
-                        border: `1.5px solid ${C.border}`,
+                        border: `1.5px solid ${aiFilledFields.department ? C.primary : C.border}`,
                         borderRadius: 8,
                         fontSize: 14,
                         outline: "none",
                         transition: "border-color 0.2s",
+                        background: aiFilledFields.department
+                          ? "#F0F9FF"
+                          : "white",
                       }}
                       placeholder="e.g., Revenue"
                     />
@@ -2012,6 +2304,20 @@ export default function EmployeeManagement({ t }) {
                       {getTranslation("addDepartment")}
                     </button>
                   </div>
+                  {aiFilledFields.department && (
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.primary,
+                        marginTop: "2px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <FiAi size={10} /> AI filled
+                    </div>
+                  )}
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -2034,14 +2340,29 @@ export default function EmployeeManagement({ t }) {
                     style={{
                       width: "100%",
                       padding: "10px 14px",
-                      border: `1.5px solid ${C.border}`,
+                      border: `1.5px solid ${aiFilledFields.position ? C.primary : C.border}`,
                       borderRadius: 8,
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
+                      background: aiFilledFields.position ? "#F0F9FF" : "white",
                     }}
                     placeholder="e.g., Team Leader"
                   />
+                  {aiFilledFields.position && (
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.primary,
+                        marginTop: "2px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <FiAi size={10} /> AI filled
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2071,14 +2392,29 @@ export default function EmployeeManagement({ t }) {
                     style={{
                       width: "100%",
                       padding: "10px 14px",
-                      border: `1.5px solid ${C.border}`,
+                      border: `1.5px solid ${aiFilledFields.phone ? C.primary : C.border}`,
                       borderRadius: 8,
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
+                      background: aiFilledFields.phone ? "#F0F9FF" : "white",
                     }}
                     placeholder="+251 9XX XXX XXX"
                   />
+                  {aiFilledFields.phone && (
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.primary,
+                        marginTop: "2px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <FiAi size={10} /> AI filled
+                    </div>
+                  )}
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -2101,13 +2437,28 @@ export default function EmployeeManagement({ t }) {
                     style={{
                       width: "100%",
                       padding: "10px 14px",
-                      border: `1.5px solid ${C.border}`,
+                      border: `1.5px solid ${aiFilledFields.hireDate ? C.primary : C.border}`,
                       borderRadius: 8,
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
+                      background: aiFilledFields.hireDate ? "#F0F9FF" : "white",
                     }}
                   />
+                  {aiFilledFields.hireDate && (
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.primary,
+                        marginTop: "2px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <FiAi size={10} /> AI filled
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2123,6 +2474,20 @@ export default function EmployeeManagement({ t }) {
                   }}
                 >
                   {getTranslation("skills")}
+                  {aiFilledFields.skills && (
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        color: C.primary,
+                        marginLeft: "8px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <FiAi size={10} /> AI filled
+                    </span>
+                  )}
                 </label>
                 <div style={{ display: "flex", gap: 8 }}>
                   <input
@@ -2169,13 +2534,16 @@ export default function EmployeeManagement({ t }) {
                     <span
                       key={skill}
                       style={{
-                        background: C.bg,
+                        background: aiFilledFields.skills ? "#F0F9FF" : C.bg,
                         padding: "4px 12px",
                         borderRadius: 20,
                         fontSize: 12,
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
+                        border: aiFilledFields.skills
+                          ? `1px solid ${C.primary}33`
+                          : "none",
                       }}
                     >
                       {skill}
@@ -2363,6 +2731,20 @@ export default function EmployeeManagement({ t }) {
                     }}
                   >
                     {getTranslation("performanceRating")}
+                    {aiFilledFields.performanceRating && (
+                      <span
+                        style={{
+                          fontSize: "10px",
+                          color: C.primary,
+                          marginLeft: "8px",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        <FiAi size={10} /> AI filled
+                      </span>
+                    )}
                   </label>
                   <input
                     type="number"
@@ -2378,14 +2760,31 @@ export default function EmployeeManagement({ t }) {
                     style={{
                       width: "100%",
                       padding: "10px 14px",
-                      border: `1.5px solid ${C.border}`,
+                      border: `1.5px solid ${aiFilledFields.performanceRating ? C.primary : C.border}`,
                       borderRadius: 8,
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
+                      background: aiFilledFields.performanceRating
+                        ? "#F0F9FF"
+                        : "white",
                     }}
                     placeholder="0-100"
                   />
+                  {aiFilledFields.performanceRating && (
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.primary,
+                        marginTop: "2px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <FiAi size={10} /> AI filled
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -2401,6 +2800,20 @@ export default function EmployeeManagement({ t }) {
                   }}
                 >
                   {getTranslation("notes")}
+                  {aiFilledFields.notes && (
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        color: C.primary,
+                        marginLeft: "8px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <FiAi size={10} /> AI filled
+                    </span>
+                  )}
                 </label>
                 <textarea
                   value={formData.notes}
@@ -2408,7 +2821,7 @@ export default function EmployeeManagement({ t }) {
                   style={{
                     width: "100%",
                     padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
+                    border: `1.5px solid ${aiFilledFields.notes ? C.primary : C.border}`,
                     borderRadius: 8,
                     fontSize: 14,
                     outline: "none",
@@ -2416,9 +2829,24 @@ export default function EmployeeManagement({ t }) {
                     resize: "vertical",
                     minHeight: 60,
                     fontFamily: F.sans,
+                    background: aiFilledFields.notes ? "#F0F9FF" : "white",
                   }}
                   placeholder="Additional notes..."
                 />
+                {aiFilledFields.notes && (
+                  <div
+                    style={{
+                      fontSize: "10px",
+                      color: C.primary,
+                      marginTop: "2px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                    }}
+                  >
+                    <FiAi size={10} /> AI filled
+                  </div>
+                )}
               </div>
 
               {/* Modal Actions */}
@@ -2900,11 +3328,7 @@ export default function EmployeeManagement({ t }) {
               </button>
               <button
                 onClick={handleDelete}
-                style={{
-                  ...btn.primary,
-                  background: "#ef4444",
-                  color: "#fff",
-                }}
+                style={{ ...btn.primary, background: "#ef4444", color: "#fff" }}
               >
                 <FiTrash2 size={16} style={{ marginRight: 6 }} />
                 {getTranslation("delete")}

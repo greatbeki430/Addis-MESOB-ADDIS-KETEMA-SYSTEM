@@ -19,6 +19,7 @@ const {
   getCategoryAndResponse,
   getTranslation,
   getReportTitle,
+  suggestEmployeeFields, // ✅ NEW: AI auto-fill for employee creation
 } = require("../controllers/aiController");
 
 // ─── Existing endpoints ───────────────────────────────────────
@@ -69,5 +70,15 @@ router.post("/translate", protect, anyRole, getTranslation);
 // POST /api/ai/generate-title         — any authenticated user
 // Generates professional bilingual report titles
 router.post("/generate-title", protect, anyRole, getReportTitle);
+
+// ─── NEW: AI Employee Field Suggestions ──────────────────────
+// POST /api/ai/suggest-employee-fields — any authenticated user
+// Analyzes user data and suggests employee fields for auto-fill
+router.post(
+  "/suggest-employee-fields",
+  protect,
+  anyRole,
+  suggestEmployeeFields,
+);
 
 module.exports = router;

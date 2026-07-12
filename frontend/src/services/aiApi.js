@@ -8,4 +8,5 @@ export {
   aiAPI as requestEvaluationSummary,
   aiAPI as requestDashboardDigest,
   aiAPI as requestMeetingMinutes,
+  aiAPI as suggestEmployeeFields, // ✅ NEW: Re-export the new method
 } from "./api";

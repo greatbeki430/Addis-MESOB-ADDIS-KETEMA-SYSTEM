@@ -11,6 +11,7 @@ const {
   categorizeComplaint,
   translateContent,
   generateReportTitle,
+  generateText, // ✅ Import generateText for AI suggestions
 } = require("../services/aiService");
 
 const DailyReport = require("../models/DailyReport");
@@ -314,6 +315,97 @@ const getReportTitle = async (req, res) => {
   }
 };
 
+// ============================================================
+// ─── NEW: AI Employee Field Suggestions ──────────────────────
+// POST /api/ai/suggest-employee-fields
+// Body: { name, email, department, position, userRole }
+// Returns suggested employee fields based on user data
+// ============================================================
+const suggestEmployeeFields = async (req, res) => {
+  try {
+    const { name, email, department, position, userRole } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({
+        message: "Name and email are required for AI analysis",
+      });
+    }
+
+    // Build prompt for AI
+    const prompt = `
+You are an AI assistant for Addis MESOB's employee management system.
+Analyze this user information and suggest appropriate employee fields:
+
+User Information:
+- Name: ${name}
+- Email: ${email}
+- Department: ${department || "Not specified"}
+- Position: ${position || "Not specified"}
+- Role: ${userRole || "employee"}
+
+Based on the user's name, email, and other info, suggest:
+
+1. Department: What department would this user likely belong to?
+   (Choose from: Revenue, Civil Registry, Labor & Skills, Housing, Traffic, Transport, Investment, Construction, Land, Planning)
+
+2. Position: What position/title would be appropriate?
+
+3. Phone: Suggest a reasonable phone number format (Ethiopian format: +251 9XX XXX XXX)
+
+4. Skills: Suggest 3-5 relevant skills for this position
+
+5. Performance Rating: Suggest a starting performance rating (0-100, typically 60-80 for new employees)
+
+6. Hire Date: Suggest a reasonable hire date (within last 6 months to current date)
+
+7. Notes: Brief notes about this employee's expected role
+
+Return ONLY valid JSON (no markdown):
+{
+  "suggestedDepartment": "department name",
+  "suggestedPosition": "position title",
+  "suggestedPhone": "phone number or null",
+  "suggestedSkills": ["skill1", "skill2", "skill3"],
+  "suggestedPerformanceRating": 75,
+  "suggestedHireDate": "YYYY-MM-DD",
+  "suggestedNotes": "brief notes",
+  "confidence": "high|medium|low",
+  "notes": "explanation of suggestions"
+}`;
+
+    const result = await generateText(prompt);
+    const jsonMatch = result.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      return res.status(200).json({
+        confidence: "low",
+        notes: "AI analysis completed but returned unexpected format",
+        suggestedDepartment: department || "",
+        suggestedPosition: position || "",
+        suggestedSkills: ["Communication", "Teamwork"],
+        suggestedPerformanceRating: 70,
+        suggestedHireDate: new Date().toISOString().split("T")[0],
+      });
+    }
+
+    const analysis = JSON.parse(jsonMatch[0]);
+    res.json(analysis);
+  } catch (error) {
+    console.error("AI employee field suggestion error:", error);
+
+    // Return a graceful fallback
+    res.status(200).json({
+      confidence: "low",
+      notes: "AI analysis failed. Please fill in fields manually.",
+      suggestedDepartment: "",
+      suggestedPosition: "",
+      suggestedSkills: ["Communication", "Teamwork", "Problem Solving"],
+      suggestedPerformanceRating: 70,
+      suggestedHireDate: new Date().toISOString().split("T")[0],
+    });
+  }
+};
+
 module.exports = {
   getDailyInsight,
   getEvaluationSummary,
@@ -324,4 +416,5 @@ module.exports = {
   getCategoryAndResponse,
   getTranslation,
   getReportTitle,
+  suggestEmployeeFields, // ✅ NEW: Export the new function
 };

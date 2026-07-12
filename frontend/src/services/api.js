@@ -179,6 +179,10 @@ export const aiAPI = {
   translate: (text, targetLanguage) =>
     api.post("/ai/translate", { text, targetLanguage }),
   generateReportTitle: (data) => api.post("/ai/generate-title", data),
+
+  // ✅ NEW: AI auto-fill for employee creation
+  suggestEmployeeFields: (userData) =>
+    api.post("/ai/suggest-employee-fields", userData),
 };
 
 // ============================================================
