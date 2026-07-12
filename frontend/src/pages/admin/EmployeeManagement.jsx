@@ -65,6 +65,7 @@ export default function EmployeeManagement({ t }) {
   const [addingDepartment, setAddingDepartment] = useState(false);
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
 
   // ── Department Modal State ──
   const [showDepartmentModal, setShowDepartmentModal] = useState(false);
@@ -201,6 +202,10 @@ export default function EmployeeManagement({ t }) {
         lowConfidence: "Low confidence",
         reviewFields: "Please review the AI-filled fields before submitting",
         aiAnalysisFailed: "AI analysis failed. Please fill in fields manually.",
+        loadingUsers: "Loading users...",
+        allUsersAlreadyEmployees: "All users are already employees.",
+        noUsersInSystem:
+          "No users found in the system. Please create users first.",
       };
       return te[key] || fallback[key] || key;
     },
@@ -251,15 +256,48 @@ export default function EmployeeManagement({ t }) {
     }
   }, [showToast, getTranslation]);
 
+  // ── Load Users with better error handling ──
   const loadUsers = useCallback(async () => {
+    setIsLoadingUsers(true);
     try {
+      console.log("🔄 Loading users from database...");
       const response = await authAPI.getUsers();
-      setAllUsers(response.data || []);
+      console.log("✅ Users loaded:", response.data);
+      console.log("📊 Total users:", response.data?.length || 0);
+
+      // Ensure we have an array
+      const usersArray = Array.isArray(response.data) ? response.data : [];
+      setAllUsers(usersArray);
+
+      if (usersArray.length === 0) {
+        showToast(getTranslation("noUsersInSystem"), "info");
+      }
+
+      return usersArray;
     } catch (error) {
-      console.error("Failed to load users:", error);
-      showToast("Failed to load users", "error");
+      console.error("❌ Failed to load users:", error);
+      console.error("Error details:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message,
+      });
+
+      // Handle specific error cases
+      if (error.response?.status === 401) {
+        showToast("Session expired. Please login again.", "error");
+        setTimeout(() => (window.location.href = "/login"), 1500);
+      } else if (error.response?.status === 403) {
+        showToast("You don't have permission to view users.", "error");
+      } else {
+        showToast("Failed to load users. Please refresh the page.", "error");
+      }
+
+      setAllUsers([]);
+      return [];
+    } finally {
+      setIsLoadingUsers(false);
     }
-  }, [showToast]);
+  }, [showToast, getTranslation]);
 
   // ── Refresh Data ──
   const refreshData = async () => {
@@ -728,12 +766,14 @@ export default function EmployeeManagement({ t }) {
     setAiNotes("");
     setShowAIAnalysis(false);
     setAiSuggestions(null);
+    setUserSearch("");
   };
 
-  const openAddModal = () => {
+  const openAddModal = async () => {
     resetModal();
     setShowAddModal(true);
-    loadUsers();
+    // Load users when modal opens
+    await loadUsers();
   };
 
   const openEditModal = (emp) => {
@@ -828,6 +868,7 @@ export default function EmployeeManagement({ t }) {
         )
       : 0;
 
+  // ── Filter users for the dropdown ──
   const availableUsers = allUsers.filter(
     (u) => !employees.some((e) => e.user?._id === u._id || e.user === u._id),
   );
@@ -839,6 +880,16 @@ export default function EmployeeManagement({ t }) {
       u.name.toLowerCase().includes(q) ||
       u.email.toLowerCase().includes(q)
     );
+  });
+
+  // Debug logging for user loading
+  console.log("🔍 User filtering debug:", {
+    allUsersCount: allUsers.length,
+    employeesCount: employees.length,
+    availableUsersCount: availableUsers.length,
+    filteredUsersCount: filteredUsers.length,
+    userSearch: userSearch,
+    isLoadingUsers: isLoadingUsers,
   });
 
   // ── Render ──
@@ -1971,7 +2022,24 @@ export default function EmployeeManagement({ t }) {
                           borderRadius: 8,
                         }}
                       >
-                        {filteredUsers.length === 0 ? (
+                        {isLoadingUsers ? (
+                          <div
+                            style={{
+                              padding: 10,
+                              fontSize: 12,
+                              color: C.muted,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                            }}
+                          >
+                            <FiLoader
+                              size={14}
+                              style={{ animation: "spin 1s linear infinite" }}
+                            />
+                            {getTranslation("loadingUsers")}
+                          </div>
+                        ) : filteredUsers.length === 0 ? (
                           <div
                             style={{
                               padding: 10,
@@ -1979,7 +2047,11 @@ export default function EmployeeManagement({ t }) {
                               color: C.muted,
                             }}
                           >
-                            {getTranslation("noUsersFound")}
+                            {allUsers.length === 0
+                              ? getTranslation("noUsersInSystem")
+                              : availableUsers.length === 0
+                                ? getTranslation("allUsersAlreadyEmployees")
+                                : getTranslation("noUsersFound")}
                           </div>
                         ) : (
                           filteredUsers.map((u) => (
