@@ -3,7 +3,13 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { C, F, btn } from "../../styles/theme";
-import { goldenMondayAPI, authAPI, uploadAPI, aiAPI } from "../../services/api";
+import {
+  goldenMondayAPI,
+  authAPI,
+  uploadAPI,
+  aiAPI,
+  departmentAPI,
+} from "../../services/api";
 // import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
 import {
@@ -70,6 +76,7 @@ export default function EmployeeManagement({ t }) {
   // const [selectedEmployees, setSelectedEmployees] = useState([]);
   // const [showBulkActions, setShowBulkActions] = useState(false);
   const [departments, setDepartments] = useState([]);
+  const [addingDepartment, setAddingDepartment] = useState(false);
   const [sortField, setSortField] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
 
@@ -513,10 +520,45 @@ export default function EmployeeManagement({ t }) {
     setNewSkill("");
   };
 
-  const openAddModal = async () => {
-    await loadUsers();
+  const openAddModal = () => {
     resetModal();
     setShowAddModal(true);
+    // Load the user list in the background — don't block the modal on it.
+    loadUsers();
+  };
+
+  const handleAddDepartment = async () => {
+    const name = window.prompt("New department name:");
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim();
+
+    if (departments.some((d) => d.toLowerCase() === trimmed.toLowerCase())) {
+      showToast("That department already exists", "warning");
+      handleFormChange("department", trimmed);
+      return;
+    }
+
+    setAddingDepartment(true);
+    try {
+      await departmentAPI.create({ name: trimmed });
+      setDepartments((prev) => [...prev, trimmed]);
+      handleFormChange("department", trimmed);
+      showToast(`Department "${trimmed}" added`, "success");
+    } catch (error) {
+      console.error("Failed to create department:", error);
+      // Still let the admin use the typed name for this employee even if
+      // the standalone department registry call failed (e.g. backend down).
+      setDepartments((prev) =>
+        prev.includes(trimmed) ? prev : [...prev, trimmed],
+      );
+      handleFormChange("department", trimmed);
+      showToast(
+        "Couldn't save the department to the registry, but it's set for this employee",
+        "warning",
+      );
+    } finally {
+      setAddingDepartment(false);
+    }
   };
 
   const openEditModal = (emp) => {
@@ -1889,24 +1931,50 @@ export default function EmployeeManagement({ t }) {
                   >
                     {getTranslation("department")} *
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.department}
-                    onChange={(e) =>
-                      handleFormChange("department", e.target.value)
-                    }
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      border: `1.5px solid ${C.border}`,
-                      borderRadius: 8,
-                      fontSize: 14,
-                      outline: "none",
-                      transition: "border-color 0.2s",
-                    }}
-                    placeholder="e.g., Revenue"
-                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <input
+                      type="text"
+                      required
+                      list="department-options"
+                      value={formData.department}
+                      onChange={(e) =>
+                        handleFormChange("department", e.target.value)
+                      }
+                      style={{
+                        flex: 1,
+                        padding: "10px 14px",
+                        border: `1.5px solid ${C.border}`,
+                        borderRadius: 8,
+                        fontSize: 14,
+                        outline: "none",
+                        transition: "border-color 0.2s",
+                      }}
+                      placeholder="e.g., Revenue"
+                    />
+                    <datalist id="department-options">
+                      {departments.map((dept) => (
+                        <option key={dept} value={dept} />
+                      ))}
+                    </datalist>
+                    <button
+                      type="button"
+                      onClick={handleAddDepartment}
+                      disabled={addingDepartment}
+                      title="Add a new department"
+                      style={{
+                        padding: "0 14px",
+                        border: `1.5px solid ${C.border}`,
+                        borderRadius: 8,
+                        background: C.gray,
+                        color: C.dark,
+                        fontWeight: 700,
+                        cursor: addingDepartment ? "default" : "pointer",
+                        opacity: addingDepartment ? 0.6 : 1,
+                      }}
+                    >
+                      {addingDepartment ? "…" : "+ New"}
+                    </button>
+                  </div>
                 </div>
                 <div style={{ marginBottom: 14 }}>
                   <label

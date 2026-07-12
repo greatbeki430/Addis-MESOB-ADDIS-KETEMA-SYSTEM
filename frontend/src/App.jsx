@@ -33,6 +33,10 @@ import GoldenMonday from "./pages/GoldenMonday";
 // Landing Page import
 import Landing from "./pages/Landing";
 
+// Profile & Settings imports
+import Profile from "./pages/Profile";
+import Settings from "./pages/Settings";
+
 // =============================================
 // ANIMATED A-MESOB TITLE COMPONENT
 // =============================================
@@ -464,6 +468,18 @@ function AuthenticatedApp() {
 
               {/* CRRSA Document Vault - All authenticated users */}
               <Route path="/documents" element={<DocumentVault />} />
+
+              {/* Profile - All authenticated users */}
+              <Route
+                path="/profile"
+                element={<Profile t={t} lang={language} />}
+              />
+
+              {/* Settings - All authenticated users */}
+              <Route
+                path="/settings"
+                element={<Settings t={t} lang={language} />}
+              />
 
               {/* Catch all - redirect to dashboard */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

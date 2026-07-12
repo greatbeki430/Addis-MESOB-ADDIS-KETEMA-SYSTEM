@@ -10,6 +10,7 @@ console.log("API_BASE_URL =", API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000, // fail fast instead of hanging forever on a dead/unreachable backend
   headers: {
     "Content-Type": "application/json",
   },
