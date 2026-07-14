@@ -1,0 +1,19 @@
+[phases.setup]
+nixPkgs = ["nodejs_18", "nodePackages.npm"]
+
+[phases.install]
+cmds = ["npm ci --only=production"]
+
+[phases.build]
+cmds = ["echo '✅ Backend build completed'"]
+
+[start]
+cmd = "npm start"
+
+[build]
+[node]
+version = "18"
+
+[environment]
+NODE_ENV = "production"
+NODE_OPTIONS = "--max-old-space-size=512"
