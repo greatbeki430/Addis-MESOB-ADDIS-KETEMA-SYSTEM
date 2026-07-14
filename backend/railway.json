@@ -8,6 +8,8 @@
     "numReplicas": 1,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10,
-    "startCommand": "node src/server.js"
+    "startCommand": "node src/server.js",
+    "healthcheckPath": "/api/health",
+    "healthcheckTimeout": 30
   }
 }
