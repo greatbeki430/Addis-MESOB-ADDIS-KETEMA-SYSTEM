@@ -299,6 +299,10 @@ export const translations = {
       // Timeline
       timelineTitle: "Recent sessions",
       timelineSub: "A running record, not a one-off event.",
+      upcomingSessionsHeader: "Upcoming Sessions",
+      pastSessionsHeader: "Past Sessions",
+      noSessionsYet:
+        "No sessions recorded yet. Start by logging a session with AI!",
 
       // AI Studio
       aiTitle: "AI session recap",
@@ -359,6 +363,86 @@ export const translations = {
       expiry: "expiry",
       loadingRotation: "Loading rotation…",
       nobodyAssigned: "Nobody assigned yet for the coming Monday.",
+
+      // Stats Dashboard
+      statsLoading: "Loading stats...",
+      statTotalSessions: "Total Sessions",
+      statPresenters: "Presenters",
+      statUpcoming: "Upcoming",
+      statAvgRating: "Avg Rating",
+      statNextPresenter: "Next Presenter",
+      statNoRating: "N/A",
+
+      // Telegram
+      postingToTelegram: "Posting...",
+      postToTelegram: "Post to Telegram",
+      postedToTelegramToast: "Posted to Telegram successfully!",
+      failedPostTelegram: "Failed to post to Telegram",
+
+      // Session Card
+      untitledSession: "Untitled Session",
+      noPresenter: "No presenter",
+      upcomingBadge: "Upcoming",
+      watchLabel: "Watch",
+      aiSuggestedLabel: "AI Suggested:",
+      viewAiRecap: "View AI Recap",
+
+      // Top-level controls
+      refreshing: "Refreshing...",
+      refresh: "Refresh",
+      dataRefreshed: "Data refreshed",
+      failedLoadData: "Failed to load data",
+
+      // AI Studio toasts
+      titleNotesRequired: "Title and notes are required",
+      sessionSavedToast: "Session saved with AI recap!",
+      failedSaveSession: "Failed to save session",
+      failedSuggestTopics: "Failed to suggest topics",
+
+      // Employee Registration Modal
+      registerEmployeeTitle: "Register Employee",
+      employeeLabel: "Employee *",
+      searchUserPlaceholder: "Search by name or email…",
+      noMatchingUsers: "No matching users",
+      departmentLabel: "Department",
+      departmentPlaceholder: "Department name",
+      positionLabel: "Position",
+      positionPlaceholder: "Job position",
+      profilePhotoLabel: "Profile Photo",
+      uploadPhotoHint:
+        "Upload a photo from your computer (JPG, PNG, GIF) - Max 5MB",
+      photoUrlLabel: "Photo URL (optional, or use upload above)",
+      photoUrlPlaceholder: "https://example.com/photo.jpg",
+      cancelBtn: "Cancel",
+      registerBtn: "Register Employee",
+      processingBtn: "Processing...",
+      removeBtn: "Remove",
+      photoTooLarge: "Photo must be less than 5MB",
+      failedLoadUsers: "Failed to load users",
+
+      // Admin Panel
+      adminPanelTitle: "Employee Management",
+      adminPanelSub: "Register and manage employees for Golden Monday rotation",
+      registeredEmployeesLabel: "Registered Employees:",
+      registerEmployeeBtn: "Register Employee",
+      noEmployeesYet:
+        'No employees registered yet. Click "Register Employee" to add.',
+      noDepartment: "No department",
+      noPosition: "No position",
+      activeLabel: "Active",
+      inactiveLabel: "Inactive",
+      presentedLabel: "Presented:",
+      deactivateBtn: "Deactivate",
+      activateBtn: "Activate",
+      selectEmployeeWarn: "Please select an employee",
+      employeeRegisteredToast: "Employee registered successfully!",
+      failedRegisterEmployee: "Failed to register employee",
+      confirmRemoveEmployee: "Remove this employee from rotation?",
+      employeeRemovedToast: "Employee removed",
+      failedRemoveEmployee: "Failed to remove employee",
+      employeeActivatedToast: "Employee activated",
+      employeeDeactivatedToast: "Employee deactivated",
+      failedUpdateEligibility: "Failed to update eligibility",
     },
   },
   am: {
@@ -654,6 +738,9 @@ export const translations = {
       // Timeline
       timelineTitle: "የቅርብ ጊዜ መርሃ-ግብሮች",
       timelineSub: "ቀጣይነት ያለው ልማድ እንጂ የአንድ ጊዜ ዝግጅት አይደለም።",
+      upcomingSessionsHeader: "መጪ መርሃ-ግብሮች",
+      pastSessionsHeader: "ያለፉ መርሃ-ግብሮች",
+      noSessionsYet: "እስካሁን ምንም መርሃ-ግብር አልተመዘገበም። በAI መርሃ-ግብር በመመዝገብ ይጀምሩ!",
 
       // AI Studio
       aiTitle: "በAI የተዘጋጀ ማጠቃለያ",
@@ -711,6 +798,84 @@ export const translations = {
       expiry: "የሚቆይበት ጊዜ",
       loadingRotation: "ሽክርክሩን በማጫን ላይ…",
       nobodyAssigned: "ለመጪው ሰኞ አቅራቢ አልተመደበም።",
+
+      // Stats Dashboard
+      statsLoading: "ስታትስቲክስ በመጫን ላይ...",
+      statTotalSessions: "ጠቅላላ መርሃ-ግብሮች",
+      statPresenters: "አቅራቢዎች",
+      statUpcoming: "መጪ",
+      statAvgRating: "አማካይ ደረጃ",
+      statNextPresenter: "ቀጣይ አቅራቢ",
+      statNoRating: "የለም",
+
+      // Telegram
+      postingToTelegram: "በመላክ ላይ...",
+      postToTelegram: "ወደ ቴሌግራም ላክ",
+      postedToTelegramToast: "ወደ ቴሌግራም በተሳካ ሁኔታ ተልኳል!",
+      failedPostTelegram: "ወደ ቴሌግራም መላክ አልተቻለም",
+
+      // Session Card
+      untitledSession: "ርዕስ የሌለው መርሃ-ግብር",
+      noPresenter: "አቅራቢ የለም",
+      upcomingBadge: "መጪ",
+      watchLabel: "ተመልከት",
+      aiSuggestedLabel: "በAI የተጠቆመ፦",
+      viewAiRecap: "የAI ማጠቃለያ ይመልከቱ",
+
+      // Top-level controls
+      refreshing: "በማደስ ላይ...",
+      refresh: "አድስ",
+      dataRefreshed: "ውሂብ ታድሷል",
+      failedLoadData: "ውሂብ መጫን አልተቻለም",
+
+      // AI Studio toasts
+      titleNotesRequired: "ርዕስ እና ማስታወሻ ያስፈልጋሉ",
+      sessionSavedToast: "መርሃ-ግብሩ በAI ማጠቃለያ ተመዝግቧል!",
+      failedSaveSession: "መርሃ-ግብሩን ማስቀመጥ አልተቻለም",
+      failedSuggestTopics: "ርዕሶችን መጠቆም አልተቻለም",
+
+      // Employee Registration Modal
+      registerEmployeeTitle: "ሰራተኛ መዝግብ",
+      employeeLabel: "ሰራተኛ *",
+      searchUserPlaceholder: "በስም ወይም በኢሜል ይፈልጉ…",
+      noMatchingUsers: "ምንም ተዛማጅ ተጠቃሚ የለም",
+      departmentLabel: "ዘርፍ",
+      departmentPlaceholder: "የዘርፍ ስም",
+      positionLabel: "ኃላፊነት",
+      positionPlaceholder: "የስራ መደብ",
+      profilePhotoLabel: "የመገለጫ ፎቶ",
+      uploadPhotoHint: "ከኮምፒዩተርዎ ፎቶ ይስቀሉ (JPG, PNG, GIF) - ከፍተኛ 5MB",
+      photoUrlLabel: "የፎቶ አድራሻ (አማራጭ፣ ወይም ከላይ ያለውን ስቀላ ይጠቀሙ)",
+      photoUrlPlaceholder: "https://example.com/photo.jpg",
+      cancelBtn: "ይቅር",
+      registerBtn: "ሰራተኛ መዝግብ",
+      processingBtn: "በሂደት ላይ...",
+      removeBtn: "አስወግድ",
+      photoTooLarge: "ፎቶ ከ5MB በታች መሆን አለበት",
+      failedLoadUsers: "ተጠቃሚዎችን መጫን አልተቻለም",
+
+      // Admin Panel
+      adminPanelTitle: "የሰራተኞች አስተዳደር",
+      adminPanelSub: "ለወርቃማ ሰኞ ሽክርክር ሰራተኞችን ይመዝግቡ እና ያስተዳድሩ",
+      registeredEmployeesLabel: "የተመዘገቡ ሰራተኞች፦",
+      registerEmployeeBtn: "ሰራተኛ መዝግብ",
+      noEmployeesYet: "እስካሁን ምንም ሰራተኛ አልተመዘገበም። ለመጨመር 'ሰራተኛ መዝግብ' ን ይጫኑ።",
+      noDepartment: "ዘርፍ የለም",
+      noPosition: "ኃላፊነት የለም",
+      activeLabel: "ንቁ",
+      inactiveLabel: "ያልነቃ",
+      presentedLabel: "ያቀረቡ፦",
+      deactivateBtn: "አቦዝን",
+      activateBtn: "አንቃ",
+      selectEmployeeWarn: "እባክዎ ሰራተኛ ይምረጡ",
+      employeeRegisteredToast: "ሰራተኛ በተሳካ ሁኔታ ተመዝግቧል!",
+      failedRegisterEmployee: "ሰራተኛ መመዝገብ አልተቻለም",
+      confirmRemoveEmployee: "ይህን ሰራተኛ ከሽክርክር ማስወገድ ይፈልጋሉ?",
+      employeeRemovedToast: "ሰራተኛ ተወግዷል",
+      failedRemoveEmployee: "ሰራተኛ ማስወገድ አልተቻለም",
+      employeeActivatedToast: "ሰራተኛ ነቅቷል",
+      employeeDeactivatedToast: "ሰራተኛ ታግዷል",
+      failedUpdateEligibility: "ብቁነት ማዘመን አልተቻለም",
     },
   },
   om: {
@@ -1013,6 +1178,10 @@ export const translations = {
       // Timeline
       timelineTitle: "Walga'iiwwan Dhiyoo",
       timelineSub: "Galmeen itti fufuu, utuu hin taane waan yeroo tokkoo.",
+      upcomingSessionsHeader: "Walga'iiwwan Dhufaa Jiran",
+      pastSessionsHeader: "Walga'iiwwan Darban",
+      noSessionsYet:
+        "Hanga ammaatti walga'iin hin galmoofne. AI'n walga'ii galmeessuun jalqabi!",
 
       // AI Studio
       aiTitle: "Ibsa walga'ii AI",
@@ -1072,6 +1241,89 @@ export const translations = {
       expiry: "haflii",
       loadingRotation: "Naanna'iinsa fe'aa jira…",
       nobodyAssigned: "Wiixata dhufuuf dhiheessituun hin ramadne.",
+
+      // Stats Dashboard
+      statsLoading: "Istaatiksii fe'aa jira...",
+      statTotalSessions: "Walga'ii Waliigalaa",
+      statPresenters: "Dhiheessitoota",
+      statUpcoming: "Dhufaa jiru",
+      statAvgRating: "Sadarkaa Giddugaleessaa",
+      statNextPresenter: "Dhiheessituu Itti Aanu",
+      statNoRating: "Hin jiru",
+
+      // Telegram
+      postingToTelegram: "Ergaa jira...",
+      postToTelegram: "Telegiraamitti Ergi",
+      postedToTelegramToast: "Milkiin Telegiraamitti ergame!",
+      failedPostTelegram: "Telegiraamitti ergu hin dandeenye",
+
+      // Session Card
+      untitledSession: "Walga'ii Mataduree Hin Qabne",
+      noPresenter: "Dhiheessituun hin jiru",
+      upcomingBadge: "Dhufaa jiru",
+      watchLabel: "Ilaali",
+      aiSuggestedLabel: "AI-n Yaadame:",
+      viewAiRecap: "Ibsa AI Ilaali",
+
+      // Top-level controls
+      refreshing: "Haaromsaa jira...",
+      refresh: "Haaromsi",
+      dataRefreshed: "Deetaan haaromfameera",
+      failedLoadData: "Deetaa fe'uun hin dandeenye",
+
+      // AI Studio toasts
+      titleNotesRequired: "Mataduree fi yaadannoo barbaachisa",
+      sessionSavedToast: "Walga'iin ibsa AI qopheessaan galmeeffame!",
+      failedSaveSession: "Walga'ii olkaa'uun hin dandeenye",
+      failedSuggestTopics: "Mataduree yaaduun hin dandeenye",
+
+      // Employee Registration Modal
+      registerEmployeeTitle: "Hojjataa Galmeessi",
+      employeeLabel: "Hojjataa *",
+      searchUserPlaceholder: "Maqaa ykn imeelii barbaadi…",
+      noMatchingUsers: "Fayyadamaan walsimu hin jiru",
+      departmentLabel: "Kutaa",
+      departmentPlaceholder: "Maqaa kutaa",
+      positionLabel: "Galma",
+      positionPlaceholder: "Sadarkaa hojii",
+      profilePhotoLabel: "Suuraa Piroofaayilii",
+      uploadPhotoHint:
+        "Kompiitara keessan irraa suuraa fe'aa (JPG, PNG, GIF) - Hamma 5MB",
+      photoUrlLabel:
+        "Teessoo Suuraa (filannoo, ykn fe'iinsa armaan olii fayyadami)",
+      photoUrlPlaceholder: "https://example.com/photo.jpg",
+      cancelBtn: "Haqi",
+      registerBtn: "Hojjataa Galmeessi",
+      processingBtn: "Adeemsisaa jira...",
+      removeBtn: "Balleessi",
+      photoTooLarge: "Suuraan MB 5 gadi ta'uu qaba",
+      failedLoadUsers: "Fayyadamtoota fe'uun hin dandeenye",
+
+      // Admin Panel
+      adminPanelTitle: "Bulchiinsa Hojjattootaa",
+      adminPanelSub:
+        "Naanna'iinsa Wiixata Warqee tiif hojjattoota galmeessi fi bulchi",
+      registeredEmployeesLabel: "Hojjattoota Galmaa'an:",
+      registerEmployeeBtn: "Hojjataa Galmeessi",
+      noEmployeesYet:
+        "Hanga ammaatti hojjataan hin galmoofne. Dabaluuf 'Hojjataa Galmeessi' tuqi.",
+      noDepartment: "Kutaan hin jiru",
+      noPosition: "Galmi hin jiru",
+      activeLabel: "Aktiivii",
+      inactiveLabel: "Aktiivii hin taane",
+      presentedLabel: "Dhiheessan:",
+      deactivateBtn: "Dhaamsi",
+      activateBtn: "Kaa'i",
+      selectEmployeeWarn: "Maaloo hojjataa filadhu",
+      employeeRegisteredToast: "Hojjataan milkiin galmeeffame!",
+      failedRegisterEmployee: "Hojjataa galmeessuun hin dandeenye",
+      confirmRemoveEmployee:
+        "Hojjataa kana naanna'iinsaa irraa balleessuu barbaaddaa?",
+      employeeRemovedToast: "Hojjataan balleeffame",
+      failedRemoveEmployee: "Hojjataa balleessuun hin dandeenye",
+      employeeActivatedToast: "Hojjataan kaa'ameera",
+      employeeDeactivatedToast: "Hojjataan dhaamsameera",
+      failedUpdateEligibility: "Ulaagaa haaromsuun hin dandeenye",
     },
   },
 };
