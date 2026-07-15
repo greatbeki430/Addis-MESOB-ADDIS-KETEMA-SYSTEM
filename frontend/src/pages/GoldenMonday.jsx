@@ -50,18 +50,42 @@ import {
 const FALLBACK_PILLARS = [
   {
     icon: "FiSunrise",
-    title: "A weekly reset",
-    body: "Every Monday morning, offices across the organization pause the routine for shared learning — a deliberate start to the work week instead of a rushed one.",
+    title: {
+      en: "A weekly reset",
+      am: "ሳምንታዊ ዳግም መነሳት",
+      om: "Torbanii haaraa bu'uura",
+    },
+    body: {
+      en: "Every Monday morning, offices across the organization pause the routine for shared learning — a deliberate start to the work week instead of a rushed one.",
+      am: "በየሳምንቱ ሰኞ ጠዋት፣ በድርጅቱ ውስጥ ያሉ ቢሮዎች ለጋራ ትምህርት የወትሮውን ተግባር ያቋርጣሉ — የስራ ሳምንቱ በፍጥነት ሳይሆን በአስተዋይ ሁኔታ ይጀምራል።",
+      om: "Guyyaa wiixata ganama hunda, biiroowwan dhaabbilee keessatti sochii yeroo barachuuf ni addaan kutu — jalqaba itti yaadame kan torbanii hojii.",
+    },
   },
   {
     icon: "FiUsers",
-    title: "Peer-led, not top-down",
-    body: "Sessions are usually carried by colleagues themselves — department heads, team leaders, and long-serving staff sharing real experience, not scripted lectures.",
+    title: {
+      en: "Peer-led, not top-down",
+      am: "በእኩዮች የሚመራ፣ ከላይ ወደ ታች አይደለም",
+      om: "Hiriyaan durfama, gubbaa gaditti miti",
+    },
+    body: {
+      en: "Sessions are usually carried by colleagues themselves — department heads, team leaders, and long-serving staff sharing real experience, not scripted lectures.",
+      am: "መርሃ-ግብሮቹ ብዙውን ጊዜ የሚካሄዱት በራሱ ሰራተኞች ነው — የዘርፍ ኃላፊዎች፣ የቡድን መሪዎች እና የረጅም ጊዜ ሰራተኞች ከተሞክሮ የተገኘ እውቀት ያካፍላሉ፣ ከመጽሀፍ የተዘጋጁ ትምህርቶች አይደሉም።",
+      om: "Walga'iin yeroo baay'ee hiriyaan ofii isaanii — hoogganaa kutaa, hoogganaa garee, fi hojjattoota yeroo dheeraa, muuxannoo dhugaa qoodu, utuu hin taane barsiisa qophaa'e.",
+    },
   },
   {
     icon: "FiTrendingUp",
-    title: "Built for multiskilling",
-    body: "The stated goal is to push every employee beyond a single fixed skill set — technology literacy, service standards, and adaptability all get airtime over time.",
+    title: {
+      en: "Built for multiskilling",
+      am: "ለብዙ ክህሎት የተገነባ",
+      om: "Dandeettii hedduutiif ijaarame",
+    },
+    body: {
+      en: "The stated goal is to push every employee beyond a single fixed skill set — technology literacy, service standards, and adaptability all get airtime over time.",
+      am: "ዋናው ግብ እያንዳንዱን ሰራተኛ ከአንድ የተወሰነ ክህሎት ባሻገር ማሳደግ ነው — የቴክኖሎጂ እውቀት፣ የአገልግሎት ደረጃዎች እና መላመድ ሁሉም ጊዜያቸውን ያገኛሉ።",
+      om: "Kaayyoon ibsame hojjetaa tokkoon tokkoo dandeettii tokkoo ol isa dabarsuu — ogummaa teeknoolojii, sadarkaa tajaajila, fi mirkanaa'uu yeroo hundaaf bakka kenname.",
+    },
   },
 ];
 
@@ -176,7 +200,7 @@ function SectionHeading({ eyebrow, title, sub, dark }) {
 // ─────────────────────────────────────────────────────────────
 // STATS DASHBOARD COMPONENT
 // ─────────────────────────────────────────────────────────────
-function StatsDashboard({ stats, nextPresenter, loading }) {
+function StatsDashboard({ stats, nextPresenter, loading, t }) {
   if (loading || !stats) {
     return (
       <div
@@ -188,29 +212,31 @@ function StatsDashboard({ stats, nextPresenter, loading }) {
           textAlign: "center",
         }}
       >
-        <p style={{ color: C.muted }}>Loading stats...</p>
+        <p style={{ color: C.muted }}>
+          {t("common.loading") || "Loading stats..."}
+        </p>
       </div>
     );
   }
 
   const statItems = [
     {
-      label: "Total Sessions",
+      label: t("goldenMonday.statsTotalSessions") || "Total Sessions",
       value: stats.totalSessions || 0,
       icon: <FiCalendar size={20} />,
     },
     {
-      label: "Presenters",
+      label: t("goldenMonday.statsPresenters") || "Presenters",
       value: stats.totalPresenters || 0,
       icon: <FiUsers size={20} />,
     },
     {
-      label: "Upcoming",
+      label: t("goldenMonday.statsUpcoming") || "Upcoming",
       value: stats.upcomingSessions || 0,
       icon: <FiClock size={20} />,
     },
     {
-      label: "Avg Rating",
+      label: t("goldenMonday.statsAvgRating") || "Avg Rating",
       value: stats.averageRating ? stats.averageRating.toFixed(1) : "N/A",
       icon: <FiStar size={20} />,
     },
@@ -261,7 +287,7 @@ function StatsDashboard({ stats, nextPresenter, loading }) {
           }}
         >
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>
-            Next Presenter
+            {t("goldenMonday.nextPresenter") || "Next Presenter"}
           </div>
           <div
             style={{
@@ -318,17 +344,23 @@ function StatsDashboard({ stats, nextPresenter, loading }) {
 // ─────────────────────────────────────────────────────────────
 // TELEGRAM POST BUTTON COMPONENT
 // ─────────────────────────────────────────────────────────────
-function TelegramPostButton({ sessionId, onPosted }) {
+function TelegramPostButton({ sessionId, onPosted, t }) {
   const [posting, setPosting] = useState(false);
 
   const handlePost = async () => {
     setPosting(true);
     try {
       await goldenMondayAPI.postToTelegram(sessionId);
-      showToast("Posted to Telegram successfully!", "success");
+      showToast(
+        t("goldenMonday.telegramSuccess") || "Posted to Telegram successfully!",
+        "success",
+      );
       if (onPosted) onPosted();
     } catch {
-      showToast("Failed to post to Telegram", "error");
+      showToast(
+        t("goldenMonday.telegramError") || "Failed to post to Telegram",
+        "error",
+      );
     } finally {
       setPosting(false);
     }
@@ -345,20 +377,21 @@ function TelegramPostButton({ sessionId, onPosted }) {
       }}
     >
       <FiBell size={14} />
-      {posting ? "Posting..." : "Post to Telegram"}
+      {posting
+        ? t("common.loading") || "Posting..."
+        : t("goldenMonday.postToTelegram") || "Post to Telegram"}
     </button>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// SESSION CARD COMPONENT - FIXED: Now uses language properly
+// SESSION CARD COMPONENT
 // ─────────────────────────────────────────────────────────────
-function SessionCard({ session, language, isAdmin, onRefresh }) {
+function SessionCard({ session, language, isAdmin, onRefresh, t }) {
   const [expanded, setExpanded] = useState(false);
   const date = new Date(session.date);
   const isUpcoming = session.status === "scheduled" || date > new Date();
 
-  // Helper to get translated text - NOW ACTUALLY USED
   const getTranslatedText = (obj) => {
     if (!obj) return "";
     return obj[language] || obj.en || obj;
@@ -407,10 +440,14 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
             <div style={{ fontWeight: 600, color: C.dark }}>
               {getTranslatedText(session.presentationTitle) ||
                 session.title ||
+                t("goldenMonday.untitledSession") ||
                 "Untitled Session"}
             </div>
             <div style={{ fontSize: 12, color: C.muted }}>
-              {getTranslatedText(session.presenterName) || "No presenter"} ·{" "}
+              {getTranslatedText(session.presenterName) ||
+                t("goldenMonday.noPresenter") ||
+                "No presenter"}{" "}
+              ·{" "}
               {date.toLocaleDateString("en-US", {
                 month: "short",
                 day: "numeric",
@@ -428,7 +465,7 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
                     color: C.gold,
                   }}
                 >
-                  {getTranslatedText({ en: "Upcoming" })}
+                  {t("goldenMonday.upcoming") || "Upcoming"}
                 </span>
               )}
               {session.averageRating > 0 && (
@@ -455,11 +492,15 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
                 fontWeight: 600,
               }}
             >
-              <FiVideo size={14} /> {getTranslatedText({ en: "Watch" })}
+              <FiVideo size={14} /> {t("goldenMonday.watch") || "Watch"}
             </a>
           )}
           {isAdmin && isUpcoming && (
-            <TelegramPostButton sessionId={session._id} onPosted={onRefresh} />
+            <TelegramPostButton
+              sessionId={session._id}
+              onPosted={onRefresh}
+              t={t}
+            />
           )}
           <button
             onClick={() => setExpanded(!expanded)}
@@ -495,7 +536,7 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
           {session.suggestedTopics && session.suggestedTopics.length > 0 && (
             <div style={{ marginBottom: 8 }}>
               <span style={{ fontSize: 11, color: C.muted }}>
-                {getTranslatedText({ en: "AI Suggested:" })}
+                {t("goldenMonday.aiSuggested") || "AI Suggested:"}
               </span>
               <div
                 style={{
@@ -528,7 +569,7 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
                 style={{ fontSize: 12, color: C.primary, cursor: "pointer" }}
               >
                 <FiInfo size={12} style={{ marginRight: 4 }} />
-                {getTranslatedText({ en: "View AI Recap" })}
+                {t("goldenMonday.viewAIRecap") || "View AI Recap"}
               </summary>
               <p
                 style={{
@@ -575,7 +616,7 @@ function SessionCard({ session, language, isAdmin, onRefresh }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// MODAL COMPONENT WITH PHOTO UPLOAD - FIXED
+// MODAL COMPONENT WITH PHOTO UPLOAD
 // ─────────────────────────────────────────────────────────────
 function EmployeeRegistrationModal({
   show,
@@ -590,12 +631,12 @@ function EmployeeRegistrationModal({
   userSearch,
   setUserSearch,
   handleSelectUser,
-  // photoFile,
   setPhotoFile,
   photoPreview,
   setPhotoPreview,
   handlePhotoChange,
   uploadingPhoto,
+  t,
 }) {
   if (!show) return null;
 
@@ -635,7 +676,7 @@ function EmployeeRegistrationModal({
           }}
         >
           <h3 style={{ margin: 0, color: C.dark, fontFamily: F.serif }}>
-            Register Employee
+            {t("employeeManagement.register") || "Register Employee"}
           </h3>
           <button
             onClick={onClose}
@@ -663,7 +704,7 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              Employee *
+              {t("employeeManagement.fullName") || "Employee"} *
             </label>
             {selectedUser ? (
               <div
@@ -720,7 +761,10 @@ function EmployeeRegistrationModal({
             ) : (
               <>
                 <input
-                  placeholder="Search by name or email…"
+                  placeholder={
+                    t("employeeManagement.searchPlaceholder") ||
+                    "Search by name or email…"
+                  }
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
                   style={inputStyle}
@@ -736,7 +780,8 @@ function EmployeeRegistrationModal({
                 >
                   {filteredUsers.length === 0 ? (
                     <div style={{ padding: 10, fontSize: 12, color: C.muted }}>
-                      No matching users
+                      {t("employeeManagement.noUsersFound") ||
+                        "No matching users"}
                     </div>
                   ) : (
                     filteredUsers.map((u) => (
@@ -778,10 +823,12 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              Department
+              {t("employeeManagement.department") || "Department"}
             </label>
             <input
-              placeholder="Department name"
+              placeholder={
+                t("employeeManagement.department") || "Department name"
+              }
               value={employeeForm.department}
               onChange={(e) =>
                 setEmployeeForm({ ...employeeForm, department: e.target.value })
@@ -800,10 +847,10 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              Position
+              {t("employeeManagement.position") || "Position"}
             </label>
             <input
-              placeholder="Job position"
+              placeholder={t("employeeManagement.position") || "Job position"}
               value={employeeForm.position}
               onChange={(e) =>
                 setEmployeeForm({ ...employeeForm, position: e.target.value })
@@ -812,7 +859,7 @@ function EmployeeRegistrationModal({
             />
           </div>
 
-          {/* Photo Upload with Preview - NOW PROPERLY USING photoFile and photoPreview */}
+          {/* Photo Upload */}
           <div>
             <label
               style={{
@@ -822,7 +869,7 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              Profile Photo
+              {t("employeeManagement.photoUrl") || "Profile Photo"}
             </label>
             <div
               style={{
@@ -853,7 +900,6 @@ function EmployeeRegistrationModal({
                 />
               )}
             </div>
-            {/* Show preview if photoFile exists */}
             {photoPreview && (
               <div
                 style={{
@@ -887,12 +933,13 @@ function EmployeeRegistrationModal({
                     fontSize: 12,
                   }}
                 >
-                  Remove
+                  {t("common.delete") || "Remove"}
                 </button>
               </div>
             )}
             <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-              Upload a photo from your computer (JPG, PNG, GIF) - Max 5MB
+              {t("employeeManagement.photoUploadHint") ||
+                "Upload a photo from your computer (JPG, PNG, GIF) - Max 5MB"}
             </div>
           </div>
 
@@ -906,7 +953,8 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              Photo URL (optional, or use upload above)
+              {t("employeeManagement.photoUrl") || "Photo URL"} (
+              {t("common.optional") || "optional"})
             </label>
             <input
               placeholder="https://example.com/photo.jpg"
@@ -933,7 +981,7 @@ function EmployeeRegistrationModal({
             }}
           >
             <button onClick={onClose} style={btnStyle("#e5e7eb", "#444")}>
-              Cancel
+              {t("common.cancel") || "Cancel"}
             </button>
             <button
               onClick={onRegister}
@@ -947,8 +995,8 @@ function EmployeeRegistrationModal({
               }}
             >
               {registering || uploadingPhoto
-                ? "Processing..."
-                : "Register Employee"}
+                ? t("common.loading") || "Processing..."
+                : t("employeeManagement.register") || "Register Employee"}
             </button>
           </div>
         </div>
@@ -964,6 +1012,20 @@ function EmployeeRegistrationModal({
 export default function GoldenMonday() {
   const { t: translations, language } = useLanguage();
   const { user } = useAuth();
+
+  // ── Translation helper ──
+  const t = (key, fallback) => {
+    const keys = key.split(".");
+    let value = translations;
+    for (const k of keys) {
+      if (value && value[k] !== undefined) {
+        value = value[k];
+      } else {
+        return fallback || key;
+      }
+    }
+    return value || fallback || key;
+  };
 
   const gmCopy = translations?.goldenMonday || {};
   const [visible, setVisible] = useState({});
@@ -1018,7 +1080,7 @@ export default function GoldenMonday() {
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
 
-  // ── Translation helper ──
+  // ── Translation helper for objects ──
   const getTranslatedText = (obj) => {
     if (!obj) return "";
     return obj[language] || obj.en || obj;
@@ -1057,17 +1119,17 @@ export default function GoldenMonday() {
       setPillars(pillarsRes.data || FALLBACK_PILLARS);
     } catch {
       console.error("Failed to load Golden Monday data");
-      showToast("Failed to load data", "error");
+      showToast(t("common.error") || "Failed to load data", "error");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   const refreshData = async () => {
     setRefreshing(true);
     await loadAllData();
     setRefreshing(false);
-    showToast("Data refreshed", "success");
+    showToast(t("common.success") || "Data refreshed", "success");
   };
 
   // ── Load on mount ──
@@ -1118,8 +1180,10 @@ export default function GoldenMonday() {
     authAPI
       .getUsers()
       .then((res) => setAllUsers(res.data || []))
-      .catch(() => showToast("Failed to load users", "error"));
-  }, [showEmployeeModal]);
+      .catch(() =>
+        showToast(t("common.error") || "Failed to load users", "error"),
+      );
+  }, [showEmployeeModal, t]);
 
   const rosterUserIds = new Set(
     employees.map((e) => (e.user?._id || e.user || "").toString()),
@@ -1144,9 +1208,12 @@ export default function GoldenMonday() {
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file size (5MB max)
       if (file.size > 5 * 1024 * 1024) {
-        showToast("Photo must be less than 5MB", "error");
+        showToast(
+          t("employeeManagement.photoTooLarge") ||
+            "Photo must be less than 5MB",
+          "error",
+        );
         e.target.value = "";
         return;
       }
@@ -1169,7 +1236,7 @@ export default function GoldenMonday() {
 
   const handleGenerateAndSave = async () => {
     if (!form.title.trim() || !form.rawNotes.trim()) {
-      showToast("Title and notes are required", "warning");
+      showToast(t("common.error") || "Title and notes are required", "warning");
       return;
     }
     try {
@@ -1185,10 +1252,15 @@ export default function GoldenMonday() {
         description: "",
       });
       setShowComposer(false);
-      showToast("Session saved with AI recap!", "success");
+      showToast(
+        t("goldenMonday.aiSaved") || "Session saved with AI recap!",
+        "success",
+      );
     } catch (error) {
       showToast(
-        error.response?.data?.message || "Failed to save session",
+        error.response?.data?.message ||
+          t("goldenMonday.aiError") ||
+          "Failed to save session",
         "error",
       );
     } finally {
@@ -1202,7 +1274,10 @@ export default function GoldenMonday() {
       const response = await goldenMondayAPI.suggestTopics();
       setTopics(response.data?.topics || []);
     } catch {
-      showToast("Failed to suggest topics", "error");
+      showToast(
+        t("goldenMonday.aiError") || "Failed to suggest topics",
+        "error",
+      );
     } finally {
       setLoadingTopics(false);
     }
@@ -1211,14 +1286,16 @@ export default function GoldenMonday() {
   // ── Admin Handlers ──
   const handleRegisterEmployee = async () => {
     if (!employeeForm.userId) {
-      showToast("Please select an employee", "warning");
+      showToast(
+        t("employeeManagement.selectUserError") || "Please select an employee",
+        "warning",
+      );
       return;
     }
     setRegistering(true);
     try {
       let profilePhotoUrl = employeeForm.profilePhotoUrl;
 
-      // If a photo was uploaded, upload it first
       if (photoFile) {
         setUploadingPhoto(true);
         const formData = new FormData();
@@ -1228,13 +1305,16 @@ export default function GoldenMonday() {
         setUploadingPhoto(false);
       }
 
-      // Register employee with the photo URL
       await goldenMondayAPI.registerEmployee({
         ...employeeForm,
         profilePhotoUrl,
       });
 
-      showToast("Employee registered successfully!", "success");
+      showToast(
+        t("employeeManagement.createSuccess") ||
+          "Employee registered successfully!",
+        "success",
+      );
       setShowEmployeeModal(false);
       setEmployeeForm({
         userId: "",
@@ -1249,7 +1329,9 @@ export default function GoldenMonday() {
       await refreshData();
     } catch (error) {
       showToast(
-        error.response?.data?.message || "Failed to register employee",
+        error.response?.data?.message ||
+          t("common.error") ||
+          "Failed to register employee",
         "error",
       );
     } finally {
@@ -1259,13 +1341,22 @@ export default function GoldenMonday() {
   };
 
   const handleRemoveEmployee = async (userId) => {
-    if (!window.confirm("Remove this employee from rotation?")) return;
+    if (
+      !window.confirm(
+        t("employeeManagement.confirmDeleteMessage") ||
+          "Remove this employee from rotation?",
+      )
+    )
+      return;
     try {
       await goldenMondayAPI.removeEmployee(userId);
-      showToast("Employee removed", "success");
+      showToast(
+        t("employeeManagement.deleteSuccess") || "Employee removed",
+        "success",
+      );
       await refreshData();
     } catch {
-      showToast("Failed to remove employee", "error");
+      showToast(t("common.error") || "Failed to remove employee", "error");
     }
   };
 
@@ -1273,17 +1364,16 @@ export default function GoldenMonday() {
     try {
       await goldenMondayAPI.updateEmployeeEligibility(userId, !isEligible);
       showToast(
-        `Employee ${isEligible ? "deactivated" : "activated"}`,
+        isEligible
+          ? t("employeeManagement.inactiveStatus") || "Deactivated"
+          : t("employeeManagement.activeStatus") || "Activated",
         "success",
       );
       await refreshData();
     } catch {
-      showToast("Failed to update eligibility", "error");
+      showToast(t("common.error") || "Failed to update eligibility", "error");
     }
   };
-
-  // ── Create `t` alias ──
-  const t = getTranslatedText;
 
   return (
     <div style={{ fontFamily: F.sans, background: C.gray }}>
@@ -1359,7 +1449,7 @@ export default function GoldenMonday() {
             }}
           >
             <FiClock size={13} />
-            {t(gmCopy.eyebrow) || "Every Monday · 2:00 – 2:50"}
+            {gmCopy.eyebrow || "Every Monday · 2:00 – 2:50"}
           </div>
 
           <h1
@@ -1391,7 +1481,7 @@ export default function GoldenMonday() {
             >
               <FiSunrise size={30} />
             </span>
-            {t(gmCopy.title) || "Golden Monday"}
+            {gmCopy.title || "Golden Monday"}
           </h1>
 
           <p
@@ -1403,7 +1493,7 @@ export default function GoldenMonday() {
               marginTop: 22,
             }}
           >
-            {t(gmCopy.subtitle) ||
+            {gmCopy.subtitle ||
               "The organization's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all."}
           </p>
 
@@ -1429,7 +1519,7 @@ export default function GoldenMonday() {
                 paddingBottom: 4,
               }}
             >
-              {t(gmCopy.scroll) || "Explore the story"}
+              {gmCopy.scroll || "Explore the story"}
               <FiChevronDown size={16} />
             </a>
 
@@ -1458,7 +1548,9 @@ export default function GoldenMonday() {
                     animation: refreshing ? "spin 1s linear infinite" : "none",
                   }}
                 />
-                {refreshing ? "Refreshing..." : "Refresh"}
+                {refreshing
+                  ? t("common.loading") || "Refreshing..."
+                  : t("common.refresh") || "Refresh"}
               </button>
             )}
           </div>
@@ -1482,6 +1574,7 @@ export default function GoldenMonday() {
           stats={stats}
           nextPresenter={nextPresenter}
           loading={loading}
+          t={t}
         />
       </section>
 
@@ -1499,10 +1592,8 @@ export default function GoldenMonday() {
       >
         <SectionHeading
           eyebrow={<FiCompass size={14} />}
-          title={t(gmCopy.pillarsTitle) || "Why a golden morning"}
-          sub={
-            t(gmCopy.pillarsSub) || "Three things every session comes back to."
-          }
+          title={gmCopy.pillarsTitle || "Why a golden morning"}
+          sub={gmCopy.pillarsSub || "Three things every session comes back to."}
         />
         <div
           style={{
@@ -1513,7 +1604,6 @@ export default function GoldenMonday() {
           }}
         >
           {pillars.map((pillar, i) => {
-            // Get the icon component from PILLAR_ICONS map
             const IconComponent = PILLAR_ICONS[pillar.icon] || (
               <FiCompass size={22} />
             );
@@ -1552,7 +1642,7 @@ export default function GoldenMonday() {
                     fontFamily: F.serif,
                   }}
                 >
-                  {t(pillar.title) || pillar.title}
+                  {getTranslatedText(pillar.title) || pillar.title}
                 </h3>
                 <p
                   style={{
@@ -1562,7 +1652,7 @@ export default function GoldenMonday() {
                     color: C.muted,
                   }}
                 >
-                  {t(pillar.body) || pillar.body}
+                  {getTranslatedText(pillar.body) || pillar.body}
                 </p>
               </div>
             );
@@ -1584,9 +1674,9 @@ export default function GoldenMonday() {
         >
           <SectionHeading
             eyebrow={<FiCpu size={14} />}
-            title={t(gmCopy.aiTitle) || "AI session recap"}
+            title={gmCopy.aiTitle || "AI session recap"}
             sub={
-              t(gmCopy.aiSub) ||
+              gmCopy.aiSub ||
               "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds."
             }
           />
@@ -1629,26 +1719,26 @@ export default function GoldenMonday() {
                   }}
                 >
                   <FiPlus size={16} />
-                  {t(gmCopy.aiNewSession) || "Log a new session"}
+                  {gmCopy.aiNewSession || "Log a new session"}
                 </button>
               ) : (
                 <div style={{ display: "grid", gap: 10 }}>
                   <input
-                    placeholder={t(gmCopy.aiFormTitle) || "Session title"}
+                    placeholder={gmCopy.aiFormTitle || "Session title"}
                     value={form.title}
                     onChange={handleFormChange("title")}
                     style={inputStyle}
                   />
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <input
-                      placeholder={t(gmCopy.aiFormOrg) || "Organization"}
+                      placeholder={gmCopy.aiFormOrg || "Organization"}
                       value={form.organization}
                       onChange={handleFormChange("organization")}
                       style={{ ...inputStyle, flex: "1 1 160px" }}
                     />
                     <input
                       placeholder={
-                        t(gmCopy.aiFormSpeaker) || "Speaker / facilitator"
+                        gmCopy.aiFormSpeaker || "Speaker / facilitator"
                       }
                       value={form.speaker}
                       onChange={handleFormChange("speaker")}
@@ -1663,7 +1753,7 @@ export default function GoldenMonday() {
                   />
                   <textarea
                     placeholder={
-                      t(gmCopy.aiFormNotes) ||
+                      gmCopy.aiFormNotes ||
                       "Raw notes — write it however you like, AI will clean it up"
                     }
                     value={form.rawNotes}
@@ -1701,7 +1791,7 @@ export default function GoldenMonday() {
                       }}
                     >
                       <FiX size={14} />
-                      {t(gmCopy.aiCancel) || "Cancel"}
+                      {gmCopy.aiCancel || "Cancel"}
                     </button>
                     <button
                       onClick={handleGenerateAndSave}
@@ -1728,12 +1818,12 @@ export default function GoldenMonday() {
                             size={14}
                             style={{ animation: "spin 1s linear infinite" }}
                           />
-                          {t(gmCopy.aiGenerating) || "Writing recap…"}
+                          {gmCopy.aiGenerating || "Writing recap…"}
                         </>
                       ) : (
                         <>
                           <FiSend size={14} />
-                          {t(gmCopy.aiGenerate) || "Generate & save with AI"}
+                          {gmCopy.aiGenerate || "Generate & save with AI"}
                         </>
                       )}
                     </button>
@@ -1770,7 +1860,7 @@ export default function GoldenMonday() {
                   }}
                 >
                   <FiSun size={16} color={C.gold} />
-                  {t(gmCopy.aiTopicsTitle) || "AI: suggest next topics"}
+                  {gmCopy.aiTopicsTitle || "AI: suggest next topics"}
                 </div>
                 <button
                   onClick={handleSuggestTopics}
@@ -1799,21 +1889,21 @@ export default function GoldenMonday() {
                     <FiCpu size={13} />
                   )}
                   {loadingTopics
-                    ? t(gmCopy.aiTopicsLoading) || "Thinking of topics…"
-                    : t(gmCopy.aiTopicsBtn) || "Suggest topics"}
+                    ? gmCopy.aiTopicsLoading || "Thinking of topics…"
+                    : gmCopy.aiTopicsBtn || "Suggest topics"}
                 </button>
               </div>
 
               <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
                 {topics === null && (
                   <p style={{ fontSize: 12.5, color: "#a9b3e0", margin: 0 }}>
-                    {t(gmCopy.aiTopicsEmpty) ||
+                    {gmCopy.aiTopicsEmpty ||
                       "Log a couple of sessions first so AI has something to build on."}
                   </p>
                 )}
                 {topics?.length === 0 && (
                   <p style={{ fontSize: 12.5, color: "#a9b3e0", margin: 0 }}>
-                    {t(gmCopy.aiTopicsEmpty) ||
+                    {gmCopy.aiTopicsEmpty ||
                       "Log a couple of sessions first so AI has something to build on."}
                   </p>
                 )}
@@ -1871,10 +1961,16 @@ export default function GoldenMonday() {
           onAssignPresenter={async (userId) => {
             try {
               await goldenMondayAPI.assignPresenter(userId);
-              showToast("Presenter assigned!", "success");
+              showToast(
+                t("goldenMonday.presenterAssigned") || "Presenter assigned!",
+                "success",
+              );
               await refreshData();
             } catch {
-              showToast("Failed to assign presenter", "error");
+              showToast(
+                t("common.error") || "Failed to assign presenter",
+                "error",
+              );
             }
           }}
         />
@@ -1893,10 +1989,8 @@ export default function GoldenMonday() {
       >
         <SectionHeading
           eyebrow={<FiCalendar size={14} />}
-          title={t(gmCopy.timelineTitle) || "Sessions Timeline"}
-          sub={
-            t(gmCopy.timelineSub) || "A running record, not a one-off event."
-          }
+          title={gmCopy.timelineTitle || "Sessions Timeline"}
+          sub={gmCopy.timelineSub || "A running record, not a one-off event."}
         />
 
         {/* Upcoming Sessions */}
@@ -1904,7 +1998,7 @@ export default function GoldenMonday() {
           <div style={{ marginTop: 30 }}>
             <h3 style={{ color: C.primary, fontSize: 16, marginBottom: 16 }}>
               <FiClock size={16} style={{ marginRight: 8 }} />
-              Upcoming Sessions
+              {t("goldenMonday.upcomingSessions") || "Upcoming Sessions"}
             </h3>
             <div style={{ display: "grid", gap: 12 }}>
               {upcomingSessions.map((session) => (
@@ -1914,6 +2008,7 @@ export default function GoldenMonday() {
                   language={language}
                   isAdmin={isAdminOrAbove}
                   onRefresh={refreshData}
+                  t={t}
                 />
               ))}
             </div>
@@ -1925,7 +2020,7 @@ export default function GoldenMonday() {
           <div style={{ marginTop: 40 }}>
             <h3 style={{ color: C.muted, fontSize: 16, marginBottom: 16 }}>
               <FiStar size={16} style={{ marginRight: 8 }} />
-              Past Sessions
+              {t("goldenMonday.pastSessions") || "Past Sessions"}
             </h3>
             <div style={{ display: "grid", gap: 12 }}>
               {pastSessions.slice(0, 10).map((session) => (
@@ -1935,6 +2030,7 @@ export default function GoldenMonday() {
                   language={language}
                   isAdmin={isAdminOrAbove}
                   onRefresh={refreshData}
+                  t={t}
                 />
               ))}
             </div>
@@ -1943,7 +2039,8 @@ export default function GoldenMonday() {
 
         {upcomingSessions.length === 0 && pastSessions.length === 0 && (
           <p style={{ color: C.muted, textAlign: "center", padding: "40px 0" }}>
-            No sessions recorded yet. Start by logging a session with AI!
+            {t("goldenMonday.noSessions") ||
+              "No sessions recorded yet. Start by logging a session with AI!"}
           </p>
         )}
       </section>
@@ -1962,8 +2059,11 @@ export default function GoldenMonday() {
         >
           <SectionHeading
             eyebrow={<FiUsers size={14} />}
-            title="Employee Management"
-            sub="Register and manage employees for Golden Monday rotation"
+            title={t("employeeManagement.title") || "Employee Management"}
+            sub={
+              t("employeeManagement.subtitle") ||
+              "Register and manage employees for Golden Monday rotation"
+            }
           />
 
           <div
@@ -1984,14 +2084,17 @@ export default function GoldenMonday() {
             >
               <div>
                 <span style={{ fontWeight: 600, color: C.dark }}>
-                  Registered Employees: {employees.length}
+                  {t("employeeManagement.totalEmployees") ||
+                    "Registered Employees"}
+                  : {employees.length}
                 </span>
               </div>
               <button
                 onClick={() => setShowEmployeeModal(true)}
                 style={btnStyle(C.primary)}
               >
-                <FiUserPlus size={14} /> Register Employee
+                <FiUserPlus size={14} />{" "}
+                {t("employeeManagement.addEmployee") || "Register Employee"}
               </button>
             </div>
 
@@ -2004,7 +2107,8 @@ export default function GoldenMonday() {
                     padding: "20px 0",
                   }}
                 >
-                  No employees registered yet. Click "Register Employee" to add.
+                  {t("employeeManagement.noEmployeesFound") ||
+                    'No employees registered yet. Click "Register Employee" to add.'}
                 </p>
               ) : (
                 employees.map((emp) => (
@@ -2065,8 +2169,13 @@ export default function GoldenMonday() {
                           {emp.name}
                         </div>
                         <div style={{ fontSize: 12, color: C.muted }}>
-                          {emp.department || "No department"} ·{" "}
-                          {emp.position || "No position"}
+                          {emp.department ||
+                            t("employeeManagement.noDepartment") ||
+                            "No department"}{" "}
+                          ·{" "}
+                          {emp.position ||
+                            t("employeeManagement.noPosition") ||
+                            "No position"}
                         </div>
                       </div>
                     </div>
@@ -2088,10 +2197,14 @@ export default function GoldenMonday() {
                           color: emp.isEligible ? "#065f46" : "#991b1b",
                         }}
                       >
-                        {emp.isEligible ? "Active" : "Inactive"}
+                        {emp.isEligible
+                          ? t("employeeManagement.activeStatus") || "Active"
+                          : t("employeeManagement.inactiveStatus") ||
+                            "Inactive"}
                       </span>
                       <span style={{ fontSize: 11, color: C.muted }}>
-                        Presented: {emp.timesPresented || 0}x
+                        {t("employeeManagement.timesPresented") || "Presented"}:{" "}
+                        {emp.timesPresented || 0}x
                       </span>
                       <button
                         onClick={() =>
@@ -2114,7 +2227,9 @@ export default function GoldenMonday() {
                         ) : (
                           <FiUserCheck size={12} />
                         )}
-                        {emp.isEligible ? "Deactivate" : "Activate"}
+                        {emp.isEligible
+                          ? t("employeeManagement.deactivate") || "Deactivate"
+                          : t("employeeManagement.activate") || "Activate"}
                       </button>
                       {isSuperAdmin && (
                         <button
@@ -2128,6 +2243,7 @@ export default function GoldenMonday() {
                           }}
                         >
                           <FiTrash2 size={12} />
+                          {t("employeeManagement.remove") || "Remove"}
                         </button>
                       )}
                     </div>
@@ -2163,11 +2279,9 @@ export default function GoldenMonday() {
             <div style={{ flex: "1 1 320px" }}>
               <SectionHeading
                 eyebrow={<FiGrid size={14} />}
-                title={
-                  t(gmCopy.mesobTitle) || "The platform this mindset built"
-                }
+                title={gmCopy.mesobTitle || "The platform this mindset built"}
                 sub={
-                  t(gmCopy.mesobSub) ||
+                  gmCopy.mesobSub ||
                   "MESOB is the organization's one-stop digital service platform — the same drive for less friction, applied to how citizens actually get things done."
                 }
                 dark
@@ -2190,7 +2304,7 @@ export default function GoldenMonday() {
                   transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               >
-                {t(gmCopy.mesobCta) || "Open Document Vault"}
+                {gmCopy.mesobCta || "Open Document Vault"}
                 <FiArrowRight size={16} />
               </a>
             </div>
@@ -2232,7 +2346,7 @@ export default function GoldenMonday() {
                       color: "#dfe4ff",
                     }}
                   >
-                    {t(pt)}
+                    {getTranslatedText(pt)}
                   </p>
                 </div>
               ))}
@@ -2256,7 +2370,7 @@ export default function GoldenMonday() {
             margin: "0 0 8px",
           }}
         >
-          {t(gmCopy.closingTitle) || "Start your week here"}
+          {gmCopy.closingTitle || "Start your week here"}
         </h3>
         <p
           style={{
@@ -2266,7 +2380,7 @@ export default function GoldenMonday() {
             margin: "0 auto",
           }}
         >
-          {t(gmCopy.closingBody) ||
+          {gmCopy.closingBody ||
             "Golden Monday is a standing fixture — check back weekly for the next session's write-up."}
         </p>
       </section>
@@ -2291,12 +2405,12 @@ export default function GoldenMonday() {
         userSearch={userSearch}
         setUserSearch={setUserSearch}
         handleSelectUser={handleSelectUser}
-        photoFile={photoFile}
         setPhotoFile={setPhotoFile}
         photoPreview={photoPreview}
         setPhotoPreview={setPhotoPreview}
         handlePhotoChange={handlePhotoChange}
         uploadingPhoto={uploadingPhoto}
+        t={t}
       />
     </div>
   );

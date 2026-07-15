@@ -144,6 +144,8 @@ export const translations = {
       loading: "Loading...",
       noData: "No data available",
       backToHome: "Back to Home",
+      refresh: "Refresh",
+      optional: "optional",
     },
     auth: {
       login: "Login",
@@ -227,6 +229,14 @@ export const translations = {
       noUsersFound:
         "No users available to add. All users may already be registered.",
       selectUser: "Select a user to add to the rotation roster",
+      photoUploadHint:
+        "Upload a photo from your computer (JPG, PNG, GIF) - Max 5MB",
+      photoTooLarge: "Photo must be less than 5MB",
+      selectUserError: "Please select an employee",
+      noDepartment: "No department",
+      noPosition: "No position",
+      deactivate: "Deactivate",
+      activate: "Activate",
     },
     report: {
       title: "Report Generator",
@@ -363,6 +373,7 @@ export const translations = {
       expiry: "expiry",
       loadingRotation: "Loading rotation…",
       nobodyAssigned: "Nobody assigned yet for the coming Monday.",
+      presenterAssigned: "Presenter assigned!",
 
       // Stats Dashboard
       statsLoading: "Loading stats...",
@@ -386,6 +397,7 @@ export const translations = {
       watchLabel: "Watch",
       aiSuggestedLabel: "AI Suggested:",
       viewAiRecap: "View AI Recap",
+      upcoming: "Upcoming",
 
       // Top-level controls
       refreshing: "Refreshing...",
@@ -409,7 +421,7 @@ export const translations = {
       positionLabel: "Position",
       positionPlaceholder: "Job position",
       profilePhotoLabel: "Profile Photo",
-      uploadPhotoHint:
+      photoUploadHint:
         "Upload a photo from your computer (JPG, PNG, GIF) - Max 5MB",
       photoUrlLabel: "Photo URL (optional, or use upload above)",
       photoUrlPlaceholder: "https://example.com/photo.jpg",
@@ -586,6 +598,8 @@ export const translations = {
       loading: "በመጫን ላይ...",
       noData: "ምንም መረጃ የለም",
       backToHome: "ወደ መጀመሪያ ተመለስ",
+      refresh: "አድስ",
+      optional: "አማራጭ",
     },
     auth: {
       login: "ግባ",
@@ -667,6 +681,13 @@ export const translations = {
       loadError: "ሰራተኞችን መጫን አልተቻለም። እባክዎ ያድሱ።",
       noUsersFound: "ለመጨመር የሚችሉ ተጠቃሚዎች የሉም። ሁሉም ተጠቃሚዎች ተመዝግበዋል።",
       selectUser: "ወደ ሽክርክር ዝርዝር ለመጨመር ተጠቃሚ ይምረጡ",
+      photoUploadHint: "ከኮምፒዩተርዎ ፎቶ ይስቀሉ (JPG, PNG, GIF) - ከፍተኛ 5MB",
+      photoTooLarge: "ፎቶ ከ5MB በታች መሆን አለበት",
+      selectUserError: "እባክዎ ሰራተኛ ይምረጡ",
+      noDepartment: "ዘርፍ የለም",
+      noPosition: "ኃላፊነት የለም",
+      deactivate: "አቦዝን",
+      activate: "አንቃ",
     },
     report: {
       title: "ሪፖርት አዘጋጅ",
@@ -798,6 +819,7 @@ export const translations = {
       expiry: "የሚቆይበት ጊዜ",
       loadingRotation: "ሽክርክሩን በማጫን ላይ…",
       nobodyAssigned: "ለመጪው ሰኞ አቅራቢ አልተመደበም።",
+      presenterAssigned: "አቅራቢ ተመድቧል!",
 
       // Stats Dashboard
       statsLoading: "ስታትስቲክስ በመጫን ላይ...",
@@ -821,6 +843,7 @@ export const translations = {
       watchLabel: "ተመልከት",
       aiSuggestedLabel: "በAI የተጠቆመ፦",
       viewAiRecap: "የAI ማጠቃለያ ይመልከቱ",
+      upcoming: "መጪ",
 
       // Top-level controls
       refreshing: "በማደስ ላይ...",
@@ -844,7 +867,7 @@ export const translations = {
       positionLabel: "ኃላፊነት",
       positionPlaceholder: "የስራ መደብ",
       profilePhotoLabel: "የመገለጫ ፎቶ",
-      uploadPhotoHint: "ከኮምፒዩተርዎ ፎቶ ይስቀሉ (JPG, PNG, GIF) - ከፍተኛ 5MB",
+      photoUploadHint: "ከኮምፒዩተርዎ ፎቶ ይስቀሉ (JPG, PNG, GIF) - ከፍተኛ 5MB",
       photoUrlLabel: "የፎቶ አድራሻ (አማራጭ፣ ወይም ከላይ ያለውን ስቀላ ይጠቀሙ)",
       photoUrlPlaceholder: "https://example.com/photo.jpg",
       cancelBtn: "ይቅር",
@@ -1021,6 +1044,8 @@ export const translations = {
       loading: "Fe'amaa jira...",
       noData: "Odeeffannoon hin jiru",
       backToHome: "Gara Ka'umsaatti Deebi'i",
+      refresh: "Haaromsi",
+      optional: "filannoo",
     },
     auth: {
       login: "Seeni",
@@ -1106,6 +1131,14 @@ export const translations = {
       noUsersFound:
         "Fayyadamtoonni dabaluuf hin jiran. Fayyadamtoonni hundi galmeeffamaniiru.",
       selectUser: "Tarree naanna'iinsaatti dabaluuf fayyadamaa filadhu",
+      photoUploadHint:
+        "Kompiitara keessan irraa suuraa fe'aa (JPG, PNG, GIF) - Hamma 5MB",
+      photoTooLarge: "Suuraan MB 5 gadi ta'uu qaba",
+      selectUserError: "Maaloo hojjataa filadhu",
+      noDepartment: "Kutaan hin jiru",
+      noPosition: "Galmi hin jiru",
+      deactivate: "Dhaamsi",
+      activate: "Kaa'i",
     },
     report: {
       title: "Gabaasa Uumaa",
@@ -1241,6 +1274,7 @@ export const translations = {
       expiry: "haflii",
       loadingRotation: "Naanna'iinsa fe'aa jira…",
       nobodyAssigned: "Wiixata dhufuuf dhiheessituun hin ramadne.",
+      presenterAssigned: "Dhiheessituun ramadame!",
 
       // Stats Dashboard
       statsLoading: "Istaatiksii fe'aa jira...",
@@ -1264,6 +1298,7 @@ export const translations = {
       watchLabel: "Ilaali",
       aiSuggestedLabel: "AI-n Yaadame:",
       viewAiRecap: "Ibsa AI Ilaali",
+      upcoming: "Dhufaa jiru",
 
       // Top-level controls
       refreshing: "Haaromsaa jira...",
@@ -1287,7 +1322,7 @@ export const translations = {
       positionLabel: "Galma",
       positionPlaceholder: "Sadarkaa hojii",
       profilePhotoLabel: "Suuraa Piroofaayilii",
-      uploadPhotoHint:
+      photoUploadHint:
         "Kompiitara keessan irraa suuraa fe'aa (JPG, PNG, GIF) - Hamma 5MB",
       photoUrlLabel:
         "Teessoo Suuraa (filannoo, ykn fe'iinsa armaan olii fayyadami)",
