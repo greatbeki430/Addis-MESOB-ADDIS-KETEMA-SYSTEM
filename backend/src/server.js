@@ -49,17 +49,30 @@ const allowedOrigins = [
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-
-    if (
-      allowedOrigins.indexOf(origin) !== -1 ||
-      process.env.NODE_ENV === "development"
-    ) {
-      callback(null, true);
-    } else {
-      console.log("Blocked origin:", origin);
-      callback(new Error("Not allowed by CORS"));
+    if (!origin) {
+      return callback(null, true);
     }
+
+    // Allow all vercel.app subdomains
+    if (origin.includes("vercel.app")) {
+      return callback(null, true);
+    }
+
+    // Allow localhost for development
+    if (origin.includes("localhost")) {
+      return callback(null, true);
+    }
+
+    // Check against specific allowed origins (with and without trailing slash)
+    const normalizedOrigin = origin.replace(/\/$/, ""); // Remove trailing slash
+    const normalizedAllowed = allowedOrigins.map((o) => o.replace(/\/$/, ""));
+
+    if (normalizedAllowed.includes(normalizedOrigin)) {
+      return callback(null, true);
+    }
+
+    console.log("Blocked origin:", origin);
+    callback(new Error("Not allowed by CORS"));
   },
   credentials: true,
   optionsSuccessStatus: 200,
@@ -70,9 +83,6 @@ const corsOptions = {
     "X-Requested-With",
     "Accept",
     "Origin",
-    "Access-Control-Allow-Origin",
-    "Access-Control-Allow-Headers",
-    "Access-Control-Allow-Credentials",
   ],
 };
 
