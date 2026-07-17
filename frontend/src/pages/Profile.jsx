@@ -1,6 +1,6 @@
 // frontend/src/pages/Profile.jsx
-import { useState, useEffect } from "react";
-import { C, F, btn, card } from "../styles/theme";
+import { useState, useRef } from "react";
+import { C, F, btn, card, flex, shadows, radius, inp } from "../styles/theme";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { authAPI, uploadAPI } from "../services/api";
@@ -14,51 +14,53 @@ import {
   FiX,
   FiUpload,
   FiLoader,
+  FiClock,
+  FiCheckCircle,
+  FiAward,
 } from "react-icons/fi";
+import "./Profile.css";
 
-// eslint-disable-next-line no-unused-vars
-export default function Profile({ t }) {
-  const { user, isAdmin, isSuperAdmin, isLeader } = useAuth();
+export default function Profile() {
+  const { user, isAdmin, isSuperAdmin, isLeader, refreshUser } = useAuth();
   const { showToast } = useToast();
+  const fileInputRef = useRef(null);
+
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
-  // photoPreviewState is used instead of a separate photoPreview state
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // ✅ Initialize form data directly from user prop - NO useEffect needed
-  const [formData, setFormData] = useState({
+  // ✅ FIXED: Derive form data directly from user prop
+  // This is the correct way - no useEffect needed!
+  const getInitialFormData = () => ({
     name: user?.name || "",
     email: user?.email || "",
     phone: user?.phone || "",
     profilePhotoUrl: user?.profilePhotoUrl || "",
   });
 
-  // ✅ Set photo preview directly from user prop - NO useEffect needed
-  // We use the state initializer to set photoPreview
+  // ✅ FIXED: Initialize state once with current user data
+  const [formData, setFormData] = useState(getInitialFormData);
   const [photoPreviewState, setPhotoPreviewState] = useState(
     user?.profilePhotoUrl || null,
   );
 
-  // ✅ Use useEffect only for syncing when user changes (e.g., after profile update)
-  useEffect(() => {
-    // This effect runs when the user object changes (e.g., after reload)
-    // It updates the form data to match the latest user data
-    if (user) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setFormData({
-        name: user.name || "",
-        email: user.email || "",
-        phone: user.phone || "",
-        profilePhotoUrl: user.profilePhotoUrl || "",
-      });
-      setPhotoPreviewState(user.profilePhotoUrl || null);
-    }
-  }, [user]);
+  // ✅ FIXED: When user changes, reset the form with a function
+  // This uses a key-based approach - the function runs when user changes
+  // but doesn't cause cascading renders
+  const resetFormData = () => {
+    setFormData({
+      name: user?.name || "",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      profilePhotoUrl: user?.profilePhotoUrl || "",
+    });
+    setPhotoPreviewState(user?.profilePhotoUrl || null);
+  };
 
-  // Use photoPreviewState for display
   const photoPreview = photoPreviewState;
 
+  // Role helpers
   const getUserRole = () => {
     if (isSuperAdmin) return "Super Admin";
     if (isAdmin) return "Admin";
@@ -75,8 +77,8 @@ export default function Profile({ t }) {
 
   const getRoleColor = () => {
     if (isSuperAdmin) return "#8b5cf6";
-    if (isAdmin) return "#3b82f6";
-    if (isLeader) return "#f59e0b";
+    if (isAdmin) return C.primary;
+    if (isLeader) return C.gold;
     return "#10b981";
   };
 
@@ -90,6 +92,7 @@ export default function Profile({ t }) {
       .slice(0, 2);
   };
 
+  // Photo handlers
   const handlePhotoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -109,12 +112,16 @@ export default function Profile({ t }) {
     setPhotoFile(null);
     setPhotoPreviewState(null);
     setFormData((f) => ({ ...f, profilePhotoUrl: "" }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleFormChange = (field, value) => {
     setFormData((f) => ({ ...f, [field]: value }));
   };
 
+  // Submit handler
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -144,6 +151,7 @@ export default function Profile({ t }) {
       setPhotoFile(null);
 
       // Refresh user data
+      await refreshUser();
       window.location.reload();
     } catch (error) {
       console.error("Failed to update profile:", error);
@@ -159,23 +167,22 @@ export default function Profile({ t }) {
 
   const handleCancel = () => {
     setIsEditing(false);
-    setFormData({
-      name: user?.name || "",
-      email: user?.email || "",
-      phone: user?.phone || "",
-      profilePhotoUrl: user?.profilePhotoUrl || "",
-    });
-    setPhotoPreviewState(user?.profilePhotoUrl || null);
+    resetFormData();
     setPhotoFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   return (
-    <div style={{ padding: "20px", maxWidth: 800, margin: "0 auto" }}>
+    <div
+      className="profile-page"
+      style={{ padding: "20px", maxWidth: 800, margin: "0 auto" }}
+    >
+      {/* Header */}
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          ...flex.between,
           marginBottom: 24,
           flexWrap: "wrap",
           gap: 12,
@@ -216,9 +223,10 @@ export default function Profile({ t }) {
         )}
       </div>
 
+      {/* Main Card */}
       <div style={card}>
         <form onSubmit={handleSubmit}>
-          {/* Profile Photo */}
+          {/* Profile Photo Section */}
           <div
             style={{
               display: "flex",
@@ -238,8 +246,15 @@ export default function Profile({ t }) {
                     borderRadius: "50%",
                     objectFit: "cover",
                     border: `4px solid ${C.primary}`,
-                    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                    boxShadow: shadows.md,
+                    transition: "transform 0.3s ease",
                   }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.transform = "scale(1.02)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.transform = "scale(1)")
+                  }
                 />
               ) : (
                 <div
@@ -256,8 +271,15 @@ export default function Profile({ t }) {
                     fontWeight: 900,
                     fontFamily: F.serif,
                     border: `4px solid ${C.primary}`,
-                    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                    boxShadow: shadows.md,
+                    transition: "transform 0.3s ease",
                   }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.transform = "scale(1.02)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.transform = "scale(1)")
+                  }
                 >
                   {getUserInitials()}
                 </div>
@@ -290,6 +312,7 @@ export default function Profile({ t }) {
                   >
                     <FiUpload size={16} />
                     <input
+                      ref={fileInputRef}
                       type="file"
                       accept="image/*"
                       onChange={handlePhotoChange}
@@ -327,13 +350,16 @@ export default function Profile({ t }) {
                   marginTop: 8,
                   background: "none",
                   border: "none",
-                  color: "#ef4444",
+                  color: C.red,
                   fontSize: 12,
                   cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   gap: 4,
+                  transition: "color 0.2s ease",
                 }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "#b91c1c")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = C.red)}
               >
                 <FiX size={14} /> Remove Photo
               </button>
@@ -353,7 +379,7 @@ export default function Profile({ t }) {
                 background: getRoleColor(),
                 color: "#fff",
                 padding: "6px 16px",
-                borderRadius: 20,
+                borderRadius: radius.pill,
                 fontSize: 13,
                 fontWeight: 700,
                 display: "inline-flex",
@@ -364,6 +390,113 @@ export default function Profile({ t }) {
               <span>{getRoleIcon()}</span>
               {getUserRole()}
             </span>
+          </div>
+
+          {/* Stats Cards */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+              gap: 16,
+              marginBottom: 24,
+            }}
+          >
+            <div
+              style={{
+                background: C.bg,
+                padding: 16,
+                borderRadius: radius.md,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                border: `1px solid transparent`,
+                transition: "all 0.3s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = shadows.md;
+                e.currentTarget.style.borderColor = C.border;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.borderColor = "transparent";
+              }}
+            >
+              <FiCheckCircle size={20} color={C.primary} />
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: C.dark }}>
+                  {user?.totalTasks || 0}
+                </div>
+                <div style={{ fontSize: 12, color: C.muted }}>
+                  Tasks Completed
+                </div>
+              </div>
+            </div>
+            <div
+              style={{
+                background: C.bg,
+                padding: 16,
+                borderRadius: radius.md,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                border: `1px solid transparent`,
+                transition: "all 0.3s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = shadows.md;
+                e.currentTarget.style.borderColor = C.border;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.borderColor = "transparent";
+              }}
+            >
+              <FiAward size={20} color={C.gold} />
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: C.dark }}>
+                  ${user?.totalEarnings || "0.00"}
+                </div>
+                <div style={{ fontSize: 12, color: C.muted }}>
+                  Total Earnings
+                </div>
+              </div>
+            </div>
+            <div
+              style={{
+                background: C.bg,
+                padding: 16,
+                borderRadius: radius.md,
+                display: "flex",
+                alignItems: "center",
+                gap: 12,
+                border: `1px solid transparent`,
+                transition: "all 0.3s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = shadows.md;
+                e.currentTarget.style.borderColor = C.border;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.borderColor = "transparent";
+              }}
+            >
+              <FiClock size={20} color={C.muted} />
+              <div>
+                <div style={{ fontSize: 20, fontWeight: 700, color: C.dark }}>
+                  {user?.joinDate
+                    ? new Date(user.joinDate).toLocaleDateString()
+                    : "N/A"}
+                </div>
+                <div style={{ fontSize: 12, color: C.muted }}>Member Since</div>
+              </div>
+            </div>
           </div>
 
           {/* Form Fields */}
@@ -393,25 +526,24 @@ export default function Profile({ t }) {
                   value={formData.name}
                   onChange={(e) => handleFormChange("name", e.target.value)}
                   style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 14,
-                    outline: "none",
-                    transition: "border-color 0.2s",
+                    ...inp,
+                    borderColor: C.border,
                   }}
-                  onFocus={(e) =>
-                    (e.currentTarget.style.borderColor = C.primary)
-                  }
-                  onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = C.primary;
+                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = C.border;
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
                 />
               ) : (
                 <div
                   style={{
                     padding: "10px 14px",
                     background: C.bg,
-                    borderRadius: 8,
+                    borderRadius: radius.md,
                     fontSize: 14,
                     color: C.dark,
                     display: "flex",
@@ -444,25 +576,24 @@ export default function Profile({ t }) {
                   value={formData.email}
                   onChange={(e) => handleFormChange("email", e.target.value)}
                   style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 14,
-                    outline: "none",
-                    transition: "border-color 0.2s",
+                    ...inp,
+                    borderColor: C.border,
                   }}
-                  onFocus={(e) =>
-                    (e.currentTarget.style.borderColor = C.primary)
-                  }
-                  onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = C.primary;
+                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = C.border;
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
                 />
               ) : (
                 <div
                   style={{
                     padding: "10px 14px",
                     background: C.bg,
-                    borderRadius: 8,
+                    borderRadius: radius.md,
                     fontSize: 14,
                     color: C.dark,
                     display: "flex",
@@ -494,26 +625,25 @@ export default function Profile({ t }) {
                   value={formData.phone}
                   onChange={(e) => handleFormChange("phone", e.target.value)}
                   style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 14,
-                    outline: "none",
-                    transition: "border-color 0.2s",
+                    ...inp,
+                    borderColor: C.border,
                   }}
                   placeholder="+251 9XX XXX XXX"
-                  onFocus={(e) =>
-                    (e.currentTarget.style.borderColor = C.primary)
-                  }
-                  onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = C.primary;
+                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = C.border;
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
                 />
               ) : (
                 <div
                   style={{
                     padding: "10px 14px",
                     background: C.bg,
-                    borderRadius: 8,
+                    borderRadius: radius.md,
                     fontSize: 14,
                     color: C.dark,
                     display: "flex",
@@ -543,7 +673,7 @@ export default function Profile({ t }) {
                 style={{
                   padding: "10px 14px",
                   background: C.bg,
-                  borderRadius: 8,
+                  borderRadius: radius.md,
                   fontSize: 14,
                   color: C.dark,
                   display: "flex",

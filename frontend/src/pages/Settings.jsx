@@ -1,6 +1,6 @@
 // frontend/src/pages/Settings.jsx
 import { useState } from "react";
-import { C, F, btn, card } from "../styles/theme";
+import { C, F, btn, card, radius, shadows } from "../styles/theme";
 import { useToast } from "../hooks/useToast";
 import { useLanguage } from "../hooks/useLanguage";
 import {
@@ -12,17 +12,17 @@ import {
   FiLock,
   FiCheckCircle,
   FiSave,
+  FiVolume2,
+  FiRadio,
+  FiKey,
+  FiShield,
+  FiTrash2,
+  FiChevronRight,
 } from "react-icons/fi";
+import "./Settings.css";
 
-// ✅ Move SettingToggle outside of the component (fixes the "created during render" error)
-const SettingToggle = ({
-  label,
-  description,
-  settingKey,
-  icon,
-  value,
-  onToggle,
-}) => (
+// Setting Toggle Component
+const SettingToggle = ({ label, description, icon, value, onToggle }) => (
   <div
     style={{
       display: "flex",
@@ -35,7 +35,21 @@ const SettingToggle = ({
     }}
   >
     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-      <span style={{ color: C.primary, fontSize: 20 }}>{icon}</span>
+      <span
+        style={{
+          color: C.primary,
+          fontSize: 20,
+          width: 40,
+          height: 40,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          background: C.bg,
+          borderRadius: radius.md,
+        }}
+      >
+        {icon}
+      </span>
       <div>
         <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>
           {label}
@@ -46,7 +60,7 @@ const SettingToggle = ({
       </div>
     </div>
     <button
-      onClick={() => onToggle(settingKey)}
+      onClick={onToggle}
       style={{
         width: 48,
         height: 28,
@@ -57,7 +71,9 @@ const SettingToggle = ({
         position: "relative",
         transition: "all 0.3s ease",
         flexShrink: 0,
+        padding: 0,
       }}
+      aria-label={`Toggle ${label}`}
     >
       <div
         style={{
@@ -76,18 +92,102 @@ const SettingToggle = ({
   </div>
 );
 
-// eslint-disable-next-line no-unused-vars
-export default function Settings({ t }) {
+// Security Item Component
+const SecurityItem = ({
+  icon,
+  label,
+  description,
+  onClick,
+  danger = false,
+}) => (
+  <button
+    onClick={onClick}
+    style={{
+      padding: "12px 16px",
+      border: `1px solid ${C.border}`,
+      borderRadius: radius.md,
+      background: C.white,
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      textAlign: "left",
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      width: "100%",
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.borderColor = danger ? C.red : C.primary;
+      e.currentTarget.style.boxShadow = shadows.md;
+      e.currentTarget.style.transform = "translateY(-1px)";
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.borderColor = C.border;
+      e.currentTarget.style.boxShadow = "none";
+      e.currentTarget.style.transform = "translateY(0)";
+    }}
+  >
+    <span
+      style={{
+        fontSize: 18,
+        color: danger ? C.red : C.primary,
+        flexShrink: 0,
+      }}
+    >
+      {icon}
+    </span>
+    <div style={{ flex: 1 }}>
+      <div
+        style={{
+          fontWeight: 600,
+          color: danger ? C.red : C.dark,
+          fontSize: 14,
+        }}
+      >
+        {label}
+      </div>
+      {description && (
+        <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+          {description}
+        </div>
+      )}
+    </div>
+    <FiChevronRight style={{ color: C.muted, flexShrink: 0 }} />
+  </button>
+);
+
+export default function Settings() {
   const { language, changeLanguage } = useLanguage();
   const { showToast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [settings, setSettings] = useState({
-    language: language || "en",
-    notifications: true,
-    darkMode: false,
-    autoSave: true,
-    emailNotifications: true,
-  });
+
+  // ✅ FIXED: Lazy initialize state - reads from localStorage once
+  // No useEffect needed! This runs once when the component mounts.
+  const getInitialSettings = () => {
+    const defaultSettings = {
+      language: language || "en",
+      notifications: true,
+      darkMode: false,
+      autoSave: true,
+      emailNotifications: true,
+      soundEffects: true,
+      dataSaver: false,
+    };
+
+    try {
+      const saved = localStorage.getItem("userSettings");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return { ...defaultSettings, ...parsed };
+      }
+    } catch (err) {
+      console.error("Failed to parse settings", err);
+    }
+
+    return defaultSettings;
+  };
+
+  // ✅ FIXED: Initialize state with lazy function
+  const [settings, setSettings] = useState(getInitialSettings);
 
   const handleToggle = (key) => {
     setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -105,8 +205,8 @@ export default function Settings({ t }) {
       localStorage.setItem("userSettings", JSON.stringify(settings));
       await new Promise((resolve) => setTimeout(resolve, 500));
       showToast("Settings saved successfully!", "success");
-      // eslint-disable-next-line no-unused-vars
-    } catch (error) {
+    } catch (err) {
+      console.error("Failed to save settings", err);
       showToast("Failed to save settings", "error");
     } finally {
       setSaving(false);
@@ -115,6 +215,7 @@ export default function Settings({ t }) {
 
   return (
     <div style={{ padding: "20px", maxWidth: 800, margin: "0 auto" }}>
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -169,130 +270,177 @@ export default function Settings({ t }) {
         </button>
       </div>
 
+      {/* Main Settings Card */}
       <div style={card}>
-        <h3
-          style={{
-            fontSize: 15,
-            fontWeight: 700,
-            color: C.dark,
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
-          <FiGlobe size={18} color={C.primary} />
-          Language Preferences
-        </h3>
+        {/* Language Section */}
         <div
           style={{
-            display: "flex",
-            gap: 10,
-            flexWrap: "wrap",
-            marginBottom: 24,
+            borderBottom: `1px solid ${C.border}`,
+            paddingBottom: 20,
+            marginBottom: 20,
           }}
         >
-          {[
-            { code: "en", label: "English", flag: "🇬🇧" },
-            { code: "am", label: "አማርኛ", flag: "🇪🇹" },
-            { code: "om", label: "Afaan Oromo", flag: "🇪🇹" },
-          ].map((lang) => (
-            <button
-              key={lang.code}
-              onClick={() => handleLanguageChange(lang.code)}
-              style={{
-                padding: "8px 16px",
-                background:
-                  settings.language === lang.code ? C.primary : "#f3f4f6",
-                color: settings.language === lang.code ? "#fff" : C.dark,
-                border: `1px solid ${
-                  settings.language === lang.code ? C.primary : C.border
-                }`,
-                borderRadius: 8,
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: settings.language === lang.code ? 700 : 500,
-                transition: "all 0.2s ease",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <span>{lang.flag}</span>
-              {lang.label}
-            </button>
-          ))}
+          <h3
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: C.dark,
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <FiGlobe size={18} color={C.primary} />
+            Language Preferences
+          </h3>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              { code: "en", label: "English", flag: "🇬🇧" },
+              { code: "am", label: "አማርኛ", flag: "🇪🇹" },
+              { code: "om", label: "Afaan Oromo", flag: "🇪🇹" },
+            ].map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => handleLanguageChange(lang.code)}
+                style={{
+                  padding: "8px 16px",
+                  background:
+                    settings.language === lang.code ? C.primary : C.bg,
+                  color: settings.language === lang.code ? "#fff" : C.dark,
+                  border: `1px solid ${
+                    settings.language === lang.code ? C.primary : C.border
+                  }`,
+                  borderRadius: radius.md,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: settings.language === lang.code ? 700 : 500,
+                  transition: "all 0.2s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+                onMouseEnter={(e) => {
+                  if (settings.language !== lang.code) {
+                    e.currentTarget.style.background = C.gray;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (settings.language !== lang.code) {
+                    e.currentTarget.style.background = C.bg;
+                  }
+                }}
+              >
+                <span>{lang.flag}</span>
+                {lang.label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        <h3
+        {/* Notifications Section */}
+        <div
           style={{
-            fontSize: 15,
-            fontWeight: 700,
-            color: C.dark,
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
+            borderBottom: `1px solid ${C.border}`,
+            paddingBottom: 20,
+            marginBottom: 20,
           }}
         >
-          <FiBell size={18} color={C.primary} />
-          Notifications
-        </h3>
-        <SettingToggle
-          label="Push Notifications"
-          description="Receive notifications about important updates"
-          settingKey="notifications"
-          icon={<FiBell size={18} />}
-          value={settings.notifications}
-          onToggle={handleToggle}
-        />
-        <SettingToggle
-          label="Email Notifications"
-          description="Get updates via email"
-          settingKey="emailNotifications"
-          icon={<FiMail size={18} />}
-          value={settings.emailNotifications}
-          onToggle={handleToggle}
-        />
+          <h3
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: C.dark,
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <FiBell size={18} color={C.primary} />
+            Notifications
+          </h3>
+          <SettingToggle
+            label="Push Notifications"
+            description="Receive notifications about important updates"
+            icon={<FiBell size={18} />}
+            value={settings.notifications}
+            onToggle={() => handleToggle("notifications")}
+          />
+          <SettingToggle
+            label="Email Notifications"
+            description="Get updates via email"
+            icon={<FiMail size={18} />}
+            value={settings.emailNotifications}
+            onToggle={() => handleToggle("emailNotifications")}
+          />
+        </div>
 
-        <h3
+        {/* Preferences Section */}
+        <div
           style={{
-            fontSize: 15,
-            fontWeight: 700,
-            color: C.dark,
-            marginTop: 24,
-            marginBottom: 16,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
+            borderBottom: `1px solid ${C.border}`,
+            paddingBottom: 20,
+            marginBottom: 20,
           }}
         >
-          <FiSettings size={18} color={C.primary} />
-          Preferences
-        </h3>
-        <SettingToggle
-          label="Dark Mode"
-          description="Toggle dark theme (coming soon)"
-          settingKey="darkMode"
-          icon={<FiMoon size={18} />}
-          value={settings.darkMode}
-          onToggle={handleToggle}
-        />
-        <SettingToggle
-          label="Auto Save"
-          description="Automatically save your work"
-          settingKey="autoSave"
-          icon={<FiSave size={18} />}
-          value={settings.autoSave}
-          onToggle={handleToggle}
-        />
+          <h3
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              color: C.dark,
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <FiSettings size={18} color={C.primary} />
+            Preferences
+          </h3>
+          <SettingToggle
+            label="Dark Mode"
+            description="Switch to dark theme"
+            icon={<FiMoon size={18} />}
+            value={settings.darkMode}
+            onToggle={() => handleToggle("darkMode")}
+          />
+          <SettingToggle
+            label="Auto Save"
+            description="Automatically save your work"
+            icon={<FiSave size={18} />}
+            value={settings.autoSave}
+            onToggle={() => handleToggle("autoSave")}
+          />
+          <SettingToggle
+            label="Sound Effects"
+            description="Play sounds for notifications"
+            icon={<FiVolume2 size={18} />}
+            value={settings.soundEffects}
+            onToggle={() => handleToggle("soundEffects")}
+          />
+          <SettingToggle
+            label="Data Saver"
+            description="Reduce data usage"
+            icon={<FiRadio size={18} />}
+            value={settings.dataSaver}
+            onToggle={() => handleToggle("dataSaver")}
+          />
+        </div>
 
+        {/* Saved Indicator */}
         <div
           style={{
             marginTop: 24,
             padding: 12,
             background: "#f0fdf4",
-            borderRadius: 8,
+            borderRadius: radius.md,
             display: "flex",
             alignItems: "center",
             gap: 10,
@@ -328,84 +476,33 @@ export default function Settings({ t }) {
             gap: 12,
           }}
         >
-          <button
-            style={{
-              padding: "12px 16px",
-              border: `1px solid ${C.border}`,
-              borderRadius: 8,
-              background: C.white,
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              textAlign: "left",
+          <SecurityItem
+            icon={<FiKey size={18} />}
+            label="Change Password"
+            description="Update your password"
+            onClick={() => showToast("Password change coming soon", "info")}
+          />
+          <SecurityItem
+            icon={<FiShield size={18} />}
+            label="Two-Factor Authentication"
+            description="Add an extra layer of security"
+            onClick={() => showToast("2FA coming soon", "info")}
+          />
+          <SecurityItem
+            icon={<FiTrash2 size={18} />}
+            label="Delete Account"
+            description="Permanently delete your account"
+            danger
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Are you sure you want to delete your account? This action cannot be undone!",
+                )
+              ) {
+                showToast("Account deletion requested", "warning");
+              }
             }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = C.primary;
-              e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = C.border;
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>
-              Change Password
-            </div>
-            <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
-              Update your password
-            </div>
-          </button>
-          <button
-            style={{
-              padding: "12px 16px",
-              border: `1px solid ${C.border}`,
-              borderRadius: 8,
-              background: C.white,
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              textAlign: "left",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = C.primary;
-              e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = C.border;
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>
-              Two-Factor Authentication
-            </div>
-            <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
-              Add an extra layer of security
-            </div>
-          </button>
-          <button
-            style={{
-              padding: "12px 16px",
-              border: `1px solid ${C.border}`,
-              borderRadius: 8,
-              background: C.white,
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              textAlign: "left",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "#ef4444";
-              e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.05)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = C.border;
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            <div style={{ fontWeight: 600, color: "#ef4444", fontSize: 14 }}>
-              Delete Account
-            </div>
-            <div style={{ fontSize: 12, color: C.muted, marginTop: 4 }}>
-              Permanently delete your account
-            </div>
-          </button>
+          />
         </div>
       </div>
     </div>
