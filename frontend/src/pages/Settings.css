@@ -1,0 +1,43 @@
+/* frontend/src/pages/Settings.css */
+
+.settings-page {
+  animation: fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .settings-page .settings-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .settings-page .settings-save-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .settings-page .language-grid {
+    gap: 8px;
+  }
+
+  .settings-page .language-btn {
+    flex: 1;
+    justify-content: center;
+    min-width: 80px;
+  }
+
+  .settings-page .security-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
