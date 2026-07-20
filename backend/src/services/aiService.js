@@ -18,13 +18,19 @@ const PROVIDERS = {
 };
 
 // ============================================================
+// TIMEOUT CONFIGURATION
+// ============================================================
+const AI_TIMEOUT_MS = 60000; // 60 seconds
+const VISION_TIMEOUT_MS = 30000; // 30 seconds for vision
+
+// ============================================================
 // SMALL UTILITY — hard timeout wrapper
 // Used so a slow/hanging provider call fails fast with a proper
 // JSON error response instead of hanging until the platform's own
 // proxy kills the connection with zero response bytes (which shows
 // up in the browser as a misleading "CORS blocked" error).
 // ============================================================
-const withTimeout = (promise, ms, label = "AI request") => {
+const withTimeout = (promise, ms = AI_TIMEOUT_MS, label = "AI request") => {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
     timeoutId = setTimeout(() => {
@@ -36,6 +42,28 @@ const withTimeout = (promise, ms, label = "AI request") => {
   return Promise.race([promise, timeout]).finally(() =>
     clearTimeout(timeoutId),
   );
+};
+
+// ============================================================
+// RETRY MECHANISM
+// ============================================================
+const withRetry = async (fn, maxRetries = 2, delay = 1000) => {
+  let lastError;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      console.warn(
+        `[aiService] Retry ${i + 1}/${maxRetries} failed:`,
+        error.message,
+      );
+      if (i < maxRetries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, delay * (i + 1)));
+      }
+    }
+  }
+  throw lastError;
 };
 
 // ============================================================
@@ -82,21 +110,10 @@ if (!GROQ_KEY) {
     console.error("[aiService] ❌ Groq init failed:", e.message);
   }
 }
-// llama-3.1-70b-versatile was decommissioned Jan 2025.
-// llama-3.3-70b-versatile (its replacement) was ALSO deprecated by
-// Groq on June 17, 2026. openai/gpt-oss-120b is Groq's official
-// recommended replacement for both — see console.groq.com/docs/deprecations
 const GROQ_MODEL = "openai/gpt-oss-120b";
-// Vision-capable Groq model, used ONLY as a fallback for document image
-// analysis (analyzeDocumentImage). GROQ_MODEL above is text-only and
-// cannot be used for image input.
-// NOTE: verify this model ID is still current at console.groq.com/docs/models
-// before relying on it — Groq deprecates model IDs over time (see note above).
 const GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
 
 // ─── Cohere ────────────────────────────────────────────────────
-// Cohere's Generate API (co.generate()) was retired Aug 26, 2025.
-// We use the v2 Chat API via CohereClientV2 instead.
 let cohereClient = null;
 let cohereInitialized = false;
 const COHERE_KEY = (process.env.COHERE_API_KEY || "").trim();
@@ -119,11 +136,6 @@ if (!COHERE_KEY) {
 const COHERE_MODEL = "command-r-08-2024";
 
 // ─── DeepSeek ──────────────────────────────────────────────────
-// DeepSeek's API is OpenAI-compatible, so we call it with plain fetch
-// (Node 18+ has fetch built in) instead of pulling in another SDK.
-// NOTE: DeepSeek is NOT free — it's pay-as-you-go, though very cheap.
-// Check current pricing at https://platform.deepseek.com before relying
-// on it heavily in production.
 let deepseekInitialized = false;
 const DEEPSEEK_KEY = (process.env.DEEPSEEK_API_KEY || "").trim();
 const DEEPSEEK_BASE_URL = "https://api.deepseek.com/chat/completions";
@@ -185,9 +197,6 @@ const normalizeAIError = (err, provider = "unknown") => {
   return normalized;
 };
 
-// ============================================================
-// SYSTEM CONTEXT
-// ============================================================
 // ============================================================
 // SYSTEM CONTEXT - UPDATED WITH CORRECT INFORMATION
 // ============================================================
@@ -303,7 +312,7 @@ const callGroq = async (
   }
 };
 
-// ─── Gemini Vision Caller (extracted so it can be one link in a chain) ─
+// ─── Gemini Vision Caller ─────────────────────────────────────
 const callGeminiVision = async (base64Data, mimeType, prompt) => {
   if (!geminiInitialized || !geminiClient) {
     throw new Error("Gemini client not initialized");
@@ -323,7 +332,7 @@ const callGeminiVision = async (base64Data, mimeType, prompt) => {
         ],
         config: { systemInstruction: SYSTEM_CONTEXT },
       }),
-      GEMINI_VISION_TIMEOUT_MS,
+      VISION_TIMEOUT_MS,
       "Gemini vision",
     );
     return { text: response.text, provider: PROVIDERS.GEMINI };
@@ -332,7 +341,7 @@ const callGeminiVision = async (base64Data, mimeType, prompt) => {
   }
 };
 
-// ─── Groq Vision Caller (fallback for document image analysis) ────────
+// ─── Groq Vision Caller ──────────────────────────────────────
 const callGroqVision = async (base64Data, mimeType, prompt) => {
   if (!groqInitialized || !groqClient) {
     throw new Error("Groq client not initialized");
@@ -356,7 +365,7 @@ const callGroqVision = async (base64Data, mimeType, prompt) => {
         temperature: 0.2,
         max_tokens: 1024,
       }),
-      GEMINI_VISION_TIMEOUT_MS,
+      VISION_TIMEOUT_MS,
       "Groq vision",
     );
     return {
@@ -368,7 +377,7 @@ const callGroqVision = async (base64Data, mimeType, prompt) => {
   }
 };
 
-// ─── Cohere Caller (v2 Chat API) ───────────────────────────────
+// ─── Cohere Caller ────────────────────────────────────────────
 const callCohere = async (
   prompt,
   systemInstruction = SYSTEM_CONTEXT,
@@ -397,7 +406,7 @@ const callCohere = async (
   }
 };
 
-// ─── DeepSeek Caller (OpenAI-compatible REST) ──────────────────
+// ─── DeepSeek Caller ──────────────────────────────────────────
 const callDeepSeek = async (
   prompt,
   systemInstruction = SYSTEM_CONTEXT,
@@ -447,7 +456,7 @@ const callDeepSeek = async (
 };
 
 // ============================================================
-// MAIN GENERATE TEXT — Auto-fallback chain
+// MAIN GENERATE TEXT — Auto-fallback chain with retry
 // Order: Gemini -> Groq -> Cohere -> DeepSeek
 // ============================================================
 const generateText = async (
@@ -485,7 +494,12 @@ const generateText = async (
     if (!provider.ready) continue;
 
     try {
-      const result = await provider.fn(prompt, systemInstruction, history);
+      // ✅ Wrap with retry mechanism
+      const result = await withRetry(
+        () => provider.fn(prompt, systemInstruction, history),
+        2,
+        1000,
+      );
       if (errors.length > 0) {
         console.log(
           `[aiService] ✅ Used ${result.provider} (fallback after ${errors.length} failure(s))`,
@@ -579,11 +593,6 @@ Under 200 words. Professional government report tone.`;
 
 // ============================================================
 // 3. DASHBOARD DIGEST
-// Cached for DIGEST_CACHE_TTL_MS so a burst of dashboard loads
-// (or a frontend polling loop) doesn't re-trigger a fresh AI call
-// -- and burn through free-tier quota -- on every single request.
-// The digest text only needs to change when the underlying stats
-// actually change, not every few seconds.
 // ============================================================
 const digestCache = { key: null, text: null, expiresAt: 0 };
 const DIGEST_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -776,18 +785,9 @@ Use null for missing fields.`;
 };
 
 // ============================================================
-// 7. DOCUMENT VISION ANALYSIS (FIXED FOR ETHIOPIAN DOCUMENTS)
-// Wrapped with a 25s hard timeout so a hanging Gemini call fails
-// fast with a real JSON response (carries CORS headers, since the
-// cors() middleware already ran) instead of hanging until the
-// platform's own proxy kills the connection with zero response
-// bytes -- which the browser then misreports as a CORS error.
-//
-// Vision fallback chain: Gemini first, Groq vision (Llama 4 Scout)
-// if Gemini fails for any reason (quota, rate limit, timeout, etc).
-// Cohere/DeepSeek are text-only and are NOT part of this chain.
+// 7. DOCUMENT VISION ANALYSIS
 // ============================================================
-const GEMINI_VISION_TIMEOUT_MS = 15000;
+const GEMINI_VISION_TIMEOUT_MS = 30000;
 
 const analyzeDocumentImage = async (base64File, mimeType) => {
   if (!geminiInitialized && !groqInitialized) {
@@ -807,7 +807,6 @@ const analyzeDocumentImage = async (base64File, mimeType) => {
       ? base64File.split(",")[1]
       : base64File;
 
-    // ✅ Check if we have valid data
     if (!base64Data || base64Data.length < 100) {
       console.error("[aiService] ❌ Invalid or empty image data");
       return {
@@ -818,13 +817,11 @@ const analyzeDocumentImage = async (base64File, mimeType) => {
       };
     }
 
-    // ✅ Log file size for debugging
     const fileSizeKB = Math.round((base64Data.length * 0.75) / 1024);
     console.log(
       `[aiService] 📄 Analyzing document (${fileSizeKB}KB, ${mimeType})`,
     );
 
-    // ✅ Simplified, faster prompt
     const prompt = `Analyze this document image for Ethiopian CRRSA government document detection.
 
 IMPORTANT: This is an ETHIOPIAN government document.
@@ -854,10 +851,6 @@ Return ONLY this JSON (no other text):
   "confidence": "high|medium|low"
 }`;
 
-    // ✅ Vision fallback chain: Gemini first, Groq vision if Gemini fails.
-    // Unlike generateText()'s 4-provider chain, only 2 providers here can
-    // actually accept image input — Cohere/DeepSeek are text-only and are
-    // deliberately excluded from this chain.
     const visionCallers = [
       {
         name: PROVIDERS.GEMINI,
@@ -904,9 +897,6 @@ Return ONLY this JSON (no other text):
       throw normalized;
     }
 
-    console.log(`[aiService] 📝 Response length: ${text.length} chars`);
-
-    // ✅ Try to extract JSON
     let jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.warn(
@@ -934,13 +924,11 @@ Return ONLY this JSON (no other text):
       };
     }
 
-    // ✅ Ensure all fields exist
     result.documentType = result.documentType || "other";
     result.confidence = result.confidence || "low";
     result.notes = result.notes || "Document analyzed.";
     result.tags = result.tags || ["ethiopian", "document"];
 
-    // ✅ If it's a birth certificate, set high confidence
     if (result.documentType === "birth_certificate") {
       result.confidence = "high";
     }
@@ -957,7 +945,6 @@ Return ONLY this JSON (no other text):
       normalized.message,
     );
 
-    // ✅ Return user-friendly error messages
     let notes = "AI analysis failed. Please fill in the fields manually.";
     if (normalized.code === "AI_TIMEOUT") {
       notes =
@@ -1112,11 +1099,7 @@ Generate 3 title options in this JSON format (no markdown):
 };
 
 // ============================================================
-// 13. GOLDEN MONDAY — SESSION RECAP (bilingual)
-// NOTE: this fixes a pre-existing bug — goldenMondayController.js
-// imported generateGoldenMondayRecap / generateGoldenMondayTopics from
-// this file, but neither was ever defined here, so every recap/topic
-// request was throwing "generateGoldenMondayRecap is not a function".
+// 13. GOLDEN MONDAY — SESSION RECAP
 // ============================================================
 const generateGoldenMondayRecap = async ({
   title,
@@ -1159,7 +1142,7 @@ Return ONLY valid JSON (no markdown fences):
 };
 
 // ============================================================
-// 14. GOLDEN MONDAY — TOPIC SUGGESTIONS FOR UPCOMING SESSIONS
+// 14. GOLDEN MONDAY — TOPIC SUGGESTIONS
 // ============================================================
 const generateGoldenMondayTopics = async (recentSessions = []) => {
   const history =
@@ -1191,9 +1174,7 @@ Return ONLY valid JSON (no markdown fences):
 };
 
 // ============================================================
-// 15. GOLDEN MONDAY — PERSONAL PRESENTATION TOPIC IDEAS
-// Used when a presenter is auto-assigned via the rotation, to give
-// them a running start. They can still title their own presentation.
+// 15. GOLDEN MONDAY — PRESENTATION TOPIC IDEAS
 // ============================================================
 const generatePresentationTopicIdeas = async ({
   presenterName,
