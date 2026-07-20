@@ -255,9 +255,9 @@ export default function TeamManagement({ t, isSuperAdmin }) {
       confirmDeleteTitle: "Confirm Delete",
       confirmDeleteMessage: "Are you sure you want to delete",
       deleteWarning: "This action cannot be undone.",
-      totalTeams: "total teams",
-      totalMembers: "total members",
-      teamsWithLeaders: "teams with leaders",
+      totalTeams: "TOTAL TEAMS",
+      totalMembers: "TOTAL MEMBERS",
+      teamsWithLeaders: "TEAMS WITH LEADERS",
     };
     return fallback[key] || key;
   };
