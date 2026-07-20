@@ -19,6 +19,7 @@ import Section from "../components/ui/Section";
 import { exportForumReportToPDF } from "../utils/pdfExport";
 import { meetingAPI } from "../services/api";
 import { aiAPI } from "../services/api";
+import { teamAPI } from "../services/api";
 import { AISummary, AIReportAssistant } from "../components/ai";
 import { useToast } from "../hooks/useToast";
 
@@ -46,6 +47,7 @@ import {
   FiUserCheck as FiUserCheckIcon,
   FiZap,
   FiTrendingUp,
+  FiChevronLeft,
 } from "react-icons/fi";
 
 // ─── FONT SIZES ──────────────────────────────────────────────
@@ -55,6 +57,233 @@ const FONT_SIZES = {
   h3: "clamp(16px, 3.5vw, 20px)",
   body: "clamp(12px, 3vw, 14px)",
   small: "clamp(10px, 2.5vw, 12px)",
+};
+
+// ─── Team Selector Component ─────────────────────────────────
+const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
+  const tf = t?.forum || {};
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const filteredTeams = teams.filter((team) =>
+    team.name.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
+
+  return (
+    <div
+      style={{
+        maxWidth: "600px",
+        margin: "0 auto",
+        padding: "clamp(20px, 4vw, 40px)",
+      }}
+    >
+      <div
+        style={{
+          textAlign: "center",
+          marginBottom: "clamp(24px, 5vw, 32px)",
+        }}
+      >
+        <div
+          style={{
+            width: "clamp(60px, 12vw, 80px)",
+            height: "clamp(60px, 12vw, 80px)",
+            background: `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`,
+            borderRadius: "50%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 16px",
+            fontSize: "clamp(32px, 8vw, 40px)",
+          }}
+        >
+          <FiMessageSquare size={40} color={C.primary} />
+        </div>
+        <h2
+          style={{
+            fontSize: FONT_SIZES.h1,
+            fontWeight: 800,
+            color: C.dark,
+            fontFamily: F.serif,
+            marginBottom: 8,
+          }}
+        >
+          {tf.selectTeamPrompt || "Select a Team"}
+        </h2>
+        <p
+          style={{
+            fontSize: FONT_SIZES.body,
+            color: C.muted,
+            fontFamily: F.sans,
+          }}
+        >
+          {tf.selectTeamHelper ||
+            "Choose a team from the list below to start or view their forum report"}
+        </p>
+      </div>
+
+      {/* Search Input */}
+      <div style={{ position: "relative", marginBottom: 16 }}>
+        <input
+          type="text"
+          placeholder={tf.searchTeams || "Search teams..."}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            width: "100%",
+            padding: "12px 16px",
+            border: `1.5px solid ${C.border}`,
+            borderRadius: 10,
+            fontSize: 14,
+            outline: "none",
+            transition: "border-color 0.2s, box-shadow 0.2s",
+            background: C.white,
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = C.primary;
+            e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = C.border;
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        />
+      </div>
+
+      {/* Teams Grid */}
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
+          <FiLoader
+            size={24}
+            style={{ animation: "spin 1s linear infinite" }}
+          />
+          <p>{tf.loadingTeams || "Loading teams..."}</p>
+        </div>
+      ) : filteredTeams.length === 0 ? (
+        <div
+          style={{
+            textAlign: "center",
+            padding: 40,
+            color: C.muted,
+            background: C.bg,
+            borderRadius: 12,
+          }}
+        >
+          <FiUsers size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
+          <p>{tf.noTeamsFound || "No teams found"}</p>
+        </div>
+      ) : (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+            gap: 12,
+          }}
+        >
+          {filteredTeams.map((team) => (
+            <button
+              key={team.id}
+              onClick={() => setSelectedTeam(team)}
+              style={{
+                padding: "clamp(14px, 2vw, 18px)",
+                background: C.white,
+                borderRadius: 12,
+                border: `2px solid ${selectedTeam?.id === team.id ? C.primary : C.border}44`,
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+                textAlign: "left",
+                boxShadow:
+                  selectedTeam?.id === team.id
+                    ? `0 4px 20px ${C.primary}22`
+                    : "0 2px 8px rgba(0,0,0,0.04)",
+                transform:
+                  selectedTeam?.id === team.id ? "scale(1.02)" : "scale(1)",
+              }}
+              onMouseEnter={(e) => {
+                if (selectedTeam?.id !== team.id) {
+                  e.currentTarget.style.borderColor = C.primary + "66";
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 16px rgba(0,0,0,0.08)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (selectedTeam?.id !== team.id) {
+                  e.currentTarget.style.borderColor = C.border + "44";
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow =
+                    "0 2px 8px rgba(0,0,0,0.04)";
+                }
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: "10px",
+                    background: `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <FiUsers size={18} color={C.primary} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontWeight: 600,
+                      fontSize: 14,
+                      color: C.dark,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {team.name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: C.muted,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {team.department || tf.noDepartment || "No department"}
+                  </div>
+                </div>
+                {selectedTeam?.id === team.id && (
+                  <div
+                    style={{
+                      background: C.primary,
+                      color: "#fff",
+                      borderRadius: "50%",
+                      width: 24,
+                      height: 24,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                    }}
+                  >
+                    <FiCheck size={14} />
+                  </div>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 };
 
 // ─── Enhanced Dynamic Field Group ────────────────────────────
@@ -346,7 +575,13 @@ const AIInsightBadge = ({ type = "info", children }) => {
 };
 
 // ─── Main Component ──────────────────────────────────────────
-export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
+export default function ForumReport({
+  t,
+  lang,
+  selectedTeam,
+  setSelectedTeam,
+  onReportSaved,
+}) {
   const safeT = t || {};
   const tf = safeT.forum || {};
   const common = safeT.common || {};
@@ -373,6 +608,38 @@ export default function ForumReport({ t, lang, selectedTeam, onReportSaved }) {
   const [focusedField, setFocusedField] = useState(null);
   const [formProgress, setFormProgress] = useState(0);
   const [aiGeneratedContent, setAiGeneratedContent] = useState(null);
+
+  // ✅ State for team selector on page
+  const [teams, setTeams] = useState([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+
+  // ─── Load teams when no team is selected ──────────────────
+  useEffect(() => {
+    if (!selectedTeam) {
+      const loadTeams = async () => {
+        try {
+          setLoadingTeams(true);
+          const response = await teamAPI.getAll();
+          if (response.data && Array.isArray(response.data)) {
+            const formattedTeams = response.data.map((team) => ({
+              id: team._id,
+              name: team.name,
+              description: team.department || "",
+              leader: team.leader?.name || "Not assigned",
+              members: team.members || [],
+              department: team.department,
+            }));
+            setTeams(formattedTeams);
+          }
+        } catch (error) {
+          console.error("Failed to load teams:", error);
+        } finally {
+          setLoadingTeams(false);
+        }
+      };
+      loadTeams();
+    }
+  }, [selectedTeam]);
 
   // ─── Calculate form progress ───────────────────────────────
   useEffect(() => {
@@ -749,51 +1016,23 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
   }
 
   // ─── No Team Selected ──────────────────────────────────────
+  // ✅ Now shows the team selector directly on the page
   if (!selectedTeam) {
     return (
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: "60vh",
-          color: C.muted,
-          fontFamily: F.sans,
-          textAlign: "center",
-          padding: "20px",
-          animation: "fadeInUp 0.5s ease",
-        }}
-      >
-        <div>
-          <div
-            style={{
-              fontSize: "clamp(48px, 12vw, 64px)",
-              marginBottom: "16px",
-              color: C.border,
-            }}
-          >
-            <FiMessageSquare
-              size={64}
-              style={{ display: "block", margin: "0 auto" }}
-            />
-          </div>
-          <p
-            style={{
-              fontSize: "clamp(18px, 4vw, 22px)",
-              marginBottom: "12px",
-              color: C.dark,
-              fontWeight: 600,
-            }}
-          >
-            {tf.selectTeamPrompt ||
-              "Select a team from the sidebar to start a report"}
-          </p>
-          <p style={{ fontSize: FONT_SIZES.body, color: C.muted }}>
-            <FiUsers size={18} style={{ marginRight: "8px" }} />
-            {tf.selectTeamHelper ||
-              "Click on 'Peer Forum' in the sidebar, then choose a team"}
-          </p>
-        </div>
+      <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
+        <TeamSelector
+          teams={teams}
+          selectedTeam={selectedTeam}
+          setSelectedTeam={setSelectedTeam}
+          t={safeT}
+          loading={loadingTeams}
+        />
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     );
   }
@@ -881,6 +1120,19 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             flexWrap: "wrap",
           }}
         >
+          {/* ✅ Change Team Button */}
+          <button
+            onClick={() => setSelectedTeam(null)}
+            style={{
+              ...btn.secondary,
+              padding: "6px 14px",
+              fontSize: "12px",
+            }}
+          >
+            <FiChevronLeft size={14} />
+            {tf.changeTeam || "Change Team"}
+          </button>
+
           {/* Progress Bar */}
           <div
             style={{

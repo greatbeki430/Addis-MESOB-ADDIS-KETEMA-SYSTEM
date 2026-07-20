@@ -354,6 +354,7 @@ function AuthenticatedApp() {
                     t={t}
                     lang={language}
                     selectedTeam={selectedTeam}
+                    setSelectedTeam={setSelectedTeam}
                     onReportSaved={(teamId, data) =>
                       console.log("Report saved:", teamId, data)
                     }
