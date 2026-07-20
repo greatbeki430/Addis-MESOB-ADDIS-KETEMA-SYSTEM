@@ -1,13 +1,5 @@
 // frontend/src/components/ai/AIDashboardWidget.jsx
 // AI-powered dashboard digest widget with auto-refresh.
-//
-// Behavior on failure: this widget never shows a hard error banner to the
-// end user. If the AI backend is misconfigured (e.g. invalid GEMINI_API_KEY)
-// or briefly unavailable, the widget quietly collapses to a small muted
-// "AI insights unavailable" line instead of a red error box, since a
-// missing executive digest is not something front-line staff should treat
-// as a system failure. Admins/superadmins still get a manual "Retry" action
-// and, where available, the underlying error code for support purposes.
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { aiAPI } from "../../services/api";
@@ -19,14 +11,15 @@ const AIDashboardWidget = ({
 }) => {
   const [digest, setDigest] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); // { message, code } | null
+  const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [fallbackDigest] = useState(
+    "📊 Dashboard analytics are being prepared. Check back soon for AI-powered insights into team performance and service delivery metrics.",
+  );
 
-  // Track mount/effect lifetime so we never set state after unmount
   const isMountedRef = useRef(true);
 
-  // ✅ Cleanup on unmount
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -34,8 +27,6 @@ const AIDashboardWidget = ({
     };
   }, []);
 
-  // Single source of truth for fetching the digest. Used by both the
-  // initial load effect and the manual "Retry" button.
   const fetchDigest = useCallback(async () => {
     if (!isMountedRef.current) return;
 
@@ -45,14 +36,12 @@ const AIDashboardWidget = ({
       console.log("📊 Fetching dashboard digest with stats:", stats);
       const response = await aiAPI.getDashboardDigest(stats);
 
-      // ✅ Only update state if component is still mounted
       if (isMountedRef.current) {
         setDigest(response.data.digest);
         setLastUpdated(new Date());
-        setRetryCount(0); // Reset retry count on success
+        setRetryCount(0);
       }
     } catch (err) {
-      // ✅ Only update state if component is still mounted
       if (isMountedRef.current) {
         const code =
           err?.response?.data?.code ||
@@ -64,7 +53,6 @@ const AIDashboardWidget = ({
           err?.response?.data?.message ||
           "AI insights are temporarily unavailable.";
 
-        // ✅ Check if it's a quota error (429)
         const isQuotaError =
           status === 429 ||
           message.includes("quota") ||
@@ -74,8 +62,6 @@ const AIDashboardWidget = ({
         if (isQuotaError) {
           message = "AI service is busy. Please try again in a few minutes.";
           console.warn("⚠️ API quota exceeded, will retry later");
-
-          // ✅ Increment retry count for exponential backoff
           setRetryCount((prev) => prev + 1);
         }
 
@@ -88,16 +74,14 @@ const AIDashboardWidget = ({
         );
       }
     } finally {
-      // ✅ Only update state if component is still mounted
       if (isMountedRef.current) {
         setLoading(false);
       }
     }
   }, [stats]);
 
-  // ✅ Initial load + auto-refresh interval with proper cleanup
+  // Initial load + auto-refresh
   useEffect(() => {
-    // ✅ Use a flag to track if this effect is still active
     let isEffectActive = true;
     let retryTimeout = null;
 
@@ -152,18 +136,14 @@ const AIDashboardWidget = ({
       }
     };
 
-    // ✅ Call the async function
     loadData();
 
-    // ✅ Set up interval with exponential backoff for retries
     const getInterval = () => {
-      // If we have quota errors, use longer intervals
       if (retryCount > 0) {
         const backoffTime = Math.min(
           60000 * Math.pow(2, retryCount - 1),
           300000,
-        ); // Max 5 minutes
-        console.log(`⏳ Using backoff: ${backoffTime}ms (retry ${retryCount})`);
+        );
         return backoffTime;
       }
       return refreshInterval;
@@ -175,7 +155,6 @@ const AIDashboardWidget = ({
       }
     }, getInterval());
 
-    // ✅ Cleanup: mark effect as inactive and clear interval
     return () => {
       isEffectActive = false;
       clearInterval(interval);
@@ -185,8 +164,7 @@ const AIDashboardWidget = ({
     };
   }, [stats, refreshInterval, retryCount]);
 
-  // Loading state (first load only — subsequent refreshes keep showing
-  // the last good digest while loading, see "Refreshing..." button state)
+  // Loading state
   if (loading && !digest && !error) {
     return (
       <div
@@ -210,9 +188,7 @@ const AIDashboardWidget = ({
     );
   }
 
-  // Graceful error state — quiet, muted, non-alarming, with a retry action.
-  // No red/alert styling: a missing AI digest is not a system failure from
-  // the end user's point of view.
+  // Error state with fallback digest
   if (error && !digest) {
     const isQuotaError = error.isQuotaError;
     const displayMessage = isQuotaError
@@ -227,51 +203,71 @@ const AIDashboardWidget = ({
           padding: "12px 20px",
           border: "1px dashed #CBD5E1",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
-          flexWrap: "wrap",
+          flexDirection: "column",
+          gap: "8px",
         }}
         className={className}
       >
-        <span style={{ color: "#64748B", fontSize: "13px" }}>
-          {displayMessage}
-          {isQuotaError && retryCount > 1 && (
-            <span
-              style={{
-                fontSize: "11px",
-                display: "block",
-                marginTop: "2px",
-                color: "#94A3B8",
-              }}
-            >
-              Auto-retry in {Math.min(60 * Math.pow(2, retryCount - 1), 300)}{" "}
-              seconds...
-            </span>
-          )}
-        </span>
-        <button
-          onClick={() => {
-            setRetryCount(0);
-            fetchDigest();
-          }}
-          disabled={loading}
+        <div
           style={{
-            background: "transparent",
-            border: "1px solid #CBD5E1",
-            color: "#475569",
-            fontSize: "12px",
-            cursor: loading ? "default" : "pointer",
-            padding: "4px 10px",
-            borderRadius: "6px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            flexWrap: "wrap",
           }}
         >
-          {loading ? "Retrying..." : "Retry"}
-        </button>
+          <span style={{ color: "#64748B", fontSize: "13px" }}>
+            {displayMessage}
+            {isQuotaError && retryCount > 1 && (
+              <span
+                style={{
+                  fontSize: "11px",
+                  display: "block",
+                  marginTop: "2px",
+                  color: "#94A3B8",
+                }}
+              >
+                Auto-retry in {Math.min(60 * Math.pow(2, retryCount - 1), 300)}{" "}
+                seconds...
+              </span>
+            )}
+          </span>
+          <button
+            onClick={() => {
+              setRetryCount(0);
+              fetchDigest();
+            }}
+            disabled={loading}
+            style={{
+              background: "transparent",
+              border: "1px solid #CBD5E1",
+              color: "#475569",
+              fontSize: "12px",
+              cursor: loading ? "default" : "pointer",
+              padding: "4px 10px",
+              borderRadius: "6px",
+            }}
+          >
+            {loading ? "Retrying..." : "Retry"}
+          </button>
+        </div>
+        {/* Fallback digest */}
+        <div
+          style={{
+            fontSize: "13px",
+            color: "#475569",
+            paddingTop: "4px",
+            borderTop: "1px dashed #CBD5E1",
+          }}
+        >
+          {fallbackDigest}
+        </div>
       </div>
     );
   }
 
+  // Success state
   return (
     <div
       style={{
@@ -333,9 +329,6 @@ const AIDashboardWidget = ({
             {digest}
           </p>
 
-          {/* Soft inline notice if a refresh failed but we still have a
-              previous digest to show — avoids replacing good content with
-              an error, just flags that the latest refresh didn't succeed. */}
           {error && digest && (
             <p
               style={{ fontSize: "11px", color: "#94A3B8", margin: "0 0 8px" }}

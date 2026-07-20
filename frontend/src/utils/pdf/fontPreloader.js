@@ -14,16 +14,23 @@ export const initPDFFonts = async () => {
   try {
     console.log("🔄 Initializing PDF fonts...");
 
-    // Preload fonts in background
-    preloadPromise = preloadFonts();
-    await preloadPromise;
-
-    preloaded = true;
-    console.log("✅ PDF fonts ready");
+    // Try to preload fonts, but don't fail if they don't load
+    try {
+      preloadPromise = preloadFonts();
+      await preloadPromise;
+      preloaded = true;
+      console.log("✅ PDF fonts ready");
+    } catch (fontError) {
+      console.warn("⚠️ PDF font preload warning:", fontError.message);
+      console.warn("   Using fallback fonts for PDF generation");
+      // ✅ Still mark as ready so PDF generation continues with fallback
+      preloaded = true;
+    }
     return true;
   } catch (error) {
     console.error("❌ PDF font initialization failed:", error);
-    return false;
+    // ✅ Return true anyway so PDF generation can continue with fallback
+    return true;
   }
 };
 
