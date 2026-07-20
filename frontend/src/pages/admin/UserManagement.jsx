@@ -27,19 +27,20 @@ import {
   FiCheck,
 } from "react-icons/fi";
 
-// ✅ Beautiful Stat Card with Gradient
-const StatCard = ({ icon: Icon, value, label, color, gradient }) => (
+// ✅ Beautiful Stat Card with Gradient and Icon
+const StatCard = ({ icon: Icon, value, label, color, gradient, subtitle }) => (
   <div
     style={{
       background: gradient || C.white,
-      padding: "16px 20px",
-      borderRadius: 12,
+      padding: "clamp(14px, 2vw, 20px) clamp(16px, 2.5vw, 24px)",
+      borderRadius: 14,
       textAlign: "center",
       border: `1px solid ${C.border}33`,
       transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
       boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
       position: "relative",
       overflow: "hidden",
+      cursor: "default",
     }}
     onMouseEnter={(e) => {
       e.currentTarget.style.transform = "translateY(-6px) scale(1.02)";
@@ -52,35 +53,52 @@ const StatCard = ({ icon: Icon, value, label, color, gradient }) => (
       e.currentTarget.style.borderColor = C.border + "33";
     }}
   >
+    {/* Decorative background circle */}
+    <div
+      style={{
+        position: "absolute",
+        top: -40,
+        right: -40,
+        width: 100,
+        height: 100,
+        borderRadius: "50%",
+        background: color + "08",
+        pointerEvents: "none",
+      }}
+    />
+
     <div
       style={{
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        gap: 8,
-        marginBottom: 4,
+        gap: 10,
+        marginBottom: 6,
+        position: "relative",
+        zIndex: 1,
       }}
     >
       <div
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: "50%",
+          width: 42,
+          height: 42,
+          borderRadius: "12px",
           background: color + "15",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
+          transition: "transform 0.3s ease",
         }}
       >
-        <Icon size={16} color={color} />
+        <Icon size={20} color={color} />
       </div>
       <div
         style={{
-          fontSize: "clamp(24px, 5vw, 32px)",
+          fontSize: "clamp(28px, 5vw, 36px)",
           fontWeight: 900,
           color: color,
-          lineHeight: 1.2,
+          lineHeight: 1,
         }}
       >
         {value}
@@ -88,14 +106,31 @@ const StatCard = ({ icon: Icon, value, label, color, gradient }) => (
     </div>
     <div
       style={{
-        fontSize: "clamp(10px, 2.5vw, 12px)",
+        fontSize: "clamp(11px, 2.5vw, 13px)",
         color: C.muted,
-        fontWeight: 500,
+        fontWeight: 600,
         marginTop: 2,
+        position: "relative",
+        zIndex: 1,
       }}
     >
       {label}
     </div>
+    {subtitle && (
+      <div
+        style={{
+          fontSize: "clamp(9px, 2vw, 10px)",
+          color: color,
+          opacity: 0.7,
+          marginTop: 2,
+          fontWeight: 500,
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        {subtitle}
+      </div>
+    )}
     {/* Decorative gradient line */}
     <div
       style={{
@@ -103,52 +138,175 @@ const StatCard = ({ icon: Icon, value, label, color, gradient }) => (
         bottom: 0,
         left: 0,
         right: 0,
-        height: 3,
-        background: `linear-gradient(90deg, ${color}44, ${color})`,
-        borderRadius: "0 0 12px 12px",
+        height: 4,
+        background: `linear-gradient(90deg, ${color}44, ${color}, ${color}44)`,
+        borderRadius: "0 0 14px 14px",
       }}
     />
   </div>
 );
 
-const ActionButton = ({ onClick, Icon, label, color = C.primary, title }) => (
-  <button
-    onClick={onClick}
-    title={title}
-    style={{
-      background: "transparent",
-      border: "none",
-      cursor: "pointer",
-      padding: "6px 10px",
-      borderRadius: 8,
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 4,
-      fontSize: 12,
-      fontWeight: 600,
-      color: color,
-      transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-      fontFamily: F.sans,
-      position: "relative",
-      minWidth: "32px",
-      minHeight: "32px",
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.background = color + "12";
-      e.currentTarget.style.transform = "translateY(-2px) scale(1.05)";
-      e.currentTarget.style.boxShadow = `0 4px 12px ${color}22`;
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.background = "transparent";
-      e.currentTarget.style.transform = "translateY(0) scale(1)";
-      e.currentTarget.style.boxShadow = "none";
-    }}
-  >
-    {Icon && <Icon size={16} />}
-    {label && <span style={{ fontSize: 10, fontWeight: 600 }}>{label}</span>}
-  </button>
-);
+// ✅ Beautiful Action Button Group - FIXED: Removed unused showMore
+const ActionButtons = ({
+  user,
+  onEdit,
+  onView,
+  onRoleChange,
+  onDelete,
+  isSuperAdmin,
+  currentUser,
+}) => {
+  const canDelete =
+    user._id !== currentUser._id &&
+    !(user.role === ROLES.SUPER_ADMIN && !isSuperAdmin);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        justifyContent: "center",
+      }}
+    >
+      {/* View Button */}
+      <button
+        onClick={() => onView(user)}
+        title="View user details"
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 8,
+          border: "none",
+          background: "#f0f3ff",
+          color: "#8b5cf6",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.2s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "#8b5cf6";
+          e.currentTarget.style.color = "#fff";
+          e.currentTarget.style.transform = "scale(1.1)";
+          e.currentTarget.style.boxShadow = "0 4px 12px rgba(139,92,246,0.3)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "#f0f3ff";
+          e.currentTarget.style.color = "#8b5cf6";
+          e.currentTarget.style.transform = "scale(1)";
+          e.currentTarget.style.boxShadow = "none";
+        }}
+      >
+        <FiEye size={16} />
+      </button>
+
+      {/* Edit Button */}
+      <button
+        onClick={() => onEdit(user)}
+        title="Edit user"
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 8,
+          border: "none",
+          background: "#eff6ff",
+          color: "#3b82f6",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.2s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.background = "#3b82f6";
+          e.currentTarget.style.color = "#fff";
+          e.currentTarget.style.transform = "scale(1.1)";
+          e.currentTarget.style.boxShadow = "0 4px 12px rgba(59,130,246,0.3)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.background = "#eff6ff";
+          e.currentTarget.style.color = "#3b82f6";
+          e.currentTarget.style.transform = "scale(1)";
+          e.currentTarget.style.boxShadow = "none";
+        }}
+      >
+        <FiEdit2 size={16} />
+      </button>
+
+      {/* Role Change Button - Only for SuperAdmin */}
+      {isSuperAdmin && user.role !== ROLES.SUPER_ADMIN && (
+        <button
+          onClick={() => onRoleChange(user)}
+          title="Change user role"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            border: "none",
+            background: "#fffbeb",
+            color: "#f59e0b",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#f59e0b";
+            e.currentTarget.style.color = "#fff";
+            e.currentTarget.style.transform = "scale(1.1)";
+            e.currentTarget.style.boxShadow = "0 4px 12px rgba(245,158,11,0.3)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "#fffbeb";
+            e.currentTarget.style.color = "#f59e0b";
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        >
+          <FiRefreshCw size={16} />
+        </button>
+      )}
+
+      {/* Delete Button */}
+      {canDelete && (
+        <button
+          onClick={() => onDelete(user._id, user.name)}
+          title="Delete user"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            border: "none",
+            background: "#fef2f2",
+            color: "#ef4444",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#ef4444";
+            e.currentTarget.style.color = "#fff";
+            e.currentTarget.style.transform = "scale(1.1)";
+            e.currentTarget.style.boxShadow = "0 4px 12px rgba(239,68,68,0.3)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "#fef2f2";
+            e.currentTarget.style.color = "#ef4444";
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        >
+          <FiTrash2 size={16} />
+        </button>
+      )}
+    </div>
+  );
+};
 
 const RoleDescription = ({ role }) => {
   const descriptions = {
@@ -387,11 +545,7 @@ export default function UserManagement({ t }) {
     return [];
   };
 
-  const canDeleteUser = (user) => {
-    if (user._id === currentUser._id) return false;
-    if (user.role === ROLES.SUPER_ADMIN && !isSuperAdmin) return false;
-    return true;
-  };
+  // FIXED: Removed unused canDeleteUser function (logic moved to ActionButtons component)
 
   const getRoleStats = () => {
     const stats = {
@@ -411,22 +565,27 @@ export default function UserManagement({ t }) {
     total: {
       color: "#1a3aad",
       gradient: "linear-gradient(135deg, #f0f3ff, #e0e7ff)",
+      subtitle: "All users",
     },
     superadmin: {
       color: "#8B1A1A",
       gradient: "linear-gradient(135deg, #fef2f2, #fee2e2)",
+      subtitle: "Full access",
     },
     admin: {
       color: "#1A6B4A",
       gradient: "linear-gradient(135deg, #f0fdf4, #dcfce7)",
+      subtitle: "Management",
     },
     leader: {
       color: "#C25A00",
       gradient: "linear-gradient(135deg, #fffbeb, #fef3c7)",
+      subtitle: "Team leads",
     },
     employee: {
       color: "#1E4D8C",
       gradient: "linear-gradient(135deg, #eff6ff, #dbeafe)",
+      subtitle: "Staff members",
     },
   };
 
@@ -674,15 +833,24 @@ export default function UserManagement({ t }) {
           }}
           style={{
             ...btn.primary,
-            padding: "8px 18px",
-            fontSize: "13px",
+            padding: "10px 22px",
+            fontSize: "14px",
             display: "flex",
             alignItems: "center",
-            gap: 6,
-            borderRadius: 8,
+            gap: 8,
+            borderRadius: 10,
+            boxShadow: `0 4px 14px ${C.primary}44`,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-2px)";
+            e.currentTarget.style.boxShadow = `0 6px 20px ${C.primary}66`;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0)";
+            e.currentTarget.style.boxShadow = `0 4px 14px ${C.primary}44`;
           }}
         >
-          <FiUserPlus size={16} />
+          <FiUserPlus size={18} />
           {getTranslation("addUser")}
         </button>
       </div>
@@ -691,9 +859,9 @@ export default function UserManagement({ t }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
-          gap: "clamp(8px, 2vw, 12px)",
-          marginBottom: 16,
+          gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+          gap: "clamp(10px, 2vw, 14px)",
+          marginBottom: 20,
         }}
       >
         <StatCard
@@ -702,6 +870,7 @@ export default function UserManagement({ t }) {
           label={getTranslation("total")}
           color={cardColors.total.color}
           gradient={cardColors.total.gradient}
+          subtitle={cardColors.total.subtitle}
         />
         <StatCard
           icon={FiShield}
@@ -709,6 +878,7 @@ export default function UserManagement({ t }) {
           label={getTranslation("superAdmin")}
           color={cardColors.superadmin.color}
           gradient={cardColors.superadmin.gradient}
+          subtitle={cardColors.superadmin.subtitle}
         />
         <StatCard
           icon={FiUserCheck}
@@ -716,6 +886,7 @@ export default function UserManagement({ t }) {
           label={getTranslation("admin")}
           color={cardColors.admin.color}
           gradient={cardColors.admin.gradient}
+          subtitle={cardColors.admin.subtitle}
         />
         <StatCard
           icon={FiStar}
@@ -723,6 +894,7 @@ export default function UserManagement({ t }) {
           label={getTranslation("teamLeader")}
           color={cardColors.leader.color}
           gradient={cardColors.leader.gradient}
+          subtitle={cardColors.leader.subtitle}
         />
         <StatCard
           icon={FiUser}
@@ -730,6 +902,7 @@ export default function UserManagement({ t }) {
           label={getTranslation("employee")}
           color={cardColors.employee.color}
           gradient={cardColors.employee.gradient}
+          subtitle={cardColors.employee.subtitle}
         />
       </div>
 
@@ -748,7 +921,7 @@ export default function UserManagement({ t }) {
             size={16}
             style={{
               position: "absolute",
-              left: "10px",
+              left: "12px",
               top: "50%",
               transform: "translateY(-50%)",
               color: "#999",
@@ -761,18 +934,21 @@ export default function UserManagement({ t }) {
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
               width: "100%",
-              padding: "8px 12px 8px 34px",
+              padding: "10px 14px 10px 38px",
               border: `1.5px solid ${C.border}`,
-              borderRadius: 8,
+              borderRadius: 10,
               fontSize: 13,
               outline: "none",
-              transition: "border-color 0.2s",
+              transition: "border-color 0.2s, box-shadow 0.2s",
+              background: C.white,
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = C.primary;
+              e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = C.border;
+              e.currentTarget.style.boxShadow = "none";
             }}
           />
         </div>
@@ -780,13 +956,23 @@ export default function UserManagement({ t }) {
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
           style={{
-            padding: "8px 12px",
+            padding: "10px 14px",
             border: `1.5px solid ${C.border}`,
-            borderRadius: 8,
+            borderRadius: 10,
             fontSize: 13,
             background: C.white,
             outline: "none",
-            minWidth: 130,
+            minWidth: 140,
+            cursor: "pointer",
+            transition: "border-color 0.2s, box-shadow 0.2s",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = C.primary;
+            e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = C.border;
+            e.currentTarget.style.boxShadow = "none";
           }}
         >
           <option value="all">{getTranslation("allRoles")}</option>
@@ -806,12 +992,12 @@ export default function UserManagement({ t }) {
         <div
           style={{
             textAlign: "center",
-            padding: 40,
+            padding: 60,
             color: C.muted,
             fontFamily: F.sans,
           }}
         >
-          <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
           <p>{safeCommon.loading || "Loading..."}</p>
         </div>
       ) : (
@@ -821,56 +1007,71 @@ export default function UserManagement({ t }) {
               width: "100%",
               borderCollapse: "collapse",
               background: C.white,
-              borderRadius: 12,
+              borderRadius: 14,
               overflow: "hidden",
               boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
-              minWidth: 600,
+              minWidth: 650,
             }}
           >
             <thead>
               <tr style={{ background: C.dark, color: C.light }}>
                 <th
                   style={{
-                    padding: "10px 14px",
+                    padding: "14px 18px",
                     textAlign: "left",
                     fontSize: 12,
+                    fontWeight: 600,
+                    letterSpacing: 0.3,
+                    textTransform: "uppercase",
                   }}
                 >
-                  <FiUser size={12} style={{ marginRight: 4 }} />
+                  <FiUser size={12} style={{ marginRight: 6 }} />
                   {getTranslation("fullName")}
                 </th>
                 <th
                   style={{
-                    padding: "10px 14px",
+                    padding: "14px 18px",
                     textAlign: "left",
                     fontSize: 12,
+                    fontWeight: 600,
+                    letterSpacing: 0.3,
+                    textTransform: "uppercase",
                   }}
                 >
                   {getTranslation("email")}
                 </th>
                 <th
                   style={{
-                    padding: "10px 14px",
+                    padding: "14px 18px",
                     textAlign: "left",
                     fontSize: 12,
+                    fontWeight: 600,
+                    letterSpacing: 0.3,
+                    textTransform: "uppercase",
                   }}
                 >
                   {getTranslation("role")}
                 </th>
                 <th
                   style={{
-                    padding: "10px 14px",
+                    padding: "14px 18px",
                     textAlign: "left",
                     fontSize: 12,
+                    fontWeight: 600,
+                    letterSpacing: 0.3,
+                    textTransform: "uppercase",
                   }}
                 >
                   {getTranslation("phone")}
                 </th>
                 <th
                   style={{
-                    padding: "10px 14px",
+                    padding: "14px 18px",
                     textAlign: "center",
                     fontSize: 12,
+                    fontWeight: 600,
+                    letterSpacing: 0.3,
+                    textTransform: "uppercase",
                   }}
                 >
                   {getTranslation("actions")}
@@ -882,133 +1083,136 @@ export default function UserManagement({ t }) {
                 <tr
                   key={user._id}
                   style={{
-                    borderBottom: `1px solid ${C.border}`,
-                    background: index % 2 === 0 ? C.white : C.cardBg,
+                    borderBottom: `1px solid ${C.border}44`,
+                    background: index % 2 === 0 ? C.white : "#fafbfa",
                     transition: "background 0.15s",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#f8faf8";
+                    e.currentTarget.style.background = "#f0f7f0";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background =
-                      index % 2 === 0 ? C.white : C.cardBg;
+                      index % 2 === 0 ? C.white : "#fafbfa";
                   }}
                 >
                   <td
                     style={{
-                      padding: "8px 14px",
+                      padding: "12px 18px",
                       fontWeight: 500,
                       color: C.dark,
                       fontSize: 13,
                     }}
                   >
-                    <FiUser
-                      size={12}
-                      style={{ marginRight: 6, color: C.primary, opacity: 0.6 }}
-                    />
-                    {user.name}
-                    {user._id === currentUser._id && (
-                      <span
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                    >
+                      <div
                         style={{
-                          marginLeft: 6,
-                          fontSize: 9,
-                          background: C.primary + "15",
-                          color: C.primary,
-                          padding: "1px 6px",
-                          borderRadius: 10,
-                          fontWeight: 600,
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "#fff",
+                          fontSize: 12,
+                          fontWeight: 700,
+                          flexShrink: 0,
                         }}
                       >
-                        {getTranslation("you")}
-                      </span>
-                    )}
+                        {user.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span>{user.name}</span>
+                      {user._id === currentUser._id && (
+                        <span
+                          style={{
+                            marginLeft: 4,
+                            fontSize: 9,
+                            background: C.primary + "15",
+                            color: C.primary,
+                            padding: "1px 8px",
+                            borderRadius: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {getTranslation("you")}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td
-                    style={{ padding: "8px 14px", color: "#555", fontSize: 12 }}
+                    style={{
+                      padding: "12px 18px",
+                      color: "#555",
+                      fontSize: 12,
+                    }}
                   >
                     {user.email}
                   </td>
-                  <td style={{ padding: "8px 14px" }}>
+                  <td style={{ padding: "12px 18px" }}>
                     <div>
                       <span
                         style={{
                           background: getRoleBadgeColor(user.role) + "15",
                           color: getRoleBadgeColor(user.role),
-                          padding: "3px 10px",
-                          borderRadius: 16,
+                          padding: "4px 12px",
+                          borderRadius: 20,
                           fontSize: 11,
                           fontWeight: 600,
                           display: "inline-flex",
                           alignItems: "center",
-                          gap: 4,
+                          gap: 5,
                         }}
                       >
-                        <span>{getRoleIcon(user.role)}</span>
+                        <span style={{ fontSize: 12 }}>
+                          {getRoleIcon(user.role)}
+                        </span>
                         {getRoleDisplayName(user.role)}
                       </span>
                       <RoleDescription role={user.role} />
                     </div>
                   </td>
                   <td
-                    style={{ padding: "8px 14px", color: "#777", fontSize: 12 }}
+                    style={{
+                      padding: "12px 18px",
+                      color: "#777",
+                      fontSize: 12,
+                    }}
                   >
                     {user.phone || "—"}
                   </td>
                   <td
                     style={{
-                      padding: "4px 8px",
+                      padding: "8px 12px",
                       textAlign: "center",
-                      display: "flex",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      gap: 2,
-                      flexWrap: "wrap",
                     }}
                   >
-                    <ActionButton
-                      onClick={() => {
-                        setEditingUser(user);
+                    <ActionButtons
+                      user={user}
+                      onEdit={(u) => {
+                        setEditingUser(u);
                         setFormData({
-                          name: user.name,
-                          email: user.email,
+                          name: u.name,
+                          email: u.email,
                           password: "",
-                          role: user.role,
-                          phone: user.phone || "",
+                          role: u.role,
+                          phone: u.phone || "",
                         });
                         setShowModal(true);
                       }}
-                      Icon={FiEdit2}
-                      color="#3b82f6"
-                      title={getTranslation("edit")}
+                      onView={openViewModal}
+                      onRoleChange={(u) => {
+                        setRoleModal({
+                          isOpen: true,
+                          user: u,
+                          selectedRole: u.role,
+                        });
+                      }}
+                      onDelete={openDeleteConfirm}
+                      isSuperAdmin={isSuperAdmin}
+                      currentUser={currentUser}
                     />
-                    <ActionButton
-                      onClick={() => openViewModal(user)}
-                      Icon={FiEye}
-                      color="#8b5cf6"
-                      title={getTranslation("viewDetails")}
-                    />
-                    {isSuperAdmin && user.role !== ROLES.SUPER_ADMIN && (
-                      <ActionButton
-                        onClick={() => {
-                          setRoleModal({
-                            isOpen: true,
-                            user: user,
-                            selectedRole: user.role,
-                          });
-                        }}
-                        Icon={FiRefreshCw}
-                        color="#f59e0b"
-                        title={getTranslation("changeRole")}
-                      />
-                    )}
-                    {canDeleteUser(user) && (
-                      <ActionButton
-                        onClick={() => openDeleteConfirm(user._id, user.name)}
-                        Icon={FiTrash2}
-                        color="#ef4444"
-                        title={getTranslation("delete")}
-                      />
-                    )}
                   </td>
                 </tr>
               ))}
@@ -1019,18 +1223,18 @@ export default function UserManagement({ t }) {
             <div
               style={{
                 textAlign: "center",
-                padding: 40,
+                padding: 60,
                 color: C.muted,
                 fontFamily: F.sans,
               }}
             >
-              <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
-              <p style={{ fontSize: 15, marginBottom: 4 }}>
+              <div style={{ fontSize: 48, marginBottom: 16 }}>👥</div>
+              <p style={{ fontSize: 16, marginBottom: 8, fontWeight: 600 }}>
                 {searchTerm || roleFilter !== "all"
                   ? getTranslation("noUsersMatch")
                   : getTranslation("noUsersFound")}
               </p>
-              <p style={{ fontSize: 12, color: "#999" }}>
+              <p style={{ fontSize: 13, color: "#999" }}>
                 {searchTerm || roleFilter !== "all"
                   ? getTranslation("tryAdjusting")
                   : getTranslation("createFirstUser")}
@@ -1063,7 +1267,7 @@ export default function UserManagement({ t }) {
             style={{
               background: C.white,
               borderRadius: 16,
-              padding: 24,
+              padding: 28,
               width: "90%",
               maxWidth: 450,
               maxHeight: "90vh",
@@ -1074,33 +1278,33 @@ export default function UserManagement({ t }) {
           >
             <h2
               style={{
-                fontSize: "clamp(18px, 4vw, 22px)",
+                fontSize: "clamp(20px, 4vw, 24px)",
                 fontWeight: 800,
                 color: C.dark,
                 fontFamily: F.serif,
                 marginBottom: 4,
                 display: "flex",
                 alignItems: "center",
-                gap: 8,
+                gap: 10,
               }}
             >
               {editingUser ? (
                 <>
-                  <FiEdit2 size={20} color="#3b82f6" />
+                  <FiEdit2 size={22} color="#3b82f6" />
                   {getTranslation("editUser")}
                 </>
               ) : (
                 <>
-                  <FiUserPlus size={20} color={C.primary} />
+                  <FiUserPlus size={22} color={C.primary} />
                   {getTranslation("addNewUser")}
                 </>
               )}
             </h2>
             <p
               style={{
-                fontSize: "clamp(11px, 2.5vw, 12px)",
+                fontSize: "clamp(12px, 2.5vw, 13px)",
                 color: C.muted,
-                marginBottom: 16,
+                marginBottom: 20,
                 fontFamily: F.sans,
               }}
             >
@@ -1110,11 +1314,11 @@ export default function UserManagement({ t }) {
             </p>
 
             <form id="user-form" onSubmit={handleSubmit}>
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 14 }}>
                 <label
                   style={{
                     display: "block",
-                    marginBottom: 3,
+                    marginBottom: 4,
                     fontWeight: 600,
                     fontSize: 12,
                     color: C.dark,
@@ -1133,27 +1337,29 @@ export default function UserManagement({ t }) {
                   }
                   style={{
                     width: "100%",
-                    padding: "8px 12px",
+                    padding: "10px 14px",
                     border: `1.5px solid ${C.border}`,
                     borderRadius: 8,
                     fontSize: 13,
-                    transition: "border-color 0.2s",
+                    transition: "border-color 0.2s, box-shadow 0.2s",
                     outline: "none",
                   }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = C.primary;
+                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = C.border;
+                    e.currentTarget.style.boxShadow = "none";
                   }}
                 />
               </div>
 
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 14 }}>
                 <label
                   style={{
                     display: "block",
-                    marginBottom: 3,
+                    marginBottom: 4,
                     fontWeight: 600,
                     fontSize: 12,
                     color: C.dark,
@@ -1172,28 +1378,30 @@ export default function UserManagement({ t }) {
                   }
                   style={{
                     width: "100%",
-                    padding: "8px 12px",
+                    padding: "10px 14px",
                     border: `1.5px solid ${C.border}`,
                     borderRadius: 8,
                     fontSize: 13,
-                    transition: "border-color 0.2s",
+                    transition: "border-color 0.2s, box-shadow 0.2s",
                     outline: "none",
                   }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = C.primary;
+                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = C.border;
+                    e.currentTarget.style.boxShadow = "none";
                   }}
                 />
               </div>
 
               {!editingUser && (
-                <div style={{ marginBottom: 12 }}>
+                <div style={{ marginBottom: 14 }}>
                   <label
                     style={{
                       display: "block",
-                      marginBottom: 3,
+                      marginBottom: 4,
                       fontWeight: 600,
                       fontSize: 12,
                       color: C.dark,
@@ -1212,28 +1420,30 @@ export default function UserManagement({ t }) {
                     }
                     style={{
                       width: "100%",
-                      padding: "8px 12px",
+                      padding: "10px 14px",
                       border: `1.5px solid ${C.border}`,
                       borderRadius: 8,
                       fontSize: 13,
-                      transition: "border-color 0.2s",
+                      transition: "border-color 0.2s, box-shadow 0.2s",
                       outline: "none",
                     }}
                     onFocus={(e) => {
                       e.currentTarget.style.borderColor = C.primary;
+                      e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.borderColor = C.border;
+                      e.currentTarget.style.boxShadow = "none";
                     }}
                   />
                 </div>
               )}
 
-              <div style={{ marginBottom: 12 }}>
+              <div style={{ marginBottom: 14 }}>
                 <label
                   style={{
                     display: "block",
-                    marginBottom: 3,
+                    marginBottom: 4,
                     fontWeight: 600,
                     fontSize: 12,
                     color: C.dark,
@@ -1249,7 +1459,7 @@ export default function UserManagement({ t }) {
                   }
                   style={{
                     width: "100%",
-                    padding: "8px 12px",
+                    padding: "10px 14px",
                     border: `1.5px solid ${C.border}`,
                     borderRadius: 8,
                     fontSize: 13,
@@ -1266,11 +1476,11 @@ export default function UserManagement({ t }) {
                 <RoleDescription role={formData.role} />
               </div>
 
-              <div style={{ marginBottom: 16 }}>
+              <div style={{ marginBottom: 18 }}>
                 <label
                   style={{
                     display: "block",
-                    marginBottom: 3,
+                    marginBottom: 4,
                     fontWeight: 600,
                     fontSize: 12,
                     color: C.dark,
@@ -1287,18 +1497,20 @@ export default function UserManagement({ t }) {
                   }
                   style={{
                     width: "100%",
-                    padding: "8px 12px",
+                    padding: "10px 14px",
                     border: `1.5px solid ${C.border}`,
                     borderRadius: 8,
                     fontSize: 13,
-                    transition: "border-color 0.2s",
+                    transition: "border-color 0.2s, box-shadow 0.2s",
                     outline: "none",
                   }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = C.primary;
+                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
                   }}
                   onBlur={(e) => {
                     e.currentTarget.style.borderColor = C.border;
+                    e.currentTarget.style.boxShadow = "none";
                   }}
                 />
               </div>
@@ -1306,10 +1518,10 @@ export default function UserManagement({ t }) {
               <div
                 style={{
                   display: "flex",
-                  gap: 10,
+                  gap: 12,
                   justifyContent: "flex-end",
                   borderTop: `1px solid ${C.border}`,
-                  paddingTop: 16,
+                  paddingTop: 20,
                 }}
               >
                 <button
@@ -1317,35 +1529,37 @@ export default function UserManagement({ t }) {
                   onClick={() => setShowModal(false)}
                   style={{
                     ...btn.secondary,
-                    padding: "8px 18px",
-                    fontSize: 12,
+                    padding: "10px 22px",
+                    fontSize: 13,
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
+                    borderRadius: 8,
                   }}
                 >
-                  <FiX size={14} />
+                  <FiX size={16} />
                   {getTranslation("cancel")}
                 </button>
                 <button
                   type="submit"
                   style={{
                     ...btn.primary,
-                    padding: "8px 18px",
-                    fontSize: 12,
+                    padding: "10px 22px",
+                    fontSize: 13,
                     display: "flex",
                     alignItems: "center",
                     gap: 6,
+                    borderRadius: 8,
                   }}
                 >
                   {editingUser ? (
                     <>
-                      <FiCheck size={14} />
+                      <FiCheck size={16} />
                       {getTranslation("updateUser")}
                     </>
                   ) : (
                     <>
-                      <FiUserPlus size={14} />
+                      <FiUserPlus size={16} />
                       {getTranslation("createUser")}
                     </>
                   )}
