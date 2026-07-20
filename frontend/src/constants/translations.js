@@ -40,7 +40,7 @@ export const translations = {
     },
     forum: {
       title: "Peer Forum Report Form",
-      subtitle: "Addis Ababa City Admin · Addis Messob · Addis Ketema Center",
+      subtitle: "Addis Ababa City Admin · Addis MESOB · Addis Ketema Center",
       meetingTime: "📅 Meeting Time",
       date: "Date",
       startTime: "Start Time",
@@ -118,7 +118,7 @@ export const translations = {
       selectService: "Select Service",
     },
     services: {
-      title: "Addis Messob · Services",
+      title: "Addis MESOB · Services",
       subtitle: "Digital One-Stop · Services",
       search: "➤ Search services...",
       all: "All",
@@ -957,7 +957,7 @@ export const translations = {
     forum: {
       title: "Unka Gabaasa Fooraamii Hiriyyaa",
       subtitle:
-        "Bulchiinsa Magaalaa Finfinnee · Addis Messob · Giddugala Addis Ketema",
+        "Bulchiinsa Magaalaa Finfinnee · Addis MESOB · Giddugala Addis Ketema",
       meetingTime: "📅 Yeroo Walgahii",
       date: "Guyyaa",
       startTime: "Yeroo Jalqabaa",
@@ -1036,7 +1036,7 @@ export const translations = {
       selectService: "Tajaajila filadhu",
     },
     services: {
-      title: "Addis Messob · Tajaajiloota",
+      title: "Addis MESOB · Tajaajiloota",
       subtitle: "Digital One-Stop · Tajaajiloota",
       search: "➤ Tajaajila barbaadi...",
       all: "Hunda",

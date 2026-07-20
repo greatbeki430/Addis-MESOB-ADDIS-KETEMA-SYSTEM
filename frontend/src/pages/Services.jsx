@@ -215,7 +215,7 @@ export default function Services({ t, lang }) {
                 backgroundClip: "text",
               }}
             >
-              {ts.title || "Addis Messob · Services"}
+              {ts.title || "Addis MESOB · Services"}
             </h1>
             <p
               style={{
