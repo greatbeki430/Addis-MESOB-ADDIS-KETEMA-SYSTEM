@@ -238,6 +238,13 @@ export default function Sidebar({
     }
   }
 
+  // ✅ FIX: Auto-expand forum when on forum page
+  useEffect(() => {
+    if (location.pathname === "/forum") {
+      setForumExpanded(true);
+    }
+  }, [location.pathname]);
+
   const safeT = (path, fallback = "") => {
     try {
       return t?.(path) || fallback;
