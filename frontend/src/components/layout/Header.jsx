@@ -60,7 +60,6 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
 
   const { logout, user, isAdmin, isSuperAdmin, isLeader, isEmployee } =
     useAuth();
-  const [isLogoutHovered, setIsLogoutHovered] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -94,7 +93,6 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
 
   const safeT = t || {};
   const safeNav = safeT.nav || {};
-  const safeAuth = safeT.auth || {};
   const safeAppName = safeT.appName || "A-MESOB";
 
   const tabLabel = safeNav[tab] || displayNames[tab] || tab;
@@ -194,6 +192,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             display: "flex",
             alignItems: "center",
           }}
+          title={tabLabel}
         >
           {icons[tab] || <FiGrid size={16} />}
         </span>
@@ -209,6 +208,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             whiteSpace: "nowrap",
             flexShrink: 0,
           }}
+          title={safeAppName}
         >
           {safeAppName}
         </span>
@@ -242,6 +242,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
           }}
+          title={tabLabel}
         >
           {tabLabel}
         </span>
@@ -270,6 +271,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             gap: 2,
             flexShrink: 0,
           }}
+          title={dateStr}
         >
           <FiCalendar size={9} />
           {dateStr}
@@ -336,6 +338,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
           <button
             className="lang-mobile"
             onClick={toggleLangDropdown}
+            title="Select Language"
             style={{
               background: isLangDropdownOpen
                 ? `linear-gradient(135deg, ${C.primary}, #1a3aad)`
@@ -436,6 +439,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                 <button
                   key={l.code}
                   onClick={() => handleLangSelect(l.code)}
+                  title={l.label}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -505,51 +509,12 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
           )}
         </div>
 
-        {/* Logout Button */}
-        <button
-          onClick={logout}
-          className="header-logout-btn"
-          style={{
-            background: isLogoutHovered ? "#dc2626" : "transparent",
-            border: `1px solid ${isLogoutHovered ? "#dc2626" : C.border}`,
-            borderRadius: 4,
-            padding: "clamp(2px, 0.8vw, 4px) clamp(4px, 1vw, 10px)",
-            minWidth: "clamp(28px, 6vw, 60px)",
-            fontSize: "clamp(8px, 1.5vw, 11px)",
-            fontWeight: 600,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 3,
-            color: isLogoutHovered ? "#fff" : C.muted,
-            transition: "all 0.3s ease",
-            whiteSpace: "nowrap",
-            height: "clamp(24px, 3.5vh, 32px)",
-            flexShrink: 0,
-          }}
-          onMouseEnter={() => setIsLogoutHovered(true)}
-          onMouseLeave={() => setIsLogoutHovered(false)}
-        >
-          <FiLogOut size={11} style={{ flexShrink: 0 }} />
-          <span
-            className="logout-text"
-            style={{
-              display: "inline-block",
-              minWidth: "clamp(18px, 3vw, 35px)",
-              textAlign: "center",
-              fontSize: "clamp(7px, 1.5vw, 10px)",
-            }}
-          >
-            {safeAuth.logout || "Logout"}
-          </span>
-        </button>
-
-        {/* User Avatar with Dropdown */}
+        {/* User Avatar with Dropdown - Logout only here */}
         <div ref={dropdownRef} style={{ position: "relative", flexShrink: 0 }}>
           <div
             className="header-avatar"
             onClick={toggleDropdown}
+            title="Profile & Settings"
             style={{
               display: "flex",
               alignItems: "center",
@@ -578,6 +543,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
               <img
                 src={userProfilePhoto}
                 alt={user?.name || "User"}
+                title={user?.name || "User"}
                 style={{
                   width: "clamp(22px, 4vw, 30px)",
                   height: "clamp(22px, 4vw, 30px)",
@@ -621,7 +587,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             />
           </div>
 
-          {/* User Dropdown Menu */}
+          {/* User Dropdown Menu - includes Logout here */}
           {isDropdownOpen && (
             <div
               style={{
@@ -657,6 +623,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                     <img
                       src={userProfilePhoto}
                       alt={user?.name || "User"}
+                      title={user?.name || "User"}
                       style={{
                         width: 32,
                         height: 32,
@@ -696,6 +663,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                       }}
+                      title={user?.name || "User"}
                     >
                       {user?.name || "User"}
                     </div>
@@ -708,6 +676,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                         fontSize: 10,
                         fontWeight: 600,
                       }}
+                      title={getUserRole()}
                     >
                       {getRoleIcon()}
                       {getUserRole()}
@@ -725,6 +694,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                     textOverflow: "ellipsis",
                     whiteSpace: "nowrap",
                   }}
+                  title={user?.email || "No email"}
                 >
                   {user?.email || "No email"}
                 </div>
@@ -749,6 +719,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                     setIsDropdownOpen(false);
                     navigate("/profile");
                   }}
+                  title="View and edit your profile"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -778,6 +749,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                     setIsDropdownOpen(false);
                     navigate("/settings");
                   }}
+                  title="App settings and preferences"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -826,6 +798,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                           onAddUserClick();
                         }
                       }}
+                      title="Create a new user account"
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -856,6 +829,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                         setIsDropdownOpen(false);
                         navigate("/users");
                       }}
+                      title="Manage all system users"
                       style={{
                         display: "flex",
                         alignItems: "center",
@@ -892,12 +866,14 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                 }}
               />
 
+              {/* Logout - Only here in dropdown */}
               <div style={{ padding: "4px 14px 8px" }}>
                 <button
                   onClick={() => {
                     setIsDropdownOpen(false);
                     logout();
                   }}
+                  title="Sign out of your account"
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -963,8 +939,6 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
           }
           .header-date { display: inline-flex !important; }
           .header-appname { display: inline-flex !important; }
-          .logout-text { display: inline-block !important; }
-          .header-lang-btn span { display: inline !important; }
         }
 
         /* Tablet: Show language dropdown */
@@ -977,7 +951,6 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
           }
           .header-date { display: none !important; }
           .header-appname { display: none !important; }
-          .logout-text { display: inline-block !important; }
         }
 
         /* Mobile: Show language dropdown */
@@ -990,13 +963,10 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
           }
           .header-date { display: none !important; }
           .header-appname { display: none !important; }
-          .logout-text { display: none !important; }
-          .header-logout-btn { min-width: 24px !important; padding: 2px 4px !important; }
         }
 
         /* Extra small: Even more compact */
         @media (max-width: 480px) {
-          .header-logout-btn { min-width: 20px !important; padding: 2px 3px !important; }
           .lang-mobile { padding: 2px 8px !important; font-size: 10px !important; min-height: 24px !important; gap: 4px !important; }
           .lang-mobile span { font-size: 12px !important; }
         }
