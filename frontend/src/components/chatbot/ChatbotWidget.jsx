@@ -24,48 +24,372 @@ import {
   FiCheckCircle,
   FiInfo,
   FiBook,
-  // FiCalendar,
   FiBriefcase,
   FiUser,
   FiGlobe,
   FiSend,
-  // FiPlus,
-  // FiMinus,
-  // FiChevronDown,
-  // FiChevronRight,
-  // FiChevronLeft,
-  // FiChevronUp,
-  // FiMenu,
-  // FiMoreHorizontal,
-  // FiRefreshCw,
   FiLoader,
-  // FiTrash2,
-  // FiEdit2,
-  // FiSave,
   FiSearch,
-  // FiFilter,
-  // FiSettings,
-  // FiBell,
   FiClock,
-  // FiMapPin,
-  // FiPhone,
-  // FiMail,
-  // FiLink,
-  // FiExternalLink,
-  // FiDownload,
-  // FiUpload,
-  // FiPrinter,
-  // FiEye,
-  // FiEyeOff,
-  // FiLock,
-  // FiUnlock,
-  // FiShield,
   FiUserCheck,
-  // FiUserX,
-  // FiUserPlus,
   FiBarChart2,
   FiUsers as FiUsersIcon,
 } from "react-icons/fi";
+
+// ─── Markdown Renderer ──────────────────────────────────────────
+const MarkdownRenderer = ({ content }) => {
+  // Split content into lines
+  const lines = content.split("\n");
+
+  // Use a function to render table from rows
+  const renderTable = (rows) => {
+    if (!rows || rows.length === 0) return null;
+
+    // Find header row (first row with all cells)
+    const headerRow = rows[0];
+    const dataRows = rows.slice(1);
+
+    // Filter out separator rows (rows with only ---)
+    const filteredDataRows = dataRows.filter(
+      (row) => !row.every((cell) => /^[-:]+$/.test(cell.trim())),
+    );
+
+    // Determine column alignment from separator row if exists
+    let alignments = [];
+    let tableRows = [headerRow, ...filteredDataRows];
+
+    if (
+      dataRows.length > 0 &&
+      dataRows[0].every((cell) => /^[-:]+$/.test(cell.trim()))
+    ) {
+      alignments = dataRows[0].map((cell) => {
+        const trimmed = cell.trim();
+        if (trimmed.startsWith(":") && trimmed.endsWith(":")) return "center";
+        if (trimmed.endsWith(":")) return "right";
+        if (trimmed.startsWith(":")) return "left";
+        return "left";
+      });
+      // Remove separator row from data
+      tableRows = [headerRow, ...filteredDataRows];
+    }
+
+    return (
+      <div style={{ overflowX: "auto", margin: "8px 0" }}>
+        <table
+          style={{
+            width: "100%",
+            borderCollapse: "collapse",
+            fontSize: "12px",
+            backgroundColor: "#fff",
+            borderRadius: "6px",
+            overflow: "hidden",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.08)",
+          }}
+        >
+          <thead>
+            <tr style={{ backgroundColor: "#F1F5F9" }}>
+              {tableRows[0]?.map((cell, idx) => (
+                <th
+                  key={idx}
+                  style={{
+                    padding: "6px 10px",
+                    textAlign: alignments[idx] || "left",
+                    borderBottom: "2px solid #E2E8F0",
+                    fontWeight: 600,
+                    color: "#0F172A",
+                    fontSize: "11px",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.3px",
+                  }}
+                >
+                  <span
+                    dangerouslySetInnerHTML={{ __html: renderText(cell) }}
+                  />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {tableRows.slice(1).map((row, rowIdx) => (
+              <tr
+                key={rowIdx}
+                style={{
+                  backgroundColor: rowIdx % 2 === 0 ? "#FFFFFF" : "#F8FAFC",
+                  transition: "background-color 0.15s",
+                }}
+              >
+                {row.map((cell, cellIdx) => (
+                  <td
+                    key={cellIdx}
+                    style={{
+                      padding: "6px 10px",
+                      textAlign: alignments[cellIdx] || "left",
+                      borderBottom: "1px solid #F1F5F9",
+                      fontSize: "12px",
+                      color: "#1E293B",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    <span
+                      dangerouslySetInnerHTML={{ __html: renderText(cell) }}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
+  const renderText = (text) => {
+    // Remove ** and replace with bold
+    let formatted = text;
+
+    // Bold: **text** -> <strong>text</strong>
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+    // Italic: *text* -> <em>text</em>
+    formatted = formatted.replace(/\*(.*?)\*/g, "<em>$1</em>");
+
+    // Inline code: `text` -> <code>text</code>
+    formatted = formatted.replace(/`(.*?)`/g, "<code>$1</code>");
+
+    // Links: [text](url) -> <a href="url">text</a>
+    formatted = formatted.replace(
+      /\[(.*?)\]\((.*?)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+    );
+
+    return formatted;
+  };
+
+  // Process lines to build elements
+  const elements = [];
+  let inTable = false;
+  let tableRows = [];
+
+  // Process lines
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    // Skip empty lines at the beginning of a table
+    if (inTable && trimmed === "") {
+      continue;
+    }
+
+    // Check for table start (line starts with | or contains |)
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      if (!inTable) {
+        inTable = true;
+        tableRows = [];
+      }
+      const cells = trimmed
+        .slice(1, -1)
+        .split("|")
+        .map((cell) => cell.trim());
+      tableRows.push(cells);
+      continue;
+    }
+
+    // End of table
+    if (inTable && !trimmed.startsWith("|")) {
+      elements.push(
+        <div key={`table-${elements.length}`}>{renderTable(tableRows)}</div>,
+      );
+      inTable = false;
+      tableRows = [];
+    }
+
+    // Headers (## or ###)
+    if (trimmed.startsWith("### ")) {
+      elements.push(
+        <h4
+          key={`h4-${i}`}
+          style={{
+            margin: "12px 0 4px 0",
+            fontSize: "14px",
+            fontWeight: 700,
+            color: "#0F172A",
+          }}
+        >
+          <span
+            dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(4)) }}
+          />
+        </h4>,
+      );
+      continue;
+    }
+
+    if (trimmed.startsWith("## ")) {
+      elements.push(
+        <h3
+          key={`h3-${i}`}
+          style={{
+            margin: "14px 0 6px 0",
+            fontSize: "15px",
+            fontWeight: 700,
+            color: "#0F172A",
+          }}
+        >
+          <span
+            dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(3)) }}
+          />
+        </h3>,
+      );
+      continue;
+    }
+
+    if (trimmed.startsWith("# ")) {
+      elements.push(
+        <h2
+          key={`h2-${i}`}
+          style={{
+            margin: "16px 0 8px 0",
+            fontSize: "17px",
+            fontWeight: 700,
+            color: "#0F172A",
+            borderBottom: "2px solid #E2E8F0",
+            paddingBottom: "4px",
+          }}
+        >
+          <span
+            dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(2)) }}
+          />
+        </h2>,
+      );
+      continue;
+    }
+
+    // Unordered lists (- item)
+    if (trimmed.startsWith("- ")) {
+      elements.push(
+        <div
+          key={`li-${i}`}
+          style={{
+            paddingLeft: "16px",
+            margin: "2px 0",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "6px",
+          }}
+        >
+          <span style={{ color: "#2563EB", fontSize: "12px" }}>•</span>
+          <span style={{ fontSize: "12px", color: "#1E293B" }}>
+            <span
+              dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(2)) }}
+            />
+          </span>
+        </div>,
+      );
+      continue;
+    }
+
+    // Ordered lists (1. item)
+    const orderedMatch = trimmed.match(/^(\d+)\.\s+(.+)/);
+    if (orderedMatch) {
+      elements.push(
+        <div
+          key={`ol-${i}`}
+          style={{
+            paddingLeft: "16px",
+            margin: "2px 0",
+            display: "flex",
+            alignItems: "flex-start",
+            gap: "6px",
+          }}
+        >
+          <span
+            style={{
+              color: "#64748B",
+              fontSize: "12px",
+              fontWeight: 600,
+              minWidth: "18px",
+            }}
+          >
+            {orderedMatch[1]}.
+          </span>
+          <span style={{ fontSize: "12px", color: "#1E293B" }}>
+            <span
+              dangerouslySetInnerHTML={{ __html: renderText(orderedMatch[2]) }}
+            />
+          </span>
+        </div>,
+      );
+      continue;
+    }
+
+    // Separators (---)
+    if (trimmed === "---") {
+      elements.push(
+        <hr
+          key={`hr-${i}`}
+          style={{
+            margin: "8px 0",
+            border: "none",
+            borderTop: "1px solid #E2E8F0",
+          }}
+        />,
+      );
+      continue;
+    }
+
+    // Blockquotes (> text)
+    if (trimmed.startsWith("> ")) {
+      elements.push(
+        <div
+          key={`blockquote-${i}`}
+          style={{
+            margin: "4px 0",
+            padding: "6px 12px",
+            borderLeft: "3px solid #2563EB",
+            backgroundColor: "#F8FAFC",
+            borderRadius: "0 4px 4px 0",
+          }}
+        >
+          <span style={{ fontSize: "12px", color: "#475569" }}>
+            <span
+              dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(2)) }}
+            />
+          </span>
+        </div>,
+      );
+      continue;
+    }
+
+    // Empty line - add spacing
+    if (trimmed === "") {
+      elements.push(<div key={`space-${i}`} style={{ height: "4px" }} />);
+      continue;
+    }
+
+    // Regular paragraph
+    if (trimmed) {
+      elements.push(
+        <p
+          key={`p-${i}`}
+          style={{
+            margin: "4px 0",
+            fontSize: "12px",
+            color: "#1E293B",
+            lineHeight: "1.6",
+          }}
+        >
+          <span dangerouslySetInnerHTML={{ __html: renderText(trimmed) }} />
+        </p>,
+      );
+    }
+  }
+
+  // Handle trailing table
+  if (inTable) {
+    elements.push(<div key="table-end">{renderTable(tableRows)}</div>);
+  }
+
+  return <div>{elements}</div>;
+};
 
 // ─── Message bubble ──────────────────────────────────────────
 const ChatMessage = ({ msg }) => {
@@ -97,7 +421,7 @@ const ChatMessage = ({ msg }) => {
         justifyContent: isUser ? "flex-end" : "flex-start",
         marginBottom: "8px",
         gap: "6px",
-        alignItems: "flex-end",
+        alignItems: "flex-start",
       }}
     >
       {!isUser && (
@@ -113,6 +437,7 @@ const ChatMessage = ({ msg }) => {
             fontSize: 13,
             flexShrink: 0,
             color: "#fff",
+            marginTop: "2px",
           }}
         >
           <FiMessageSquare size={14} />
@@ -129,16 +454,21 @@ const ChatMessage = ({ msg }) => {
           lineHeight: "1.55",
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
+          overflow: "hidden",
         }}
       >
-        {msg.content}
+        {isUser ? msg.content : <MarkdownRenderer content={msg.content} />}
         {msg.timestamp && (
           <div
             style={{
               fontSize: "10px",
               opacity: 0.6,
-              marginTop: "4px",
+              marginTop: "6px",
               textAlign: isUser ? "right" : "left",
+              borderTop: isUser
+                ? "1px solid rgba(255,255,255,0.2)"
+                : "1px solid rgba(0,0,0,0.05)",
+              paddingTop: "4px",
             }}
           >
             <FiClock size={10} style={{ marginRight: "2px" }} />
@@ -838,9 +1168,10 @@ export default function ChatbotWidget() {
             position: "fixed",
             bottom: "92px",
             right: "24px",
-            width: "370px",
+            width: "420px",
             maxWidth: "calc(100vw - 48px)",
-            height: "520px",
+            height: "560px",
+            maxHeight: "calc(100vh - 120px)",
             background: "#fff",
             borderRadius: "20px",
             boxShadow: "0 8px 48px rgba(0,0,0,0.18)",
@@ -964,7 +1295,7 @@ export default function ChatbotWidget() {
                   <div
                     style={{
                       display: "flex",
-                      alignItems: "flex-end",
+                      alignItems: "flex-start",
                       gap: "6px",
                       marginBottom: "8px",
                     }}
@@ -980,6 +1311,7 @@ export default function ChatbotWidget() {
                         justifyContent: "center",
                         fontSize: 13,
                         color: "#fff",
+                        marginTop: "2px",
                       }}
                     >
                       <FiMessageSquare size={14} />
@@ -1027,6 +1359,7 @@ export default function ChatbotWidget() {
                     flexWrap: "wrap",
                     gap: "6px",
                     background: "#fff",
+                    flexShrink: 0,
                   }}
                 >
                   {quickActions.map((a, i) => (
@@ -1446,6 +1779,41 @@ export default function ChatbotWidget() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        /* Table styles */
+        table {
+          border-collapse: collapse;
+        }
+        table th {
+          background-color: #F1F5F9 !important;
+          font-weight: 600 !important;
+        }
+        table tr:hover td {
+          background-color: #F8FAFC !important;
+        }
+        /* Code styles */
+        code {
+          background-color: #F1F5F9;
+          padding: 1px 4px;
+          border-radius: 3px;
+          font-size: 11px;
+          color: #2563EB;
+          font-family: monospace;
+        }
+        /* Link styles */
+        a {
+          color: #2563EB;
+          text-decoration: underline;
+          text-decoration-color: #93C5FD;
+        }
+        a:hover {
+          color: #1D4ED8;
+          text-decoration-color: #2563EB;
+        }
+        /* Strong text */
+        strong {
+          color: #0F172A;
+          font-weight: 700;
         }
       `}</style>
     </>
