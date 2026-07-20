@@ -136,40 +136,39 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
     <header
       style={{
         height: "auto",
-        minHeight: "clamp(48px, 8vh, 56px)",
+        minHeight: "clamp(44px, 7vh, 52px)",
         background: C.white,
         borderBottom: `2px solid rgba(26, 58, 173, 0.13)`,
         display: "flex",
         alignItems: "center",
         justifyContent: "space-between",
-        padding: "8px clamp(12px, 4vw, 24px)",
+        padding: "4px clamp(8px, 2vw, 20px)",
         boxShadow: "0 2px 12px rgba(26,58,173,0.08)",
         position: "sticky",
         top: 0,
         zIndex: 40,
         flexShrink: 0,
-        gap: "clamp(6px, 2vw, 12px)",
-        flexWrap: "nowrap", // ✅ PREVENT WRAPPING
-        overflow: "hidden", // ✅ PREVENT OVERFLOW
+        gap: "clamp(4px, 1.5vw, 12px)",
+        flexWrap: "nowrap",
+        overflow: "visible", // ✅ Allow dropdown to be visible
       }}
     >
-      {/* LEFT SECTION - Breadcrumb */}
+      {/* LEFT SECTION - Breadcrumb - Shrinks on mobile */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "clamp(4px, 1.5vw, 10px)",
-          flexShrink: 0, // ✅ DON'T SHRINK
+          gap: "clamp(3px, 1vw, 10px)",
+          flex: "1 1 auto",
           minWidth: 0,
-          overflow: "hidden", // ✅ PREVENT OVERFLOW
+          overflow: "hidden",
         }}
       >
         <span
           style={{
-            fontSize: "clamp(14px, 3vw, 18px)",
+            fontSize: "clamp(14px, 2.5vw, 18px)",
             color: C.primary,
             flexShrink: 0,
-            animation: "pulseGlow 3s ease-in-out infinite",
             display: "flex",
             alignItems: "center",
           }}
@@ -181,12 +180,12 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
           className="header-appname"
           style={{
             color: C.muted,
-            fontSize: "clamp(9px, 2.5vw, 11px)",
+            fontSize: "clamp(8px, 2vw, 11px)",
             fontFamily: F.sans,
             display: "inline-flex",
             alignItems: "center",
-            gap: 3,
-            whiteSpace: "nowrap", // ✅ PREVENT WRAPPING
+            whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
         >
           {safeAppName}
@@ -195,63 +194,62 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
         <span
           style={{
             color: C.gold,
-            fontSize: "clamp(8px, 2vw, 12px)",
+            fontSize: "clamp(6px, 1.5vw, 12px)",
             fontWeight: 900,
             display: "flex",
             alignItems: "center",
             flexShrink: 0,
           }}
         >
-          <FiChevronRight size={12} />
+          <FiChevronRight size={10} />
         </span>
 
         <span
           style={{
             fontWeight: 700,
-            fontSize: "clamp(10px, 3vw, 13px)",
+            fontSize: "clamp(9px, 2.5vw, 13px)",
             color: C.dark,
             fontFamily: F.sans,
-            whiteSpace: "nowrap", // ✅ PREVENT WRAPPING
+            whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
-            maxWidth: "min(150px, 30vw)",
+            flex: "1 1 auto",
+            minWidth: 0,
             background: `linear-gradient(90deg, ${C.primary}, ${C.gold})`,
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
-            flexShrink: 1,
           }}
         >
           {tabLabel}
         </span>
       </div>
 
-      {/* RIGHT SECTION */}
+      {/* RIGHT SECTION - Items stay visible */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "clamp(4px, 1.5vw, 12px)",
-          flexShrink: 0, // ✅ DON'T SHRINK
-          flexWrap: "nowrap", // ✅ PREVENT WRAPPING
-          overflow: "hidden", // ✅ PREVENT OVERFLOW
+          gap: "clamp(3px, 1vw, 12px)",
+          flexShrink: 0,
+          flexWrap: "nowrap",
         }}
       >
         {/* Date - Hidden on small screens */}
         <span
           className="header-date"
           style={{
-            fontSize: "clamp(8px, 2vw, 10px)",
+            fontSize: "clamp(7px, 1.5vw, 10px)",
             color: C.muted,
             fontFamily: F.sans,
             whiteSpace: "nowrap",
             display: "inline-flex",
             alignItems: "center",
-            gap: 3,
+            gap: 2,
             flexShrink: 0,
           }}
         >
-          <FiCalendar size={10} />
+          <FiCalendar size={9} />
           {dateStr}
         </span>
 
@@ -259,7 +257,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
         <div
           style={{
             display: "flex",
-            gap: "clamp(2px, 1vw, 4px)",
+            gap: "clamp(1px, 0.8vw, 4px)",
             flexShrink: 0,
           }}
         >
@@ -274,19 +272,20 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                 color: lang === l.code ? C.gold : C.primary,
                 border: `1px solid ${lang === l.code ? C.primary : C.border}`,
                 borderRadius: 4,
-                padding: "clamp(2px, 1vw, 4px) clamp(3px, 1.5vw, 6px)",
-                fontSize: "clamp(8px, 2vw, 10px)",
+                padding: "clamp(1px, 0.8vw, 3px) clamp(3px, 1vw, 6px)",
+                fontSize: "clamp(7px, 1.5vw, 10px)",
                 fontWeight: 700,
                 cursor: "pointer",
                 fontFamily: F.sans,
                 transition: "all 0.2s ease",
                 whiteSpace: "nowrap",
-                minWidth: "clamp(20px, 5vw, 28px)",
+                minWidth: "clamp(18px, 4vw, 28px)",
                 transform: lang === l.code ? "scale(1.05)" : "scale(1)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 1,
+                flexShrink: 0,
               }}
               onMouseEnter={(e) => {
                 if (lang !== l.code) {
@@ -301,8 +300,10 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                 }
               }}
             >
-              <FiGlobe size={8} />
-              {l.flag}
+              <FiGlobe size={7} />
+              <span style={{ fontSize: "clamp(6px, 1.2vw, 9px)" }}>
+                {l.flag}
+              </span>
             </button>
           ))}
         </div>
@@ -315,32 +316,32 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             background: isLogoutHovered ? "#dc2626" : "transparent",
             border: `1px solid ${isLogoutHovered ? "#dc2626" : C.border}`,
             borderRadius: 4,
-            padding: "clamp(2px, 1vw, 4px) clamp(4px, 1.5vw, 10px)",
-            minWidth: "clamp(32px, 8vw, 70px)",
-            fontSize: "clamp(9px, 2vw, 11px)",
+            padding: "clamp(2px, 0.8vw, 4px) clamp(4px, 1vw, 10px)",
+            minWidth: "clamp(28px, 6vw, 60px)",
+            fontSize: "clamp(8px, 1.5vw, 11px)",
             fontWeight: 600,
             cursor: "pointer",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: 4,
+            gap: 3,
             color: isLogoutHovered ? "#fff" : C.muted,
             transition: "all 0.3s ease",
             whiteSpace: "nowrap",
-            height: "clamp(26px, 4vh, 34px)",
+            height: "clamp(24px, 3.5vh, 32px)",
             flexShrink: 0,
           }}
           onMouseEnter={() => setIsLogoutHovered(true)}
           onMouseLeave={() => setIsLogoutHovered(false)}
         >
-          <FiLogOut size={12} style={{ flexShrink: 0 }} />
+          <FiLogOut size={11} style={{ flexShrink: 0 }} />
           <span
             className="logout-text"
             style={{
               display: "inline-block",
-              minWidth: "clamp(20px, 4vw, 40px)",
+              minWidth: "clamp(18px, 3vw, 35px)",
               textAlign: "center",
-              fontSize: "clamp(8px, 1.8vw, 11px)",
+              fontSize: "clamp(7px, 1.5vw, 10px)",
             }}
           >
             {safeAuth.logout || "Logout"}
@@ -355,10 +356,10 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 4,
+              gap: 3,
               cursor: "pointer",
-              padding: "2px 4px 2px 2px",
-              borderRadius: 20,
+              padding: "1px 3px 1px 1px",
+              borderRadius: 18,
               border: isDropdownOpen
                 ? `2px solid ${C.primary}`
                 : "2px solid transparent",
@@ -381,8 +382,8 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                 src={userProfilePhoto}
                 alt={user?.name || "User"}
                 style={{
-                  width: "clamp(24px, 5vw, 32px)",
-                  height: "clamp(24px, 5vw, 32px)",
+                  width: "clamp(22px, 4vw, 30px)",
+                  height: "clamp(22px, 4vw, 30px)",
                   borderRadius: "50%",
                   objectFit: "cover",
                   border: `2px solid ${C.primary}`,
@@ -392,14 +393,14 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             ) : (
               <div
                 style={{
-                  width: "clamp(24px, 5vw, 32px)",
-                  height: "clamp(24px, 5vw, 32px)",
+                  width: "clamp(22px, 4vw, 30px)",
+                  height: "clamp(22px, 4vw, 30px)",
                   background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
                   borderRadius: "50%",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "clamp(10px, 2.5vw, 14px)",
+                  fontSize: "clamp(9px, 2vw, 13px)",
                   color: "#fff",
                   fontWeight: 900,
                   fontFamily: F.serif,
@@ -413,7 +414,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
               </div>
             )}
             <FiChevronDown
-              size={12}
+              size={10}
               style={{
                 color: C.muted,
                 transition: "transform 0.3s ease",
@@ -428,9 +429,9 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             <div
               style={{
                 position: "absolute",
-                top: "calc(100% + 8px)",
+                top: "calc(100% + 6px)",
                 right: 0,
-                minWidth: 220,
+                minWidth: 200,
                 background: C.white,
                 borderRadius: 12,
                 boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
@@ -443,7 +444,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
               {/* User Info */}
               <div
                 style={{
-                  padding: "14px 16px 10px",
+                  padding: "12px 14px 8px",
                   borderBottom: `1px solid ${C.border}`,
                   background: C.bg,
                 }}
@@ -452,7 +453,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 10,
+                    gap: 8,
                   }}
                 >
                   {userProfilePhoto ? (
@@ -460,8 +461,8 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                       src={userProfilePhoto}
                       alt={user?.name || "User"}
                       style={{
-                        width: 36,
-                        height: 36,
+                        width: 32,
+                        height: 32,
                         borderRadius: "50%",
                         objectFit: "cover",
                         border: `2px solid ${C.primary}`,
@@ -471,14 +472,14 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                   ) : (
                     <div
                       style={{
-                        width: 36,
-                        height: 36,
+                        width: 32,
+                        height: 32,
                         background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
                         borderRadius: "50%",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 14,
+                        fontSize: 12,
                         color: "#fff",
                         fontWeight: 900,
                         fontFamily: F.serif,
@@ -493,7 +494,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                       style={{
                         fontWeight: 700,
                         color: C.dark,
-                        fontSize: 13,
+                        fontSize: 12,
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
@@ -505,9 +506,9 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 4,
+                        gap: 3,
                         color: getRoleColor(),
-                        fontSize: 11,
+                        fontSize: 10,
                         fontWeight: 600,
                       }}
                     >
@@ -518,10 +519,10 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                 </div>
                 <div
                   style={{
-                    fontSize: 10,
+                    fontSize: 9,
                     color: C.muted,
-                    marginTop: 4,
-                    paddingTop: 4,
+                    marginTop: 3,
+                    paddingTop: 3,
                     borderTop: `1px solid ${C.border}44`,
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -536,8 +537,8 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
               <div style={{ padding: "4px 0" }}>
                 <div
                   style={{
-                    padding: "6px 16px",
-                    fontSize: 10,
+                    padding: "4px 14px",
+                    fontSize: 9,
                     color: C.muted,
                     fontWeight: 600,
                     textTransform: "uppercase",
@@ -554,13 +555,13 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
-                    padding: "6px 16px",
+                    gap: 6,
+                    padding: "5px 14px",
                     width: "100%",
                     border: "none",
                     background: "transparent",
                     cursor: "pointer",
-                    fontSize: 12,
+                    fontSize: 11,
                     color: C.dark,
                     transition: "background 0.2s ease",
                     fontFamily: F.sans,
@@ -572,7 +573,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                     e.currentTarget.style.background = "transparent";
                   }}
                 >
-                  <FiUser size={14} style={{ color: C.muted }} />
+                  <FiUser size={12} style={{ color: C.muted }} />
                   My Profile
                 </button>
                 <button
@@ -583,13 +584,13 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
-                    padding: "6px 16px",
+                    gap: 6,
+                    padding: "5px 14px",
                     width: "100%",
                     border: "none",
                     background: "transparent",
                     cursor: "pointer",
-                    fontSize: 12,
+                    fontSize: 11,
                     color: C.dark,
                     transition: "background 0.2s ease",
                     fontFamily: F.sans,
@@ -601,7 +602,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                     e.currentTarget.style.background = "transparent";
                   }}
                 >
-                  <FiSettings size={14} style={{ color: C.muted }} />
+                  <FiSettings size={12} style={{ color: C.muted }} />
                   Settings
                 </button>
 
@@ -609,8 +610,8 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                   <>
                     <div
                       style={{
-                        padding: "6px 16px 2px",
-                        fontSize: 10,
+                        padding: "4px 14px 2px",
+                        fontSize: 9,
                         color: C.muted,
                         fontWeight: 600,
                         textTransform: "uppercase",
@@ -631,13 +632,13 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 8,
-                        padding: "6px 16px",
+                        gap: 6,
+                        padding: "5px 14px",
                         width: "100%",
                         border: "none",
                         background: "transparent",
                         cursor: "pointer",
-                        fontSize: 12,
+                        fontSize: 11,
                         color: C.primary,
                         transition: "background 0.2s ease",
                         fontFamily: F.sans,
@@ -650,7 +651,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                         e.currentTarget.style.background = "transparent";
                       }}
                     >
-                      <FiUserPlus size={14} style={{ color: C.primary }} />
+                      <FiUserPlus size={12} style={{ color: C.primary }} />
                       Add New User
                     </button>
                     <button
@@ -661,13 +662,13 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 8,
-                        padding: "6px 16px",
+                        gap: 6,
+                        padding: "5px 14px",
                         width: "100%",
                         border: "none",
                         background: "transparent",
                         cursor: "pointer",
-                        fontSize: 12,
+                        fontSize: 11,
                         color: C.dark,
                         transition: "background 0.2s ease",
                         fontFamily: F.sans,
@@ -679,24 +680,22 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                         e.currentTarget.style.background = "transparent";
                       }}
                     >
-                      <FiUsers size={14} style={{ color: C.muted }} />
+                      <FiUsers size={12} style={{ color: C.muted }} />
                       User Management
                     </button>
                   </>
                 )}
               </div>
 
-              {/* Divider */}
               <div
                 style={{
                   height: 1,
                   background: C.border,
-                  margin: "2px 16px",
+                  margin: "2px 14px",
                 }}
               />
 
-              {/* Logout */}
-              <div style={{ padding: "4px 16px 8px" }}>
+              <div style={{ padding: "4px 14px 8px" }}>
                 <button
                   onClick={() => {
                     setIsDropdownOpen(false);
@@ -705,14 +704,14 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
-                    padding: "6px 12px",
+                    gap: 6,
+                    padding: "5px 10px",
                     width: "100%",
                     border: "none",
                     borderRadius: 6,
                     background: "#fee2e2",
                     cursor: "pointer",
-                    fontSize: 12,
+                    fontSize: 11,
                     color: "#dc2626",
                     fontWeight: 600,
                     transition: "all 0.2s ease",
@@ -727,7 +726,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                     e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
-                  <FiLogOut size={14} />
+                  <FiLogOut size={12} />
                   Logout
                 </button>
               </div>
@@ -737,98 +736,36 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
       </div>
 
       <style>{`
-        /* ✅ RESPONSIVE BREAKPOINTS - Keep everything on one line */
-        
-        /* Extra Small Screens - Hide text, show only icons */
         @media (max-width: 480px) {
-          .header-date {
-            display: none !important;
-          }
-          .header-appname {
-            display: none !important;
-          }
-          .logout-text {
-            display: none !important;
-          }
-          .header-lang-btn span {
-            display: none !important;
-          }
-          .header-lang-btn {
-            min-width: 20px !important;
-            padding: 2px 4px !important;
-          }
-          .header-logout-btn {
-            min-width: 28px !important;
-            padding: 4px 6px !important;
-          }
+          .header-date { display: none !important; }
+          .header-appname { display: none !important; }
+          .logout-text { display: none !important; }
+          .header-lang-btn span { display: none !important; }
+          .header-lang-btn { min-width: 18px !important; padding: 1px 3px !important; }
+          .header-logout-btn { min-width: 24px !important; padding: 2px 4px !important; }
         }
-
-        /* Small Screens - Show only essential */
         @media (min-width: 481px) and (max-width: 640px) {
-          .header-date {
-            display: none !important;
-          }
-          .header-appname {
-            display: none !important;
-          }
-          .logout-text {
-            display: none !important;
-          }
-          .header-lang-btn span {
-            display: none !important;
-          }
-          .header-lang-btn {
-            min-width: 24px !important;
-            padding: 2px 5px !important;
-          }
+          .header-date { display: none !important; }
+          .header-appname { display: none !important; }
+          .logout-text { display: none !important; }
+          .header-lang-btn span { display: none !important; }
+          .header-lang-btn { min-width: 22px !important; padding: 2px 4px !important; }
         }
-
-        /* Medium Screens - Show language flags but hide text */
         @media (min-width: 641px) and (max-width: 768px) {
-          .header-date {
-            display: none !important;
-          }
-          .header-appname {
-            display: none !important;
-          }
-          .header-lang-btn span {
-            display: none !important;
-          }
-          .header-lang-btn {
-            min-width: 28px !important;
-          }
+          .header-date { display: none !important; }
+          .header-appname { display: none !important; }
+          .header-lang-btn span { display: none !important; }
+          .header-lang-btn { min-width: 26px !important; }
         }
-
-        /* Large Screens - Show everything */
         @media (min-width: 769px) {
-          .header-date {
-            display: inline-flex !important;
-          }
-          .header-appname {
-            display: inline-flex !important;
-          }
-          .logout-text {
-            display: inline-block !important;
-          }
-          .header-lang-btn span {
-            display: inline !important;
-          }
+          .header-date { display: inline-flex !important; }
+          .header-appname { display: inline-flex !important; }
+          .logout-text { display: inline-block !important; }
+          .header-lang-btn span { display: inline !important; }
         }
-
-        @keyframes pulseGlow {
-          0%, 100% { box-shadow: 0 0 20px rgba(26,58,173,0.3); }
-          50% { box-shadow: 0 0 40px rgba(245,197,24,0.3); }
-        }
-        
         @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </header>

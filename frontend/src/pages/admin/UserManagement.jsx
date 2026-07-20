@@ -21,21 +21,96 @@ import {
   FiUsers,
   FiUser,
   FiUserCheck,
-  // eslint-disable-next-line no-unused-vars
-  FiUserX,
   FiShield,
-  // eslint-disable-next-line no-unused-vars
-  FiShieldOff,
   FiStar,
-  // eslint-disable-next-line no-unused-vars
-  FiAward,
   FiX,
   FiCheck,
-  // eslint-disable-next-line no-unused-vars
-  FiAlertCircle,
 } from "react-icons/fi";
 
-// ✅ Reusable Action Button Component with beautiful icons
+// ✅ Beautiful Stat Card with Gradient
+const StatCard = ({ icon: Icon, value, label, color, gradient }) => (
+  <div
+    style={{
+      background: gradient || C.white,
+      padding: "16px 20px",
+      borderRadius: 12,
+      textAlign: "center",
+      border: `1px solid ${C.border}33`,
+      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+      position: "relative",
+      overflow: "hidden",
+    }}
+    onMouseEnter={(e) => {
+      e.currentTarget.style.transform = "translateY(-6px) scale(1.02)";
+      e.currentTarget.style.boxShadow = `0 12px 40px ${color}22`;
+      e.currentTarget.style.borderColor = color;
+    }}
+    onMouseLeave={(e) => {
+      e.currentTarget.style.transform = "translateY(0) scale(1)";
+      e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.04)";
+      e.currentTarget.style.borderColor = C.border + "33";
+    }}
+  >
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 8,
+        marginBottom: 4,
+      }}
+    >
+      <div
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: "50%",
+          background: color + "15",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
+      >
+        <Icon size={16} color={color} />
+      </div>
+      <div
+        style={{
+          fontSize: "clamp(24px, 5vw, 32px)",
+          fontWeight: 900,
+          color: color,
+          lineHeight: 1.2,
+        }}
+      >
+        {value}
+      </div>
+    </div>
+    <div
+      style={{
+        fontSize: "clamp(10px, 2.5vw, 12px)",
+        color: C.muted,
+        fontWeight: 500,
+        marginTop: 2,
+      }}
+    >
+      {label}
+    </div>
+    {/* Decorative gradient line */}
+    <div
+      style={{
+        position: "absolute",
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 3,
+        background: `linear-gradient(90deg, ${color}44, ${color})`,
+        borderRadius: "0 0 12px 12px",
+      }}
+    />
+  </div>
+);
+
 const ActionButton = ({ onClick, Icon, label, color = C.primary, title }) => (
   <button
     onClick={onClick}
@@ -44,25 +119,25 @@ const ActionButton = ({ onClick, Icon, label, color = C.primary, title }) => (
       background: "transparent",
       border: "none",
       cursor: "pointer",
-      padding: "8px 12px",
+      padding: "6px 10px",
       borderRadius: 8,
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      gap: 6,
-      fontSize: 13,
+      gap: 4,
+      fontSize: 12,
       fontWeight: 600,
       color: color,
       transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
       fontFamily: F.sans,
       position: "relative",
-      minWidth: "36px",
-      minHeight: "36px",
+      minWidth: "32px",
+      minHeight: "32px",
     }}
     onMouseEnter={(e) => {
-      e.currentTarget.style.background = color + "15";
+      e.currentTarget.style.background = color + "12";
       e.currentTarget.style.transform = "translateY(-2px) scale(1.05)";
-      e.currentTarget.style.boxShadow = `0 4px 12px ${color}33`;
+      e.currentTarget.style.boxShadow = `0 4px 12px ${color}22`;
     }}
     onMouseLeave={(e) => {
       e.currentTarget.style.background = "transparent";
@@ -70,38 +145,9 @@ const ActionButton = ({ onClick, Icon, label, color = C.primary, title }) => (
       e.currentTarget.style.boxShadow = "none";
     }}
   >
-    {Icon && <Icon size={18} />}
-    {label && <span style={{ fontSize: 11, fontWeight: 600 }}>{label}</span>}
+    {Icon && <Icon size={16} />}
+    {label && <span style={{ fontSize: 10, fontWeight: 600 }}>{label}</span>}
   </button>
-);
-
-// ✅ Stat Card Component with react-icons
-// eslint-disable-next-line no-unused-vars
-const StatCard = ({ icon: Icon, value, label, color, bgColor }) => (
-  <div
-    style={{
-      background: C.white,
-      padding: "14px 18px",
-      borderRadius: 10,
-      textAlign: "center",
-      border: `1px solid ${C.border}`,
-      transition: "all 0.3s ease",
-    }}
-    onMouseEnter={(e) => {
-      e.currentTarget.style.transform = "translateY(-4px)";
-      e.currentTarget.style.boxShadow = `0 8px 24px ${color}22`;
-    }}
-    onMouseLeave={(e) => {
-      e.currentTarget.style.transform = "translateY(0)";
-      e.currentTarget.style.boxShadow = "none";
-    }}
-  >
-    <div style={{ fontSize: 28, fontWeight: 900, color: color }}>{value}</div>
-    <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-      <Icon size={14} style={{ marginRight: 4, color: color }} />
-      {label}
-    </div>
-  </div>
 );
 
 const RoleDescription = ({ role }) => {
@@ -114,10 +160,10 @@ const RoleDescription = ({ role }) => {
   return (
     <span
       style={{
-        fontSize: 10,
+        fontSize: 9,
         color: "#999",
         display: "block",
-        marginTop: 2,
+        marginTop: 1,
         fontStyle: "italic",
       }}
     >
@@ -140,7 +186,7 @@ export default function UserManagement({ t }) {
       subtitle: "Manage all users in the system",
       totalUsers: "total users",
       addUser: "Add New User",
-      searchPlaceholder: " Search users by name or email...",
+      searchPlaceholder: "Search users by name or email...",
       allRoles: "All Roles",
       noUsersFound: "No users found",
       noUsersMatch: "No users match your search criteria",
@@ -182,17 +228,6 @@ export default function UserManagement({ t }) {
       roleTeamLeader: "Team Leader",
       roleAdmin: "Admin",
       roleSuperAdmin: "Super Admin",
-      invalidRoleTitle: "Invalid Role",
-      invalidRoleMessage: "Please use: employee, leader, or admin",
-      changeRolePrompt: "Change role for",
-      roleOptions: "Enter one of: employee, leader, admin",
-      minPassword: "Min 6 characters",
-      updateSuccess: "User updated successfully!",
-      createSuccess: "User created successfully!",
-      deleteSuccess: "User deleted successfully!",
-      deleteError: "Delete failed. Please try again.",
-      saveError: "Operation failed. Please try again.",
-      loadError: "Failed to load users. Please refresh the page.",
     };
     return fallback[key] || key;
   };
@@ -233,7 +268,6 @@ export default function UserManagement({ t }) {
     selectedRole: "employee",
   });
 
-  // Use toast but DON'T render ToastContainer here (it's in App.jsx)
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -372,11 +406,39 @@ export default function UserManagement({ t }) {
 
   const roleStats = getRoleStats();
 
-  return (
-    <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
-      {/* Modals - no ToastContainer here */}
+  // Color configurations for stat cards
+  const cardColors = {
+    total: {
+      color: "#1a3aad",
+      gradient: "linear-gradient(135deg, #f0f3ff, #e0e7ff)",
+    },
+    superadmin: {
+      color: "#8B1A1A",
+      gradient: "linear-gradient(135deg, #fef2f2, #fee2e2)",
+    },
+    admin: {
+      color: "#1A6B4A",
+      gradient: "linear-gradient(135deg, #f0fdf4, #dcfce7)",
+    },
+    leader: {
+      color: "#C25A00",
+      gradient: "linear-gradient(135deg, #fffbeb, #fef3c7)",
+    },
+    employee: {
+      color: "#1E4D8C",
+      gradient: "linear-gradient(135deg, #eff6ff, #dbeafe)",
+    },
+  };
 
-      {/* Alert Modal */}
+  return (
+    <div
+      style={{
+        padding: "clamp(12px, 3vw, 20px)",
+        maxWidth: 1200,
+        margin: "0 auto",
+      }}
+    >
+      {/* Modals */}
       <Modal
         isOpen={alertModal.isOpen}
         onClose={() =>
@@ -387,7 +449,6 @@ export default function UserManagement({ t }) {
         type={alertModal.type}
       />
 
-      {/* Confirm Delete Modal */}
       <Modal
         isOpen={confirmModal.isOpen}
         onClose={() =>
@@ -404,7 +465,6 @@ export default function UserManagement({ t }) {
         }
       />
 
-      {/* View User Modal */}
       <Modal
         isOpen={viewModal.isOpen}
         onClose={() => setViewModal({ isOpen: false, user: null })}
@@ -414,112 +474,63 @@ export default function UserManagement({ t }) {
       >
         {viewModal.user && (
           <div style={{ fontFamily: F.sans }}>
-            <div style={{ display: "grid", gap: 12 }}>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderBottom: `1px solid ${C.border}`,
-                  paddingBottom: 8,
-                }}
-              >
-                <span style={{ color: C.muted }}>
-                  {getTranslation("fullName")}
-                </span>
-                <span style={{ fontWeight: 600, color: C.dark }}>
-                  {viewModal.user.name}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderBottom: `1px solid ${C.border}`,
-                  paddingBottom: 8,
-                }}
-              >
-                <span style={{ color: C.muted }}>
-                  {getTranslation("email")}
-                </span>
-                <span style={{ fontWeight: 600, color: C.dark }}>
-                  {viewModal.user.email}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderBottom: `1px solid ${C.border}`,
-                  paddingBottom: 8,
-                }}
-              >
-                <span style={{ color: C.muted }}>{getTranslation("role")}</span>
-                <span style={{ fontWeight: 600, color: C.dark }}>
-                  {getRoleIcon(viewModal.user.role)}{" "}
-                  {getRoleDisplayName(viewModal.user.role)}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderBottom: `1px solid ${C.border}`,
-                  paddingBottom: 8,
-                }}
-              >
-                <span style={{ color: C.muted }}>
-                  {getTranslation("phone")}
-                </span>
-                <span style={{ fontWeight: 600, color: C.dark }}>
-                  {viewModal.user.phone || "N/A"}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderBottom: `1px solid ${C.border}`,
-                  paddingBottom: 8,
-                }}
-              >
-                <span style={{ color: C.muted }}>
-                  {getTranslation("userId")}
-                </span>
-                <span style={{ fontWeight: 400, color: "#999", fontSize: 12 }}>
-                  {viewModal.user._id}
-                </span>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  borderBottom: `1px solid ${C.border}`,
-                  paddingBottom: 8,
-                }}
-              >
-                <span style={{ color: C.muted }}>
-                  {getTranslation("created")}
-                </span>
-                <span style={{ fontWeight: 600, color: C.dark }}>
-                  {new Date(viewModal.user.createdAt).toLocaleDateString()} at{" "}
-                  {new Date(viewModal.user.createdAt).toLocaleTimeString()}
-                </span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: C.muted }}>
-                  {getTranslation("lastUpdated")}
-                </span>
-                <span style={{ fontWeight: 600, color: C.dark }}>
-                  {new Date(viewModal.user.updatedAt).toLocaleDateString()} at{" "}
-                  {new Date(viewModal.user.updatedAt).toLocaleTimeString()}
-                </span>
-              </div>
+            <div style={{ display: "grid", gap: 10 }}>
+              {[
+                {
+                  label: getTranslation("fullName"),
+                  value: viewModal.user.name,
+                },
+                { label: getTranslation("email"), value: viewModal.user.email },
+                {
+                  label: getTranslation("role"),
+                  value: getRoleDisplayName(viewModal.user.role),
+                },
+                {
+                  label: getTranslation("phone"),
+                  value: viewModal.user.phone || "N/A",
+                },
+                {
+                  label: getTranslation("userId"),
+                  value: viewModal.user._id,
+                  small: true,
+                },
+                {
+                  label: getTranslation("created"),
+                  value: new Date(viewModal.user.createdAt).toLocaleString(),
+                },
+                {
+                  label: getTranslation("lastUpdated"),
+                  value: new Date(viewModal.user.updatedAt).toLocaleString(),
+                },
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    borderBottom: idx < 6 ? `1px solid ${C.border}` : "none",
+                    paddingBottom: idx < 6 ? 8 : 0,
+                  }}
+                >
+                  <span style={{ color: C.muted, fontSize: 12 }}>
+                    {item.label}
+                  </span>
+                  <span
+                    style={{
+                      fontWeight: 600,
+                      color: C.dark,
+                      fontSize: item.small ? 11 : 13,
+                    }}
+                  >
+                    {item.value}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         )}
       </Modal>
 
-      {/* Role Change Modal */}
       <Modal
         isOpen={roleModal.isOpen}
         onClose={() =>
@@ -567,7 +578,7 @@ export default function UserManagement({ t }) {
         }
       >
         <div style={{ padding: "4px 0" }}>
-          <p style={{ marginBottom: 16, color: "#555" }}>
+          <p style={{ marginBottom: 16, color: "#555", fontSize: 13 }}>
             {getTranslation("changeRolePrompt")}{" "}
             <strong>{roleModal.user?.name}</strong>
           </p>
@@ -577,7 +588,7 @@ export default function UserManagement({ t }) {
                 display: "block",
                 marginBottom: 6,
                 fontWeight: 600,
-                fontSize: 13,
+                fontSize: 12,
               }}
             >
               {getTranslation("role")}
@@ -589,10 +600,10 @@ export default function UserManagement({ t }) {
               }
               style={{
                 width: "100%",
-                padding: "10px 14px",
+                padding: "8px 12px",
                 border: `1.5px solid ${C.border}`,
                 borderRadius: 8,
-                fontSize: 14,
+                fontSize: 13,
                 background: C.white,
                 outline: "none",
               }}
@@ -609,35 +620,39 @@ export default function UserManagement({ t }) {
         </div>
       </Modal>
 
-      {/* Header with Stats */}
+      {/* Header */}
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 24,
+          flexDirection: "row",
           flexWrap: "wrap",
+          justifyContent: "space-between",
+          alignItems: "center",
           gap: 12,
+          marginBottom: 20,
         }}
       >
         <div>
           <h1
             style={{
-              fontSize: "clamp(20px, 5vw, 26px)",
+              fontSize: "clamp(18px, 4vw, 24px)",
               fontWeight: 900,
               color: C.dark,
               fontFamily: F.serif,
               margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
             }}
           >
-            <FiUsers size={24} style={{ marginRight: 8, color: C.primary }} />
+            <FiUsers size={22} color={C.primary} />
             {getTranslation("title")}
           </h1>
           <p
             style={{
-              fontSize: "clamp(11px, 3vw, 13px)",
+              fontSize: "clamp(11px, 2.5vw, 13px)",
               color: C.muted,
-              marginTop: 4,
+              marginTop: 2,
               fontFamily: F.sans,
             }}
           >
@@ -659,56 +674,62 @@ export default function UserManagement({ t }) {
           }}
           style={{
             ...btn.primary,
-            padding: "10px 24px",
-            fontSize: "14px",
+            padding: "8px 18px",
+            fontSize: "13px",
             display: "flex",
             alignItems: "center",
-            gap: 8,
+            gap: 6,
+            borderRadius: 8,
           }}
         >
-          <FiUserPlus size={18} />
+          <FiUserPlus size={16} />
           {getTranslation("addUser")}
         </button>
       </div>
 
-      {/* Statistics Cards with react-icons */}
+      {/* Statistics Cards - Responsive Grid */}
       <div
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
-          gap: 12,
-          marginBottom: 20,
+          gap: "clamp(8px, 2vw, 12px)",
+          marginBottom: 16,
         }}
       >
         <StatCard
           icon={FiUsers}
           value={roleStats.total}
           label={getTranslation("total")}
-          color="#1a3aad"
+          color={cardColors.total.color}
+          gradient={cardColors.total.gradient}
         />
         <StatCard
           icon={FiShield}
           value={roleStats.superadmin}
           label={getTranslation("superAdmin")}
-          color="#8B1A1A"
+          color={cardColors.superadmin.color}
+          gradient={cardColors.superadmin.gradient}
         />
         <StatCard
           icon={FiUserCheck}
           value={roleStats.admin}
           label={getTranslation("admin")}
-          color="#1A6B4A"
+          color={cardColors.admin.color}
+          gradient={cardColors.admin.gradient}
         />
         <StatCard
           icon={FiStar}
           value={roleStats.leader}
           label={getTranslation("teamLeader")}
-          color="#C25A00"
+          color={cardColors.leader.color}
+          gradient={cardColors.leader.gradient}
         />
         <StatCard
           icon={FiUser}
           value={roleStats.employee}
           label={getTranslation("employee")}
-          color="#1E4D8C"
+          color={cardColors.employee.color}
+          gradient={cardColors.employee.gradient}
         />
       </div>
 
@@ -718,16 +739,16 @@ export default function UserManagement({ t }) {
           display: "flex",
           flexDirection: "row",
           flexWrap: "wrap",
-          gap: 12,
+          gap: 10,
           marginBottom: 16,
         }}
       >
-        <div style={{ flex: 1, minWidth: 200, position: "relative" }}>
+        <div style={{ flex: 1, minWidth: 180, position: "relative" }}>
           <FiSearch
-            size={18}
+            size={16}
             style={{
               position: "absolute",
-              left: "12px",
+              left: "10px",
               top: "50%",
               transform: "translateY(-50%)",
               color: "#999",
@@ -740,10 +761,10 @@ export default function UserManagement({ t }) {
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
               width: "100%",
-              padding: "10px 14px 10px 40px",
+              padding: "8px 12px 8px 34px",
               border: `1.5px solid ${C.border}`,
               borderRadius: 8,
-              fontSize: 14,
+              fontSize: 13,
               outline: "none",
               transition: "border-color 0.2s",
             }}
@@ -759,13 +780,13 @@ export default function UserManagement({ t }) {
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value)}
           style={{
-            padding: "10px 14px",
+            padding: "8px 12px",
             border: `1.5px solid ${C.border}`,
             borderRadius: 8,
-            fontSize: 14,
+            fontSize: 13,
             background: C.white,
             outline: "none",
-            minWidth: 150,
+            minWidth: 130,
           }}
         >
           <option value="all">{getTranslation("allRoles")}</option>
@@ -785,12 +806,12 @@ export default function UserManagement({ t }) {
         <div
           style={{
             textAlign: "center",
-            padding: 60,
+            padding: 40,
             color: C.muted,
             fontFamily: F.sans,
           }}
         >
-          <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+          <div style={{ fontSize: 28, marginBottom: 8 }}>⏳</div>
           <p>{safeCommon.loading || "Loading..."}</p>
         </div>
       ) : (
@@ -803,52 +824,53 @@ export default function UserManagement({ t }) {
               borderRadius: 12,
               overflow: "hidden",
               boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+              minWidth: 600,
             }}
           >
             <thead>
               <tr style={{ background: C.dark, color: C.light }}>
                 <th
                   style={{
-                    padding: "14px 16px",
+                    padding: "10px 14px",
                     textAlign: "left",
-                    fontSize: 13,
+                    fontSize: 12,
                   }}
                 >
-                  <FiUser size={14} style={{ marginRight: 6 }} />
+                  <FiUser size={12} style={{ marginRight: 4 }} />
                   {getTranslation("fullName")}
                 </th>
                 <th
                   style={{
-                    padding: "14px 16px",
+                    padding: "10px 14px",
                     textAlign: "left",
-                    fontSize: 13,
+                    fontSize: 12,
                   }}
                 >
                   {getTranslation("email")}
                 </th>
                 <th
                   style={{
-                    padding: "14px 16px",
+                    padding: "10px 14px",
                     textAlign: "left",
-                    fontSize: 13,
+                    fontSize: 12,
                   }}
                 >
                   {getTranslation("role")}
                 </th>
                 <th
                   style={{
-                    padding: "14px 16px",
+                    padding: "10px 14px",
                     textAlign: "left",
-                    fontSize: 13,
+                    fontSize: 12,
                   }}
                 >
                   {getTranslation("phone")}
                 </th>
                 <th
                   style={{
-                    padding: "14px 16px",
+                    padding: "10px 14px",
                     textAlign: "center",
-                    fontSize: 13,
+                    fontSize: 12,
                   }}
                 >
                   {getTranslation("actions")}
@@ -874,25 +896,26 @@ export default function UserManagement({ t }) {
                 >
                   <td
                     style={{
-                      padding: "12px 16px",
+                      padding: "8px 14px",
                       fontWeight: 500,
                       color: C.dark,
+                      fontSize: 13,
                     }}
                   >
                     <FiUser
-                      size={14}
-                      style={{ marginRight: 8, color: C.primary, opacity: 0.6 }}
+                      size={12}
+                      style={{ marginRight: 6, color: C.primary, opacity: 0.6 }}
                     />
                     {user.name}
                     {user._id === currentUser._id && (
                       <span
                         style={{
-                          marginLeft: 8,
-                          fontSize: 10,
+                          marginLeft: 6,
+                          fontSize: 9,
                           background: C.primary + "15",
                           color: C.primary,
-                          padding: "2px 8px",
-                          borderRadius: 12,
+                          padding: "1px 6px",
+                          borderRadius: 10,
                           fontWeight: 600,
                         }}
                       >
@@ -900,22 +923,24 @@ export default function UserManagement({ t }) {
                       </span>
                     )}
                   </td>
-                  <td style={{ padding: "12px 16px", color: "#555" }}>
+                  <td
+                    style={{ padding: "8px 14px", color: "#555", fontSize: 12 }}
+                  >
                     {user.email}
                   </td>
-                  <td style={{ padding: "12px 16px" }}>
+                  <td style={{ padding: "8px 14px" }}>
                     <div>
                       <span
                         style={{
                           background: getRoleBadgeColor(user.role) + "15",
                           color: getRoleBadgeColor(user.role),
-                          padding: "5px 12px",
-                          borderRadius: 20,
-                          fontSize: 12,
+                          padding: "3px 10px",
+                          borderRadius: 16,
+                          fontSize: 11,
                           fontWeight: 600,
                           display: "inline-flex",
                           alignItems: "center",
-                          gap: 6,
+                          gap: 4,
                         }}
                       >
                         <span>{getRoleIcon(user.role)}</span>
@@ -924,19 +949,20 @@ export default function UserManagement({ t }) {
                       <RoleDescription role={user.role} />
                     </div>
                   </td>
-                  <td style={{ padding: "12px 16px", color: "#777" }}>
+                  <td
+                    style={{ padding: "8px 14px", color: "#777", fontSize: 12 }}
+                  >
                     {user.phone || "—"}
                   </td>
                   <td
                     style={{
-                      padding: "8px 12px",
+                      padding: "4px 8px",
                       textAlign: "center",
                       display: "flex",
                       justifyContent: "center",
                       alignItems: "center",
-                      gap: 4,
+                      gap: 2,
                       flexWrap: "wrap",
-                      minWidth: "120px",
                     }}
                   >
                     <ActionButton
@@ -952,19 +978,15 @@ export default function UserManagement({ t }) {
                         setShowModal(true);
                       }}
                       Icon={FiEdit2}
-                      label=""
                       color="#3b82f6"
                       title={getTranslation("edit")}
                     />
-
                     <ActionButton
                       onClick={() => openViewModal(user)}
                       Icon={FiEye}
-                      label=""
                       color="#8b5cf6"
                       title={getTranslation("viewDetails")}
                     />
-
                     {isSuperAdmin && user.role !== ROLES.SUPER_ADMIN && (
                       <ActionButton
                         onClick={() => {
@@ -975,17 +997,14 @@ export default function UserManagement({ t }) {
                           });
                         }}
                         Icon={FiRefreshCw}
-                        label=""
                         color="#f59e0b"
                         title={getTranslation("changeRole")}
                       />
                     )}
-
                     {canDeleteUser(user) && (
                       <ActionButton
                         onClick={() => openDeleteConfirm(user._id, user.name)}
                         Icon={FiTrash2}
-                        label=""
                         color="#ef4444"
                         title={getTranslation("delete")}
                       />
@@ -1000,18 +1019,18 @@ export default function UserManagement({ t }) {
             <div
               style={{
                 textAlign: "center",
-                padding: 60,
+                padding: 40,
                 color: C.muted,
                 fontFamily: F.sans,
               }}
             >
-              <div style={{ fontSize: 48, marginBottom: 16 }}>👥</div>
-              <p style={{ fontSize: 16, marginBottom: 8 }}>
+              <div style={{ fontSize: 40, marginBottom: 12 }}>👥</div>
+              <p style={{ fontSize: 15, marginBottom: 4 }}>
                 {searchTerm || roleFilter !== "all"
                   ? getTranslation("noUsersMatch")
                   : getTranslation("noUsersFound")}
               </p>
-              <p style={{ fontSize: 13, color: "#999" }}>
+              <p style={{ fontSize: 12, color: "#999" }}>
                 {searchTerm || roleFilter !== "all"
                   ? getTranslation("tryAdjusting")
                   : getTranslation("createFirstUser")}
@@ -1044,9 +1063,9 @@ export default function UserManagement({ t }) {
             style={{
               background: C.white,
               borderRadius: 16,
-              padding: 28,
+              padding: 24,
               width: "90%",
-              maxWidth: 500,
+              maxWidth: 450,
               maxHeight: "90vh",
               overflow: "auto",
               boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
@@ -1055,33 +1074,33 @@ export default function UserManagement({ t }) {
           >
             <h2
               style={{
-                fontSize: "clamp(20px, 5vw, 24px)",
+                fontSize: "clamp(18px, 4vw, 22px)",
                 fontWeight: 800,
                 color: C.dark,
                 fontFamily: F.serif,
                 marginBottom: 4,
                 display: "flex",
                 alignItems: "center",
-                gap: 10,
+                gap: 8,
               }}
             >
               {editingUser ? (
                 <>
-                  <FiEdit2 size={22} color="#3b82f6" />
+                  <FiEdit2 size={20} color="#3b82f6" />
                   {getTranslation("editUser")}
                 </>
               ) : (
                 <>
-                  <FiUserPlus size={22} color={C.primary} />
+                  <FiUserPlus size={20} color={C.primary} />
                   {getTranslation("addNewUser")}
                 </>
               )}
             </h2>
             <p
               style={{
-                fontSize: "clamp(12px, 3vw, 13px)",
+                fontSize: "clamp(11px, 2.5vw, 12px)",
                 color: C.muted,
-                marginBottom: 20,
+                marginBottom: 16,
                 fontFamily: F.sans,
               }}
             >
@@ -1091,13 +1110,13 @@ export default function UserManagement({ t }) {
             </p>
 
             <form id="user-form" onSubmit={handleSubmit}>
-              <div style={{ marginBottom: 14 }}>
+              <div style={{ marginBottom: 12 }}>
                 <label
                   style={{
                     display: "block",
-                    marginBottom: 4,
+                    marginBottom: 3,
                     fontWeight: 600,
-                    fontSize: 13,
+                    fontSize: 12,
                     color: C.dark,
                   }}
                 >
@@ -1114,10 +1133,10 @@ export default function UserManagement({ t }) {
                   }
                   style={{
                     width: "100%",
-                    padding: "10px 14px",
+                    padding: "8px 12px",
                     border: `1.5px solid ${C.border}`,
                     borderRadius: 8,
-                    fontSize: 14,
+                    fontSize: 13,
                     transition: "border-color 0.2s",
                     outline: "none",
                   }}
@@ -1130,13 +1149,13 @@ export default function UserManagement({ t }) {
                 />
               </div>
 
-              <div style={{ marginBottom: 14 }}>
+              <div style={{ marginBottom: 12 }}>
                 <label
                   style={{
                     display: "block",
-                    marginBottom: 4,
+                    marginBottom: 3,
                     fontWeight: 600,
-                    fontSize: 13,
+                    fontSize: 12,
                     color: C.dark,
                   }}
                 >
@@ -1153,10 +1172,10 @@ export default function UserManagement({ t }) {
                   }
                   style={{
                     width: "100%",
-                    padding: "10px 14px",
+                    padding: "8px 12px",
                     border: `1.5px solid ${C.border}`,
                     borderRadius: 8,
-                    fontSize: 14,
+                    fontSize: 13,
                     transition: "border-color 0.2s",
                     outline: "none",
                   }}
@@ -1170,13 +1189,13 @@ export default function UserManagement({ t }) {
               </div>
 
               {!editingUser && (
-                <div style={{ marginBottom: 14 }}>
+                <div style={{ marginBottom: 12 }}>
                   <label
                     style={{
                       display: "block",
-                      marginBottom: 4,
+                      marginBottom: 3,
                       fontWeight: 600,
-                      fontSize: 13,
+                      fontSize: 12,
                       color: C.dark,
                     }}
                   >
@@ -1186,17 +1205,17 @@ export default function UserManagement({ t }) {
                   <input
                     type="password"
                     required
-                    placeholder={getTranslation("minPassword")}
+                    placeholder="Min 6 characters"
                     value={formData.password}
                     onChange={(e) =>
                       setFormData({ ...formData, password: e.target.value })
                     }
                     style={{
                       width: "100%",
-                      padding: "10px 14px",
+                      padding: "8px 12px",
                       border: `1.5px solid ${C.border}`,
                       borderRadius: 8,
-                      fontSize: 14,
+                      fontSize: 13,
                       transition: "border-color 0.2s",
                       outline: "none",
                     }}
@@ -1210,13 +1229,13 @@ export default function UserManagement({ t }) {
                 </div>
               )}
 
-              <div style={{ marginBottom: 14 }}>
+              <div style={{ marginBottom: 12 }}>
                 <label
                   style={{
                     display: "block",
-                    marginBottom: 4,
+                    marginBottom: 3,
                     fontWeight: 600,
-                    fontSize: 13,
+                    fontSize: 12,
                     color: C.dark,
                   }}
                 >
@@ -1230,10 +1249,10 @@ export default function UserManagement({ t }) {
                   }
                   style={{
                     width: "100%",
-                    padding: "10px 14px",
+                    padding: "8px 12px",
                     border: `1.5px solid ${C.border}`,
                     borderRadius: 8,
-                    fontSize: 14,
+                    fontSize: 13,
                     background: C.white,
                     outline: "none",
                   }}
@@ -1247,13 +1266,13 @@ export default function UserManagement({ t }) {
                 <RoleDescription role={formData.role} />
               </div>
 
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 16 }}>
                 <label
                   style={{
                     display: "block",
-                    marginBottom: 4,
+                    marginBottom: 3,
                     fontWeight: 600,
-                    fontSize: 13,
+                    fontSize: 12,
                     color: C.dark,
                   }}
                 >
@@ -1268,10 +1287,10 @@ export default function UserManagement({ t }) {
                   }
                   style={{
                     width: "100%",
-                    padding: "10px 14px",
+                    padding: "8px 12px",
                     border: `1.5px solid ${C.border}`,
                     borderRadius: 8,
-                    fontSize: 14,
+                    fontSize: 13,
                     transition: "border-color 0.2s",
                     outline: "none",
                   }}
@@ -1287,10 +1306,10 @@ export default function UserManagement({ t }) {
               <div
                 style={{
                   display: "flex",
-                  gap: 12,
+                  gap: 10,
                   justifyContent: "flex-end",
                   borderTop: `1px solid ${C.border}`,
-                  paddingTop: 20,
+                  paddingTop: 16,
                 }}
               >
                 <button
@@ -1298,35 +1317,35 @@ export default function UserManagement({ t }) {
                   onClick={() => setShowModal(false)}
                   style={{
                     ...btn.secondary,
-                    padding: "10px 24px",
-                    fontSize: 14,
+                    padding: "8px 18px",
+                    fontSize: 12,
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
-                  <FiX size={16} />
+                  <FiX size={14} />
                   {getTranslation("cancel")}
                 </button>
                 <button
                   type="submit"
                   style={{
                     ...btn.primary,
-                    padding: "10px 24px",
-                    fontSize: 14,
+                    padding: "8px 18px",
+                    fontSize: 12,
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
                   {editingUser ? (
                     <>
-                      <FiCheck size={16} />
+                      <FiCheck size={14} />
                       {getTranslation("updateUser")}
                     </>
                   ) : (
                     <>
-                      <FiUserPlus size={16} />
+                      <FiUserPlus size={14} />
                       {getTranslation("createUser")}
                     </>
                   )}
