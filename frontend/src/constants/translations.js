@@ -532,7 +532,7 @@ export const translations = {
       saved: "ሪፖርቱ ተሞልቷል!",
       savedSub: "የአቻ ፎረም ሪፖርት በተሳካ ሁኔታ ተጠናቋል።",
       teamsTitle: "በቡድን የአቻ ፎረም ሪፖርቶች",
-      addTeam: "+ ቡድን ጨምር",
+      addTeam: "ቡድን ጨምር",
       yourTeam: "ቡድንህ",
       selectTeamToReport: "ሪፖርት ለመሙላት ቡድን ይምረጡ",
       noTeamsYet: "እስካሁን ምንም ቡድን አልተፈጠረም። አዲስ ቡድን ለመፍጠር ቁልፉን ይጫኑ።",
