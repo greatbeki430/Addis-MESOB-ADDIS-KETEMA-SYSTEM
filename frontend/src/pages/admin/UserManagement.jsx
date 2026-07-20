@@ -140,7 +140,7 @@ export default function UserManagement({ t }) {
       subtitle: "Manage all users in the system",
       totalUsers: "total users",
       addUser: "Add New User",
-      searchPlaceholder: "🔍 Search users by name or email...",
+      searchPlaceholder: " Search users by name or email...",
       allRoles: "All Roles",
       noUsersFound: "No users found",
       noUsersMatch: "No users match your search criteria",

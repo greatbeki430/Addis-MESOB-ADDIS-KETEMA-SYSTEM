@@ -246,6 +246,10 @@ export default function Sidebar({
     }
   };
 
+  // Get forum translations
+  const forumT = safeT("forum", {});
+  const commonT = safeT("common", {});
+
   const DARK_BG = "#0d1a5e";
   const BORDER_COLOR = "#1a3aad";
   const ACTIVE_BG = "#1a3aad33";
@@ -338,7 +342,7 @@ export default function Sidebar({
 
   const handleAddTeam = async () => {
     if (!newTeamName.trim()) {
-      alert("Please enter a team name");
+      alert(commonT.teamNameRequired || "Please enter a team name");
       return;
     }
     try {
@@ -368,6 +372,7 @@ export default function Sidebar({
     } catch (error) {
       alert(
         error.response?.data?.message ||
+          commonT.failedCreateTeam ||
           "Failed to create team. Please try again.",
       );
     } finally {
@@ -385,7 +390,7 @@ export default function Sidebar({
       "admin/services": <FiSettings size={20} />,
       users: <FiUsersIcon size={20} />,
       teams: <FiUsers size={20} />,
-      employees: <FiUsers size={20} />, // ← ADDED: Employee Management
+      employees: <FiUsers size={20} />,
       analytics: <FiBarChart2 size={20} />,
       documents: <FiFileText size={20} />,
       "golden-monday": <FiSunrise size={20} />,
@@ -621,7 +626,7 @@ export default function Sidebar({
                         size={14}
                         style={{ animation: "spin 1s linear infinite" }}
                       />
-                      Loading...
+                      {forumT.loadingTeams || "Loading teams..."}
                     </div>
                   )}
                   {!loading && teams.length === 0 && (
@@ -634,8 +639,9 @@ export default function Sidebar({
                       }}
                     >
                       {isEmployee || isLeader
-                        ? "You are not assigned to any team"
-                        : "No teams yet"}
+                        ? forumT.noTeamsAssigned ||
+                          "You are not assigned to any team"
+                        : forumT.noTeamsYetShort || "No teams yet"}
                     </div>
                   )}
                   {teams.map((team) => (
@@ -697,7 +703,7 @@ export default function Sidebar({
                               fontWeight: 700,
                             }}
                           >
-                            Your Team
+                            {forumT.yourTeam || "Your Team"}
                           </span>
                         )}
                     </button>
@@ -734,7 +740,7 @@ export default function Sidebar({
                       }}
                     >
                       <FiPlus size={14} style={{ fontWeight: "bold" }} />
-                      Add Team
+                      {forumT.addTeam || "Add Team"}
                     </button>
                   )}
                 </div>
@@ -809,7 +815,7 @@ export default function Sidebar({
         </div>
       </div>
 
-      {/* Add Team Modal - unchanged */}
+      {/* Add Team Modal - Updated with translations */}
       {showAddTeamModal && (
         <div
           style={{
@@ -850,11 +856,11 @@ export default function Sidebar({
               }}
             >
               <FiUserPlus size={20} color={C.primary} />
-              Add New Team
+              {forumT.addNewTeam || "Add New Team"}
             </h3>
             <input
               type="text"
-              placeholder="Team Name"
+              placeholder={forumT.teamName || "Team Name"}
               value={newTeamName}
               onChange={(e) => setNewTeamName(e.target.value)}
               style={{
@@ -879,7 +885,7 @@ export default function Sidebar({
             />
             <input
               type="text"
-              placeholder="Department (Optional)"
+              placeholder={forumT.teamDescription || "Department (Optional)"}
               value={newTeamDepartment}
               onChange={(e) => setNewTeamDepartment(e.target.value)}
               style={{
@@ -928,7 +934,7 @@ export default function Sidebar({
                 }}
               >
                 <FiX size={16} />
-                Cancel
+                {commonT.cancel || "Cancel"}
               </button>
               <button
                 onClick={handleAddTeam}
@@ -967,12 +973,12 @@ export default function Sidebar({
                       size={16}
                       style={{ animation: "spin 1s linear infinite" }}
                     />
-                    Adding...
+                    {commonT.saving || "Adding..."}
                   </>
                 ) : (
                   <>
                     <FiCheck size={16} />
-                    Add Team
+                    {forumT.createTeam || "Add Team"}
                   </>
                 )}
               </button>

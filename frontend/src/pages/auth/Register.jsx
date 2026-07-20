@@ -186,7 +186,7 @@ export default function Register({ onClose, t }) {
 
   return (
     <div style={registerStyles.container}>
-      <h1 style={registerStyles.title}>➕ {tu.addNewUser || "Add New User"}</h1>
+      <h1 style={registerStyles.title}> {tu.addNewUser || "Add New User"}</h1>
       <p style={registerStyles.subtitle}>
         {tu.createAccount ||
           "Create a new user account with specific role permissions"}
