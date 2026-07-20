@@ -145,15 +145,8 @@ function AuthenticatedApp() {
   const { language, t, changeLanguage } = useLanguage();
   const { showToast, toasts, removeToast } = useToast();
   const location = useLocation();
-  const {
-    // user, // ❌ Removed - not used directly in App.jsx (used in Header)
-    isAdmin,
-    isSuperAdmin,
-    // isLeader, // ❌ Removed - not used directly
-    // isEmployee, // ❌ Removed - not used directly
-    isAdminOrSuperAdmin,
-    isLeaderOrAbove,
-  } = useAuth();
+  const { isAdmin, isSuperAdmin, isAdminOrSuperAdmin, isLeaderOrAbove } =
+    useAuth();
 
   const currentTab = location.pathname.replace("/", "") || "dashboard";
   const [collapsed, setCollapsed] = useState(false);
@@ -172,11 +165,11 @@ function AuthenticatedApp() {
           setPdfReady(true);
         } else {
           console.warn("⚠️ PDF system running with fallback fonts");
-          setPdfReady(true); // Still allow PDF generation with fallbacks
+          setPdfReady(true);
         }
       } catch (error) {
         console.error("❌ PDF initialization failed:", error);
-        setPdfReady(true); // Allow PDF generation even if fonts fail
+        setPdfReady(true);
       }
     };
 
@@ -325,6 +318,7 @@ function AuthenticatedApp() {
           t={t}
           lang={language}
           setLang={changeLanguage}
+          onAddUserClick={() => setShowRegister(true)}
         />
 
         <main
@@ -498,7 +492,7 @@ function AuthenticatedApp() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 2000, // ✅ Increased from 1000 to 2000 to appear above chatbot
+            zIndex: 2000,
             animation: "fadeIn 0.3s ease",
           }}
           onClick={() => setShowRegister(false)}
@@ -509,13 +503,13 @@ function AuthenticatedApp() {
         </div>
       )}
 
-      {/* Add User FAB */}
+      {/* ✅ Add User FAB - positioned above chatbot to prevent overlap */}
       {isAdminOrSuperAdmin && (
         <button
           onClick={() => setShowRegister(true)}
           style={{
             position: "fixed",
-            bottom: 20,
+            bottom: "100px",
             right: 20,
             background: C.primary,
             color: "#fff",
