@@ -581,19 +581,60 @@ const AIInsightBadge = ({ type = "info", children }) => {
 const formatAIResponse = (text) => {
   if (!text) return "";
 
-  // Remove markdown symbols and format nicely
+  // Clean up the text - remove all markdown symbols
   let formatted = text
-    // Remove ** around text
+    // Remove ** (bold markers)
     .replace(/\*\*/g, "")
+    // Remove * (italic markers)
+    .replace(/\*/g, "")
     // Remove ### headers
     .replace(/### /g, "")
     // Remove --- separators
     .replace(/---/g, "")
-    // Clean up extra newlines
+    // Clean up multiple newlines
     .replace(/\n{3,}/g, "\n\n")
-    // Add bullet points for list items
-    .replace(/• /g, "• ")
+    // Remove trailing spaces
+    .replace(/[ \t]+$/gm, "")
+    // Clean up bullet points - make them consistent
+    .replace(/^[•·-]\s*/gm, "• ")
+    // Remove empty parentheses
+    .replace(/\(\s*\)/g, "")
     .trim();
+
+  // Remove any remaining asterisks
+  formatted = formatted.replace(/\*/g, "");
+
+  // Clean up extra spaces
+  formatted = formatted.replace(/\s{2,}/g, " ");
+
+  // Format sections nicely with headers
+  const sections = [
+    "MEETING MINUTES",
+    "Date:",
+    "Attendees:",
+    "AGENDA ITEMS & DECISIONS",
+    "ACTION ITEMS",
+    "NEXT MEETING",
+  ];
+
+  // Add proper spacing after section headers
+  sections.forEach((section) => {
+    const regex = new RegExp(`(${section})`, "g");
+    formatted = formatted.replace(regex, "\n$1\n");
+  });
+
+  // Clean up bullet points in AGENDA ITEMS section
+  formatted = formatted.replace(/•\s*Topics:/g, "• Topics:");
+  formatted = formatted.replace(/•\s*Explanation:/g, "• Explanation:");
+  formatted = formatted.replace(/•\s*Gaps:/g, "• Gaps:");
+  formatted = formatted.replace(/•\s*Agreements:/g, "• Agreements:");
+
+  // Remove empty bullet points
+  formatted = formatted.replace(/•\s*\(no details recorded\)/g, "");
+  formatted = formatted.replace(/•\s*No/g, "• No");
+
+  // Clean up multiple newlines again
+  formatted = formatted.replace(/\n{3,}/g, "\n\n");
 
   return formatted;
 };
@@ -729,7 +770,7 @@ export default function ForumReport({
     setForm((prev) => ({
       ...prev,
       explanation: prev.explanation
-        ? `${prev.explanation}\n\n---\n📝 AI Generated Summary:\n${formattedText}`
+        ? `${prev.explanation}\n\n📝 AI Generated Summary:\n${formattedText}`
         : `📝 AI Generated Summary:\n${formattedText}`,
     }));
 
