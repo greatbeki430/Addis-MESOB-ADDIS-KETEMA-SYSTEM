@@ -24,6 +24,7 @@ import {
   FiAward,
   FiUserPlus,
   FiCheck,
+  FiChevronUp,
 } from "react-icons/fi";
 
 export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
@@ -274,7 +275,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
           {dateStr}
         </span>
 
-        {/* Language Selector - Dropdown on mobile, buttons on desktop */}
+        {/* Language Selector - Beautiful Dropdown on mobile, buttons on desktop */}
         <div
           ref={langDropdownRef}
           style={{ position: "relative", flexShrink: 0 }}
@@ -331,70 +332,106 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             ))}
           </div>
 
-          {/* Mobile: Language dropdown button - FIXED: Removed duplicate display */}
+          {/* Mobile: Beautiful Language dropdown button */}
           <button
             className="lang-mobile"
             onClick={toggleLangDropdown}
             style={{
-              background: isLangDropdownOpen ? C.primary : "#f0f3ff",
+              background: isLangDropdownOpen
+                ? `linear-gradient(135deg, ${C.primary}, #1a3aad)`
+                : "#f0f3ff",
               color: isLangDropdownOpen ? C.gold : C.primary,
               border: `1px solid ${isLangDropdownOpen ? C.primary : C.border}`,
-              borderRadius: 4,
-              padding: "clamp(2px, 1vw, 4px) clamp(6px, 2vw, 10px)",
-              fontSize: "clamp(10px, 2vw, 12px)",
+              borderRadius: 8,
+              padding: "clamp(4px, 1.2vw, 6px) clamp(10px, 2.5vw, 16px)",
+              fontSize: "clamp(11px, 2.5vw, 13px)",
               fontWeight: 700,
               cursor: "pointer",
               fontFamily: F.sans,
-              transition: "all 0.2s ease",
+              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
               whiteSpace: "nowrap",
-              display: "flex", // ✅ Only one display property
+              display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 4,
+              gap: 6,
               flexShrink: 0,
-              minHeight: "clamp(28px, 4vh, 34px)",
+              minHeight: "clamp(32px, 4.5vh, 38px)",
+              boxShadow: isLangDropdownOpen
+                ? `0 4px 20px ${C.primary}44`
+                : "0 2px 8px rgba(0,0,0,0.06)",
+              transform: isLangDropdownOpen ? "scale(1.02)" : "scale(1)",
             }}
             onMouseEnter={(e) => {
               if (!isLangDropdownOpen) {
                 e.currentTarget.style.background = C.primary + "22";
+                e.currentTarget.style.transform = "scale(1.03)";
+                e.currentTarget.style.boxShadow = `0 4px 16px ${C.primary}33`;
               }
             }}
             onMouseLeave={(e) => {
               if (!isLangDropdownOpen) {
                 e.currentTarget.style.background = "#f0f3ff";
+                e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
               }
             }}
           >
-            <FiGlobe size={14} />
-            <span>{currentLang.flag}</span>
-            <FiChevronDown
-              size={10}
+            <FiGlobe size={16} />
+            <span
               style={{
-                transition: "transform 0.3s ease",
-                transform: isLangDropdownOpen
-                  ? "rotate(180deg)"
-                  : "rotate(0deg)",
+                fontSize: "clamp(14px, 3vw, 18px)",
+                lineHeight: 1,
               }}
-            />
+            >
+              {currentLang.flag}
+            </span>
+            <span
+              style={{
+                fontSize: "clamp(10px, 2vw, 12px)",
+                fontWeight: 600,
+                opacity: 0.8,
+              }}
+            >
+              {currentLang.label}
+            </span>
+            {isLangDropdownOpen ? (
+              <FiChevronUp size={14} />
+            ) : (
+              <FiChevronDown size={14} />
+            )}
           </button>
 
-          {/* Mobile Language Dropdown Menu */}
+          {/* Mobile: Beautiful Language Dropdown Menu */}
           {isLangDropdownOpen && (
             <div
               style={{
                 position: "absolute",
-                top: "calc(100% + 6px)",
+                top: "calc(100% + 8px)",
                 right: 0,
-                minWidth: 140,
+                minWidth: 180,
                 background: C.white,
-                borderRadius: 10,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                borderRadius: 12,
+                boxShadow: "0 12px 48px rgba(0,0,0,0.18)",
                 border: `1px solid ${C.border}`,
                 overflow: "hidden",
-                animation: "fadeInUp 0.2s ease",
+                animation: "slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
                 zIndex: 101,
+                padding: "6px",
               }}
             >
+              <div
+                style={{
+                  padding: "6px 12px 4px",
+                  fontSize: 10,
+                  color: C.muted,
+                  fontWeight: 600,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.8,
+                  borderBottom: `1px solid ${C.border}44`,
+                }}
+              >
+                Select Language
+              </div>
               {LANGUAGES.map((l) => (
                 <button
                   key={l.code}
@@ -402,40 +439,65 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
-                    padding: "8px 14px",
+                    gap: 10,
+                    padding: "10px 14px",
                     width: "100%",
                     border: "none",
+                    borderRadius: 8,
                     background:
-                      lang === l.code ? C.primary + "11" : "transparent",
+                      lang === l.code
+                        ? `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`
+                        : "transparent",
                     cursor: "pointer",
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: lang === l.code ? 600 : 400,
                     color: lang === l.code ? C.primary : C.dark,
                     transition: "all 0.2s ease",
                     fontFamily: F.sans,
-                    borderLeft:
-                      lang === l.code
-                        ? `3px solid ${C.primary}`
-                        : "3px solid transparent",
+                    margin: "2px 0",
+                    position: "relative",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = C.bg;
+                    e.currentTarget.style.background =
+                      lang === l.code
+                        ? `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`
+                        : C.bg;
+                    e.currentTarget.style.transform = "translateX(4px)";
                   }}
                   onMouseLeave={(e) => {
-                    if (lang !== l.code) {
-                      e.currentTarget.style.background = "transparent";
-                    }
+                    e.currentTarget.style.background =
+                      lang === l.code
+                        ? `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`
+                        : "transparent";
+                    e.currentTarget.style.transform = "translateX(0)";
                   }}
                 >
-                  <span style={{ fontSize: 18 }}>{l.flag}</span>
-                  <span>{l.label}</span>
+                  <span
+                    style={{
+                      fontSize: 20,
+                      width: 28,
+                      textAlign: "center",
+                    }}
+                  >
+                    {l.flag}
+                  </span>
+                  <span style={{ flex: 1 }}>{l.label}</span>
                   {lang === l.code && (
-                    <FiCheck
-                      size={14}
-                      color={C.primary}
-                      style={{ marginLeft: "auto" }}
-                    />
+                    <span
+                      style={{
+                        background: C.primary,
+                        color: "#fff",
+                        borderRadius: "50%",
+                        width: 20,
+                        height: 20,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 11,
+                      }}
+                    >
+                      <FiCheck size={12} />
+                    </span>
                   )}
                 </button>
               ))}
@@ -871,6 +933,26 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
       </div>
 
       <style>{`
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-12px) scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
         /* Desktop: Show all language buttons */
         @media (min-width: 769px) {
           .lang-mobile {
@@ -896,11 +978,9 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
           .header-date { display: none !important; }
           .header-appname { display: none !important; }
           .logout-text { display: inline-block !important; }
-          .header-lang-btn span { display: none !important; }
-          .header-lang-btn { min-width: 26px !important; }
         }
 
-        /* Mobile: Show language dropdown, hide individual buttons */
+        /* Mobile: Show language dropdown */
         @media (max-width: 640px) {
           .lang-mobile {
             display: flex !important;
@@ -917,12 +997,8 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
         /* Extra small: Even more compact */
         @media (max-width: 480px) {
           .header-logout-btn { min-width: 20px !important; padding: 2px 3px !important; }
-          .lang-mobile { padding: 2px 6px !important; font-size: 10px !important; min-height: 24px !important; }
-        }
-
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(-10px); }
-          to { opacity: 1; transform: translateY(0); }
+          .lang-mobile { padding: 2px 8px !important; font-size: 10px !important; min-height: 24px !important; gap: 4px !important; }
+          .lang-mobile span { font-size: 12px !important; }
         }
       `}</style>
     </header>
