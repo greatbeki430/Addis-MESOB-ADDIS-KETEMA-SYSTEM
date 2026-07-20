@@ -912,7 +912,7 @@ export const translations = {
       report: "Gabaasa Guyyaa",
       services: "Tajaajiloota",
       analytics: "Analiitiksii",
-      users: "Bulchiinsa Fayyadamtootaa",
+      users: "Fayyadamtoota",
       teams: "Bulchiinsa Garee",
       "admin/services": "Bulchiinsa Tajaajilaa",
       documents: "Kuusaa Dookumentiiwwani",
