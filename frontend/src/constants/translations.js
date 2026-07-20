@@ -442,7 +442,7 @@ export const translations = {
       failedLoadUsers: "Failed to load users",
 
       // Admin Panel
-      adminPanelTitle: "Employee Management",
+      adminPanelTitle: "Employee Mngmnt",
       adminPanelSub: "Register and manage employees for Golden Monday rotation",
       registeredEmployeesLabel: "Registered Employees:",
       registerEmployeeBtn: "Register Employee",
