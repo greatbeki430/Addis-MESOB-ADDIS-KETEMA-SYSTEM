@@ -488,7 +488,7 @@ function AuthenticatedApp() {
         </main>
       </div>
 
-      {/* Register Modal */}
+      {/* ✅ Register Modal - with higher z-index than chatbot to prevent overlap */}
       {isAdminOrSuperAdmin && showRegister && (
         <div
           style={{
@@ -498,7 +498,7 @@ function AuthenticatedApp() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            zIndex: 1000,
+            zIndex: 2000, // ✅ Increased from 1000 to 2000 to appear above chatbot
             animation: "fadeIn 0.3s ease",
           }}
           onClick={() => setShowRegister(false)}
@@ -545,8 +545,8 @@ function AuthenticatedApp() {
         </button>
       )}
 
-      {/* AI Chatbot Widget — floats globally for all authenticated users */}
-      <ChatbotWidget />
+      {/* ✅ AI Chatbot Widget - hidden when register modal is open to prevent overlap */}
+      {!showRegister && <ChatbotWidget />}
     </div>
   );
 }
