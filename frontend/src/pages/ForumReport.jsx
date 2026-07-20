@@ -20,7 +20,7 @@ import { exportForumReportToPDF } from "../utils/pdfExport";
 import { meetingAPI } from "../services/api";
 import { aiAPI } from "../services/api";
 import { teamAPI } from "../services/api";
-import { AISummary, AIReportAssistant } from "../components/ai";
+import { AISummary } from "../components/ai";
 import { useToast } from "../hooks/useToast";
 
 // ✅ React Icons
@@ -52,11 +52,11 @@ import {
 
 // ─── FONT SIZES ──────────────────────────────────────────────
 const FONT_SIZES = {
-  h1: "clamp(22px, 5vw, 28px)",
-  h2: "clamp(18px, 4vw, 24px)",
-  h3: "clamp(16px, 3.5vw, 20px)",
-  body: "clamp(12px, 3vw, 14px)",
-  small: "clamp(10px, 2.5vw, 12px)",
+  h1: "clamp(18px, 4.5vw, 28px)",
+  h2: "clamp(15px, 3.5vw, 24px)",
+  h3: "clamp(14px, 3vw, 20px)",
+  body: "clamp(11px, 2.8vw, 14px)",
+  small: "clamp(9px, 2.2vw, 12px)",
 };
 
 // ─── Team Selector Component ─────────────────────────────────
@@ -84,18 +84,18 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
       >
         <div
           style={{
-            width: "clamp(60px, 12vw, 80px)",
-            height: "clamp(60px, 12vw, 80px)",
+            width: "clamp(50px, 10vw, 80px)",
+            height: "clamp(50px, 10vw, 80px)",
             background: `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`,
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             margin: "0 auto 16px",
-            fontSize: "clamp(32px, 8vw, 40px)",
+            fontSize: "clamp(28px, 7vw, 40px)",
           }}
         >
-          <FiMessageSquare size={40} color={C.primary} />
+          <FiMessageSquare size={32} color={C.primary} />
         </div>
         <h2
           style={{
@@ -174,7 +174,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+            gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
             gap: 12,
           }}
         >
@@ -183,7 +183,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
               key={team.id}
               onClick={() => setSelectedTeam(team)}
               style={{
-                padding: "clamp(14px, 2vw, 18px)",
+                padding: "clamp(12px, 1.8vw, 18px)",
                 background: C.white,
                 borderRadius: 12,
                 border: `2px solid ${selectedTeam?.id === team.id ? C.primary : C.border}44`,
@@ -223,8 +223,8 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
               >
                 <div
                   style={{
-                    width: 40,
-                    height: 40,
+                    width: 36,
+                    height: 36,
                     borderRadius: "10px",
                     background: `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`,
                     display: "flex",
@@ -233,13 +233,13 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
                     flexShrink: 0,
                   }}
                 >
-                  <FiUsers size={18} color={C.primary} />
+                  <FiUsers size={16} color={C.primary} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
                     style={{
                       fontWeight: 600,
-                      fontSize: 14,
+                      fontSize: 13,
                       color: C.dark,
                       whiteSpace: "nowrap",
                       overflow: "hidden",
@@ -250,7 +250,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
                   </div>
                   <div
                     style={{
-                      fontSize: 11,
+                      fontSize: 10,
                       color: C.muted,
                       whiteSpace: "nowrap",
                       overflow: "hidden",
@@ -266,15 +266,15 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
                       background: C.primary,
                       color: "#fff",
                       borderRadius: "50%",
-                      width: 24,
-                      height: 24,
+                      width: 20,
+                      height: 20,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
                     }}
                   >
-                    <FiCheck size={14} />
+                    <FiCheck size={12} />
                   </div>
                 )}
               </div>
@@ -287,7 +287,6 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
 };
 
 // ─── Enhanced Dynamic Field Group ────────────────────────────
-// ✅ FIXED: "Add Another" button now matches parent width
 const DynamicFieldGroup = ({
   title,
   values,
@@ -354,8 +353,8 @@ const DynamicFieldGroup = ({
                   ...btn.icon,
                   color: "#dc2626",
                   background: "#fee2e2",
-                  width: "32px",
-                  height: "32px",
+                  width: "28px",
+                  height: "28px",
                   borderRadius: "6px",
                 }}
                 onMouseEnter={(e) => {
@@ -367,14 +366,14 @@ const DynamicFieldGroup = ({
                   e.currentTarget.style.transform = "scale(1)";
                 }}
               >
-                <FiX size={16} />
+                <FiX size={14} />
               </button>
             )}
           </div>
         ))}
       </div>
 
-      {/* ✅ "Add Another" button - full width */}
+      {/* "Add Another" button - full width */}
       {values.length < maxItems && (
         <button
           onClick={handleAdd}
@@ -383,7 +382,7 @@ const DynamicFieldGroup = ({
             padding: "6px 14px",
             fontSize: "12px",
             marginTop: "8px",
-            width: "100%", // ✅ Full width
+            width: "100%",
             justifyContent: "center",
           }}
         >
@@ -393,7 +392,7 @@ const DynamicFieldGroup = ({
       )}
 
       {helperText && (
-        <p style={{ ...text.muted, fontSize: "11px", marginTop: "4px" }}>
+        <p style={{ ...text.muted, fontSize: "10px", marginTop: "4px" }}>
           <FiInfo size={12} style={{ marginRight: "4px" }} />
           {helperText}
         </p>
@@ -563,12 +562,12 @@ const AIInsightBadge = ({ type = "info", children }) => {
         display: "flex",
         alignItems: "flex-start",
         gap: "8px",
-        padding: "10px 14px",
+        padding: "8px 12px",
         borderRadius: radius.md,
         background: style.background,
         border: style.border,
         color: style.color,
-        fontSize: FONT_SIZES.body,
+        fontSize: "clamp(10px, 2.5vw, 13px)",
         marginBottom: SPACING.md,
       }}
     >
@@ -576,6 +575,27 @@ const AIInsightBadge = ({ type = "info", children }) => {
       <div>{children}</div>
     </div>
   );
+};
+
+// ─── Format AI Response ──────────────────────────────────────
+const formatAIResponse = (text) => {
+  if (!text) return "";
+
+  // Remove markdown symbols and format nicely
+  let formatted = text
+    // Remove ** around text
+    .replace(/\*\*/g, "")
+    // Remove ### headers
+    .replace(/### /g, "")
+    // Remove --- separators
+    .replace(/---/g, "")
+    // Clean up extra newlines
+    .replace(/\n{3,}/g, "\n\n")
+    // Add bullet points for list items
+    .replace(/• /g, "• ")
+    .trim();
+
+  return formatted;
 };
 
 // ─── Main Component ──────────────────────────────────────────
@@ -703,14 +723,17 @@ export default function ForumReport({
       return;
     }
 
+    // Format the AI response
+    const formattedText = formatAIResponse(text);
+
     setForm((prev) => ({
       ...prev,
       explanation: prev.explanation
-        ? `${prev.explanation}\n\n---\n🤖 AI Generated:\n${text}`
-        : `🤖 AI Generated:\n${text}`,
+        ? `${prev.explanation}\n\n---\n📝 AI Generated Summary:\n${formattedText}`
+        : `📝 AI Generated Summary:\n${formattedText}`,
     }));
 
-    setAiGeneratedContent(text);
+    setAiGeneratedContent(formattedText);
     showToast("✅ AI suggestion applied to explanation!", "success");
   };
 
@@ -780,30 +803,28 @@ export default function ForumReport({
       });
 
       let content = response.data?.minutes || response.data?.insight || "";
+      const formattedContent = formatAIResponse(content);
 
       const fullReport = `
-📋 PEER FORUM MEETING REPORT
-${"=".repeat(50)}
+PEER FORUM MEETING REPORT
+${"=".repeat(40)}
 
-📅 Date: ${form.date}
-👥 Attendees: ${context.attendees.join(", ") || "Not specified"}
+Date: ${form.date}
+Attendees: ${context.attendees.join(", ") || "Not specified"}
 
-📌 TOPICS DISCUSSED:
+TOPICS DISCUSSED:
 ${context.topics.map((t, i) => `${i + 1}. ${t}`).join("\n") || "No topics listed"}
 
-💬 DISCUSSION SUMMARY:
-${content || "No summary available"}
+DISCUSSION SUMMARY:
+${formattedContent || "No summary available"}
 
-⚠️ GAPS IDENTIFIED:
+GAPS IDENTIFIED:
 ${context.gaps.map((g, i) => `${i + 1}. ${g}`).join("\n") || "No gaps identified"}
 
-✅ AGREEMENTS REACHED:
+AGREEMENTS REACHED:
 ${context.agreements.map((a, i) => `${i + 1}. ${a}`).join("\n") || "No agreements"}
 
-📝 FULL MINUTES:
-${content || "No content"}
-
-${"=".repeat(50)}
+${"=".repeat(40)}
 Generated by AI Assistant • ${new Date().toLocaleString()}
       `;
 
@@ -875,8 +896,8 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
 
   const g3Responsive = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 200px), 1fr))",
-    gap: "clamp(12px, 3vw, 16px)",
+    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
+    gap: "clamp(10px, 2vw, 16px)",
   };
 
   // ─── Submitted State ──────────────────────────────────────
@@ -888,7 +909,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         <div
           style={{
             textAlign: "center",
-            padding: "clamp(40px, 8vw, 60px) clamp(20px, 5vw, 40px)",
+            padding: "clamp(30px, 6vw, 60px) clamp(16px, 4vw, 40px)",
             background: C.white,
             borderRadius: radius.xl,
             boxShadow: shadows.xl,
@@ -898,20 +919,20 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         >
           <div
             style={{
-              width: "clamp(60px, 15vw, 80px)",
-              height: "clamp(60px, 15vw, 80px)",
+              width: "clamp(50px, 12vw, 80px)",
+              height: "clamp(50px, 12vw, 80px)",
               background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
               borderRadius: "50%",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "clamp(32px, 8vw, 40px)",
+              fontSize: "clamp(28px, 7vw, 40px)",
               color: "#fff",
               margin: "0 auto 18px",
               boxShadow: shadows.glow,
             }}
           >
-            <FiCheck size={40} />
+            <FiCheck size={32} />
           </div>
           <h2
             style={{
@@ -940,7 +961,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               style={{
                 background: "#EFF6FF",
                 borderRadius: radius.md,
-                padding: "12px 16px",
+                padding: "10px 14px",
                 marginBottom: "16px",
                 textAlign: "left",
                 border: "1px solid #BFDBFE",
@@ -951,13 +972,13 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                   display: "flex",
                   alignItems: "center",
                   gap: "8px",
-                  marginBottom: "8px",
+                  marginBottom: "6px",
                 }}
               >
-                <FiZap size={16} color="#1D4ED8" />
+                <FiZap size={14} color="#1D4ED8" />
                 <span
                   style={{
-                    fontSize: "12px",
+                    fontSize: "11px",
                     fontWeight: 600,
                     color: "#1D4ED8",
                   }}
@@ -967,15 +988,15 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               </div>
               <p
                 style={{
-                  fontSize: "12px",
+                  fontSize: "11px",
                   color: "#1E293B",
                   margin: 0,
-                  maxHeight: "100px",
+                  maxHeight: "80px",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
                 }}
               >
-                {aiGeneratedContent.substring(0, 200)}...
+                {aiGeneratedContent.substring(0, 150)}...
               </p>
             </div>
           )}
@@ -989,7 +1010,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             }}
           >
             <button style={btn.primary} onClick={() => setSubmitted(false)}>
-              <FiPlus size={18} />
+              <FiPlus size={16} />
               {tf.newReport || "New Report"}
             </button>
           </div>
@@ -1046,7 +1067,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
       style={{
         maxWidth: "1000px",
         margin: "0 auto",
-        padding: "clamp(16px, 4vw, 28px) clamp(12px, 4vw, 20px)",
+        padding: "clamp(12px, 3vw, 28px) clamp(10px, 3vw, 20px)",
         animation: "fadeInUp 0.5s ease",
       }}
       ref={formRef}
@@ -1059,28 +1080,35 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           flexWrap: "wrap",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: "clamp(8px, 3vw, 14px)",
-          marginBottom: "clamp(20px, 4vw, 28px)",
-          paddingBottom: "clamp(12px, 3vw, 16px)",
+          gap: "clamp(6px, 2vw, 14px)",
+          marginBottom: "clamp(16px, 3.5vw, 28px)",
+          paddingBottom: "clamp(10px, 2.5vw, 16px)",
           borderBottom: `2px solid ${C.border}`,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "clamp(8px, 2vw, 14px)",
+          }}
+        >
           <div
             style={{
-              width: "48px",
-              height: "48px",
+              width: "clamp(36px, 7vw, 48px)",
+              height: "clamp(36px, 7vw, 48px)",
               background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
               borderRadius: radius.lg,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               color: "#fff",
-              fontSize: "22px",
+              fontSize: "clamp(16px, 3vw, 22px)",
               boxShadow: shadows.glow,
+              flexShrink: 0,
             }}
           >
-            <FiMessageSquare size={24} />
+            <FiMessageSquare size={20} />
           </div>
           <div>
             <h1
@@ -1101,15 +1129,15 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             </h1>
             <p
               style={{
-                fontSize: FONT_SIZES.body,
+                fontSize: FONT_SIZES.small,
                 color: C.muted,
                 margin: "2px 0 0",
                 display: "flex",
                 alignItems: "center",
-                gap: "6px",
+                gap: "4px",
               }}
             >
-              <FiCalendar size={14} />
+              <FiCalendar size={12} />
               {tf.subtitle ||
                 "Addis Ababa City Admin · Addis Messob · Addis Ketema Center"}
             </p>
@@ -1119,7 +1147,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "12px",
+            gap: "clamp(6px, 1.5vw, 12px)",
             flexWrap: "wrap",
           }}
         >
@@ -1127,11 +1155,11 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             onClick={() => setSelectedTeam(null)}
             style={{
               ...btn.secondary,
-              padding: "6px 14px",
-              fontSize: "12px",
+              padding: "4px 10px",
+              fontSize: "11px",
             }}
           >
-            <FiChevronLeft size={14} />
+            <FiChevronLeft size={12} />
             {tf.changeTeam || "Change Team"}
           </button>
 
@@ -1139,19 +1167,19 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "8px",
+              gap: "6px",
               background: C.bg,
-              padding: "4px 12px",
+              padding: "3px 10px",
               borderRadius: radius.pill,
             }}
           >
-            <span style={{ fontSize: "11px", color: C.muted, fontWeight: 600 }}>
+            <span style={{ fontSize: "10px", color: C.muted, fontWeight: 600 }}>
               {formProgress}%
             </span>
             <div
               style={{
-                width: "80px",
-                height: "4px",
+                width: "60px",
+                height: "3px",
                 background: C.border,
                 borderRadius: radius.pill,
                 overflow: "hidden",
@@ -1172,17 +1200,17 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             style={{
               background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
               color: "#fff",
-              padding: "6px 16px",
+              padding: "4px 12px",
               borderRadius: radius.pill,
               fontSize: FONT_SIZES.small,
               fontWeight: 700,
               display: "flex",
               alignItems: "center",
-              gap: "6px",
+              gap: "4px",
               boxShadow: shadows.glow,
             }}
           >
-            <FiCalendar size={14} />
+            <FiCalendar size={12} />
             {safeYear}
           </div>
         </div>
@@ -1190,7 +1218,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
 
       <AIInsightBadge type="info">
         <strong>Progress: {formProgress}% complete</strong>
-        <span style={{ marginLeft: "8px", fontSize: "12px" }}>
+        <span style={{ marginLeft: "6px", fontSize: "11px" }}>
           {formProgress < 30 && "Start filling in the report details below"}
           {formProgress >= 30 &&
             formProgress < 70 &&
@@ -1205,7 +1233,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
       <div
         style={{
           ...card,
-          padding: "clamp(20px, 4vw, 32px)",
+          padding: "clamp(16px, 3vw, 32px)",
           background: C.white,
           borderRadius: radius.xl,
           boxShadow: shadows.md,
@@ -1215,7 +1243,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         {/* Meeting Time */}
         <Section
           title={tf.meetingTime || "Meeting Time"}
-          icon={<FiCalendar size={18} />}
+          icon={<FiCalendar size={16} />}
         >
           <div style={g3Responsive}>
             <Field
@@ -1242,7 +1270,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         {/* Present Members */}
         <DynamicFieldGroup
           title={tf.presentMembers || "Present Members"}
-          icon={<FiUserCheckIcon size={18} />}
+          icon={<FiUserCheckIcon size={16} />}
           values={form.present}
           onAdd={() => addItem("present", "")}
           onRemove={(idx) => removeItem("present", idx)}
@@ -1272,7 +1300,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         {/* Absent Members */}
         <Section
           title={tf.absentMembers || "Absent Members & Reasons"}
-          icon={<FiUserX size={18} />}
+          icon={<FiUserX size={16} />}
         >
           <div
             style={{ display: "flex", flexDirection: "column", gap: "12px" }}
@@ -1281,7 +1309,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               <div
                 key={idx}
                 style={{
-                  padding: "14px 16px",
+                  padding: "12px 14px",
                   background: C.cardBg,
                   border: `1px solid ${C.border}`,
                   borderRadius: radius.lg,
@@ -1302,20 +1330,20 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                     fontSize: FONT_SIZES.small,
                     fontWeight: 600,
                     color: C.muted,
-                    marginBottom: "10px",
+                    marginBottom: "8px",
                     display: "flex",
                     alignItems: "center",
-                    gap: "6px",
+                    gap: "4px",
                   }}
                 >
-                  <FiUserX size={14} />
+                  <FiUserX size={12} />
                   {tf.absentMemberLabel || "Absent Member"} #{idx + 1}
                 </div>
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns: "1fr 1fr",
-                    gap: "12px",
+                    gap: "10px",
                   }}
                 >
                   <Field
@@ -1336,10 +1364,10 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                     onClick={() => removeAbsent(idx)}
                     style={{
                       ...btn.icon,
-                      marginTop: "8px",
+                      marginTop: "6px",
                       color: "#dc2626",
-                      fontSize: "12px",
-                      padding: "4px 8px",
+                      fontSize: "11px",
+                      padding: "3px 6px",
                       borderRadius: radius.md,
                       background: "transparent",
                     }}
@@ -1350,13 +1378,14 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                       e.currentTarget.style.background = "transparent";
                     }}
                   >
-                    <FiX size={14} />
+                    <FiX size={12} />
                     {common.remove || "Remove"}
                   </button>
                 )}
               </div>
             ))}
           </div>
+          {/* ✅ Add Absent Member - Full Width */}
           <button
             onClick={addAbsent}
             style={{
@@ -1364,6 +1393,8 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               padding: "6px 14px",
               fontSize: "12px",
               marginTop: "8px",
+              width: "100%",
+              justifyContent: "center",
             }}
           >
             <FiPlus size={14} />
@@ -1374,7 +1405,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         {/* Previous Results */}
         <DynamicFieldGroup
           title={tf.prevResults || "Results from Previous Meeting"}
-          icon={<FiFileText size={18} />}
+          icon={<FiFileText size={16} />}
           values={form.prevResults}
           onAdd={() => addItem("prevResults", "")}
           onRemove={(idx) => removeItem("prevResults", idx)}
@@ -1394,7 +1425,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         {/* Today's Topics */}
         <DynamicFieldGroup
           title={tf.todayTopics || "Today's Discussion Topics"}
-          icon={<FiMessageSquare size={18} />}
+          icon={<FiMessageSquare size={16} />}
           values={form.topics}
           onAdd={() => addItem("topics", "")}
           onRemove={(idx) => removeItem("topics", idx)}
@@ -1413,15 +1444,15 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         {/* Explanation - Enhanced with AI Actions */}
         <Section
           title={tf.explanation || "Explanation Given (Brief)"}
-          icon={<FiEdit3 size={18} />}
+          icon={<FiEdit3 size={16} />}
         >
           <textarea
             style={{
               ...inp,
               resize: "vertical",
-              minHeight: "clamp(100px, 20vw, 120px)",
+              minHeight: "clamp(80px, 15vw, 120px)",
               fontSize: FONT_SIZES.body,
-              padding: "12px 14px",
+              padding: "10px 12px",
               borderRadius: radius.md,
               border: `1.5px solid ${focusedField === "explanation" ? C.primary : C.border}`,
               boxShadow:
@@ -1431,7 +1462,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               transition: "all 0.2s ease",
               width: "100%",
               fontFamily: F.sans,
-              lineHeight: 1.6,
+              lineHeight: 1.5,
             }}
             rows={4}
             value={form.explanation}
@@ -1441,15 +1472,15 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             placeholder={tf.explanationPlaceholder || "Write explanation..."}
           />
 
-          {/* ✅ AI Actions Toolbar - Full width buttons */}
+          {/* ✅ AI Actions Toolbar - Full width buttons, no duplicate */}
           <div
             style={{
               marginTop: "12px",
               display: "flex",
               flexWrap: "wrap",
-              gap: "8px",
+              gap: "6px",
               alignItems: "center",
-              padding: "12px 14px",
+              padding: "10px 12px",
               background: "#F8FAFC",
               borderRadius: radius.md,
               border: `1px solid ${C.border}`,
@@ -1457,17 +1488,17 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           >
             <span
               style={{
-                fontSize: "11px",
+                fontSize: "10px",
                 fontWeight: 600,
                 color: C.muted,
                 display: "flex",
                 alignItems: "center",
                 gap: "4px",
-                marginRight: "8px",
+                marginRight: "6px",
                 flexShrink: 0,
               }}
             >
-              <FiZap size={14} color={C.primary} />
+              <FiZap size={12} color={C.primary} />
               AI Actions:
             </span>
 
@@ -1475,7 +1506,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               style={{
                 display: "flex",
                 flexWrap: "wrap",
-                gap: "6px",
+                gap: "4px",
                 flex: 1,
                 alignItems: "center",
               }}
@@ -1484,18 +1515,18 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 onClick={handleGenerateSummary}
                 style={{
                   ...btn.secondary,
-                  padding: "6px 12px",
-                  fontSize: "11px",
+                  padding: "4px 10px",
+                  fontSize: "10px",
                   background: "#EFF6FF",
                   borderColor: "#BFDBFE",
                   color: "#1D4ED8",
                   flex: "1 1 auto",
-                  minWidth: "80px",
+                  minWidth: "70px",
                   justifyContent: "center",
                   whiteSpace: "nowrap",
                 }}
               >
-                <FiZap size={12} />
+                <FiZap size={11} />
                 {tf.aiWritingAssistant || "AI Writing Assistant"}
               </button>
 
@@ -1503,18 +1534,18 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 onClick={handleGenerateSummary}
                 style={{
                   ...btn.secondary,
-                  padding: "6px 12px",
-                  fontSize: "11px",
+                  padding: "4px 10px",
+                  fontSize: "10px",
                   background: "#F0FDF4",
                   borderColor: "#86EFAC",
                   color: "#15803D",
                   flex: "1 1 auto",
-                  minWidth: "60px",
+                  minWidth: "55px",
                   justifyContent: "center",
                   whiteSpace: "nowrap",
                 }}
               >
-                <FiTrendingUp size={12} />
+                <FiTrendingUp size={11} />
                 {tf.summarize || "Summarize"}
               </button>
 
@@ -1522,65 +1553,48 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 onClick={handleGenerateFullReport}
                 style={{
                   ...btn.secondary,
-                  padding: "6px 12px",
-                  fontSize: "11px",
+                  padding: "4px 10px",
+                  fontSize: "10px",
                   background: "#FEF3C7",
                   borderColor: "#FDE68A",
                   color: "#92400E",
                   flex: "1 1 auto",
-                  minWidth: "60px",
+                  minWidth: "55px",
                   justifyContent: "center",
                   whiteSpace: "nowrap",
                 }}
               >
-                <FiBookOpen size={12} />
+                <FiBookOpen size={11} />
                 {tf.fullReport || "Full Report"}
               </button>
 
+              {/* ✅ Export button - Icon only */}
               <button
                 onClick={handleExport}
                 style={{
                   ...btn.secondary,
-                  padding: "6px 12px",
-                  fontSize: "11px",
+                  padding: "4px 8px",
+                  fontSize: "10px",
                   background: "#F3E8FF",
                   borderColor: "#D8B4FE",
                   color: "#6D28D9",
                   flex: "1 1 auto",
-                  minWidth: "60px",
+                  minWidth: "36px",
                   justifyContent: "center",
                   whiteSpace: "nowrap",
                 }}
+                title={common.export || "Export"}
               >
-                <FiDownload size={12} />
-                {common.export || "Export"}
+                <FiDownload size={14} />
               </button>
             </div>
-          </div>
-
-          <div style={{ marginTop: "12px" }}>
-            <AIReportAssistant
-              type="forum"
-              reportContext={{
-                title: `${tf.title || "Peer Forum Report"} - ${selectedTeam?.name || ""}`,
-                date: form.date,
-                attendees: form.present.filter((p) => p.trim() !== ""),
-                topics: form.topics.filter((t) => t.trim()),
-                explanation: form.explanation || "",
-                gaps: form.gaps.filter((g) => g.trim()),
-                agreements: form.agreements.filter((a) => a.trim()),
-              }}
-              onApply={handleApplySuggestion}
-              onGenerateFullReport={handleGenerateFullReport}
-              buttonText={tf.aiWritingAssistant || "AI Writing Assistant"}
-            />
           </div>
         </Section>
 
         {/* Gaps */}
         <DynamicFieldGroup
           title={tf.gaps || "Identified Gaps"}
-          icon={<FiAlertCircle size={18} />}
+          icon={<FiAlertCircle size={16} />}
           values={form.gaps}
           onAdd={() => addItem("gaps", "")}
           onRemove={(idx) => removeItem("gaps", idx)}
@@ -1599,7 +1613,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         {/* Agreements */}
         <DynamicFieldGroup
           title={tf.agreements || "Agreed Points"}
-          icon={<FiCheckCircle size={18} />}
+          icon={<FiCheckCircle size={16} />}
           values={form.agreements}
           onAdd={() => addItem("agreements", "")}
           onRemove={(idx) => removeItem("agreements", idx)}
@@ -1618,7 +1632,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         {/* Signatures */}
         <Section
           title={tf.signatures || "Signatures"}
-          icon={<FiPenTool size={18} />}
+          icon={<FiPenTool size={16} />}
         >
           <div
             style={{ display: "flex", flexDirection: "column", gap: "10px" }}
@@ -1663,8 +1677,8 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                       ...btn.icon,
                       color: "#dc2626",
                       background: "#fee2e2",
-                      width: "32px",
-                      height: "32px",
+                      width: "28px",
+                      height: "28px",
                       borderRadius: "6px",
                     }}
                     onMouseEnter={(e) => {
@@ -1676,12 +1690,13 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                       e.currentTarget.style.transform = "scale(1)";
                     }}
                   >
-                    <FiX size={16} />
+                    <FiX size={14} />
                   </button>
                 )}
               </div>
             ))}
           </div>
+          {/* ✅ Add Signature - Full Width */}
           <button
             onClick={() => addItem("signatures", "")}
             style={{
@@ -1689,6 +1704,8 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               padding: "6px 14px",
               fontSize: "12px",
               marginTop: "8px",
+              width: "100%",
+              justifyContent: "center",
             }}
           >
             <FiPlus size={14} />
@@ -1696,24 +1713,24 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           </button>
         </Section>
 
-        {/* ✅ Action Buttons - SIDE BY SIDE ON ONE LINE */}
+        {/* ✅ Action Buttons - SIDE BY SIDE */}
         <div
           style={{
             display: "flex",
-            flexDirection: "row", // ✅ Horizontal layout
-            gap: "clamp(12px, 3vw, 16px)",
+            flexDirection: "row",
+            gap: "clamp(10px, 2vw, 16px)",
             justifyContent: "center",
-            marginTop: "clamp(24px, 5vw, 32px)",
-            paddingTop: "clamp(16px, 4vw, 20px)",
+            marginTop: "clamp(20px, 4vw, 32px)",
+            paddingTop: "clamp(14px, 3vw, 20px)",
             borderTop: `2px solid ${C.border}`,
           }}
         >
           <button
             style={{
               ...btn.danger,
-              flex: 1, // ✅ Equal width
+              flex: 1,
               justifyContent: "center",
-              padding: "clamp(10px, 2.5vw, 14px) clamp(20px, 5vw, 32px)",
+              padding: "clamp(8px, 2vw, 14px) clamp(16px, 4vw, 32px)",
               fontSize: FONT_SIZES.body,
               minWidth: 0,
             }}
@@ -1735,9 +1752,9 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           <button
             style={{
               ...btn.primary,
-              flex: 1, // ✅ Equal width
+              flex: 1,
               justifyContent: "center",
-              padding: "clamp(10px, 2.5vw, 14px) clamp(20px, 5vw, 32px)",
+              padding: "clamp(8px, 2vw, 14px) clamp(16px, 4vw, 32px)",
               fontSize: FONT_SIZES.body,
               opacity: saving ? 0.7 : 1,
               cursor: saving ? "not-allowed" : "pointer",
