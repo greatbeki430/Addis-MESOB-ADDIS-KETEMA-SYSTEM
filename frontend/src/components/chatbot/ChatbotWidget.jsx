@@ -41,20 +41,37 @@ const MarkdownRenderer = ({ content }) => {
   // Split content into lines
   const lines = content.split("\n");
 
-  // Use a function to render table from rows
+  const renderText = (text) => {
+    let formatted = text;
+
+    // Bold: **text** -> <strong>text</strong>
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+    // Italic: *text* -> <em>text</em>
+    formatted = formatted.replace(/\*(.*?)\*/g, "<em>$1</em>");
+
+    // Inline code: `text` -> <code>text</code>
+    formatted = formatted.replace(/`(.*?)`/g, "<code>$1</code>");
+
+    // Links: [text](url) -> <a href="url">text</a>
+    formatted = formatted.replace(
+      /\[(.*?)\]\((.*?)\)/g,
+      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
+    );
+
+    return formatted;
+  };
+
   const renderTable = (rows) => {
     if (!rows || rows.length === 0) return null;
 
-    // Find header row (first row with all cells)
     const headerRow = rows[0];
     const dataRows = rows.slice(1);
 
-    // Filter out separator rows (rows with only ---)
     const filteredDataRows = dataRows.filter(
       (row) => !row.every((cell) => /^[-:]+$/.test(cell.trim())),
     );
 
-    // Determine column alignment from separator row if exists
     let alignments = [];
     let tableRows = [headerRow, ...filteredDataRows];
 
@@ -69,7 +86,6 @@ const MarkdownRenderer = ({ content }) => {
         if (trimmed.startsWith(":")) return "left";
         return "left";
       });
-      // Remove separator row from data
       tableRows = [headerRow, ...filteredDataRows];
     }
 
@@ -101,11 +117,8 @@ const MarkdownRenderer = ({ content }) => {
                     textTransform: "uppercase",
                     letterSpacing: "0.3px",
                   }}
-                >
-                  <span
-                    dangerouslySetInnerHTML={{ __html: renderText(cell) }}
-                  />
-                </th>
+                  dangerouslySetInnerHTML={{ __html: renderText(cell) }}
+                />
               ))}
             </tr>
           </thead>
@@ -129,11 +142,8 @@ const MarkdownRenderer = ({ content }) => {
                       color: "#1E293B",
                       wordBreak: "break-word",
                     }}
-                  >
-                    <span
-                      dangerouslySetInnerHTML={{ __html: renderText(cell) }}
-                    />
-                  </td>
+                    dangerouslySetInnerHTML={{ __html: renderText(cell) }}
+                  />
                 ))}
               </tr>
             ))}
@@ -141,28 +151,6 @@ const MarkdownRenderer = ({ content }) => {
         </table>
       </div>
     );
-  };
-
-  const renderText = (text) => {
-    // Remove ** and replace with bold
-    let formatted = text;
-
-    // Bold: **text** -> <strong>text</strong>
-    formatted = formatted.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-
-    // Italic: *text* -> <em>text</em>
-    formatted = formatted.replace(/\*(.*?)\*/g, "<em>$1</em>");
-
-    // Inline code: `text` -> <code>text</code>
-    formatted = formatted.replace(/`(.*?)`/g, "<code>$1</code>");
-
-    // Links: [text](url) -> <a href="url">text</a>
-    formatted = formatted.replace(
-      /\[(.*?)\]\((.*?)\)/g,
-      '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>',
-    );
-
-    return formatted;
   };
 
   // Process lines to build elements
@@ -175,12 +163,7 @@ const MarkdownRenderer = ({ content }) => {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Skip empty lines at the beginning of a table
-    if (inTable && trimmed === "") {
-      continue;
-    }
-
-    // Check for table start (line starts with | or contains |)
+    // Check for table start
     if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
       if (!inTable) {
         inTable = true;
@@ -203,7 +186,7 @@ const MarkdownRenderer = ({ content }) => {
       tableRows = [];
     }
 
-    // Headers (## or ###)
+    // Headers
     if (trimmed.startsWith("### ")) {
       elements.push(
         <h4
@@ -214,11 +197,8 @@ const MarkdownRenderer = ({ content }) => {
             fontWeight: 700,
             color: "#0F172A",
           }}
-        >
-          <span
-            dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(4)) }}
-          />
-        </h4>,
+          dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(4)) }}
+        />,
       );
       continue;
     }
@@ -233,11 +213,8 @@ const MarkdownRenderer = ({ content }) => {
             fontWeight: 700,
             color: "#0F172A",
           }}
-        >
-          <span
-            dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(3)) }}
-          />
-        </h3>,
+          dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(3)) }}
+        />,
       );
       continue;
     }
@@ -254,16 +231,13 @@ const MarkdownRenderer = ({ content }) => {
             borderBottom: "2px solid #E2E8F0",
             paddingBottom: "4px",
           }}
-        >
-          <span
-            dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(2)) }}
-          />
-        </h2>,
+          dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(2)) }}
+        />,
       );
       continue;
     }
 
-    // Unordered lists (- item)
+    // Unordered lists
     if (trimmed.startsWith("- ")) {
       elements.push(
         <div
@@ -277,17 +251,16 @@ const MarkdownRenderer = ({ content }) => {
           }}
         >
           <span style={{ color: "#2563EB", fontSize: "12px" }}>•</span>
-          <span style={{ fontSize: "12px", color: "#1E293B" }}>
-            <span
-              dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(2)) }}
-            />
-          </span>
+          <span
+            style={{ fontSize: "12px", color: "#1E293B" }}
+            dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(2)) }}
+          />
         </div>,
       );
       continue;
     }
 
-    // Ordered lists (1. item)
+    // Ordered lists
     const orderedMatch = trimmed.match(/^(\d+)\.\s+(.+)/);
     if (orderedMatch) {
       elements.push(
@@ -311,17 +284,16 @@ const MarkdownRenderer = ({ content }) => {
           >
             {orderedMatch[1]}.
           </span>
-          <span style={{ fontSize: "12px", color: "#1E293B" }}>
-            <span
-              dangerouslySetInnerHTML={{ __html: renderText(orderedMatch[2]) }}
-            />
-          </span>
+          <span
+            style={{ fontSize: "12px", color: "#1E293B" }}
+            dangerouslySetInnerHTML={{ __html: renderText(orderedMatch[2]) }}
+          />
         </div>,
       );
       continue;
     }
 
-    // Separators (---)
+    // Separators
     if (trimmed === "---") {
       elements.push(
         <hr
@@ -336,7 +308,7 @@ const MarkdownRenderer = ({ content }) => {
       continue;
     }
 
-    // Blockquotes (> text)
+    // Blockquotes
     if (trimmed.startsWith("> ")) {
       elements.push(
         <div
@@ -349,17 +321,16 @@ const MarkdownRenderer = ({ content }) => {
             borderRadius: "0 4px 4px 0",
           }}
         >
-          <span style={{ fontSize: "12px", color: "#475569" }}>
-            <span
-              dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(2)) }}
-            />
-          </span>
+          <span
+            style={{ fontSize: "12px", color: "#475569" }}
+            dangerouslySetInnerHTML={{ __html: renderText(trimmed.slice(2)) }}
+          />
         </div>,
       );
       continue;
     }
 
-    // Empty line - add spacing
+    // Empty line
     if (trimmed === "") {
       elements.push(<div key={`space-${i}`} style={{ height: "4px" }} />);
       continue;
@@ -376,9 +347,8 @@ const MarkdownRenderer = ({ content }) => {
             color: "#1E293B",
             lineHeight: "1.6",
           }}
-        >
-          <span dangerouslySetInnerHTML={{ __html: renderText(trimmed) }} />
-        </p>,
+          dangerouslySetInnerHTML={{ __html: renderText(trimmed) }}
+        />,
       );
     }
   }

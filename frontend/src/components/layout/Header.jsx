@@ -22,9 +22,10 @@ import {
   FiShield,
   FiUserCheck,
   FiAward,
+  FiUserPlus, // ✅ Added for Add User
 } from "react-icons/fi";
 
-export default function Header({ tab, t, lang, setLang }) {
+export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
   const navigate = useNavigate();
 
   const icons = {
@@ -137,6 +138,9 @@ export default function Header({ tab, t, lang, setLang }) {
   };
 
   const userProfilePhoto = getUserProfilePhoto();
+
+  // ✅ Check if user can add users (Admin or SuperAdmin)
+  const canAddUsers = isAdmin || isSuperAdmin;
 
   return (
     <header
@@ -596,6 +600,87 @@ export default function Header({ tab, t, lang, setLang }) {
                   <FiSettings size={16} style={{ color: C.muted }} />
                   Settings
                 </button>
+
+                {/* ✅ Add New User - Only for Admins and SuperAdmins */}
+                {canAddUsers && (
+                  <>
+                    <div
+                      style={{
+                        padding: "8px 16px 4px",
+                        fontSize: 11,
+                        color: C.muted,
+                        fontWeight: 600,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                        borderTop: `1px solid ${C.border}44`,
+                        marginTop: 4,
+                      }}
+                    >
+                      Admin
+                    </div>
+                    <button
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        if (onAddUserClick) {
+                          onAddUserClick(); // ✅ Call the parent function
+                        }
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 16px",
+                        width: "100%",
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        color: C.primary,
+                        transition: "background 0.2s ease",
+                        fontFamily: F.sans,
+                        fontWeight: 500,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = C.primary + "11";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      <FiUserPlus size={16} style={{ color: C.primary }} />
+                      Add New User
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        navigate("/users");
+                      }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "8px 16px",
+                        width: "100%",
+                        border: "none",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        color: C.dark,
+                        transition: "background 0.2s ease",
+                        fontFamily: F.sans,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = C.bg;
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      <FiUsers size={16} style={{ color: C.muted }} />
+                      User Management
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Divider */}
