@@ -915,7 +915,7 @@ export const translations = {
       users: "Fayyadamtoota",
       teams: "Bulchiinsa Garee",
       "admin/services": "Bulchiinsa Tajaajilaa",
-      documents: "Kuusaa Dookumentiiwwani",
+      documents: "Kuusaa Dook.",
       "golden-monday": "Wiixata Warqee",
       employees: "Bulchiinsa Hojjattootaa",
     },
