@@ -23,6 +23,7 @@ import {
   FiUserCheck,
   FiAward,
   FiUserPlus,
+  FiCheck,
 } from "react-icons/fi";
 
 export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
@@ -60,12 +61,20 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
     useAuth();
   const [isLogoutHovered, setIsLogoutHovered] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const langDropdownRef = useRef(null);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
+      }
+      if (
+        langDropdownRef.current &&
+        !langDropdownRef.current.contains(event.target)
+      ) {
+        setIsLangDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -129,8 +138,20 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
     setIsDropdownOpen(!isDropdownOpen);
   };
 
+  const toggleLangDropdown = () => {
+    setIsLangDropdownOpen(!isLangDropdownOpen);
+  };
+
+  const handleLangSelect = (code) => {
+    setLang(code);
+    setIsLangDropdownOpen(false);
+  };
+
   const userProfilePhoto = getUserProfilePhoto();
   const canAddUsers = isAdmin || isSuperAdmin;
+
+  // Get current language label
+  const currentLang = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
 
   return (
     <header
@@ -150,7 +171,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
         flexShrink: 0,
         gap: "clamp(4px, 1.5vw, 12px)",
         flexWrap: "nowrap",
-        overflow: "visible", // ✅ Allow dropdown to be visible
+        overflow: "visible",
       }}
     >
       {/* LEFT SECTION - Breadcrumb - Shrinks on mobile */}
@@ -225,7 +246,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
         </span>
       </div>
 
-      {/* RIGHT SECTION - Items stay visible */}
+      {/* RIGHT SECTION */}
       <div
         style={{
           display: "flex",
@@ -253,62 +274,176 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
           {dateStr}
         </span>
 
-        {/* Language Buttons - Compact */}
+        {/* Language Selector - Dropdown on mobile, buttons on desktop */}
         <div
-          style={{
-            display: "flex",
-            gap: "clamp(1px, 0.8vw, 4px)",
-            flexShrink: 0,
-          }}
+          ref={langDropdownRef}
+          style={{ position: "relative", flexShrink: 0 }}
         >
-          {LANGUAGES.map((l) => (
-            <button
-              key={l.code}
-              className="header-lang-btn"
-              onClick={() => setLang(l.code)}
-              title={l.label}
+          {/* Desktop: Show all language buttons */}
+          <div
+            className="lang-desktop"
+            style={{ display: "flex", gap: "clamp(1px, 0.8vw, 4px)" }}
+          >
+            {LANGUAGES.map((l) => (
+              <button
+                key={l.code}
+                className="header-lang-btn"
+                onClick={() => setLang(l.code)}
+                title={l.label}
+                style={{
+                  background: lang === l.code ? C.primary : "#f0f3ff",
+                  color: lang === l.code ? C.gold : C.primary,
+                  border: `1px solid ${lang === l.code ? C.primary : C.border}`,
+                  borderRadius: 4,
+                  padding: "clamp(1px, 0.8vw, 3px) clamp(3px, 1vw, 6px)",
+                  fontSize: "clamp(7px, 1.5vw, 10px)",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  fontFamily: F.sans,
+                  transition: "all 0.2s ease",
+                  whiteSpace: "nowrap",
+                  minWidth: "clamp(18px, 4vw, 28px)",
+                  transform: lang === l.code ? "scale(1.05)" : "scale(1)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 1,
+                  flexShrink: 0,
+                }}
+                onMouseEnter={(e) => {
+                  if (lang !== l.code) {
+                    e.currentTarget.style.background = C.primary + "22";
+                    e.currentTarget.style.transform = "scale(1.05)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (lang !== l.code) {
+                    e.currentTarget.style.background = "#f0f3ff";
+                    e.currentTarget.style.transform = "scale(1)";
+                  }
+                }}
+              >
+                <FiGlobe size={7} />
+                <span style={{ fontSize: "clamp(6px, 1.2vw, 9px)" }}>
+                  {l.flag}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Mobile: Language dropdown button - FIXED: Removed duplicate display */}
+          <button
+            className="lang-mobile"
+            onClick={toggleLangDropdown}
+            style={{
+              background: isLangDropdownOpen ? C.primary : "#f0f3ff",
+              color: isLangDropdownOpen ? C.gold : C.primary,
+              border: `1px solid ${isLangDropdownOpen ? C.primary : C.border}`,
+              borderRadius: 4,
+              padding: "clamp(2px, 1vw, 4px) clamp(6px, 2vw, 10px)",
+              fontSize: "clamp(10px, 2vw, 12px)",
+              fontWeight: 700,
+              cursor: "pointer",
+              fontFamily: F.sans,
+              transition: "all 0.2s ease",
+              whiteSpace: "nowrap",
+              display: "flex", // ✅ Only one display property
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+              flexShrink: 0,
+              minHeight: "clamp(28px, 4vh, 34px)",
+            }}
+            onMouseEnter={(e) => {
+              if (!isLangDropdownOpen) {
+                e.currentTarget.style.background = C.primary + "22";
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isLangDropdownOpen) {
+                e.currentTarget.style.background = "#f0f3ff";
+              }
+            }}
+          >
+            <FiGlobe size={14} />
+            <span>{currentLang.flag}</span>
+            <FiChevronDown
+              size={10}
               style={{
-                background: lang === l.code ? C.primary : "#f0f3ff",
-                color: lang === l.code ? C.gold : C.primary,
-                border: `1px solid ${lang === l.code ? C.primary : C.border}`,
-                borderRadius: 4,
-                padding: "clamp(1px, 0.8vw, 3px) clamp(3px, 1vw, 6px)",
-                fontSize: "clamp(7px, 1.5vw, 10px)",
-                fontWeight: 700,
-                cursor: "pointer",
-                fontFamily: F.sans,
-                transition: "all 0.2s ease",
-                whiteSpace: "nowrap",
-                minWidth: "clamp(18px, 4vw, 28px)",
-                transform: lang === l.code ? "scale(1.05)" : "scale(1)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 1,
-                flexShrink: 0,
+                transition: "transform 0.3s ease",
+                transform: isLangDropdownOpen
+                  ? "rotate(180deg)"
+                  : "rotate(0deg)",
               }}
-              onMouseEnter={(e) => {
-                if (lang !== l.code) {
-                  e.currentTarget.style.background = C.primary + "22";
-                  e.currentTarget.style.transform = "scale(1.05)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (lang !== l.code) {
-                  e.currentTarget.style.background = "#f0f3ff";
-                  e.currentTarget.style.transform = "scale(1)";
-                }
+            />
+          </button>
+
+          {/* Mobile Language Dropdown Menu */}
+          {isLangDropdownOpen && (
+            <div
+              style={{
+                position: "absolute",
+                top: "calc(100% + 6px)",
+                right: 0,
+                minWidth: 140,
+                background: C.white,
+                borderRadius: 10,
+                boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                border: `1px solid ${C.border}`,
+                overflow: "hidden",
+                animation: "fadeInUp 0.2s ease",
+                zIndex: 101,
               }}
             >
-              <FiGlobe size={7} />
-              <span style={{ fontSize: "clamp(6px, 1.2vw, 9px)" }}>
-                {l.flag}
-              </span>
-            </button>
-          ))}
+              {LANGUAGES.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => handleLangSelect(l.code)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "8px 14px",
+                    width: "100%",
+                    border: "none",
+                    background:
+                      lang === l.code ? C.primary + "11" : "transparent",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: lang === l.code ? 600 : 400,
+                    color: lang === l.code ? C.primary : C.dark,
+                    transition: "all 0.2s ease",
+                    fontFamily: F.sans,
+                    borderLeft:
+                      lang === l.code
+                        ? `3px solid ${C.primary}`
+                        : "3px solid transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = C.bg;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (lang !== l.code) {
+                      e.currentTarget.style.background = "transparent";
+                    }
+                  }}
+                >
+                  <span style={{ fontSize: 18 }}>{l.flag}</span>
+                  <span>{l.label}</span>
+                  {lang === l.code && (
+                    <FiCheck
+                      size={14}
+                      color={C.primary}
+                      style={{ marginLeft: "auto" }}
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Logout Button - Icon only on small screens */}
+        {/* Logout Button */}
         <button
           onClick={logout}
           className="header-logout-btn"
@@ -424,7 +559,7 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             />
           </div>
 
-          {/* Dropdown Menu - Same as before */}
+          {/* User Dropdown Menu */}
           {isDropdownOpen && (
             <div
               style={{
@@ -736,33 +871,55 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
       </div>
 
       <style>{`
-        @media (max-width: 480px) {
-          .header-date { display: none !important; }
-          .header-appname { display: none !important; }
-          .logout-text { display: none !important; }
-          .header-lang-btn span { display: none !important; }
-          .header-lang-btn { min-width: 18px !important; padding: 1px 3px !important; }
-          .header-logout-btn { min-width: 24px !important; padding: 2px 4px !important; }
-        }
-        @media (min-width: 481px) and (max-width: 640px) {
-          .header-date { display: none !important; }
-          .header-appname { display: none !important; }
-          .logout-text { display: none !important; }
-          .header-lang-btn span { display: none !important; }
-          .header-lang-btn { min-width: 22px !important; padding: 2px 4px !important; }
-        }
-        @media (min-width: 641px) and (max-width: 768px) {
-          .header-date { display: none !important; }
-          .header-appname { display: none !important; }
-          .header-lang-btn span { display: none !important; }
-          .header-lang-btn { min-width: 26px !important; }
-        }
+        /* Desktop: Show all language buttons */
         @media (min-width: 769px) {
+          .lang-mobile {
+            display: none !important;
+          }
+          .lang-desktop {
+            display: flex !important;
+          }
           .header-date { display: inline-flex !important; }
           .header-appname { display: inline-flex !important; }
           .logout-text { display: inline-block !important; }
           .header-lang-btn span { display: inline !important; }
         }
+
+        /* Tablet: Show language dropdown */
+        @media (min-width: 641px) and (max-width: 768px) {
+          .lang-mobile {
+            display: flex !important;
+          }
+          .lang-desktop {
+            display: none !important;
+          }
+          .header-date { display: none !important; }
+          .header-appname { display: none !important; }
+          .logout-text { display: inline-block !important; }
+          .header-lang-btn span { display: none !important; }
+          .header-lang-btn { min-width: 26px !important; }
+        }
+
+        /* Mobile: Show language dropdown, hide individual buttons */
+        @media (max-width: 640px) {
+          .lang-mobile {
+            display: flex !important;
+          }
+          .lang-desktop {
+            display: none !important;
+          }
+          .header-date { display: none !important; }
+          .header-appname { display: none !important; }
+          .logout-text { display: none !important; }
+          .header-logout-btn { min-width: 24px !important; padding: 2px 4px !important; }
+        }
+
+        /* Extra small: Even more compact */
+        @media (max-width: 480px) {
+          .header-logout-btn { min-width: 20px !important; padding: 2px 3px !important; }
+          .lang-mobile { padding: 2px 6px !important; font-size: 10px !important; min-height: 24px !important; }
+        }
+
         @keyframes fadeInUp {
           from { opacity: 0; transform: translateY(-10px); }
           to { opacity: 1; transform: translateY(0); }
