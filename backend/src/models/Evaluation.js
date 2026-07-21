@@ -1,14 +1,15 @@
+// backend/src/models/Evaluation.js
 const mongoose = require("mongoose");
 
 const evaluationSchema = new mongoose.Schema(
   {
-    // ✅ Keep team reference for compatibility
+    // Team reference for compatibility
     team: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Team",
-      required: false, // Make optional for standalone evaluations
+      required: false,
     },
-    // ✅ New fields for the enhanced evaluation
+    // Evaluation data
     teamName: {
       type: String,
       default: "Untitled Team",
@@ -41,7 +42,7 @@ const evaluationSchema = new mongoose.Schema(
       type: String,
       default: "en",
     },
-    // ✅ Keep old fields for backward compatibility
+    // Backward compatibility
     period: {
       type: String,
       required: false,
@@ -55,11 +56,16 @@ const evaluationSchema = new mongoose.Schema(
       ref: "User",
       required: false,
     },
-    // ✅ Add status field
+    // Status
     status: {
       type: String,
       enum: ["draft", "submitted", "approved"],
       default: "draft",
+    },
+    // ✅ Digital Signatures
+    signatures: {
+      type: Object,
+      default: {},
     },
   },
   { timestamps: true },
