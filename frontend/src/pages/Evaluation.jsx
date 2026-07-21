@@ -37,6 +37,132 @@ import {
   FiInfo,
 } from "react-icons/fi";
 
+// ─── Signature Canvas Component ──────────────────────────────
+const SignatureCanvas = ({ onSave, value }) => {
+  const canvasRef = useRef(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [hasSignature, setHasSignature] = useState(false);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext("2d");
+    ctx.strokeStyle = "#1a3aad";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    // Load existing signature if any
+    if (value) {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0);
+        setHasSignature(true);
+      };
+      img.src = value;
+    }
+  }, [value]);
+
+  const startDrawing = (e) => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || e.touches[0].clientX) - rect.left;
+    const y = (e.clientY || e.touches[0].clientY) - rect.top;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    setIsDrawing(true);
+  };
+
+  const draw = (e) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX || e.touches[0].clientX) - rect.left;
+    const y = (e.clientY || e.touches[0].clientY) - rect.top;
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    setHasSignature(true);
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    if (hasSignature && onSave) {
+      const canvas = canvasRef.current;
+      onSave(canvas.toDataURL("image/png"));
+    }
+  };
+
+  const clearSignature = () => {
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasSignature(false);
+    if (onSave) onSave(null);
+  };
+
+  return (
+    <div style={{ position: "relative" }}>
+      <canvas
+        ref={canvasRef}
+        width={300}
+        height={100}
+        style={{
+          border: `2px dashed ${C.border}`,
+          borderRadius: 8,
+          width: "100%",
+          height: "100px",
+          cursor: "pointer",
+          touchAction: "none",
+          background: "#fafbfc",
+        }}
+        onMouseDown={startDrawing}
+        onMouseMove={draw}
+        onMouseUp={stopDrawing}
+        onMouseLeave={stopDrawing}
+        onTouchStart={startDrawing}
+        onTouchMove={draw}
+        onTouchEnd={stopDrawing}
+      />
+      {hasSignature && (
+        <button
+          onClick={clearSignature}
+          style={{
+            position: "absolute",
+            top: 4,
+            right: 4,
+            background: "#fee2e2",
+            border: "none",
+            borderRadius: "50%",
+            width: 24,
+            height: 24,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "#dc2626",
+            fontSize: 12,
+          }}
+        >
+          <FiX size={14} />
+        </button>
+      )}
+      <div
+        style={{
+          fontSize: 10,
+          color: C.muted,
+          marginTop: 4,
+          textAlign: "center",
+        }}
+      >
+        {hasSignature ? "✓ Signature saved" : "✍️ Sign here (touch or mouse)"}
+      </div>
+    </div>
+  );
+};
+
 export default function Evaluation({ t, lang }) {
   const safeT = t || {};
   const te = safeT.evaluation || {};
@@ -51,9 +177,50 @@ export default function Evaluation({ t, lang }) {
   const [showRankings, setShowRankings] = useState(true);
   const [saving, setSaving] = useState(false);
   const [evaluationId, setEvaluationId] = useState(null);
+  const [signatures, setSignatures] = useState({});
 
   const inputRefs = useRef({});
+  const memberInputRefs = useRef([]);
 
+  // ─── Focus management ──────────────────────────────────────
+  const focusNextField = (currentIndex) => {
+    const nextIndex = currentIndex + 1;
+    if (nextIndex < members.length) {
+      memberInputRefs.current[nextIndex]?.focus();
+    } else if (nextIndex === members.length && members.length < 7) {
+      addMember();
+      setTimeout(() => {
+        const newIndex = members.length;
+        memberInputRefs.current[newIndex]?.focus();
+      }, 50);
+    }
+  };
+
+  // ─── Auto-save to localStorage ─────────────────────────────
+  useEffect(() => {
+    const hasData =
+      members.some((m) => m.trim() !== "") || Object.keys(scores).length > 0;
+
+    if (!hasData) return;
+
+    const data = {
+      members,
+      scores,
+      comments,
+      teamName,
+      evaluationId,
+      signatures,
+      lastUpdated: new Date().toISOString(),
+    };
+
+    const timer = setTimeout(() => {
+      localStorage.setItem("currentEvaluation", JSON.stringify(data));
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [members, scores, comments, teamName, evaluationId, signatures]);
+
+  // ─── Load saved evaluation ─────────────────────────────────
   useEffect(() => {
     let isMounted = true;
 
@@ -68,6 +235,7 @@ export default function Evaluation({ t, lang }) {
             if (data.comments) setComments(data.comments);
             if (data.teamName) setTeamName(data.teamName);
             if (data.evaluationId) setEvaluationId(data.evaluationId);
+            if (data.signatures) setSignatures(data.signatures);
           }
         } catch (e) {
           console.error("Failed to load saved evaluation:", e);
@@ -82,34 +250,18 @@ export default function Evaluation({ t, lang }) {
     };
   }, []);
 
-  useEffect(() => {
-    const hasData =
-      members.some((m) => m.trim() !== "") || Object.keys(scores).length > 0;
-
-    if (!hasData) return;
-
-    const data = {
-      members,
-      scores,
-      comments,
-      teamName,
-      evaluationId,
-      lastUpdated: new Date().toISOString(),
-    };
-
-    const timer = setTimeout(() => {
-      localStorage.setItem("currentEvaluation", JSON.stringify(data));
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [members, scores, comments, teamName, evaluationId]);
-
+  // ─── Member management ──────────────────────────────────────
   const addMember = () => {
     if (members.length < 7) {
       setMembers([...members, ""]);
       const newComments = { ...comments };
       newComments[members.length] = "";
       setComments(newComments);
+      // Focus the new member input after render
+      setTimeout(() => {
+        const newIndex = members.length;
+        memberInputRefs.current[newIndex]?.focus();
+      }, 50);
     }
   };
 
@@ -134,6 +286,11 @@ export default function Evaluation({ t, lang }) {
     const newMembers = [...members];
     newMembers[index] = name;
     setMembers(newMembers);
+
+    // Auto-advance to next field when name is entered
+    if (name.trim() !== "" && index === members.length - 1) {
+      focusNextField(index);
+    }
   };
 
   const updateComment = (index, comment) => {
@@ -142,6 +299,7 @@ export default function Evaluation({ t, lang }) {
     setComments(newComments);
   };
 
+  // ─── Score management ──────────────────────────────────────
   const setScore = (cId, iIdx, m, v) => {
     const key = `${cId}-${iIdx}-${m}`;
     const max = CRITERIA[cId - 1].items[iIdx].points;
@@ -153,6 +311,7 @@ export default function Evaluation({ t, lang }) {
       c.items.map((_, i) => scores[`${c.id}-${i}-${m}`] || 0),
     ).reduce((a, b) => a + b, 0);
 
+  // ─── Computed values ──────────────────────────────────────
   const totals = members
     .filter((m) => m.trim() !== "")
     .map((m, idx) => ({
@@ -178,6 +337,15 @@ export default function Evaluation({ t, lang }) {
   const lowestScore = sortedMembers[sortedMembers.length - 1]?.total || 0;
   const bestPerformer = sortedMembers[0]?.name || "—";
 
+  // ─── Signature handling ─────────────────────────────────────
+  const handleSignatureSave = (memberName, signatureData) => {
+    setSignatures((prev) => ({
+      ...prev,
+      [memberName]: signatureData,
+    }));
+  };
+
+  // ─── Save evaluation ──────────────────────────────────────
   const saveEvaluation = async () => {
     const validMembers = members.filter((m) => m.trim() !== "");
     if (validMembers.length === 0) {
@@ -203,6 +371,7 @@ export default function Evaluation({ t, lang }) {
         members: validMembers,
         scores: scores,
         comments: comments,
+        signatures: signatures,
         totalScores: totalScoresData,
         evaluatedBy: user?.name || user?.email || "Unknown",
         evaluatedAt: new Date().toISOString(),
@@ -225,6 +394,7 @@ export default function Evaluation({ t, lang }) {
         showToast("✅ Evaluation saved successfully!", "success");
       }
 
+      // Clear localStorage after successful save
       localStorage.removeItem("currentEvaluation");
     } catch (error) {
       console.error("Failed to save evaluation:", error);
@@ -238,6 +408,19 @@ export default function Evaluation({ t, lang }) {
     }
   };
 
+  // ─── Reset form ──────────────────────────────────────────
+  const resetForm = () => {
+    setScores({});
+    setComments({});
+    setMembers(["", "", ""]);
+    setTeamName("");
+    setEvaluationId(null);
+    setSignatures({});
+    localStorage.removeItem("currentEvaluation");
+    showToast("Form reset successfully", "info");
+  };
+
+  // ─── Helper functions ──────────────────────────────────────
   const getRankBadge = (index, total) => {
     if (total <= 1) return "🥇";
     if (index === 0) return "🥇";
@@ -548,10 +731,17 @@ export default function Evaluation({ t, lang }) {
               style={{ display: "flex", gap: 8, alignItems: "center" }}
             >
               <input
+                ref={(el) => (memberInputRefs.current[idx] = el)}
                 style={{ ...inp, flex: 1 }}
                 placeholder={`Member ${idx + 1}`}
                 value={member}
                 onChange={(e) => updateMemberName(idx, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    focusNextField(idx);
+                  }
+                }}
               />
               {members.length > 1 && (
                 <button
@@ -800,7 +990,7 @@ export default function Evaluation({ t, lang }) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
                 gap: 10,
                 marginBottom: 20,
               }}
@@ -936,7 +1126,7 @@ export default function Evaluation({ t, lang }) {
               style={{
                 display: "grid",
                 gridTemplateColumns:
-                  "repeat(auto-fill, minmax(min(100%, 300px), 1fr))",
+                  "repeat(auto-fill, minmax(min(100%, 280px), 1fr))",
                 gap: 12,
               }}
             >
@@ -1249,7 +1439,7 @@ export default function Evaluation({ t, lang }) {
             </div>
           </div>
 
-          {/* Signature Grid */}
+          {/* Signature Grid with Canvas */}
           <div>
             <div
               style={{
@@ -1264,13 +1454,13 @@ export default function Evaluation({ t, lang }) {
               }}
             >
               <FiPenTool size={14} />
-              {te.signaturesTitle || "ፊርማዎች / Signatures"}
+              {te.signaturesTitle || "ፊርማዎች / Digital Signatures"}
             </div>
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns:
-                  "repeat(auto-fill, minmax(min(100%, 160px), 1fr))",
+                  "repeat(auto-fill, minmax(min(100%, 220px), 1fr))",
                 gap: "clamp(12px, 3vw, 20px)",
               }}
             >
@@ -1320,22 +1510,10 @@ export default function Evaluation({ t, lang }) {
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
                 />
-                <div
-                  style={{
-                    borderBottom: `1.5px solid ${C.dark}`,
-                    marginTop: 24,
-                    marginBottom: 4,
-                  }}
+                <SignatureCanvas
+                  onSave={(data) => handleSignatureSave("teamLeader", data)}
+                  value={signatures.teamLeader}
                 />
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: C.muted,
-                    fontFamily: F.sans,
-                  }}
-                >
-                  {te.signatureLine || "ፊርማ / Signature"}
-                </div>
               </div>
 
               {/* Member signature boxes */}
@@ -1369,7 +1547,7 @@ export default function Evaluation({ t, lang }) {
                       fontWeight: 700,
                       color: C.dark,
                       fontFamily: F.sans,
-                      marginBottom: 4,
+                      marginBottom: 8,
                       minHeight: 20,
                       display: "flex",
                       alignItems: "center",
@@ -1380,22 +1558,10 @@ export default function Evaluation({ t, lang }) {
                     <FiUser size={12} color={C.primary} />
                     {name}
                   </div>
-                  <div
-                    style={{
-                      borderBottom: `1.5px solid ${C.dark}`,
-                      marginTop: 24,
-                      marginBottom: 4,
-                    }}
+                  <SignatureCanvas
+                    onSave={(data) => handleSignatureSave(name, data)}
+                    value={signatures[name]}
                   />
-                  <div
-                    style={{
-                      fontSize: 10,
-                      color: C.muted,
-                      fontFamily: F.sans,
-                    }}
-                  >
-                    {te.signatureLine || "ፊርማ / Signature"}
-                  </div>
                 </div>
               ))}
             </div>
@@ -1611,13 +1777,13 @@ export default function Evaluation({ t, lang }) {
               }}
             />
 
-            {/* Enhanced AI Performance Insights */}
+            {/* Enhanced AI Performance Insights - Responsive */}
             {sortedMembers.length > 0 && (
               <div style={{ marginTop: "20px" }}>
                 <div
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
                     gap: "14px",
                   }}
                 >
@@ -1626,8 +1792,9 @@ export default function Evaluation({ t, lang }) {
                     style={{
                       background: "#fff",
                       borderRadius: "10px",
-                      padding: "16px 18px",
+                      padding: "14px 16px",
                       border: "1px solid #E2E8F0",
+                      overflow: "hidden",
                     }}
                   >
                     <div
@@ -1635,7 +1802,7 @@ export default function Evaluation({ t, lang }) {
                         display: "flex",
                         alignItems: "center",
                         gap: "8px",
-                        marginBottom: "12px",
+                        marginBottom: "10px",
                       }}
                     >
                       <FiTrendingUp size={18} color={C.primary} />
@@ -1650,7 +1817,12 @@ export default function Evaluation({ t, lang }) {
                       </span>
                     </div>
                     <div
-                      style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}
+                      style={{
+                        display: "flex",
+                        gap: "4px",
+                        flexWrap: "wrap",
+                        justifyContent: "center",
+                      }}
                     >
                       {sortedMembers.slice(0, 6).map((m, idx) => {
                         const level = getPerformanceLevel(m.total);
@@ -1658,12 +1830,13 @@ export default function Evaluation({ t, lang }) {
                           <div
                             key={idx}
                             style={{
-                              flex: 1,
-                              minWidth: "35px",
+                              flex: "1 1 40px",
+                              minWidth: "32px",
+                              maxWidth: "60px",
                               textAlign: "center",
                               background: idx === 0 ? "#F0FDF4" : "#F8FAFC",
                               borderRadius: "6px",
-                              padding: "6px 4px",
+                              padding: "4px 2px",
                               border:
                                 idx === 0
                                   ? `2px solid ${level.color}`
@@ -1673,7 +1846,7 @@ export default function Evaluation({ t, lang }) {
                           >
                             <div
                               style={{
-                                fontSize: "13px",
+                                fontSize: "11px",
                                 fontWeight: 800,
                                 color: idx === 0 ? "#15803D" : "#1E293B",
                               }}
@@ -1682,12 +1855,11 @@ export default function Evaluation({ t, lang }) {
                             </div>
                             <div
                               style={{
-                                fontSize: "8px",
+                                fontSize: "7px",
                                 color: C.muted,
                                 overflow: "hidden",
                                 textOverflow: "ellipsis",
                                 whiteSpace: "nowrap",
-                                maxWidth: "40px",
                               }}
                             >
                               {m.name.substring(0, 4)}
@@ -1695,13 +1867,13 @@ export default function Evaluation({ t, lang }) {
                             {idx === 0 && (
                               <div
                                 style={{
-                                  fontSize: "7px",
+                                  fontSize: "6px",
                                   color: "#15803D",
                                   fontWeight: 700,
-                                  marginTop: 2,
+                                  marginTop: 1,
                                 }}
                               >
-                                ★ BEST
+                                ★
                               </div>
                             )}
                           </div>
@@ -1710,12 +1882,12 @@ export default function Evaluation({ t, lang }) {
                       {sortedMembers.length > 6 && (
                         <div
                           style={{
-                            minWidth: "35px",
+                            minWidth: "32px",
                             textAlign: "center",
-                            padding: "6px 4px",
+                            padding: "4px 2px",
                             background: "#F1F5F9",
                             borderRadius: "6px",
-                            fontSize: "10px",
+                            fontSize: "9px",
                             color: C.muted,
                             display: "flex",
                             alignItems: "center",
@@ -1730,11 +1902,12 @@ export default function Evaluation({ t, lang }) {
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
-                        marginTop: "10px",
-                        fontSize: "10px",
+                        marginTop: "8px",
+                        fontSize: "9px",
                         color: C.muted,
                         borderTop: "1px solid #E2E8F0",
-                        paddingTop: "8px",
+                        paddingTop: "6px",
+                        flexWrap: "wrap",
                       }}
                     >
                       <span>
@@ -1750,8 +1923,9 @@ export default function Evaluation({ t, lang }) {
                     style={{
                       background: "#fff",
                       borderRadius: "10px",
-                      padding: "16px 18px",
+                      padding: "14px 16px",
                       border: "1px solid #E2E8F0",
+                      overflow: "hidden",
                     }}
                   >
                     <div
@@ -1759,7 +1933,7 @@ export default function Evaluation({ t, lang }) {
                         display: "flex",
                         alignItems: "center",
                         gap: "8px",
-                        marginBottom: "12px",
+                        marginBottom: "10px",
                       }}
                     >
                       <FiTarget size={18} color={C.primary} />
@@ -1775,12 +1949,12 @@ export default function Evaluation({ t, lang }) {
                     </div>
                     <div
                       style={{
-                        fontSize: "12px",
+                        fontSize: "11px",
                         color: "#1E293B",
                         lineHeight: 1.6,
                       }}
                     >
-                      <ul style={{ margin: 0, paddingLeft: "18px" }}>
+                      <ul style={{ margin: 0, paddingLeft: "16px" }}>
                         {averageScore < 70 && (
                           <li>
                             <strong>Training needed:</strong> Average score
@@ -1791,27 +1965,24 @@ export default function Evaluation({ t, lang }) {
                           <li>
                             <strong>Performance gap:</strong>{" "}
                             {highestScore - lowestScore}pt gap detected.
-                            Consider mentorship program pairing top performers
-                            with those needing improvement.
+                            Consider mentorship program.
                           </li>
                         )}
                         {sortedMembers.length > 5 && (
                           <li>
-                            <strong>Team optimization:</strong> Large team size
-                            ({sortedMembers.length}). Consider breaking into
-                            smaller sub-teams for more focused evaluation.
+                            <strong>Team optimization:</strong> Large team (
+                            {sortedMembers.length}). Consider sub-teams.
                           </li>
                         )}
                         {averageScore >= 80 && (
                           <li>
-                            <strong>Excellent performance:</strong> Team average
-                            ({averageScore}) is high. Consider recognition
-                            program.
+                            <strong>Excellent performance:</strong> Avg (
+                            {averageScore}) high. Consider recognition program.
                           </li>
                         )}
                         <li>
-                          <strong>Review criteria:</strong> Ensure evaluation
-                          criteria are applied consistently across all members.
+                          <strong>Review criteria:</strong> Ensure consistent
+                          application across all members.
                         </li>
                       </ul>
                     </div>
@@ -1822,8 +1993,9 @@ export default function Evaluation({ t, lang }) {
                     style={{
                       background: "#fff",
                       borderRadius: "10px",
-                      padding: "16px 18px",
+                      padding: "14px 16px",
                       border: "1px solid #E2E8F0",
+                      overflow: "hidden",
                     }}
                   >
                     <div
@@ -1831,7 +2003,7 @@ export default function Evaluation({ t, lang }) {
                         display: "flex",
                         alignItems: "center",
                         gap: "8px",
-                        marginBottom: "12px",
+                        marginBottom: "10px",
                       }}
                     >
                       <FiInfo size={18} color={C.primary} />
@@ -1847,34 +2019,40 @@ export default function Evaluation({ t, lang }) {
                     </div>
                     <div
                       style={{
-                        fontSize: "12px",
+                        fontSize: "11px",
                         color: "#1E293B",
                         lineHeight: 1.6,
                       }}
                     >
-                      <div style={{ marginBottom: "6px" }}>
+                      <div
+                        style={{ marginBottom: "4px", wordBreak: "break-word" }}
+                      >
                         <span style={{ fontWeight: 600 }}>Top Performer:</span>{" "}
                         {bestPerformer} ({highestScore} pts)
                       </div>
-                      <div style={{ marginBottom: "6px" }}>
+                      <div
+                        style={{ marginBottom: "4px", wordBreak: "break-word" }}
+                      >
                         <span style={{ fontWeight: 600 }}>
                           Area for Growth:
                         </span>{" "}
                         {lowestScore > 60
                           ? "Maintain current performance levels"
-                          : "Significant improvement needed in core competencies"}
+                          : "Significant improvement needed"}
                       </div>
-                      <div style={{ marginBottom: "6px" }}>
+                      <div
+                        style={{ marginBottom: "4px", wordBreak: "break-word" }}
+                      >
                         <span style={{ fontWeight: 600 }}>Team Strength:</span>{" "}
                         {averageScore >= 75
                           ? "Strong collective performance"
-                          : "Opportunity for team building and skill development"}
+                          : "Opportunity for team building"}
                       </div>
-                      <div>
+                      <div style={{ wordBreak: "break-word" }}>
                         <span style={{ fontWeight: 600 }}>Recommendation:</span>{" "}
                         {averageScore >= 80
                           ? "Focus on sustaining excellence and innovation"
-                          : "Implement targeted development programs for underperforming areas"}
+                          : "Implement targeted development programs"}
                       </div>
                     </div>
                   </div>
@@ -1885,11 +2063,12 @@ export default function Evaluation({ t, lang }) {
         </div>
       )}
 
-      {/* Action Buttons */}
+      {/* Action Buttons - Inline on all devices */}
       <div
         style={{
           display: "flex",
-          gap: "clamp(8px, 3vw, 12px)",
+          flexDirection: "row",
+          gap: "clamp(8px, 2vw, 12px)",
           justifyContent: "center",
           marginTop: "clamp(20px, 5vw, 28px)",
           flexWrap: "wrap",
@@ -1909,6 +2088,8 @@ export default function Evaluation({ t, lang }) {
             display: "flex",
             alignItems: "center",
             gap: 6,
+            flex: "1 1 auto",
+            justifyContent: "center",
           }}
           onClick={saveEvaluation}
           disabled={saving}
@@ -1928,6 +2109,8 @@ export default function Evaluation({ t, lang }) {
             </>
           )}
         </button>
+
+        {/* Export button - Icon only on mobile, text + icon on desktop */}
         <button
           style={{
             background: "#dc2626",
@@ -1941,6 +2124,8 @@ export default function Evaluation({ t, lang }) {
             display: "flex",
             alignItems: "center",
             gap: 6,
+            flex: "1 1 auto",
+            justifyContent: "center",
           }}
           onClick={() => {
             const bestPerformerName =
@@ -1956,36 +2141,41 @@ export default function Evaluation({ t, lang }) {
           }}
         >
           <FiDownload size={16} />
-          Export PDF
+          <span className="export-text">Export PDF</span>
+          <style>{`
+            @media (max-width: 480px) {
+              .export-text {
+                display: none !important;
+              }
+            }
+          `}</style>
         </button>
+
         <button
           style={{
             ...btn.secondary,
             display: "flex",
             alignItems: "center",
             gap: 6,
+            flex: "1 1 auto",
+            justifyContent: "center",
           }}
-          onClick={() => {
-            setScores({});
-            setComments({});
-            setMembers(["", "", ""]);
-            setTeamName("");
-            setEvaluationId(null);
-            localStorage.removeItem("currentEvaluation");
-          }}
+          onClick={resetForm}
         >
           <FiRefreshCw size={16} />
           {te.reset || "Reset"}
         </button>
       </div>
 
-      {/* AI Evaluation Narrative */}
+      {/* AI Evaluation Narrative - with proper spacing */}
       {evaluationId && (
-        <AISummary
-          fetchFn={(id) => aiAPI.getEvaluationSummary(id, null)}
-          args={[evaluationId]}
-          label="AI Evaluation Narrative"
-        />
+        <div style={{ marginTop: "clamp(16px, 4vw, 24px)" }}>
+          <AISummary
+            fetchFn={(id) => aiAPI.getEvaluationSummary(id, null)}
+            args={[evaluationId]}
+            label="AI Evaluation Narrative"
+          />
+        </div>
       )}
 
       <style>{`
