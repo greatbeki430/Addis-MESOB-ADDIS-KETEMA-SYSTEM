@@ -237,51 +237,34 @@ export default function Evaluation({ t, lang }) {
   const inputRefs = useRef({});
   const memberInputRefs = useRef([]);
 
-  // ─── Auto-advance to next field ─────────────────────────────
-  const autoAdvance = (currentField, currentIndex, type) => {
-    if (type === "member") {
-      // Member name fields
-      const nextIndex = currentIndex + 1;
-      if (nextIndex < members.length) {
-        setTimeout(() => {
-          memberInputRefs.current[nextIndex]?.focus();
-        }, 50);
-      } else if (nextIndex === members.length && members.length < 7) {
-        addMember();
-      }
-    } else if (type === "score") {
-      // Score fields - advance to next score or next member
-      const [cId, itemIdx, member] = currentField.split("-");
-      const allMembers = members.filter((m) => m.trim() !== "");
-      const currentMemberIndex = allMembers.indexOf(member);
+  // ─── Auto-advance for SCORE fields only ─────────────────────
+  const autoAdvanceScore = (currentField) => {
+    const [cId, itemIdx, member] = currentField.split("-");
+    const allMembers = members.filter((m) => m.trim() !== "");
+    const currentMemberIndex = allMembers.indexOf(member);
 
-      let nextCriterionId = parseInt(cId);
-      let nextItemIdx = parseInt(itemIdx);
-      let nextMemberIndex = currentMemberIndex + 1;
+    let nextCriterionId = parseInt(cId);
+    let nextItemIdx = parseInt(itemIdx);
+    let nextMemberIndex = currentMemberIndex + 1;
 
-      if (nextMemberIndex >= allMembers.length) {
-        nextMemberIndex = 0;
-        nextItemIdx = nextItemIdx + 1;
-        if (nextItemIdx >= CRITERIA[cId - 1].items.length) {
-          nextItemIdx = 0;
-          nextCriterionId = cId + 1;
-          if (nextCriterionId > CRITERIA.length) {
-            nextCriterionId = 1;
-          }
+    if (nextMemberIndex >= allMembers.length) {
+      nextMemberIndex = 0;
+      nextItemIdx = nextItemIdx + 1;
+      if (nextItemIdx >= CRITERIA[cId - 1].items.length) {
+        nextItemIdx = 0;
+        nextCriterionId = cId + 1;
+        if (nextCriterionId > CRITERIA.length) {
+          nextCriterionId = 1;
         }
       }
+    }
 
-      const nextMember = allMembers[nextMemberIndex];
-      if (nextMember) {
-        const nextInputId = getInputId(
-          nextCriterionId,
-          nextItemIdx,
-          nextMember,
-        );
-        setTimeout(() => {
-          inputRefs.current[nextInputId]?.focus();
-        }, 50);
-      }
+    const nextMember = allMembers[nextMemberIndex];
+    if (nextMember) {
+      const nextInputId = getInputId(nextCriterionId, nextItemIdx, nextMember);
+      setTimeout(() => {
+        inputRefs.current[nextInputId]?.focus();
+      }, 50);
     }
   };
 
@@ -370,15 +353,12 @@ export default function Evaluation({ t, lang }) {
     }
   };
 
+  // ✅ REMOVED auto-advance from member name field
   const updateMemberName = (index, name) => {
     const newMembers = [...members];
     newMembers[index] = name;
     setMembers(newMembers);
-
-    // Auto-advance to next member field when a name is entered
-    if (name.trim() !== "") {
-      autoAdvance(null, index, "member");
-    }
+    // No auto-advance here - user can press Enter or Tab to move manually
   };
 
   const updateComment = (index, comment) => {
@@ -394,9 +374,9 @@ export default function Evaluation({ t, lang }) {
     const value = Math.min(Number(v), max);
     setScores((s) => ({ ...s, [key]: isNaN(value) ? "" : value }));
 
-    // Auto-advance to next score field after entering a valid number
+    // ✅ Auto-advance to next score field after entering a valid number
     if (v && !isNaN(v) && v > 0) {
-      autoAdvance(`${cId}-${iIdx}-${m}`, null, "score");
+      autoAdvanceScore(`${cId}-${iIdx}-${m}`);
     }
   };
 
@@ -768,6 +748,7 @@ export default function Evaluation({ t, lang }) {
                 placeholder={`Member ${idx + 1}`}
                 value={member}
                 onChange={(e) => updateMemberName(idx, e.target.value)}
+                // ✅ NO auto-advance on keydown - user presses Enter or Tab manually
               />
               {members.length > 1 && (
                 <button
