@@ -42,6 +42,12 @@ const SignatureCanvas = ({ onSave, value }) => {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+  const [isTouchDevice] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      ("ontouchstart" in window || navigator.maxTouchPoints > 0),
+  );
+  const [textSignature, setTextSignature] = useState("");
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -53,7 +59,6 @@ const SignatureCanvas = ({ onSave, value }) => {
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
-    // Load existing signature if any
     if (value) {
       const img = new Image();
       img.onload = () => {
@@ -68,8 +73,8 @@ const SignatureCanvas = ({ onSave, value }) => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || e.touches[0].clientX) - rect.left;
-    const y = (e.clientY || e.touches[0].clientY) - rect.top;
+    const x = (e.clientX || e.touches?.[0]?.clientX || 0) - rect.left;
+    const y = (e.clientY || e.touches?.[0]?.clientY || 0) - rect.top;
     ctx.beginPath();
     ctx.moveTo(x, y);
     setIsDrawing(true);
@@ -80,8 +85,8 @@ const SignatureCanvas = ({ onSave, value }) => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || e.touches[0].clientX) - rect.left;
-    const y = (e.clientY || e.touches[0].clientY) - rect.top;
+    const x = (e.clientX || e.touches?.[0]?.clientX || 0) - rect.left;
+    const y = (e.clientY || e.touches?.[0]?.clientY || 0) - rect.top;
     ctx.lineTo(x, y);
     ctx.stroke();
     setHasSignature(true);
@@ -101,6 +106,24 @@ const SignatureCanvas = ({ onSave, value }) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasSignature(false);
     if (onSave) onSave(null);
+    setTextSignature("");
+  };
+
+  const handleTextSignature = (e) => {
+    const value = e.target.value;
+    setTextSignature(value);
+    if (value.trim() && onSave) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = "24px 'Noto Sans Ethiopic', serif";
+      ctx.fillStyle = "#1a3aad";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(value, canvas.width / 2, canvas.height / 2);
+      setHasSignature(true);
+      onSave(canvas.toDataURL("image/png"));
+    }
   };
 
   return (
@@ -114,18 +137,46 @@ const SignatureCanvas = ({ onSave, value }) => {
           borderRadius: 8,
           width: "100%",
           height: "100px",
-          cursor: "pointer",
+          cursor: isTouchDevice ? "pointer" : "default",
           touchAction: "none",
           background: "#fafbfc",
         }}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        onTouchStart={startDrawing}
-        onTouchMove={draw}
-        onTouchEnd={stopDrawing}
+        onMouseDown={isTouchDevice ? undefined : startDrawing}
+        onMouseMove={isTouchDevice ? undefined : draw}
+        onMouseUp={isTouchDevice ? undefined : stopDrawing}
+        onMouseLeave={isTouchDevice ? undefined : stopDrawing}
+        onTouchStart={isTouchDevice ? startDrawing : undefined}
+        onTouchMove={isTouchDevice ? draw : undefined}
+        onTouchEnd={isTouchDevice ? stopDrawing : undefined}
       />
+
+      {!isTouchDevice && (
+        <div style={{ marginTop: 6 }}>
+          <input
+            type="text"
+            placeholder="Type your name as signature..."
+            value={textSignature}
+            onChange={handleTextSignature}
+            style={{
+              width: "100%",
+              padding: "6px 10px",
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              fontSize: "12px",
+              fontFamily: F.sans,
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = C.primary;
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+            }}
+          />
+        </div>
+      )}
+
       {hasSignature && (
         <button
           onClick={clearSignature}
@@ -157,7 +208,11 @@ const SignatureCanvas = ({ onSave, value }) => {
           textAlign: "center",
         }}
       >
-        {hasSignature ? "✓ Signature saved" : "✍️ Sign here (touch or mouse)"}
+        {hasSignature
+          ? "✓ Signature saved"
+          : isTouchDevice
+            ? "✍️ Sign here (touch or mouse)"
+            : "✍️ Type your name or use mouse to sign"}
       </div>
     </div>
   );
@@ -182,17 +237,51 @@ export default function Evaluation({ t, lang }) {
   const inputRefs = useRef({});
   const memberInputRefs = useRef([]);
 
-  // ─── Focus management ──────────────────────────────────────
-  const focusNextField = (currentIndex) => {
-    const nextIndex = currentIndex + 1;
-    if (nextIndex < members.length) {
-      memberInputRefs.current[nextIndex]?.focus();
-    } else if (nextIndex === members.length && members.length < 7) {
-      addMember();
-      setTimeout(() => {
-        const newIndex = members.length;
-        memberInputRefs.current[newIndex]?.focus();
-      }, 50);
+  // ─── Auto-advance to next field ─────────────────────────────
+  const autoAdvance = (currentField, currentIndex, type) => {
+    if (type === "member") {
+      // Member name fields
+      const nextIndex = currentIndex + 1;
+      if (nextIndex < members.length) {
+        setTimeout(() => {
+          memberInputRefs.current[nextIndex]?.focus();
+        }, 50);
+      } else if (nextIndex === members.length && members.length < 7) {
+        addMember();
+      }
+    } else if (type === "score") {
+      // Score fields - advance to next score or next member
+      const [cId, itemIdx, member] = currentField.split("-");
+      const allMembers = members.filter((m) => m.trim() !== "");
+      const currentMemberIndex = allMembers.indexOf(member);
+
+      let nextCriterionId = parseInt(cId);
+      let nextItemIdx = parseInt(itemIdx);
+      let nextMemberIndex = currentMemberIndex + 1;
+
+      if (nextMemberIndex >= allMembers.length) {
+        nextMemberIndex = 0;
+        nextItemIdx = nextItemIdx + 1;
+        if (nextItemIdx >= CRITERIA[cId - 1].items.length) {
+          nextItemIdx = 0;
+          nextCriterionId = cId + 1;
+          if (nextCriterionId > CRITERIA.length) {
+            nextCriterionId = 1;
+          }
+        }
+      }
+
+      const nextMember = allMembers[nextMemberIndex];
+      if (nextMember) {
+        const nextInputId = getInputId(
+          nextCriterionId,
+          nextItemIdx,
+          nextMember,
+        );
+        setTimeout(() => {
+          inputRefs.current[nextInputId]?.focus();
+        }, 50);
+      }
     }
   };
 
@@ -253,15 +342,14 @@ export default function Evaluation({ t, lang }) {
   // ─── Member management ──────────────────────────────────────
   const addMember = () => {
     if (members.length < 7) {
-      setMembers([...members, ""]);
+      setMembers((prev) => [...prev, ""]);
       const newComments = { ...comments };
       newComments[members.length] = "";
       setComments(newComments);
-      // Focus the new member input after render
       setTimeout(() => {
         const newIndex = members.length;
         memberInputRefs.current[newIndex]?.focus();
-      }, 50);
+      }, 100);
     }
   };
 
@@ -287,9 +375,9 @@ export default function Evaluation({ t, lang }) {
     newMembers[index] = name;
     setMembers(newMembers);
 
-    // Auto-advance to next field when name is entered
-    if (name.trim() !== "" && index === members.length - 1) {
-      focusNextField(index);
+    // Auto-advance to next member field when a name is entered
+    if (name.trim() !== "") {
+      autoAdvance(null, index, "member");
     }
   };
 
@@ -303,7 +391,13 @@ export default function Evaluation({ t, lang }) {
   const setScore = (cId, iIdx, m, v) => {
     const key = `${cId}-${iIdx}-${m}`;
     const max = CRITERIA[cId - 1].items[iIdx].points;
-    setScores((s) => ({ ...s, [key]: Math.min(Number(v), max) }));
+    const value = Math.min(Number(v), max);
+    setScores((s) => ({ ...s, [key]: isNaN(value) ? "" : value }));
+
+    // Auto-advance to next score field after entering a valid number
+    if (v && !isNaN(v) && v > 0) {
+      autoAdvance(`${cId}-${iIdx}-${m}`, null, "score");
+    }
   };
 
   const total = (m) =>
@@ -394,8 +488,8 @@ export default function Evaluation({ t, lang }) {
         showToast("✅ Evaluation saved successfully!", "success");
       }
 
-      // Clear localStorage after successful save
-      localStorage.removeItem("currentEvaluation");
+      // ✅ Clear form after successful save
+      clearFormAfterSave();
     } catch (error) {
       console.error("Failed to save evaluation:", error);
       showToast(
@@ -408,8 +502,8 @@ export default function Evaluation({ t, lang }) {
     }
   };
 
-  // ─── Reset form ──────────────────────────────────────────
-  const resetForm = () => {
+  // ─── Clear form after save ─────────────────────────────────
+  const clearFormAfterSave = () => {
     setScores({});
     setComments({});
     setMembers(["", "", ""]);
@@ -417,6 +511,11 @@ export default function Evaluation({ t, lang }) {
     setEvaluationId(null);
     setSignatures({});
     localStorage.removeItem("currentEvaluation");
+  };
+
+  // ─── Reset form ──────────────────────────────────────────
+  const resetForm = () => {
+    clearFormAfterSave();
     showToast("Form reset successfully", "info");
   };
 
@@ -471,73 +570,6 @@ export default function Evaluation({ t, lang }) {
       icon: <FiAlertCircle size={14} />,
       description: "Immediate action required to improve performance",
     };
-  };
-
-  const handleKeyDown = (e, cId, itemIdx, member) => {
-    const allMembers = members.filter((m) => m.trim() !== "");
-    const currentMemberIndex = allMembers.indexOf(member);
-
-    if (e.key === "Enter" || e.key === "ArrowDown") {
-      e.preventDefault();
-      let nextCriterionId = cId;
-      let nextItemIdx = itemIdx;
-      let nextMemberIndex = currentMemberIndex + 1;
-
-      if (nextMemberIndex >= allMembers.length) {
-        nextMemberIndex = 0;
-        nextItemIdx = itemIdx + 1;
-        if (nextItemIdx >= CRITERIA[cId - 1].items.length) {
-          nextItemIdx = 0;
-          nextCriterionId = cId + 1;
-          if (nextCriterionId > CRITERIA.length) {
-            nextCriterionId = 1;
-          }
-        }
-      }
-
-      const nextMember = allMembers[nextMemberIndex];
-      if (nextMember) {
-        const nextInputId = getInputId(
-          nextCriterionId,
-          nextItemIdx,
-          nextMember,
-        );
-        inputRefs.current[nextInputId]?.focus();
-      }
-    }
-
-    if (e.key === "ArrowUp") {
-      e.preventDefault();
-      let prevCriterionId = cId;
-      let prevItemIdx = itemIdx;
-      let prevMemberIndex = currentMemberIndex - 1;
-
-      if (prevMemberIndex < 0) {
-        prevMemberIndex = allMembers.length - 1;
-        prevItemIdx = itemIdx - 1;
-        if (prevItemIdx < 0) {
-          const prevCriterion = CRITERIA[cId - 2];
-          if (prevCriterion) {
-            prevItemIdx = prevCriterion.items.length - 1;
-            prevCriterionId = cId - 1;
-          } else {
-            const lastCriterion = CRITERIA[CRITERIA.length - 1];
-            prevItemIdx = lastCriterion.items.length - 1;
-            prevCriterionId = CRITERIA.length;
-          }
-        }
-      }
-
-      const prevMember = allMembers[prevMemberIndex];
-      if (prevMember) {
-        const prevInputId = getInputId(
-          prevCriterionId,
-          prevItemIdx,
-          prevMember,
-        );
-        inputRefs.current[prevInputId]?.focus();
-      }
-    }
   };
 
   const getInputId = (cId, iIdx, m) =>
@@ -736,12 +768,6 @@ export default function Evaluation({ t, lang }) {
                 placeholder={`Member ${idx + 1}`}
                 value={member}
                 onChange={(e) => updateMemberName(idx, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    focusNextField(idx);
-                  }
-                }}
               />
               {members.length > 1 && (
                 <button
@@ -877,7 +903,6 @@ export default function Evaluation({ t, lang }) {
                               onChange={(e) =>
                                 setScore(c.id, idx, m, e.target.value)
                               }
-                              onKeyDown={(e) => handleKeyDown(e, c.id, idx, m)}
                             />
                           </td>
                         );
@@ -1754,7 +1779,6 @@ export default function Evaluation({ t, lang }) {
                 showToast("AI feedback generated successfully!", "success");
                 console.log("AI Feedback:", feedback);
 
-                // Enhanced feedback application
                 if (feedback && feedback.individualFeedback) {
                   feedback.individualFeedback.forEach((item) => {
                     const memberIndex = members.findIndex(

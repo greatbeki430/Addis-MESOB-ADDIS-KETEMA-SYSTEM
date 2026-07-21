@@ -232,8 +232,9 @@ const AISummary = ({
               fontSize: "10px",
               background: "#DBEAFE",
               color: "#1D4ED8",
-              padding: "2px 10px",
-              borderRadius: radius.pill,
+              padding: "2px 14px",
+              // borderRadius: radius.pill,
+              borderRadius: "10px",
               fontWeight: 500,
             }}
           >
