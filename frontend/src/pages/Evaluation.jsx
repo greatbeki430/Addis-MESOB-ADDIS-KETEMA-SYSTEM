@@ -237,22 +237,33 @@ export default function Evaluation({ t, lang }) {
   const inputRefs = useRef({});
   const memberInputRefs = useRef([]);
 
-  // ─── Auto-advance for SCORE fields only ─────────────────────
+  // ─── Auto-advance for SCORE fields - FIXED to go to next criterion ──
   const autoAdvanceScore = (currentField) => {
     const [cId, itemIdx, member] = currentField.split("-");
     const allMembers = members.filter((m) => m.trim() !== "");
     const currentMemberIndex = allMembers.indexOf(member);
+    const currentCriterionIndex = parseInt(cId) - 1;
+    const currentItemIndex = parseInt(itemIdx);
+
+    // Get total items in current criterion
+    const totalItemsInCurrentCriterion =
+      CRITERIA[currentCriterionIndex]?.items?.length || 0;
 
     let nextCriterionId = parseInt(cId);
-    let nextItemIdx = parseInt(itemIdx);
+    let nextItemIdx = currentItemIndex;
     let nextMemberIndex = currentMemberIndex + 1;
 
+    // If we've gone through all members for this item, move to next item
     if (nextMemberIndex >= allMembers.length) {
       nextMemberIndex = 0;
-      nextItemIdx = nextItemIdx + 1;
-      if (nextItemIdx >= CRITERIA[cId - 1].items.length) {
+      nextItemIdx = currentItemIndex + 1;
+
+      // If we've gone through all items in this criterion, move to next criterion
+      if (nextItemIdx >= totalItemsInCurrentCriterion) {
         nextItemIdx = 0;
-        nextCriterionId = cId + 1;
+        nextCriterionId = parseInt(cId) + 1;
+
+        // If we've gone through all criteria, wrap around to first criterion
         if (nextCriterionId > CRITERIA.length) {
           nextCriterionId = 1;
         }
@@ -263,7 +274,11 @@ export default function Evaluation({ t, lang }) {
     if (nextMember) {
       const nextInputId = getInputId(nextCriterionId, nextItemIdx, nextMember);
       setTimeout(() => {
-        inputRefs.current[nextInputId]?.focus();
+        const nextInput = inputRefs.current[nextInputId];
+        if (nextInput) {
+          nextInput.focus();
+          nextInput.select();
+        }
       }, 50);
     }
   };
@@ -353,12 +368,10 @@ export default function Evaluation({ t, lang }) {
     }
   };
 
-  // ✅ REMOVED auto-advance from member name field
   const updateMemberName = (index, name) => {
     const newMembers = [...members];
     newMembers[index] = name;
     setMembers(newMembers);
-    // No auto-advance here - user can press Enter or Tab to move manually
   };
 
   const updateComment = (index, comment) => {
@@ -419,7 +432,7 @@ export default function Evaluation({ t, lang }) {
     }));
   };
 
-  // ─── Save evaluation ──────────────────────────────────────
+  // ─── Save evaluation - REMOVED auto-clear ──────────────────
   const saveEvaluation = async () => {
     const validMembers = members.filter((m) => m.trim() !== "");
     if (validMembers.length === 0) {
@@ -468,8 +481,8 @@ export default function Evaluation({ t, lang }) {
         showToast("✅ Evaluation saved successfully!", "success");
       }
 
-      // ✅ Clear form after successful save
-      clearFormAfterSave();
+      // ✅ REMOVED auto-clear - form data stays visible after save
+      // User can use Reset button to clear manually
     } catch (error) {
       console.error("Failed to save evaluation:", error);
       showToast(
@@ -482,8 +495,8 @@ export default function Evaluation({ t, lang }) {
     }
   };
 
-  // ─── Clear form after save ─────────────────────────────────
-  const clearFormAfterSave = () => {
+  // ─── Reset form - clears everything ─────────────────────────
+  const resetForm = () => {
     setScores({});
     setComments({});
     setMembers(["", "", ""]);
@@ -491,11 +504,6 @@ export default function Evaluation({ t, lang }) {
     setEvaluationId(null);
     setSignatures({});
     localStorage.removeItem("currentEvaluation");
-  };
-
-  // ─── Reset form ──────────────────────────────────────────
-  const resetForm = () => {
-    clearFormAfterSave();
     showToast("Form reset successfully", "info");
   };
 
@@ -748,7 +756,6 @@ export default function Evaluation({ t, lang }) {
                 placeholder={`Member ${idx + 1}`}
                 value={member}
                 onChange={(e) => updateMemberName(idx, e.target.value)}
-                // ✅ NO auto-advance on keydown - user presses Enter or Tab manually
               />
               {members.length > 1 && (
                 <button
