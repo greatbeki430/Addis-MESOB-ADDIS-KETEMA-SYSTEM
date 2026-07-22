@@ -12,10 +12,10 @@ import {
   FiCalendar,
   FiLogIn,
   FiLogOut,
-  FiHistory,
   FiChevronDown,
   FiChevronUp,
   FiInfo,
+  FiList, // Replacing FiHistory with FiList
 } from "react-icons/fi";
 
 const API_BASE_URL =
@@ -607,7 +607,7 @@ const DigitalAttendance = () => {
               gap: 8,
             }}
           >
-            <FiHistory size={18} />
+            <FiList size={18} /> {/* Changed from FiHistory to FiList */}
             Recent Digital Attendance History
           </h3>
           {showHistory ? (
