@@ -38,10 +38,13 @@ import {
 } from "react-icons/fi";
 
 // ─── Signature Canvas Component ──────────────────────────────
+// ─── Signature Canvas Component - FIXED ──────────────────────
+// ─── Signature Canvas Component - FIXED ──────────────────────
 const SignatureCanvas = ({ onSave, value }) => {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+  // ✅ Initialize isTouchDevice directly, not in useEffect
   const [isTouchDevice] = useState(
     () =>
       typeof window !== "undefined" &&
@@ -49,13 +52,16 @@ const SignatureCanvas = ({ onSave, value }) => {
   );
   const [textSignature, setTextSignature] = useState("");
 
+  // ✅ Remove the useEffect that was causing the error
+  // The isTouchDevice is now set directly in useState
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext("2d");
     ctx.strokeStyle = "#1a3aad";
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
@@ -69,30 +75,44 @@ const SignatureCanvas = ({ onSave, value }) => {
     }
   }, [value]);
 
+  // ─── Get canvas coordinates ──────────────────────────────
+  const getCanvasCoords = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.clientX || e.touches?.[0]?.clientX || 0;
+    const clientY = e.clientY || e.touches?.[0]?.clientY || 0;
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top,
+    };
+  };
+
+  // ─── Start drawing ────────────────────────────────────────
   const startDrawing = (e) => {
+    e.preventDefault();
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || e.touches?.[0]?.clientX || 0) - rect.left;
-    const y = (e.clientY || e.touches?.[0]?.clientY || 0) - rect.top;
+    const { x, y } = getCanvasCoords(e);
     ctx.beginPath();
     ctx.moveTo(x, y);
     setIsDrawing(true);
   };
 
+  // ─── Draw ──────────────────────────────────────────────────
   const draw = (e) => {
+    e.preventDefault();
     if (!isDrawing) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.clientX || e.touches?.[0]?.clientX || 0) - rect.left;
-    const y = (e.clientY || e.touches?.[0]?.clientY || 0) - rect.top;
+    const { x, y } = getCanvasCoords(e);
     ctx.lineTo(x, y);
     ctx.stroke();
     setHasSignature(true);
   };
 
-  const stopDrawing = () => {
+  // ─── Stop drawing ─────────────────────────────────────────
+  const stopDrawing = (e) => {
+    e.preventDefault();
     setIsDrawing(false);
     if (hasSignature && onSave) {
       const canvas = canvasRef.current;
@@ -100,6 +120,7 @@ const SignatureCanvas = ({ onSave, value }) => {
     }
   };
 
+  // ─── Clear signature ──────────────────────────────────────
   const clearSignature = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -109,6 +130,7 @@ const SignatureCanvas = ({ onSave, value }) => {
     setTextSignature("");
   };
 
+  // ─── Handle text signature ──────────────────────────────
   const handleTextSignature = (e) => {
     const value = e.target.value;
     setTextSignature(value);
@@ -137,45 +159,51 @@ const SignatureCanvas = ({ onSave, value }) => {
           borderRadius: 8,
           width: "100%",
           height: "100px",
-          cursor: isTouchDevice ? "pointer" : "default",
+          cursor: "pointer",
           touchAction: "none",
           background: "#fafbfc",
         }}
-        onMouseDown={isTouchDevice ? undefined : startDrawing}
-        onMouseMove={isTouchDevice ? undefined : draw}
-        onMouseUp={isTouchDevice ? undefined : stopDrawing}
-        onMouseLeave={isTouchDevice ? undefined : stopDrawing}
-        onTouchStart={isTouchDevice ? startDrawing : undefined}
-        onTouchMove={isTouchDevice ? draw : undefined}
-        onTouchEnd={isTouchDevice ? stopDrawing : undefined}
+        // ✅ Mouse events - always enabled
+        onMouseDown={startDrawing}
+        onMouseMove={draw}
+        onMouseUp={stopDrawing}
+        onMouseLeave={stopDrawing}
+        // ✅ Touch events - always enabled
+        onTouchStart={startDrawing}
+        onTouchMove={draw}
+        onTouchEnd={stopDrawing}
+        onTouchCancel={stopDrawing}
       />
 
-      {!isTouchDevice && (
-        <div style={{ marginTop: 6 }}>
-          <input
-            type="text"
-            placeholder="Type your name as signature..."
-            value={textSignature}
-            onChange={handleTextSignature}
-            style={{
-              width: "100%",
-              padding: "6px 10px",
-              border: `1px solid ${C.border}`,
-              borderRadius: 6,
-              fontSize: "12px",
-              fontFamily: F.sans,
-              outline: "none",
-              boxSizing: "border-box",
-            }}
-            onFocus={(e) => {
-              e.currentTarget.style.borderColor = C.primary;
-            }}
-            onBlur={(e) => {
-              e.currentTarget.style.borderColor = C.border;
-            }}
-          />
-        </div>
-      )}
+      {/* Text input fallback for all devices */}
+      <div style={{ marginTop: 6 }}>
+        <input
+          type="text"
+          placeholder={
+            isTouchDevice
+              ? "Or type your name as signature..."
+              : "Type your name as signature..."
+          }
+          value={textSignature}
+          onChange={handleTextSignature}
+          style={{
+            width: "100%",
+            padding: "6px 10px",
+            border: `1px solid ${C.border}`,
+            borderRadius: 6,
+            fontSize: "12px",
+            fontFamily: F.sans,
+            outline: "none",
+            boxSizing: "border-box",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = C.primary;
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = C.border;
+          }}
+        />
+      </div>
 
       {hasSignature && (
         <button
@@ -211,8 +239,8 @@ const SignatureCanvas = ({ onSave, value }) => {
         {hasSignature
           ? "✓ Signature saved"
           : isTouchDevice
-            ? "✍️ Sign here (touch or mouse)"
-            : "✍️ Type your name or use mouse to sign"}
+            ? "✍️ Sign with your finger (touch) or type name below"
+            : "✍️ Sign with mouse or type name below"}
       </div>
     </div>
   );
