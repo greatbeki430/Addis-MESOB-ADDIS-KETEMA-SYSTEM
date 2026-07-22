@@ -21,13 +21,18 @@ import {
   FiFileText,
   FiGrid,
   FiSettings,
-  FiUsers as FiUsersIcon,
   FiBarChart2,
   FiGlobe,
   FiCheck,
   FiLoader,
   FiMenu,
   FiSunrise,
+  FiUser,
+  FiClock,
+  FiSmartphone,
+  FiBell,
+  FiClipboard,
+  FiMail,
 } from "react-icons/fi";
 
 // =============================================
@@ -388,20 +393,40 @@ export default function Sidebar({
     }
   };
 
+  // ✅ UPDATED: getNavIcon with ALL navigation items and proper unique icons
   const getNavIcon = (id) => {
     const icons = {
+      // Core User Pages
       dashboard: <FiHome size={20} />,
       forum: <FiMessageSquare size={20} />,
       evaluation: <FiStar size={20} />,
       report: <FiFileText size={20} />,
       services: <FiGrid size={20} />,
-      "admin/services": <FiSettings size={20} />,
-      users: <FiUsersIcon size={20} />,
-      teams: <FiUsers size={20} />,
-      employees: <FiUsers size={20} />,
-      analytics: <FiBarChart2 size={20} />,
       documents: <FiFileText size={20} />,
+      analytics: <FiBarChart2 size={20} />,
       "golden-monday": <FiSunrise size={20} />,
+
+      // Admin Management Pages
+      users: <FiUsers size={20} />,
+      teams: <FiUsers size={20} />,
+      employees: <FiUser size={20} />,
+
+      // Service Manager
+      "admin/services": <FiSettings size={20} />,
+
+      // Attendance & Digital Attendance
+      "digital-attendance": <FiSmartphone size={20} />,
+      "admin-attendance": <FiClock size={20} />,
+      "admin-digital-attendance": <FiSmartphone size={20} />,
+
+      // Alerts
+      "admin-alerts": <FiBell size={20} />,
+
+      // Admin Data Management
+      "admin-evaluations": <FiStar size={20} />,
+      "admin-daily-reports": <FiClipboard size={20} />,
+      "admin-forum-reports": <FiMessageSquare size={20} />,
+      "admin-requests": <FiMail size={20} />,
     };
     return icons[id] || <FiMenu size={20} />;
   };

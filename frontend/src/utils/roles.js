@@ -132,7 +132,7 @@ export const NAV_ITEMS = [
 
   // Admin Service Management
   {
-    id: "admin-services",
+    id: "admin/services",
     icon: "🔧",
     label: "Service Manager",
     roles: [ROLES.SUPER_ADMIN],
