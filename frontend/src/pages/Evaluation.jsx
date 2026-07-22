@@ -38,22 +38,16 @@ import {
 } from "react-icons/fi";
 
 // ─── Signature Canvas Component ──────────────────────────────
-// ─── Signature Canvas Component - FIXED ──────────────────────
-// ─── Signature Canvas Component - FIXED ──────────────────────
 const SignatureCanvas = ({ onSave, value }) => {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
-  // ✅ Initialize isTouchDevice directly, not in useEffect
   const [isTouchDevice] = useState(
     () =>
       typeof window !== "undefined" &&
       ("ontouchstart" in window || navigator.maxTouchPoints > 0),
   );
   const [textSignature, setTextSignature] = useState("");
-
-  // ✅ Remove the useEffect that was causing the error
-  // The isTouchDevice is now set directly in useState
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -75,7 +69,6 @@ const SignatureCanvas = ({ onSave, value }) => {
     }
   }, [value]);
 
-  // ─── Get canvas coordinates ──────────────────────────────
   const getCanvasCoords = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -87,7 +80,6 @@ const SignatureCanvas = ({ onSave, value }) => {
     };
   };
 
-  // ─── Start drawing ────────────────────────────────────────
   const startDrawing = (e) => {
     e.preventDefault();
     const canvas = canvasRef.current;
@@ -98,7 +90,6 @@ const SignatureCanvas = ({ onSave, value }) => {
     setIsDrawing(true);
   };
 
-  // ─── Draw ──────────────────────────────────────────────────
   const draw = (e) => {
     e.preventDefault();
     if (!isDrawing) return;
@@ -110,7 +101,6 @@ const SignatureCanvas = ({ onSave, value }) => {
     setHasSignature(true);
   };
 
-  // ─── Stop drawing ─────────────────────────────────────────
   const stopDrawing = (e) => {
     e.preventDefault();
     setIsDrawing(false);
@@ -120,7 +110,6 @@ const SignatureCanvas = ({ onSave, value }) => {
     }
   };
 
-  // ─── Clear signature ──────────────────────────────────────
   const clearSignature = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
@@ -130,7 +119,6 @@ const SignatureCanvas = ({ onSave, value }) => {
     setTextSignature("");
   };
 
-  // ─── Handle text signature ──────────────────────────────
   const handleTextSignature = (e) => {
     const value = e.target.value;
     setTextSignature(value);
@@ -163,19 +151,16 @@ const SignatureCanvas = ({ onSave, value }) => {
           touchAction: "none",
           background: "#fafbfc",
         }}
-        // ✅ Mouse events - always enabled
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
         onMouseLeave={stopDrawing}
-        // ✅ Touch events - always enabled
         onTouchStart={startDrawing}
         onTouchMove={draw}
         onTouchEnd={stopDrawing}
         onTouchCancel={stopDrawing}
       />
 
-      {/* Text input fallback for all devices */}
       <div style={{ marginTop: 6 }}>
         <input
           type="text"
@@ -246,6 +231,53 @@ const SignatureCanvas = ({ onSave, value }) => {
   );
 };
 
+// ─── Format AI Narrative - Removes markdown and formats nicely ──
+const formatAINarrative = (text) => {
+  if (!text) return "";
+
+  let formatted = text
+    // Remove ** (bold markers)
+    .replace(/\*\*/g, "")
+    // Remove * (italic markers)
+    .replace(/\*/g, "")
+    // Remove ### headers
+    .replace(/### /g, "")
+    // Remove --- separators
+    .replace(/---/g, "")
+    // Clean up multiple newlines
+    .replace(/\n{3,}/g, "\n\n")
+    // Remove trailing spaces
+    .replace(/[ \t]+$/gm, "")
+    // Clean up bullet points
+    .replace(/^[•·-]\s*/gm, "• ")
+    // Remove empty parentheses
+    .replace(/\(\s*\)/g, "")
+    .trim();
+
+  // Remove any remaining asterisks
+  formatted = formatted.replace(/\*/g, "");
+
+  // Clean up extra spaces
+  formatted = formatted.replace(/\s{2,}/g, " ");
+
+  // Add proper section headers with spacing
+  const sectionHeaders = [
+    "Overall Team Performance Overview",
+    "Strengths and Best Performer Recognition",
+    "Areas for Improvement and Recommendations",
+  ];
+
+  sectionHeaders.forEach((header) => {
+    const regex = new RegExp(`(${header})`, "g");
+    formatted = formatted.replace(regex, "\n📌 $1\n");
+  });
+
+  // Clean up multiple newlines
+  formatted = formatted.replace(/\n{3,}/g, "\n\n");
+
+  return formatted;
+};
+
 export default function Evaluation({ t, lang }) {
   const safeT = t || {};
   const te = safeT.evaluation || {};
@@ -261,11 +293,12 @@ export default function Evaluation({ t, lang }) {
   const [saving, setSaving] = useState(false);
   const [evaluationId, setEvaluationId] = useState(null);
   const [signatures, setSignatures] = useState({});
+  const [includeAINarrative, setIncludeAINarrative] = useState(true);
 
   const inputRefs = useRef({});
   const memberInputRefs = useRef([]);
 
-  // ─── Auto-advance for SCORE fields - FIXED to go to next criterion ──
+  // ─── Auto-advance for SCORE fields ──────────────────────────
   const autoAdvanceScore = (currentField) => {
     const [cId, itemIdx, member] = currentField.split("-");
     const allMembers = members.filter((m) => m.trim() !== "");
@@ -273,7 +306,6 @@ export default function Evaluation({ t, lang }) {
     const currentCriterionIndex = parseInt(cId) - 1;
     const currentItemIndex = parseInt(itemIdx);
 
-    // Get total items in current criterion
     const totalItemsInCurrentCriterion =
       CRITERIA[currentCriterionIndex]?.items?.length || 0;
 
@@ -281,17 +313,14 @@ export default function Evaluation({ t, lang }) {
     let nextItemIdx = currentItemIndex;
     let nextMemberIndex = currentMemberIndex + 1;
 
-    // If we've gone through all members for this item, move to next item
     if (nextMemberIndex >= allMembers.length) {
       nextMemberIndex = 0;
       nextItemIdx = currentItemIndex + 1;
 
-      // If we've gone through all items in this criterion, move to next criterion
       if (nextItemIdx >= totalItemsInCurrentCriterion) {
         nextItemIdx = 0;
         nextCriterionId = parseInt(cId) + 1;
 
-        // If we've gone through all criteria, wrap around to first criterion
         if (nextCriterionId > CRITERIA.length) {
           nextCriterionId = 1;
         }
@@ -335,7 +364,7 @@ export default function Evaluation({ t, lang }) {
     return () => clearTimeout(timer);
   }, [members, scores, comments, teamName, evaluationId, signatures]);
 
-  // ─── Load saved evaluation (localStorage first, then reconcile with server) ──
+  // ─── Load saved evaluation ─────────────────────────────────
   useEffect(() => {
     let isMounted = true;
 
@@ -352,9 +381,6 @@ export default function Evaluation({ t, lang }) {
             if (data.evaluationId) setEvaluationId(data.evaluationId);
             if (data.signatures) setSignatures(data.signatures);
 
-            // ✅ NEW: if we know the evaluation's DB id, pull the authoritative
-            // copy (including signatures) from MongoDB — this is what makes
-            // signatures retrievable from a fresh browser/device.
             if (data.evaluationId) {
               evaluationAPI
                 .getById(data.evaluationId)
@@ -434,7 +460,6 @@ export default function Evaluation({ t, lang }) {
     const value = Math.min(Number(v), max);
     setScores((s) => ({ ...s, [key]: isNaN(value) ? "" : value }));
 
-    // ✅ Auto-advance to next score field after entering a valid number
     if (v && !isNaN(v) && v > 0) {
       autoAdvanceScore(`${cId}-${iIdx}-${m}`);
     }
@@ -479,7 +504,7 @@ export default function Evaluation({ t, lang }) {
     }));
   };
 
-  // ─── Save evaluation - REMOVED auto-clear ──────────────────
+  // ─── Save evaluation ──────────────────────────────────────
   const saveEvaluation = async () => {
     const validMembers = members.filter((m) => m.trim() !== "");
     if (validMembers.length === 0) {
@@ -527,9 +552,6 @@ export default function Evaluation({ t, lang }) {
         setEvaluationId(response.data._id);
         showToast("✅ Evaluation saved successfully!", "success");
       }
-
-      // ✅ REMOVED auto-clear - form data stays visible after save
-      // User can use Reset button to clear manually
     } catch (error) {
       console.error("Failed to save evaluation:", error);
       showToast(
@@ -542,7 +564,7 @@ export default function Evaluation({ t, lang }) {
     }
   };
 
-  // ─── Reset form - clears everything ─────────────────────────
+  // ─── Reset form ──────────────────────────────────────────
   const resetForm = () => {
     setScores({});
     setComments({});
@@ -2227,14 +2249,59 @@ export default function Evaluation({ t, lang }) {
         </button>
       </div>
 
-      {/* AI Evaluation Narrative - with proper spacing */}
+      {/* AI Evaluation Narrative - with toggle */}
       {evaluationId && (
         <div style={{ marginTop: "clamp(16px, 4vw, 24px)" }}>
-          <AISummary
-            fetchFn={(id) => aiAPI.getEvaluationSummary(id, null)}
-            args={[evaluationId]}
-            label="AI Evaluation Narrative"
-          />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "12px",
+              flexWrap: "wrap",
+              gap: "8px",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <FiZap size={18} color={C.primary} />
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontSize: "clamp(13px, 3vw, 15px)",
+                  color: C.dark,
+                }}
+              >
+                AI Evaluation Narrative
+              </span>
+            </div>
+            <label
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "12px",
+                color: C.muted,
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={includeAINarrative}
+                onChange={(e) => setIncludeAINarrative(e.target.checked)}
+                style={{ cursor: "pointer" }}
+              />
+              Include in report
+            </label>
+          </div>
+
+          {includeAINarrative && (
+            <AISummary
+              fetchFn={(id) => aiAPI.getEvaluationSummary(id, null)}
+              args={[evaluationId]}
+              label="AI Evaluation Narrative"
+              formatResult={formatAINarrative}
+            />
+          )}
         </div>
       )}
 
