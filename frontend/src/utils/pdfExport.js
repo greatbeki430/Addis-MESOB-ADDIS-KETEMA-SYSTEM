@@ -727,7 +727,7 @@ export const exportEvaluationReportToPDF = (
       }
     }
 
-    // ✅ AI NARRATIVE SECTION - ADD THIS
+    // ✅ AI NARRATIVE SECTION - FIXED with proper encoding
     if (includeAINarrative && aiNarrative) {
       if (yPos > 220) {
         doc.addPage();
@@ -746,12 +746,29 @@ export const exportEvaluationReportToPDF = (
       yPos += 8;
 
       doc.setFontSize(10);
-      setSmartFont(doc, aiNarrative, false);
+      // ✅ Force Ethiopic font for Amharic text
+      doc.setFont(FONT_NAMES.ethiopic, "normal");
       doc.setTextColor(50, 50, 50);
+
+      // ✅ Clean up the narrative
+      let cleanNarrative = aiNarrative
+        // Remove any markdown artifacts
+        .replace(/\*\*/g, "")
+        .replace(/\*/g, "")
+        .replace(/O- U/g, "")
+        .replace(/O-U/g, "")
+        .replace(/\/\d+\/points\//g, "")
+        .replace(/ma contributed/g, "and contributed")
+        .replace(/ma/g, "and")
+        .replace(/\s{2,}/g, " ")
+        .trim();
+
+      // ✅ Properly encode the text
+      cleanNarrative = encodeText(cleanNarrative);
 
       // Split the narrative into lines and wrap
       const splitNarrative = doc.splitTextToSize(
-        encodeText(aiNarrative),
+        cleanNarrative,
         pageWidth - margin * 2 - 5,
       );
 

@@ -35,6 +35,9 @@ import {
   FiAlertCircle,
   FiZap,
   FiInfo,
+  FiList,
+  FiSend,
+  FiEye,
 } from "react-icons/fi";
 
 // ─── Signature Canvas Component ──────────────────────────────
@@ -296,8 +299,86 @@ export default function Evaluation({ t, lang }) {
   const [includeAINarrative, setIncludeAINarrative] = useState(true);
   const [aiNarrativeContent, setAiNarrativeContent] = useState("");
 
+  // ─── Tab Management ──────────────────────────────────────────
+  const [activeTab, setActiveTab] = useState("form"); // "form" | "history"
+  const [savedEvaluations, setSavedEvaluations] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
   const inputRefs = useRef({});
   const memberInputRefs = useRef([]);
+  const isMountedRef = useRef(true);
+
+  // ─── Cleanup on unmount ─────────────────────────────────
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // ─── Effect to load history when tab changes ──────────────
+  useEffect(() => {
+    let isActive = true;
+
+    const fetchHistory = async () => {
+      if (activeTab === "history" && isActive) {
+        setLoadingHistory(true);
+        try {
+          const response = await evaluationAPI.getAll();
+          if (isActive) {
+            setSavedEvaluations(response.data || []);
+          }
+        } catch (error) {
+          if (isActive) {
+            console.error("Failed to load evaluations:", error);
+            showToast("Failed to load evaluation history", "error");
+          }
+        } finally {
+          if (isActive) {
+            setLoadingHistory(false);
+          }
+        }
+      }
+    };
+
+    fetchHistory();
+
+    return () => {
+      isActive = false;
+    };
+  }, [activeTab, showToast]);
+
+  // ─── Load an evaluation from history ──────────────────────
+  const loadEvaluation = (evalData) => {
+    setMembers(evalData.members || ["", "", ""]);
+    setScores(evalData.scores || {});
+    setComments(evalData.comments || {});
+    setTeamName(evalData.teamName || "");
+    setSignatures(evalData.signatures || {});
+    setEvaluationId(evalData._id);
+    setActiveTab("form");
+    showToast("Evaluation loaded successfully!", "success");
+  };
+
+  // ─── Pass to Super Admin ────────────────────────────────────
+  const passToSuperAdmin = async () => {
+    if (!evaluationId) {
+      showToast("Please save the evaluation first", "warning");
+      return;
+    }
+
+    try {
+      await evaluationAPI.update(evaluationId, {
+        status: "submitted",
+        submittedTo: "superadmin",
+        submittedAt: new Date().toISOString(),
+      });
+      showToast("✅ Evaluation passed to Super Admin for review!", "success");
+    } catch (error) {
+      console.error("Failed to pass evaluation:", error);
+      showToast("Failed to pass evaluation to Super Admin", "error");
+    }
+  };
 
   // ─── Auto-advance for SCORE fields ──────────────────────────
   const autoAdvanceScore = (currentField) => {
@@ -735,1579 +816,1828 @@ export default function Evaluation({ t, lang }) {
         {te.subtitle || "Addis Ababa City Admin · Public Service Bureau"}
       </p>
 
-      {/* Team Name Input */}
-      <div style={card}>
-        <label
-          style={{
-            display: "block",
-            fontSize: "clamp(12px, 3.5vw, 13px)",
-            fontWeight: 600,
-            marginBottom: 8,
-            color: C.dark,
-          }}
-        >
-          <FiUsers size={14} style={{ marginRight: 6 }} />
-          Team Name / Department
-        </label>
-        <input
-          type="text"
-          style={inp}
-          placeholder="e.g., Addis Ketema Service Team"
-          value={teamName}
-          onChange={(e) => setTeamName(e.target.value)}
-        />
-      </div>
-
-      {/* Dynamic Team Members Section */}
-      <div style={card}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            marginBottom: 16,
-          }}
-        >
-          <h3
-            style={{
-              fontSize: "clamp(13px, 4vw, 15px)",
-              fontWeight: 800,
-              color: C.dark,
-              fontFamily: F.sans,
-              margin: 0,
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <FiUsers size={18} color={C.primary} />
-            {te.teamMembers || "Team Members"} (Max 7)
-          </h3>
-          {members.length < 7 && (
-            <button
-              onClick={addMember}
-              style={{
-                background: C.primary,
-                color: "#fff",
-                border: "none",
-                borderRadius: 20,
-                padding: "6px 16px",
-                fontSize: "12px",
-                fontWeight: 600,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <FiPlus size={14} />
-              Add Member
-            </button>
-          )}
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns:
-              "repeat(auto-fill, minmax(min(100%, 200px), 1fr))",
-            gap: 12,
-          }}
-        >
-          {members.map((member, idx) => (
-            <div
-              key={idx}
-              style={{ display: "flex", gap: 8, alignItems: "center" }}
-            >
-              <input
-                ref={(el) => (memberInputRefs.current[idx] = el)}
-                style={{ ...inp, flex: 1 }}
-                placeholder={`Member ${idx + 1}`}
-                value={member}
-                onChange={(e) => updateMemberName(idx, e.target.value)}
-              />
-              {members.length > 1 && (
-                <button
-                  onClick={() => removeMember(idx)}
-                  style={{
-                    background: "#fee2e2",
-                    color: "#dc2626",
-                    border: "none",
-                    borderRadius: 6,
-                    width: 32,
-                    height: 32,
-                    cursor: "pointer",
-                    fontSize: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <FiX size={16} />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Criteria Sections */}
-      {CRITERIA.map((c) => (
-        <div
-          key={c.id}
-          style={{
-            ...card,
-            borderLeft: `5px solid ${c.color}`,
-            paddingLeft: "clamp(12px, 3vw, 20px)",
-            overflowX: "auto",
-          }}
-        >
-          <h3
-            style={{
-              margin: "0 0 12px",
-              fontSize: "clamp(13px, 4vw, 15px)",
-              fontWeight: 800,
-              color: c.color,
-              fontFamily: F.sans,
-              display: "flex",
-              flexWrap: "wrap",
-              alignItems: "baseline",
-              gap: 6,
-            }}
-          >
-            <FiTarget size={16} />
-            {safeCriteria[c.key] || c.key}
-            <span
-              style={{
-                fontWeight: 400,
-                fontSize: "clamp(10px, 3vw, 12px)",
-                color: "#888",
-              }}
-            >
-              ({c.weight}%)
-            </span>
-          </h3>
-
-          <div style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
-            <table
-              style={{
-                width: "100%",
-                borderCollapse: "collapse",
-                fontSize: "clamp(10px, 3vw, 12px)",
-                minWidth: 500,
-              }}
-            >
-              <thead>
-                <tr>
-                  <th style={thS}>መስፈርት / Criterion</th>
-                  <th style={{ ...thS, textAlign: "center" }}>
-                    {te.maxPts || "Max Pts"}
-                  </th>
-                  {members
-                    .filter((m) => m.trim() !== "")
-                    .map((m) => (
-                      <th
-                        key={m}
-                        style={{
-                          ...thS,
-                          textAlign: "center",
-                          minWidth: "80px",
-                        }}
-                      >
-                        {m.length > 15 ? m.substring(0, 12) + "..." : m}
-                      </th>
-                    ))}
-                </tr>
-              </thead>
-              <tbody>
-                {c.items.map((item, idx) => (
-                  <tr
-                    key={idx}
-                    style={idx % 2 === 0 ? { background: C.cardBg } : {}}
-                  >
-                    <td style={tdS}>{item.text}</td>
-                    <td
-                      style={{
-                        ...tdS,
-                        textAlign: "center",
-                        fontWeight: 700,
-                        color: c.color,
-                      }}
-                    >
-                      {item.points}
-                    </td>
-                    {members
-                      .filter((m) => m.trim() !== "")
-                      .map((m) => {
-                        const inputId = getInputId(c.id, idx, m);
-                        return (
-                          <td key={m} style={{ ...tdS, textAlign: "center" }}>
-                            <input
-                              ref={(el) => (inputRefs.current[inputId] = el)}
-                              id={inputId}
-                              type="number"
-                              min="0"
-                              max={item.points}
-                              style={{
-                                width: "clamp(50px, 12vw, 60px)",
-                                border: `1.5px solid ${C.border}`,
-                                borderRadius: 6,
-                                padding: "clamp(3px, 1.5vw, 6px)",
-                                textAlign: "center",
-                                fontSize: "clamp(11px, 3vw, 13px)",
-                              }}
-                              value={scores[`${c.id}-${idx}-${m}`] || ""}
-                              onChange={(e) =>
-                                setScore(c.id, idx, m, e.target.value)
-                              }
-                            />
-                          </td>
-                        );
-                      })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
-
-      {/* RANKINGS WITH DYNAMIC COMMENTS */}
-      <div style={card}>
-        <div
-          onClick={() => setShowRankings(!showRankings)}
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            cursor: "pointer",
-            padding: "8px 4px",
-            borderRadius: 8,
-            transition: "background 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = C.bg)}
-          onMouseLeave={(e) =>
-            (e.currentTarget.style.background = "transparent")
-          }
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <FiChevronDown
-              size={20}
-              style={{
-                transform: showRankings ? "rotate(0deg)" : "rotate(-90deg)",
-                transition: "transform 0.2s ease",
-                color: C.primary,
-              }}
-            />
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "clamp(14px, 4vw, 18px)",
-                fontWeight: 800,
-                color: C.dark,
-                fontFamily: F.sans,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <FiBarChart2 size={18} color={C.primary} />
-              Performance Rankings & Feedback
-            </h3>
-            {!showRankings && sortedMembers.length > 0 && (
-              <span
-                style={{
-                  background: C.primary,
-                  color: "#fff",
-                  padding: "2px 8px",
-                  borderRadius: 20,
-                  fontSize: "11px",
-                  fontWeight: 600,
-                }}
-              >
-                {sortedMembers.length} Members
-              </span>
-            )}
-          </div>
-          {!showRankings && sortedMembers.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                gap: 16,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "clamp(11px, 3vw, 13px)",
-                  color: C.muted,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <FiAward size={14} color={C.gold} />
-                Best: {bestPerformer}
-              </span>
-              <span
-                style={{
-                  fontSize: "clamp(11px, 3vw, 13px)",
-                  color: C.muted,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <FiTrendingUp size={14} color={C.primary} />
-                Avg: {averageScore}
-              </span>
-            </div>
-          )}
-        </div>
-
-        {showRankings && sortedMembers.length > 0 && (
-          <div style={{ marginTop: 20 }}>
-            {/* Summary Stats */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
-                gap: 10,
-                marginBottom: 20,
-              }}
-            >
-              <div
-                style={{
-                  background: C.bg,
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "clamp(20px, 4vw, 24px)",
-                    fontWeight: 900,
-                    color: C.primary,
-                  }}
-                >
-                  {totalMembers}
-                </div>
-                <div
-                  style={{
-                    fontSize: "10px",
-                    color: C.muted,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 4,
-                  }}
-                >
-                  <FiUsers size={12} />
-                  Total Members
-                </div>
-              </div>
-              <div
-                style={{
-                  background: C.bg,
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "clamp(20px, 4vw, 24px)",
-                    fontWeight: 900,
-                    color: C.primary,
-                  }}
-                >
-                  {averageScore}
-                </div>
-                <div
-                  style={{
-                    fontSize: "10px",
-                    color: C.muted,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 4,
-                  }}
-                >
-                  <FiTrendingUp size={12} />
-                  Average Score
-                </div>
-              </div>
-              <div
-                style={{
-                  background: C.bg,
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "clamp(20px, 4vw, 24px)",
-                    fontWeight: 900,
-                    color: C.primary,
-                  }}
-                >
-                  {highestScore}
-                </div>
-                <div
-                  style={{
-                    fontSize: "10px",
-                    color: C.muted,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 4,
-                  }}
-                >
-                  <FiAward size={12} />
-                  Highest Score
-                </div>
-              </div>
-              <div
-                style={{
-                  background: C.bg,
-                  borderRadius: 8,
-                  padding: "10px 12px",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "clamp(20px, 4vw, 24px)",
-                    fontWeight: 900,
-                    color: C.primary,
-                  }}
-                >
-                  {lowestScore}
-                </div>
-                <div
-                  style={{
-                    fontSize: "10px",
-                    color: C.muted,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 4,
-                  }}
-                >
-                  <FiTrendingDown size={12} />
-                  Lowest Score
-                </div>
-              </div>
-            </div>
-
-            {/* Compact Cards with Comments */}
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fill, minmax(min(100%, 280px), 1fr))",
-                gap: 12,
-              }}
-            >
-              {sortedMembers.map(
-                ({ name, index, total: memberTotal, comment }, idx) => {
-                  const level = getPerformanceLevel(memberTotal);
-                  const rankBadge = getRankBadge(idx, sortedMembers.length);
-                  const isTopThree = idx < 3;
-
-                  return (
-                    <div
-                      key={name}
-                      style={{
-                        background: C.white,
-                        borderRadius: 10,
-                        padding: "14px 16px",
-                        border: `2px solid ${isTopThree ? level.color : C.border}`,
-                        boxShadow: isTopThree
-                          ? `0 4px 16px ${level.color}33`
-                          : "0 2px 8px rgba(0,0,0,0.04)",
-                        transition: "all 0.3s ease",
-                        position: "relative",
-                        overflow: "hidden",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow = `0 6px 24px ${level.color}44`;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = "translateY(0)";
-                        e.currentTarget.style.boxShadow = isTopThree
-                          ? `0 4px 16px ${level.color}33`
-                          : "0 2px 8px rgba(0,0,0,0.04)";
-                      }}
-                    >
-                      {isTopThree && (
-                        <div
-                          style={{
-                            position: "absolute",
-                            top: 0,
-                            right: 0,
-                            background: level.color,
-                            color: "#fff",
-                            padding: "2px 12px",
-                            fontSize: "9px",
-                            fontWeight: 700,
-                            borderRadius: "0 10px 0 10px",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                        >
-                          {idx === 0 ? (
-                            <>
-                              <FiAward size={10} />
-                              TOP
-                            </>
-                          ) : idx === 1 ? (
-                            <>
-                              <FiAward size={10} />
-                              2ND
-                            </>
-                          ) : (
-                            <>
-                              <FiStar size={10} />
-                              3RD
-                            </>
-                          )}
-                        </div>
-                      )}
-
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          marginBottom: 4,
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: "clamp(15px, 3vw, 17px)",
-                              fontWeight: 800,
-                              color: C.dark,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 4,
-                            }}
-                          >
-                            <FiUser size={14} color={C.primary} />
-                            {name}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: "clamp(11px, 2.5vw, 13px)",
-                              fontWeight: 700,
-                            }}
-                          >
-                            {rankBadge}
-                          </span>
-                        </div>
-                        <span
-                          style={{
-                            fontSize: "clamp(18px, 4vw, 22px)",
-                            fontWeight: 900,
-                            color: level.color,
-                          }}
-                        >
-                          {memberTotal}
-                        </span>
-                      </div>
-
-                      <div
-                        style={{
-                          background: C.bg,
-                          borderRadius: 4,
-                          height: 4,
-                          overflow: "hidden",
-                          marginBottom: 8,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${memberTotal}%`,
-                            height: "100%",
-                            background: `linear-gradient(90deg, ${level.color}, ${level.color}dd)`,
-                            borderRadius: 4,
-                            transition: "width 0.5s ease",
-                          }}
-                        />
-                      </div>
-
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 4,
-                          marginBottom: 6,
-                        }}
-                      >
-                        {level.icon}
-                        <span
-                          style={{
-                            fontSize: "clamp(10px, 2.5vw, 11px)",
-                            fontWeight: 600,
-                            color: level.color,
-                          }}
-                        >
-                          {level.label}
-                        </span>
-                        <span
-                          style={{
-                            fontSize: "9px",
-                            color: C.muted,
-                            marginLeft: "auto",
-                          }}
-                        >
-                          {level.description}
-                        </span>
-                      </div>
-
-                      <div style={{ marginTop: 4 }}>
-                        <label
-                          style={{
-                            fontSize: "clamp(9px, 2vw, 10px)",
-                            fontWeight: 600,
-                            color: C.muted,
-                            display: "block",
-                            marginBottom: 2,
-                          }}
-                        >
-                          <FiMessageSquare
-                            size={10}
-                            style={{ marginRight: 4 }}
-                          />
-                          Feedback / Comments
-                        </label>
-                        <textarea
-                          value={comment || ""}
-                          onChange={(e) => updateComment(index, e.target.value)}
-                          placeholder="Add your feedback, strengths, or areas for improvement..."
-                          style={{
-                            width: "100%",
-                            border: `1px solid ${C.border}`,
-                            borderRadius: 6,
-                            padding: "6px 8px",
-                            fontSize: "clamp(10px, 2.5vw, 11px)",
-                            fontFamily: F.sans,
-                            resize: "vertical",
-                            minHeight: "50px",
-                            outline: "none",
-                            transition: "border-color 0.2s",
-                            background: "#fafbfc",
-                          }}
-                          onFocus={(e) => {
-                            e.currentTarget.borderColor = C.primary;
-                            e.currentTarget.boxShadow = `0 0 0 2px ${C.primary}22`;
-                          }}
-                          onBlur={(e) => {
-                            e.currentTarget.borderColor = C.border;
-                            e.currentTarget.boxShadow = "none";
-                          }}
-                        />
-                        {comment && comment.length > 0 && (
-                          <div
-                            style={{
-                              fontSize: "9px",
-                              color: C.muted,
-                              marginTop: 2,
-                              textAlign: "right",
-                            }}
-                          >
-                            {comment.length} characters
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                },
-              )}
-            </div>
-          </div>
-        )}
-
-        {showRankings && sortedMembers.length === 0 && (
-          <div
-            style={{
-              textAlign: "center",
-              padding: "30px 20px",
-              color: C.muted,
-            }}
-          >
-            <div style={{ fontSize: 32, marginBottom: 8 }}>
-              <FiClipboard size={32} color={C.muted} />
-            </div>
-            <p>Add team members and scores to see rankings</p>
-          </div>
-        )}
-      </div>
-
-      {/* BEST PERFORMER DECLARATION + SIGNATURES */}
-      {sortedMembers.length > 0 && (
-        <div
-          style={{
-            ...card,
-            border: `2px solid ${C.gold}`,
-            background: "linear-gradient(135deg, #fff, #fffdf0)",
-          }}
-        >
-          {/* Best Performer Announcement */}
-          <div
-            style={{
-              textAlign: "center",
-              padding: "clamp(12px, 3vw, 20px)",
-              borderBottom: `1px solid ${C.border}`,
-              marginBottom: 20,
-            }}
-          >
-            <div
-              style={{ fontSize: "clamp(28px, 7vw, 40px)", marginBottom: 8 }}
-            >
-              <FiAward
-                size={40}
-                color={C.gold}
-                style={{ display: "block", margin: "0 auto" }}
-              />
-            </div>
-            <div
-              style={{
-                fontSize: "clamp(12px, 3vw, 14px)",
-                color: C.muted,
-                fontFamily: F.sans,
-                marginBottom: 8,
-              }}
-            >
-              {te.bestPerformerLabel ||
-                "የወሩ ምርጥ ፈፃሚ / Best Performer of the Month"}
-            </div>
-            <div
-              style={{
-                fontSize: "clamp(18px, 5vw, 26px)",
-                fontWeight: 900,
-                color: C.dark,
-                fontFamily: F.serif,
-                background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
-                WebkitBackgroundClip: "text",
-                WebkitTextFillColor: "transparent",
-                backgroundClip: "text",
-                marginBottom: 4,
-              }}
-            >
-              {sortedMembers[0]?.name || "—"}
-            </div>
-            <div
-              style={{
-                fontSize: "clamp(11px, 3vw, 13px)",
-                color: C.muted,
-                fontFamily: F.sans,
-              }}
-            >
-              {te.bestPerformerSub || "ሆኖ ተመርጧል"} ·{" "}
-              {sortedMembers[0]?.total || 0} {te.points || "pts"}
-            </div>
-          </div>
-
-          {/* Signature Grid with Canvas */}
-          <div>
-            <div
-              style={{
-                fontSize: "clamp(12px, 3vw, 13px)",
-                fontWeight: 700,
-                color: C.dark,
-                fontFamily: F.sans,
-                marginBottom: 16,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <FiPenTool size={14} />
-              {te.signaturesTitle || "ፊርማዎች / Digital Signatures"}
-            </div>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fill, minmax(min(100%, 220px), 1fr))",
-                gap: "clamp(12px, 3vw, 20px)",
-              }}
-            >
-              {/* Team Leader signature box */}
-              <div
-                style={{
-                  background: `linear-gradient(135deg, ${C.primary}10, ${C.gold}10)`,
-                  border: `1.5px solid ${C.primary}`,
-                  borderRadius: 10,
-                  padding: "clamp(10px, 3vw, 16px)",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "clamp(10px, 2.5vw, 11px)",
-                    fontWeight: 700,
-                    color: C.primary,
-                    fontFamily: F.sans,
-                    marginBottom: 8,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.5,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 4,
-                  }}
-                >
-                  <FiStar size={12} />
-                  {te.teamLeaderLabel || "ቡድን መሪ / Team Leader"}
-                </div>
-                <input
-                  type="text"
-                  placeholder={te.namePlaceholder || "ስም / Name"}
-                  style={{
-                    width: "100%",
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 6,
-                    padding: "6px 8px",
-                    fontSize: "clamp(11px, 2.5vw, 12px)",
-                    fontFamily: F.sans,
-                    marginBottom: 8,
-                    textAlign: "center",
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
-                  value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
-                />
-                <SignatureCanvas
-                  onSave={(data) => handleSignatureSave("teamLeader", data)}
-                  value={signatures.teamLeader}
-                />
-              </div>
-
-              {/* Member signature boxes */}
-              {sortedMembers.slice(0, 5).map(({ name }, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    background: C.cardBg,
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 10,
-                    padding: "clamp(10px, 3vw, 16px)",
-                    textAlign: "center",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "clamp(10px, 2.5vw, 11px)",
-                      fontWeight: 600,
-                      color: C.muted,
-                      fontFamily: F.sans,
-                      marginBottom: 6,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {te.memberLabel || "ተመዛኝ ፈፃሚ"} {idx + 1}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "clamp(11px, 2.5vw, 13px)",
-                      fontWeight: 700,
-                      color: C.dark,
-                      fontFamily: F.sans,
-                      marginBottom: 8,
-                      minHeight: 20,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 4,
-                    }}
-                  >
-                    <FiUser size={12} color={C.primary} />
-                    {name}
-                  </div>
-                  <SignatureCanvas
-                    onSave={(data) => handleSignatureSave(name, data)}
-                    value={signatures[name]}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {/* Date row */}
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "flex-end",
-                marginTop: 16,
-                gap: 8,
-                alignItems: "center",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "clamp(11px, 3vw, 12px)",
-                  color: C.muted,
-                  fontFamily: F.sans,
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
-                <FiCalendar size={12} />
-                {te.dateLabel || "ቀን / Date:"}
-              </span>
-              <span
-                style={{
-                  fontSize: "clamp(11px, 3vw, 12px)",
-                  color: C.dark,
-                  fontFamily: F.sans,
-                  fontWeight: 700,
-                  borderBottom: `1px solid ${C.border}`,
-                  minWidth: 120,
-                  paddingBottom: 2,
-                }}
-              >
-                {new Date().toLocaleDateString("en-GB")}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ════════════════════════════════════════════════════════════ */}
-      {/* ENHANCED AI EVALUATION HELPER WITH ADVANCED INSIGHTS */}
-      {/* ════════════════════════════════════════════════════════════ */}
-      {evaluationId && (
-        <div style={{ marginTop: "clamp(16px, 4vw, 24px)" }}>
-          <div
-            style={{
-              ...card,
-              border: `2px solid ${C.primary}`,
-              background: "linear-gradient(135deg, #EFF6FF, #F0FDF4)",
-              padding: "clamp(16px, 4vw, 24px)",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                flexWrap: "wrap",
-                gap: "12px",
-                marginBottom: "16px",
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                }}
-              >
-                <div
-                  style={{
-                    width: "40px",
-                    height: "40px",
-                    background: "linear-gradient(135deg, #7C3AED, #6D28D9)",
-                    borderRadius: "50%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "#fff",
-                  }}
-                >
-                  <FiZap size={20} />
-                </div>
-                <div>
-                  <h4
-                    style={{
-                      margin: 0,
-                      fontSize: "clamp(14px, 4vw, 16px)",
-                      fontWeight: 700,
-                      color: "#0F172A",
-                      fontFamily: F.sans,
-                    }}
-                  >
-                    AI Evaluation Insights
-                  </h4>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: "11px",
-                      color: C.muted,
-                    }}
-                  >
-                    Advanced AI analysis of team performance with
-                    recommendations
-                  </p>
-                </div>
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  gap: "8px",
-                  alignItems: "center",
-                }}
-              >
-                <span
-                  style={{
-                    background: C.primary,
-                    color: "#fff",
-                    padding: "4px 12px",
-                    borderRadius: 20,
-                    fontSize: "10px",
-                    fontWeight: 600,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                  }}
-                >
-                  <FiAward size={12} />
-                  AI Powered
-                </span>
-                {evaluationId && (
-                  <span
-                    style={{
-                      background: "#10b981",
-                      color: "#fff",
-                      padding: "4px 12px",
-                      borderRadius: 20,
-                      fontSize: "10px",
-                      fontWeight: 600,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    <FiCheck size={12} />
-                    {totalMembers} Members
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* AI Evaluation Helper Component */}
-            <AIEvaluationHelper
-              evaluationData={{
-                teamName: teamName || "Untitled Team",
-                members: members.filter((m) => m.trim() !== ""),
-                totalScores: sortedMembers.map((m) => ({
-                  member: m.name,
-                  total: m.total,
-                  comment: m.comment || "",
-                })),
-                comments: comments,
-                evaluatedBy: user?.name || "Administrator",
-                period: "current period",
-                averageScore: averageScore,
-                highestScore: highestScore,
-                lowestScore: lowestScore,
-                bestPerformer: bestPerformer,
-                totalMembers: totalMembers,
-                criteriaScores: sortedMembers.map((m) => {
-                  const memberScores = {};
-                  CRITERIA.forEach((c) => {
-                    c.items.forEach((item, idx) => {
-                      const key = `${c.id}-${idx}-${m.name}`;
-                      memberScores[c.key] =
-                        (memberScores[c.key] || 0) + (scores[key] || 0);
-                    });
-                  });
-                  return { member: m.name, ...memberScores };
-                }),
-              }}
-              onApplyFeedback={(feedback) => {
-                showToast("AI feedback generated successfully!", "success");
-                console.log("AI Feedback:", feedback);
-
-                if (feedback && feedback.individualFeedback) {
-                  feedback.individualFeedback.forEach((item) => {
-                    const memberIndex = members.findIndex(
-                      (m) => m === item.member,
-                    );
-                    if (memberIndex !== -1) {
-                      const existingComment = comments[memberIndex] || "";
-                      const enhancedComment = `${existingComment}\n\n🤖 AI Analysis: ${item.feedback}`;
-                      setComments((prev) => ({
-                        ...prev,
-                        [memberIndex]: enhancedComment.trim(),
-                      }));
-                    }
-                  });
-                  showToast(
-                    `✅ Applied AI feedback for ${feedback.individualFeedback.length} member(s)`,
-                    "success",
-                  );
-                }
-              }}
-            />
-
-            {/* Enhanced AI Performance Insights - Responsive */}
-            {sortedMembers.length > 0 && (
-              <div style={{ marginTop: "20px" }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-                    gap: "14px",
-                  }}
-                >
-                  {/* AI Performance Summary Card */}
-                  <div
-                    style={{
-                      background: "#fff",
-                      borderRadius: "10px",
-                      padding: "14px 16px",
-                      border: "1px solid #E2E8F0",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        marginBottom: "10px",
-                      }}
-                    >
-                      <FiTrendingUp size={18} color={C.primary} />
-                      <span
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          color: C.dark,
-                        }}
-                      >
-                        Performance Distribution
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        gap: "4px",
-                        flexWrap: "wrap",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {sortedMembers.slice(0, 6).map((m, idx) => {
-                        const level = getPerformanceLevel(m.total);
-                        return (
-                          <div
-                            key={idx}
-                            style={{
-                              flex: "1 1 40px",
-                              minWidth: "32px",
-                              maxWidth: "60px",
-                              textAlign: "center",
-                              background: idx === 0 ? "#F0FDF4" : "#F8FAFC",
-                              borderRadius: "6px",
-                              padding: "4px 2px",
-                              border:
-                                idx === 0
-                                  ? `2px solid ${level.color}`
-                                  : "1px solid #E2E8F0",
-                              position: "relative",
-                            }}
-                          >
-                            <div
-                              style={{
-                                fontSize: "11px",
-                                fontWeight: 800,
-                                color: idx === 0 ? "#15803D" : "#1E293B",
-                              }}
-                            >
-                              {m.total}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: "7px",
-                                color: C.muted,
-                                overflow: "hidden",
-                                textOverflow: "ellipsis",
-                                whiteSpace: "nowrap",
-                              }}
-                            >
-                              {m.name.substring(0, 4)}
-                            </div>
-                            {idx === 0 && (
-                              <div
-                                style={{
-                                  fontSize: "6px",
-                                  color: "#15803D",
-                                  fontWeight: 700,
-                                  marginTop: 1,
-                                }}
-                              >
-                                ★
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                      {sortedMembers.length > 6 && (
-                        <div
-                          style={{
-                            minWidth: "32px",
-                            textAlign: "center",
-                            padding: "4px 2px",
-                            background: "#F1F5F9",
-                            borderRadius: "6px",
-                            fontSize: "9px",
-                            color: C.muted,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          +{sortedMembers.length - 6}
-                        </div>
-                      )}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        marginTop: "8px",
-                        fontSize: "9px",
-                        color: C.muted,
-                        borderTop: "1px solid #E2E8F0",
-                        paddingTop: "6px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <span>
-                        Range: {lowestScore} - {highestScore}
-                      </span>
-                      <span>Gap: {highestScore - lowestScore} pts</span>
-                      <span>Avg: {averageScore}</span>
-                    </div>
-                  </div>
-
-                  {/* AI Recommendations Card */}
-                  <div
-                    style={{
-                      background: "#fff",
-                      borderRadius: "10px",
-                      padding: "14px 16px",
-                      border: "1px solid #E2E8F0",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        marginBottom: "10px",
-                      }}
-                    >
-                      <FiTarget size={18} color={C.primary} />
-                      <span
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          color: C.dark,
-                        }}
-                      >
-                        AI Recommendations
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "#1E293B",
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      <ul style={{ margin: 0, paddingLeft: "16px" }}>
-                        {averageScore < 70 && (
-                          <li>
-                            <strong>Training needed:</strong> Average score
-                            below 70. Consider additional training sessions.
-                          </li>
-                        )}
-                        {highestScore - lowestScore > 30 && (
-                          <li>
-                            <strong>Performance gap:</strong>{" "}
-                            {highestScore - lowestScore}pt gap detected.
-                            Consider mentorship program.
-                          </li>
-                        )}
-                        {sortedMembers.length > 5 && (
-                          <li>
-                            <strong>Team optimization:</strong> Large team (
-                            {sortedMembers.length}). Consider sub-teams.
-                          </li>
-                        )}
-                        {averageScore >= 80 && (
-                          <li>
-                            <strong>Excellent performance:</strong> Avg (
-                            {averageScore}) high. Consider recognition program.
-                          </li>
-                        )}
-                        <li>
-                          <strong>Review criteria:</strong> Ensure consistent
-                          application across all members.
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  {/* AI Performance Insights Card */}
-                  <div
-                    style={{
-                      background: "#fff",
-                      borderRadius: "10px",
-                      padding: "14px 16px",
-                      border: "1px solid #E2E8F0",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "8px",
-                        marginBottom: "10px",
-                      }}
-                    >
-                      <FiInfo size={18} color={C.primary} />
-                      <span
-                        style={{
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          color: C.dark,
-                        }}
-                      >
-                        Key Insights
-                      </span>
-                    </div>
-                    <div
-                      style={{
-                        fontSize: "11px",
-                        color: "#1E293B",
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      <div
-                        style={{ marginBottom: "4px", wordBreak: "break-word" }}
-                      >
-                        <span style={{ fontWeight: 600 }}>Top Performer:</span>{" "}
-                        {bestPerformer} ({highestScore} pts)
-                      </div>
-                      <div
-                        style={{ marginBottom: "4px", wordBreak: "break-word" }}
-                      >
-                        <span style={{ fontWeight: 600 }}>
-                          Area for Growth:
-                        </span>{" "}
-                        {lowestScore > 60
-                          ? "Maintain current performance levels"
-                          : "Significant improvement needed"}
-                      </div>
-                      <div
-                        style={{ marginBottom: "4px", wordBreak: "break-word" }}
-                      >
-                        <span style={{ fontWeight: 600 }}>Team Strength:</span>{" "}
-                        {averageScore >= 75
-                          ? "Strong collective performance"
-                          : "Opportunity for team building"}
-                      </div>
-                      <div style={{ wordBreak: "break-word" }}>
-                        <span style={{ fontWeight: 600 }}>Recommendation:</span>{" "}
-                        {averageScore >= 80
-                          ? "Focus on sustaining excellence and innovation"
-                          : "Implement targeted development programs"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Action Buttons - Inline on all devices */}
+      {/* ─── Tab Navigation ─── */}
       <div
         style={{
           display: "flex",
-          flexDirection: "row",
-          gap: "clamp(8px, 2vw, 12px)",
-          justifyContent: "center",
-          marginTop: "clamp(20px, 5vw, 28px)",
+          gap: "4px",
+          marginBottom: "clamp(16px, 4vw, 24px)",
+          borderBottom: `2px solid ${C.border}`,
+          paddingBottom: "8px",
           flexWrap: "wrap",
         }}
       >
         <button
+          onClick={() => setActiveTab("form")}
           style={{
-            background: "#10b981",
-            color: "#fff",
+            padding: "8px 20px",
+            background: activeTab === "form" ? C.primary : "transparent",
+            color: activeTab === "form" ? "#fff" : C.muted,
             border: "none",
-            padding: "clamp(8px, 2.5vw, 11px) clamp(16px, 5vw, 26px)",
             borderRadius: 8,
-            fontSize: "clamp(12px, 3.5vw, 14px)",
-            fontWeight: 700,
+            fontSize: "clamp(12px, 3vw, 14px)",
+            fontWeight: 600,
             cursor: "pointer",
-            opacity: saving ? 0.7 : 1,
+            transition: "all 0.2s ease",
             display: "flex",
             alignItems: "center",
-            gap: 6,
-            flex: "1 1 auto",
-            justifyContent: "center",
+            gap: "6px",
           }}
-          onClick={saveEvaluation}
-          disabled={saving}
         >
-          {saving ? (
-            <>
-              <FiLoader
-                size={16}
-                style={{ animation: "spin 1s linear infinite" }}
-              />
-              Saving...
-            </>
-          ) : (
-            <>
-              <FiSave size={16} />
-              Save Evaluation
-            </>
-          )}
+          <FiClipboard size={16} />
+          Evaluation Form
         </button>
-
-        {/* Export button - Icon only on mobile, text + icon on desktop */}
-        {/* Export button - Icon only on mobile, text + icon on desktop */}
         <button
+          onClick={() => setActiveTab("history")}
           style={{
-            background: "#dc2626",
-            color: "#fff",
+            padding: "8px 20px",
+            background: activeTab === "history" ? C.primary : "transparent",
+            color: activeTab === "history" ? "#fff" : C.muted,
             border: "none",
-            padding: "clamp(8px, 2.5vw, 11px) clamp(16px, 5vw, 26px)",
             borderRadius: 8,
-            fontSize: "clamp(12px, 3.5vw, 14px)",
-            fontWeight: 700,
+            fontSize: "clamp(12px, 3vw, 14px)",
+            fontWeight: 600,
             cursor: "pointer",
+            transition: "all 0.2s ease",
             display: "flex",
             alignItems: "center",
-            gap: 6,
-            flex: "1 1 auto",
-            justifyContent: "center",
-          }}
-          onClick={() => {
-            const bestPerformerName =
-              sortedMembers.length > 0 ? sortedMembers[0].name : null;
-            exportEvaluationReportToPDF(
-              scores,
-              members.filter((m) => m.trim() !== ""),
-              (m) => total(m),
-              bestPerformerName,
-              t,
-              comments,
-              signatures,
-              includeAINarrative, // ✅ Pass the toggle state
-              aiNarrativeContent, // ✅ Pass the AI narrative content
-            );
+            gap: "6px",
           }}
         >
-          <FiDownload size={16} />
-          <span className="export-text">Export PDF</span>
-          <style>{`
-    @media (max-width: 480px) {
-      .export-text {
-        display: none !important;
-      }
-    }
-  `}</style>
+          <FiList size={16} />
+          History ({savedEvaluations.length})
         </button>
-
-        <button
-          style={{
-            ...btn.secondary,
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            flex: "1 1 auto",
-            justifyContent: "center",
-          }}
-          onClick={resetForm}
-        >
-          <FiRefreshCw size={16} />
-          {te.reset || "Reset"}
-        </button>
+        {evaluationId && (
+          <button
+            onClick={passToSuperAdmin}
+            style={{
+              padding: "8px 20px",
+              background: "#8b5cf6",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontSize: "clamp(12px, 3vw, 14px)",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              marginLeft: "auto",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#7c3aed";
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow =
+                "0 4px 16px rgba(139,92,246,0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#8b5cf6";
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            <FiSend size={16} />
+            Pass to Super Admin
+          </button>
+        )}
       </div>
 
-      {/* AI Evaluation Narrative - with toggle */}
-      {evaluationId && (
-        <div style={{ marginTop: "clamp(16px, 4vw, 24px)" }}>
+      {/* ─── History Tab Content ─── */}
+      {activeTab === "history" && (
+        <div style={{ marginBottom: "clamp(20px, 4vw, 32px)" }}>
+          {loadingHistory ? (
+            <div
+              style={{ textAlign: "center", padding: "40px", color: C.muted }}
+            >
+              <FiLoader
+                size={24}
+                style={{ animation: "spin 1s linear infinite" }}
+              />
+              <p>Loading evaluations...</p>
+            </div>
+          ) : savedEvaluations.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "60px 20px",
+                color: C.muted,
+              }}
+            >
+              <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
+              <p style={{ fontSize: 16, marginBottom: 8 }}>
+                No saved evaluations found
+              </p>
+              <p style={{ fontSize: 13, color: "#999" }}>
+                Save an evaluation to see it here
+              </p>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gap: "12px" }}>
+              {savedEvaluations.map((evalItem) => (
+                <div
+                  key={evalItem._id}
+                  style={{
+                    background: C.white,
+                    borderRadius: 10,
+                    padding: "14px 18px",
+                    border: `1px solid ${C.border}`,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = C.primary;
+                    e.currentTarget.style.boxShadow =
+                      "0 4px 16px rgba(0,0,0,0.06)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = C.border;
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        fontWeight: 600,
+                        fontSize: "14px",
+                        color: C.dark,
+                      }}
+                    >
+                      {evalItem.teamName || "Untitled Team"}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: C.muted,
+                        display: "flex",
+                        gap: "12px",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span>{evalItem.members?.length || 0} members</span>
+                      <span>•</span>
+                      <span>Avg: {evalItem.averageScore || 0} pts</span>
+                      <span>•</span>
+                      <span>
+                        {new Date(evalItem.createdAt).toLocaleDateString()}
+                      </span>
+                      {evalItem.status && (
+                        <span
+                          style={{
+                            background:
+                              evalItem.status === "submitted"
+                                ? "#DBEAFE"
+                                : "#D1FAE5",
+                            color:
+                              evalItem.status === "submitted"
+                                ? "#1D4ED8"
+                                : "#065F46",
+                            padding: "1px 8px",
+                            borderRadius: "12px",
+                            fontSize: "10px",
+                            fontWeight: 600,
+                          }}
+                        >
+                          {evalItem.status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      onClick={() => loadEvaluation(evalItem)}
+                      style={{
+                        ...btn.small,
+                        padding: "4px 12px",
+                        fontSize: "12px",
+                      }}
+                    >
+                      <FiEye size={14} />
+                      Load
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── Form Content - Only show when activeTab is "form" ─── */}
+      {activeTab === "form" && (
+        <>
+          {/* Team Name Input */}
+          <div style={card}>
+            <label
+              style={{
+                display: "block",
+                fontSize: "clamp(12px, 3.5vw, 13px)",
+                fontWeight: 600,
+                marginBottom: 8,
+                color: C.dark,
+              }}
+            >
+              <FiUsers size={14} style={{ marginRight: 6 }} />
+              Team Name / Department
+            </label>
+            <input
+              type="text"
+              style={inp}
+              placeholder="e.g., Addis Ketema Service Team"
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+            />
+          </div>
+
+          {/* Dynamic Team Members Section */}
+          <div style={card}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                marginBottom: 16,
+              }}
+            >
+              <h3
+                style={{
+                  fontSize: "clamp(13px, 4vw, 15px)",
+                  fontWeight: 800,
+                  color: C.dark,
+                  fontFamily: F.sans,
+                  margin: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <FiUsers size={18} color={C.primary} />
+                {te.teamMembers || "Team Members"} (Max 7)
+              </h3>
+              {members.length < 7 && (
+                <button
+                  onClick={addMember}
+                  style={{
+                    background: C.primary,
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 20,
+                    padding: "6px 16px",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <FiPlus size={14} />
+                  Add Member
+                </button>
+              )}
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(min(100%, 200px), 1fr))",
+                gap: 12,
+              }}
+            >
+              {members.map((member, idx) => (
+                <div
+                  key={idx}
+                  style={{ display: "flex", gap: 8, alignItems: "center" }}
+                >
+                  <input
+                    ref={(el) => (memberInputRefs.current[idx] = el)}
+                    style={{ ...inp, flex: 1 }}
+                    placeholder={`Member ${idx + 1}`}
+                    value={member}
+                    onChange={(e) => updateMemberName(idx, e.target.value)}
+                  />
+                  {members.length > 1 && (
+                    <button
+                      onClick={() => removeMember(idx)}
+                      style={{
+                        background: "#fee2e2",
+                        color: "#dc2626",
+                        border: "none",
+                        borderRadius: 6,
+                        width: 32,
+                        height: 32,
+                        cursor: "pointer",
+                        fontSize: 16,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <FiX size={16} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Criteria Sections */}
+          {CRITERIA.map((c) => (
+            <div
+              key={c.id}
+              style={{
+                ...card,
+                borderLeft: `5px solid ${c.color}`,
+                paddingLeft: "clamp(12px, 3vw, 20px)",
+                overflowX: "auto",
+              }}
+            >
+              <h3
+                style={{
+                  margin: "0 0 12px",
+                  fontSize: "clamp(13px, 4vw, 15px)",
+                  fontWeight: 800,
+                  color: c.color,
+                  fontFamily: F.sans,
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "baseline",
+                  gap: 6,
+                }}
+              >
+                <FiTarget size={16} />
+                {safeCriteria[c.key] || c.key}
+                <span
+                  style={{
+                    fontWeight: 400,
+                    fontSize: "clamp(10px, 3vw, 12px)",
+                    color: "#888",
+                  }}
+                >
+                  ({c.weight}%)
+                </span>
+              </h3>
+
+              <div
+                style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
+              >
+                <table
+                  style={{
+                    width: "100%",
+                    borderCollapse: "collapse",
+                    fontSize: "clamp(10px, 3vw, 12px)",
+                    minWidth: 500,
+                  }}
+                >
+                  <thead>
+                    <tr>
+                      <th style={thS}>መስፈርት / Criterion</th>
+                      <th style={{ ...thS, textAlign: "center" }}>
+                        {te.maxPts || "Max Pts"}
+                      </th>
+                      {members
+                        .filter((m) => m.trim() !== "")
+                        .map((m) => (
+                          <th
+                            key={m}
+                            style={{
+                              ...thS,
+                              textAlign: "center",
+                              minWidth: "80px",
+                            }}
+                          >
+                            {m.length > 15 ? m.substring(0, 12) + "..." : m}
+                          </th>
+                        ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {c.items.map((item, idx) => (
+                      <tr
+                        key={idx}
+                        style={idx % 2 === 0 ? { background: C.cardBg } : {}}
+                      >
+                        <td style={tdS}>{item.text}</td>
+                        <td
+                          style={{
+                            ...tdS,
+                            textAlign: "center",
+                            fontWeight: 700,
+                            color: c.color,
+                          }}
+                        >
+                          {item.points}
+                        </td>
+                        {members
+                          .filter((m) => m.trim() !== "")
+                          .map((m) => {
+                            const inputId = getInputId(c.id, idx, m);
+                            return (
+                              <td
+                                key={m}
+                                style={{ ...tdS, textAlign: "center" }}
+                              >
+                                <input
+                                  ref={(el) =>
+                                    (inputRefs.current[inputId] = el)
+                                  }
+                                  id={inputId}
+                                  type="number"
+                                  min="0"
+                                  max={item.points}
+                                  style={{
+                                    width: "clamp(50px, 12vw, 60px)",
+                                    border: `1.5px solid ${C.border}`,
+                                    borderRadius: 6,
+                                    padding: "clamp(3px, 1.5vw, 6px)",
+                                    textAlign: "center",
+                                    fontSize: "clamp(11px, 3vw, 13px)",
+                                  }}
+                                  value={scores[`${c.id}-${idx}-${m}`] || ""}
+                                  onChange={(e) =>
+                                    setScore(c.id, idx, m, e.target.value)
+                                  }
+                                />
+                              </td>
+                            );
+                          })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+
+          {/* RANKINGS WITH DYNAMIC COMMENTS */}
+          <div style={card}>
+            <div
+              onClick={() => setShowRankings(!showRankings)}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                cursor: "pointer",
+                padding: "8px 4px",
+                borderRadius: 8,
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = C.bg)}
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "transparent")
+              }
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <FiChevronDown
+                  size={20}
+                  style={{
+                    transform: showRankings ? "rotate(0deg)" : "rotate(-90deg)",
+                    transition: "transform 0.2s ease",
+                    color: C.primary,
+                  }}
+                />
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: "clamp(14px, 4vw, 18px)",
+                    fontWeight: 800,
+                    color: C.dark,
+                    fontFamily: F.sans,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <FiBarChart2 size={18} color={C.primary} />
+                  Performance Rankings & Feedback
+                </h3>
+                {!showRankings && sortedMembers.length > 0 && (
+                  <span
+                    style={{
+                      background: C.primary,
+                      color: "#fff",
+                      padding: "2px 8px",
+                      borderRadius: 20,
+                      fontSize: "11px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    {sortedMembers.length} Members
+                  </span>
+                )}
+              </div>
+              {!showRankings && sortedMembers.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 16,
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "clamp(11px, 3vw, 13px)",
+                      color: C.muted,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <FiAward size={14} color={C.gold} />
+                    Best: {bestPerformer}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "clamp(11px, 3vw, 13px)",
+                      color: C.muted,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <FiTrendingUp size={14} color={C.primary} />
+                    Avg: {averageScore}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {showRankings && sortedMembers.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                {/* Summary Stats */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))",
+                    gap: 10,
+                    marginBottom: 20,
+                  }}
+                >
+                  <div
+                    style={{
+                      background: C.bg,
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "clamp(20px, 4vw, 24px)",
+                        fontWeight: 900,
+                        color: C.primary,
+                      }}
+                    >
+                      {totalMembers}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.muted,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <FiUsers size={12} />
+                      Total Members
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      background: C.bg,
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "clamp(20px, 4vw, 24px)",
+                        fontWeight: 900,
+                        color: C.primary,
+                      }}
+                    >
+                      {averageScore}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.muted,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <FiTrendingUp size={12} />
+                      Average Score
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      background: C.bg,
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "clamp(20px, 4vw, 24px)",
+                        fontWeight: 900,
+                        color: C.primary,
+                      }}
+                    >
+                      {highestScore}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.muted,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <FiAward size={12} />
+                      Highest Score
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      background: C.bg,
+                      borderRadius: 8,
+                      padding: "10px 12px",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "clamp(20px, 4vw, 24px)",
+                        fontWeight: 900,
+                        color: C.primary,
+                      }}
+                    >
+                      {lowestScore}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "10px",
+                        color: C.muted,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <FiTrendingDown size={12} />
+                      Lowest Score
+                    </div>
+                  </div>
+                </div>
+
+                {/* Compact Cards with Comments */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(min(100%, 280px), 1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {sortedMembers.map(
+                    ({ name, index, total: memberTotal, comment }, idx) => {
+                      const level = getPerformanceLevel(memberTotal);
+                      const rankBadge = getRankBadge(idx, sortedMembers.length);
+                      const isTopThree = idx < 3;
+
+                      return (
+                        <div
+                          key={name}
+                          style={{
+                            background: C.white,
+                            borderRadius: 10,
+                            padding: "14px 16px",
+                            border: `2px solid ${isTopThree ? level.color : C.border}`,
+                            boxShadow: isTopThree
+                              ? `0 4px 16px ${level.color}33`
+                              : "0 2px 8px rgba(0,0,0,0.04)",
+                            transition: "all 0.3s ease",
+                            position: "relative",
+                            overflow: "hidden",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform =
+                              "translateY(-2px)";
+                            e.currentTarget.style.boxShadow = `0 6px 24px ${level.color}44`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = "translateY(0)";
+                            e.currentTarget.style.boxShadow = isTopThree
+                              ? `0 4px 16px ${level.color}33`
+                              : "0 2px 8px rgba(0,0,0,0.04)";
+                          }}
+                        >
+                          {isTopThree && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                top: 0,
+                                right: 0,
+                                background: level.color,
+                                color: "#fff",
+                                padding: "2px 12px",
+                                fontSize: "9px",
+                                fontWeight: 700,
+                                borderRadius: "0 10px 0 10px",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4,
+                              }}
+                            >
+                              {idx === 0 ? (
+                                <>
+                                  <FiAward size={10} />
+                                  TOP
+                                </>
+                              ) : idx === 1 ? (
+                                <>
+                                  <FiAward size={10} />
+                                  2ND
+                                </>
+                              ) : (
+                                <>
+                                  <FiStar size={10} />
+                                  3RD
+                                </>
+                              )}
+                            </div>
+                          )}
+
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              marginBottom: 4,
+                            }}
+                          >
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                              }}
+                            >
+                              <span
+                                style={{
+                                  fontSize: "clamp(15px, 3vw, 17px)",
+                                  fontWeight: 800,
+                                  color: C.dark,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                <FiUser size={14} color={C.primary} />
+                                {name}
+                              </span>
+                              <span
+                                style={{
+                                  fontSize: "clamp(11px, 2.5vw, 13px)",
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {rankBadge}
+                              </span>
+                            </div>
+                            <span
+                              style={{
+                                fontSize: "clamp(18px, 4vw, 22px)",
+                                fontWeight: 900,
+                                color: level.color,
+                              }}
+                            >
+                              {memberTotal}
+                            </span>
+                          </div>
+
+                          <div
+                            style={{
+                              background: C.bg,
+                              borderRadius: 4,
+                              height: 4,
+                              overflow: "hidden",
+                              marginBottom: 8,
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: `${memberTotal}%`,
+                                height: "100%",
+                                background: `linear-gradient(90deg, ${level.color}, ${level.color}dd)`,
+                                borderRadius: 4,
+                                transition: "width 0.5s ease",
+                              }}
+                            />
+                          </div>
+
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                              marginBottom: 6,
+                            }}
+                          >
+                            {level.icon}
+                            <span
+                              style={{
+                                fontSize: "clamp(10px, 2.5vw, 11px)",
+                                fontWeight: 600,
+                                color: level.color,
+                              }}
+                            >
+                              {level.label}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: "9px",
+                                color: C.muted,
+                                marginLeft: "auto",
+                              }}
+                            >
+                              {level.description}
+                            </span>
+                          </div>
+
+                          <div style={{ marginTop: 4 }}>
+                            <label
+                              style={{
+                                fontSize: "clamp(9px, 2vw, 10px)",
+                                fontWeight: 600,
+                                color: C.muted,
+                                display: "block",
+                                marginBottom: 2,
+                              }}
+                            >
+                              <FiMessageSquare
+                                size={10}
+                                style={{ marginRight: 4 }}
+                              />
+                              Feedback / Comments
+                            </label>
+                            <textarea
+                              value={comment || ""}
+                              onChange={(e) =>
+                                updateComment(index, e.target.value)
+                              }
+                              placeholder="Add your feedback, strengths, or areas for improvement..."
+                              style={{
+                                width: "100%",
+                                border: `1px solid ${C.border}`,
+                                borderRadius: 6,
+                                padding: "6px 8px",
+                                fontSize: "clamp(10px, 2.5vw, 11px)",
+                                fontFamily: F.sans,
+                                resize: "vertical",
+                                minHeight: "50px",
+                                outline: "none",
+                                transition: "border-color 0.2s",
+                                background: "#fafbfc",
+                              }}
+                              onFocus={(e) => {
+                                e.currentTarget.borderColor = C.primary;
+                                e.currentTarget.boxShadow = `0 0 0 2px ${C.primary}22`;
+                              }}
+                              onBlur={(e) => {
+                                e.currentTarget.borderColor = C.border;
+                                e.currentTarget.boxShadow = "none";
+                              }}
+                            />
+                            {comment && comment.length > 0 && (
+                              <div
+                                style={{
+                                  fontSize: "9px",
+                                  color: C.muted,
+                                  marginTop: 2,
+                                  textAlign: "right",
+                                }}
+                              >
+                                {comment.length} characters
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+              </div>
+            )}
+
+            {showRankings && sortedMembers.length === 0 && (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "30px 20px",
+                  color: C.muted,
+                }}
+              >
+                <div style={{ fontSize: 32, marginBottom: 8 }}>
+                  <FiClipboard size={32} color={C.muted} />
+                </div>
+                <p>Add team members and scores to see rankings</p>
+              </div>
+            )}
+          </div>
+
+          {/* BEST PERFORMER DECLARATION + SIGNATURES */}
+          {sortedMembers.length > 0 && (
+            <div
+              style={{
+                ...card,
+                border: `2px solid ${C.gold}`,
+                background: "linear-gradient(135deg, #fff, #fffdf0)",
+              }}
+            >
+              {/* Best Performer Announcement */}
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "clamp(12px, 3vw, 20px)",
+                  borderBottom: `1px solid ${C.border}`,
+                  marginBottom: 20,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "clamp(28px, 7vw, 40px)",
+                    marginBottom: 8,
+                  }}
+                >
+                  <FiAward
+                    size={40}
+                    color={C.gold}
+                    style={{ display: "block", margin: "0 auto" }}
+                  />
+                </div>
+                <div
+                  style={{
+                    fontSize: "clamp(12px, 3vw, 14px)",
+                    color: C.muted,
+                    fontFamily: F.sans,
+                    marginBottom: 8,
+                  }}
+                >
+                  {te.bestPerformerLabel ||
+                    "የወሩ ምርጥ ፈፃሚ / Best Performer of the Month"}
+                </div>
+                <div
+                  style={{
+                    fontSize: "clamp(18px, 5vw, 26px)",
+                    fontWeight: 900,
+                    color: C.dark,
+                    fontFamily: F.serif,
+                    background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                    marginBottom: 4,
+                  }}
+                >
+                  {sortedMembers[0]?.name || "—"}
+                </div>
+                <div
+                  style={{
+                    fontSize: "clamp(11px, 3vw, 13px)",
+                    color: C.muted,
+                    fontFamily: F.sans,
+                  }}
+                >
+                  {te.bestPerformerSub || "ሆኖ ተመርጧል"} ·{" "}
+                  {sortedMembers[0]?.total || 0} {te.points || "pts"}
+                </div>
+              </div>
+
+              {/* Signature Grid with Canvas */}
+              <div>
+                <div
+                  style={{
+                    fontSize: "clamp(12px, 3vw, 13px)",
+                    fontWeight: 700,
+                    color: C.dark,
+                    fontFamily: F.sans,
+                    marginBottom: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <FiPenTool size={14} />
+                  {te.signaturesTitle || "ፊርማዎች / Digital Signatures"}
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fill, minmax(min(100%, 220px), 1fr))",
+                    gap: "clamp(12px, 3vw, 20px)",
+                  }}
+                >
+                  {/* Team Leader signature box */}
+                  <div
+                    style={{
+                      background: `linear-gradient(135deg, ${C.primary}10, ${C.gold}10)`,
+                      border: `1.5px solid ${C.primary}`,
+                      borderRadius: 10,
+                      padding: "clamp(10px, 3vw, 16px)",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "clamp(10px, 2.5vw, 11px)",
+                        fontWeight: 700,
+                        color: C.primary,
+                        fontFamily: F.sans,
+                        marginBottom: 8,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <FiStar size={12} />
+                      {te.teamLeaderLabel || "ቡድን መሪ / Team Leader"}
+                    </div>
+                    <input
+                      type="text"
+                      placeholder={te.namePlaceholder || "ስም / Name"}
+                      style={{
+                        width: "100%",
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 6,
+                        padding: "6px 8px",
+                        fontSize: "clamp(11px, 2.5vw, 12px)",
+                        fontFamily: F.sans,
+                        marginBottom: 8,
+                        textAlign: "center",
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                      value={teamName}
+                      onChange={(e) => setTeamName(e.target.value)}
+                    />
+                    <SignatureCanvas
+                      onSave={(data) => handleSignatureSave("teamLeader", data)}
+                      value={signatures.teamLeader}
+                    />
+                  </div>
+
+                  {/* Member signature boxes */}
+                  {sortedMembers.slice(0, 5).map(({ name }, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        background: C.cardBg,
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 10,
+                        padding: "clamp(10px, 3vw, 16px)",
+                        textAlign: "center",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "clamp(10px, 2.5vw, 11px)",
+                          fontWeight: 600,
+                          color: C.muted,
+                          fontFamily: F.sans,
+                          marginBottom: 6,
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        {te.memberLabel || "ተመዛኝ ፈፃሚ"} {idx + 1}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "clamp(11px, 2.5vw, 13px)",
+                          fontWeight: 700,
+                          color: C.dark,
+                          fontFamily: F.sans,
+                          marginBottom: 8,
+                          minHeight: 20,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <FiUser size={12} color={C.primary} />
+                        {name}
+                      </div>
+                      <SignatureCanvas
+                        onSave={(data) => handleSignatureSave(name, data)}
+                        value={signatures[name]}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                {/* Date row */}
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    marginTop: 16,
+                    gap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "clamp(11px, 3vw, 12px)",
+                      color: C.muted,
+                      fontFamily: F.sans,
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <FiCalendar size={12} />
+                    {te.dateLabel || "ቀን / Date:"}
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "clamp(11px, 3vw, 12px)",
+                      color: C.dark,
+                      fontFamily: F.sans,
+                      fontWeight: 700,
+                      borderBottom: `1px solid ${C.border}`,
+                      minWidth: 120,
+                      paddingBottom: 2,
+                    }}
+                  >
+                    {new Date().toLocaleDateString("en-GB")}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ════════════════════════════════════════════════════════════ */}
+          {/* ENHANCED AI EVALUATION HELPER WITH ADVANCED INSIGHTS */}
+          {/* ════════════════════════════════════════════════════════════ */}
+          {evaluationId && (
+            <div style={{ marginTop: "clamp(16px, 4vw, 24px)" }}>
+              <div
+                style={{
+                  ...card,
+                  border: `2px solid ${C.primary}`,
+                  background: "linear-gradient(135deg, #EFF6FF, #F0FDF4)",
+                  padding: "clamp(16px, 4vw, 24px)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                    marginBottom: "16px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "40px",
+                        height: "40px",
+                        background: "linear-gradient(135deg, #7C3AED, #6D28D9)",
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: "#fff",
+                      }}
+                    >
+                      <FiZap size={20} />
+                    </div>
+                    <div>
+                      <h4
+                        style={{
+                          margin: 0,
+                          fontSize: "clamp(14px, 4vw, 16px)",
+                          fontWeight: 700,
+                          color: "#0F172A",
+                          fontFamily: F.sans,
+                        }}
+                      >
+                        AI Evaluation Insights
+                      </h4>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: "11px",
+                          color: C.muted,
+                        }}
+                      >
+                        Advanced AI analysis of team performance with
+                        recommendations
+                      </p>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "8px",
+                      alignItems: "center",
+                    }}
+                  >
+                    <span
+                      style={{
+                        background: C.primary,
+                        color: "#fff",
+                        padding: "4px 12px",
+                        borderRadius: 20,
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <FiAward size={12} />
+                      AI Powered
+                    </span>
+                    {evaluationId && (
+                      <span
+                        style={{
+                          background: "#10b981",
+                          color: "#fff",
+                          padding: "4px 12px",
+                          borderRadius: 20,
+                          fontSize: "10px",
+                          fontWeight: 600,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "4px",
+                        }}
+                      >
+                        <FiCheck size={12} />
+                        {totalMembers} Members
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* AI Evaluation Helper Component */}
+                <AIEvaluationHelper
+                  evaluationData={{
+                    teamName: teamName || "Untitled Team",
+                    members: members.filter((m) => m.trim() !== ""),
+                    totalScores: sortedMembers.map((m) => ({
+                      member: m.name,
+                      total: m.total,
+                      comment: m.comment || "",
+                    })),
+                    comments: comments,
+                    evaluatedBy: user?.name || "Administrator",
+                    period: "current period",
+                    averageScore: averageScore,
+                    highestScore: highestScore,
+                    lowestScore: lowestScore,
+                    bestPerformer: bestPerformer,
+                    totalMembers: totalMembers,
+                    criteriaScores: sortedMembers.map((m) => {
+                      const memberScores = {};
+                      CRITERIA.forEach((c) => {
+                        c.items.forEach((item, idx) => {
+                          const key = `${c.id}-${idx}-${m.name}`;
+                          memberScores[c.key] =
+                            (memberScores[c.key] || 0) + (scores[key] || 0);
+                        });
+                      });
+                      return { member: m.name, ...memberScores };
+                    }),
+                  }}
+                  onApplyFeedback={(feedback) => {
+                    showToast("AI feedback generated successfully!", "success");
+                    console.log("AI Feedback:", feedback);
+
+                    if (feedback && feedback.individualFeedback) {
+                      feedback.individualFeedback.forEach((item) => {
+                        const memberIndex = members.findIndex(
+                          (m) => m === item.member,
+                        );
+                        if (memberIndex !== -1) {
+                          const existingComment = comments[memberIndex] || "";
+                          const enhancedComment = `${existingComment}\n\n🤖 AI Analysis: ${item.feedback}`;
+                          setComments((prev) => ({
+                            ...prev,
+                            [memberIndex]: enhancedComment.trim(),
+                          }));
+                        }
+                      });
+                      showToast(
+                        `✅ Applied AI feedback for ${feedback.individualFeedback.length} member(s)`,
+                        "success",
+                      );
+                    }
+                  }}
+                />
+
+                {/* Enhanced AI Performance Insights - Responsive */}
+                {sortedMembers.length > 0 && (
+                  <div style={{ marginTop: "20px" }}>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns:
+                          "repeat(auto-fit, minmax(250px, 1fr))",
+                        gap: "14px",
+                      }}
+                    >
+                      {/* AI Performance Summary Card */}
+                      <div
+                        style={{
+                          background: "#fff",
+                          borderRadius: "10px",
+                          padding: "14px 16px",
+                          border: "1px solid #E2E8F0",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            marginBottom: "10px",
+                          }}
+                        >
+                          <FiTrendingUp size={18} color={C.primary} />
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: C.dark,
+                            }}
+                          >
+                            Performance Distribution
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "4px",
+                            flexWrap: "wrap",
+                            justifyContent: "center",
+                          }}
+                        >
+                          {sortedMembers.slice(0, 6).map((m, idx) => {
+                            const level = getPerformanceLevel(m.total);
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  flex: "1 1 40px",
+                                  minWidth: "32px",
+                                  maxWidth: "60px",
+                                  textAlign: "center",
+                                  background: idx === 0 ? "#F0FDF4" : "#F8FAFC",
+                                  borderRadius: "6px",
+                                  padding: "4px 2px",
+                                  border:
+                                    idx === 0
+                                      ? `2px solid ${level.color}`
+                                      : "1px solid #E2E8F0",
+                                  position: "relative",
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 800,
+                                    color: idx === 0 ? "#15803D" : "#1E293B",
+                                  }}
+                                >
+                                  {m.total}
+                                </div>
+                                <div
+                                  style={{
+                                    fontSize: "7px",
+                                    color: C.muted,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {m.name.substring(0, 4)}
+                                </div>
+                                {idx === 0 && (
+                                  <div
+                                    style={{
+                                      fontSize: "6px",
+                                      color: "#15803D",
+                                      fontWeight: 700,
+                                      marginTop: 1,
+                                    }}
+                                  >
+                                    ★
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {sortedMembers.length > 6 && (
+                            <div
+                              style={{
+                                minWidth: "32px",
+                                textAlign: "center",
+                                padding: "4px 2px",
+                                background: "#F1F5F9",
+                                borderRadius: "6px",
+                                fontSize: "9px",
+                                color: C.muted,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                            >
+                              +{sortedMembers.length - 6}
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            marginTop: "8px",
+                            fontSize: "9px",
+                            color: C.muted,
+                            borderTop: "1px solid #E2E8F0",
+                            paddingTop: "6px",
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <span>
+                            Range: {lowestScore} - {highestScore}
+                          </span>
+                          <span>Gap: {highestScore - lowestScore} pts</span>
+                          <span>Avg: {averageScore}</span>
+                        </div>
+                      </div>
+
+                      {/* AI Recommendations Card */}
+                      <div
+                        style={{
+                          background: "#fff",
+                          borderRadius: "10px",
+                          padding: "14px 16px",
+                          border: "1px solid #E2E8F0",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            marginBottom: "10px",
+                          }}
+                        >
+                          <FiTarget size={18} color={C.primary} />
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: C.dark,
+                            }}
+                          >
+                            AI Recommendations
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            color: "#1E293B",
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          <ul style={{ margin: 0, paddingLeft: "16px" }}>
+                            {averageScore < 70 && (
+                              <li>
+                                <strong>Training needed:</strong> Average score
+                                below 70. Consider additional training sessions.
+                              </li>
+                            )}
+                            {highestScore - lowestScore > 30 && (
+                              <li>
+                                <strong>Performance gap:</strong>{" "}
+                                {highestScore - lowestScore}pt gap detected.
+                                Consider mentorship program.
+                              </li>
+                            )}
+                            {sortedMembers.length > 5 && (
+                              <li>
+                                <strong>Team optimization:</strong> Large team (
+                                {sortedMembers.length}). Consider sub-teams.
+                              </li>
+                            )}
+                            {averageScore >= 80 && (
+                              <li>
+                                <strong>Excellent performance:</strong> Avg (
+                                {averageScore}) high. Consider recognition
+                                program.
+                              </li>
+                            )}
+                            <li>
+                              <strong>Review criteria:</strong> Ensure
+                              consistent application across all members.
+                            </li>
+                          </ul>
+                        </div>
+                      </div>
+
+                      {/* AI Performance Insights Card */}
+                      <div
+                        style={{
+                          background: "#fff",
+                          borderRadius: "10px",
+                          padding: "14px 16px",
+                          border: "1px solid #E2E8F0",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            marginBottom: "10px",
+                          }}
+                        >
+                          <FiInfo size={18} color={C.primary} />
+                          <span
+                            style={{
+                              fontSize: "12px",
+                              fontWeight: 700,
+                              color: C.dark,
+                            }}
+                          >
+                            Key Insights
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            color: "#1E293B",
+                            lineHeight: 1.6,
+                          }}
+                        >
+                          <div
+                            style={{
+                              marginBottom: "4px",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            <span style={{ fontWeight: 600 }}>
+                              Top Performer:
+                            </span>{" "}
+                            {bestPerformer} ({highestScore} pts)
+                          </div>
+                          <div
+                            style={{
+                              marginBottom: "4px",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            <span style={{ fontWeight: 600 }}>
+                              Area for Growth:
+                            </span>{" "}
+                            {lowestScore > 60
+                              ? "Maintain current performance levels"
+                              : "Significant improvement needed"}
+                          </div>
+                          <div
+                            style={{
+                              marginBottom: "4px",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            <span style={{ fontWeight: 600 }}>
+                              Team Strength:
+                            </span>{" "}
+                            {averageScore >= 75
+                              ? "Strong collective performance"
+                              : "Opportunity for team building"}
+                          </div>
+                          <div style={{ wordBreak: "break-word" }}>
+                            <span style={{ fontWeight: 600 }}>
+                              Recommendation:
+                            </span>{" "}
+                            {averageScore >= 80
+                              ? "Focus on sustaining excellence and innovation"
+                              : "Implement targeted development programs"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Action Buttons - Inline on all devices */}
           <div
             style={{
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: "12px",
+              flexDirection: "row",
+              gap: "clamp(8px, 2vw, 12px)",
+              justifyContent: "center",
+              marginTop: "clamp(20px, 5vw, 28px)",
               flexWrap: "wrap",
-              gap: "8px",
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <FiZap size={18} color={C.primary} />
-              <span
-                style={{
-                  fontWeight: 700,
-                  fontSize: "clamp(13px, 3vw, 15px)",
-                  color: C.dark,
-                }}
-              >
-                AI Evaluation Narrative
-              </span>
-            </div>
-            <label
+            <button
               style={{
+                background: "#10b981",
+                color: "#fff",
+                border: "none",
+                padding: "clamp(8px, 2.5vw, 11px) clamp(16px, 5vw, 26px)",
+                borderRadius: 8,
+                fontSize: "clamp(12px, 3.5vw, 14px)",
+                fontWeight: 700,
+                cursor: "pointer",
+                opacity: saving ? 0.7 : 1,
                 display: "flex",
                 alignItems: "center",
-                gap: "6px",
-                fontSize: "12px",
-                color: C.muted,
+                gap: 6,
+                flex: "1 1 auto",
+                justifyContent: "center",
+              }}
+              onClick={saveEvaluation}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <FiLoader
+                    size={16}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <FiSave size={16} />
+                  Save Evaluation
+                </>
+              )}
+            </button>
+
+            {/* Export button - Icon only on mobile, text + icon on desktop */}
+            <button
+              style={{
+                background: "#dc2626",
+                color: "#fff",
+                border: "none",
+                padding: "clamp(8px, 2.5vw, 11px) clamp(16px, 5vw, 26px)",
+                borderRadius: 8,
+                fontSize: "clamp(12px, 3.5vw, 14px)",
+                fontWeight: 700,
                 cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flex: "1 1 auto",
+                justifyContent: "center",
+              }}
+              onClick={() => {
+                const bestPerformerName =
+                  sortedMembers.length > 0 ? sortedMembers[0].name : null;
+                exportEvaluationReportToPDF(
+                  scores,
+                  members.filter((m) => m.trim() !== ""),
+                  (m) => total(m),
+                  bestPerformerName,
+                  t,
+                  comments,
+                  signatures,
+                  includeAINarrative,
+                  aiNarrativeContent,
+                );
               }}
             >
-              <input
-                type="checkbox"
-                checked={includeAINarrative}
-                onChange={(e) => setIncludeAINarrative(e.target.checked)}
-                style={{ cursor: "pointer" }}
-              />
-              Include in report
-            </label>
+              <FiDownload size={16} />
+              <span className="export-text">Export PDF</span>
+              <style>{`
+                @media (max-width: 480px) {
+                  .export-text {
+                    display: none !important;
+                  }
+                }
+              `}</style>
+            </button>
+
+            <button
+              style={{
+                ...btn.secondary,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flex: "1 1 auto",
+                justifyContent: "center",
+              }}
+              onClick={resetForm}
+            >
+              <FiRefreshCw size={16} />
+              {te.reset || "Reset"}
+            </button>
           </div>
 
-          {includeAINarrative && (
-            <AISummary
-              fetchFn={(id) => aiAPI.getEvaluationSummary(id, null)}
-              args={[evaluationId]}
-              label="AI Evaluation Narrative"
-              formatResult={formatAINarrative}
-              onContentGenerated={(content) => setAiNarrativeContent(content)} // ✅ Add this
-            />
+          {/* AI Evaluation Narrative - with toggle */}
+          {evaluationId && (
+            <div style={{ marginTop: "clamp(16px, 4vw, 24px)" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: "12px",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                }}
+              >
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "10px" }}
+                >
+                  <FiZap size={18} color={C.primary} />
+                  <span
+                    style={{
+                      fontWeight: 700,
+                      fontSize: "clamp(13px, 3vw, 15px)",
+                      color: C.dark,
+                    }}
+                  >
+                    AI Evaluation Narrative
+                  </span>
+                </div>
+                <label
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontSize: "12px",
+                    color: C.muted,
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeAINarrative}
+                    onChange={(e) => setIncludeAINarrative(e.target.checked)}
+                    style={{ cursor: "pointer" }}
+                  />
+                  Include in report
+                </label>
+              </div>
+
+              {includeAINarrative && (
+                <AISummary
+                  fetchFn={(id) => aiAPI.getEvaluationSummary(id, null)}
+                  args={[evaluationId]}
+                  label="AI Evaluation Narrative"
+                  formatResult={formatAINarrative}
+                  onContentGenerated={(content) =>
+                    setAiNarrativeContent(content)
+                  }
+                />
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
 
       <style>{`
