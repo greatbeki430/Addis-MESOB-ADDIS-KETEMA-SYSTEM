@@ -10,7 +10,6 @@ import { C, F } from "../styles/theme";
 import { useLanguage } from "../hooks/useLanguage";
 import { LANGUAGES } from "../constants/translations";
 import { SERVICES } from "../constants/services";
-import { serviceAPI } from "../services/api";
 import mesobLogo from "../assets/mesoblogo.png";
 import {
   FiMessageSquare,
@@ -708,52 +707,10 @@ export default function Landing() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [services, setServices] = useState([]);
-  const [servicesLoading, setServicesLoading] = useState(true);
-  const [servicesError, setServicesError] = useState(null);
+  const [services] = useState(SERVICES);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDept, setFilterDept] = useState("All");
   const sectionRefs = useRef({});
-
-  // ─── Load services for display ──────────────────────────────
-  useEffect(() => {
-    const loadServices = async () => {
-      try {
-        setServicesLoading(true);
-        const response = await serviceAPI.getAll();
-
-        let serviceData = [];
-        if (response) {
-          if (Array.isArray(response)) {
-            serviceData = response;
-          } else if (response.data && Array.isArray(response.data)) {
-            serviceData = response.data;
-          } else if (
-            response.data &&
-            response.data.data &&
-            Array.isArray(response.data.data)
-          ) {
-            serviceData = response.data.data;
-          } else if (response.services && Array.isArray(response.services)) {
-            serviceData = response.services;
-          }
-        }
-
-        if (serviceData.length > 0) {
-          setServices(serviceData);
-        } else {
-          setServices(SERVICES);
-        }
-      } catch (error) {
-        console.error("Failed to load services:", error);
-        setServicesError(error.message);
-        setServices(SERVICES);
-      } finally {
-        setServicesLoading(false);
-      }
-    };
-    loadServices();
-  }, []);
 
   // ─── Memoized stats ──────────────────────────────────────────
   const stats = useMemo(() => {
@@ -1646,17 +1603,7 @@ export default function Landing() {
         </div>
 
         {/* Services Grid */}
-        {servicesLoading ? (
-          <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
-            Loading services...
-          </div>
-        ) : servicesError ? (
-          <div
-            style={{ textAlign: "center", padding: "40px", color: "#dc2626" }}
-          >
-            Error loading services: {servicesError}
-          </div>
-        ) : displayServices.length === 0 ? (
+        {displayServices.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
             <FiPackage size={48} style={{ marginBottom: 12, opacity: 0.5 }} />
             <p>No services found matching your criteria</p>
