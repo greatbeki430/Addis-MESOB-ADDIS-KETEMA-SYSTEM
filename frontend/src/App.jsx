@@ -504,21 +504,21 @@ function AuthenticatedApp() {
         </div>
       )}
 
-      {/* ✅ Add User FAB - positioned above chatbot to prevent overlap */}
+      {/* ✅ Add User FAB - positioned above chatbot, smaller on all devices */}
       {isAdminOrSuperAdmin && (
         <button
           onClick={() => setShowRegister(true)}
           style={{
             position: "fixed",
-            bottom: "100px",
-            right: 20,
+            bottom: "clamp(80px, 12vh, 100px)",
+            right: "clamp(12px, 2vw, 20px)",
             background: C.primary,
             color: "#fff",
             border: "none",
             borderRadius: "50%",
-            width: 56,
-            height: 56,
-            fontSize: 24,
+            width: "clamp(40px, 6vw, 52px)",
+            height: "clamp(40px, 6vw, 52px)",
+            fontSize: "clamp(18px, 3vw, 24px)",
             cursor: "pointer",
             boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
             display: "flex",
@@ -540,7 +540,7 @@ function AuthenticatedApp() {
         </button>
       )}
 
-      {/* ✅ AI Chatbot Widget - hidden when register modal is open to prevent overlap */}
+      {/* ✅ AI Chatbot Widget - smaller on all devices, hidden when register modal is open */}
       {!showRegister && <ChatbotWidget />}
     </div>
   );

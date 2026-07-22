@@ -335,7 +335,7 @@ export default function Evaluation({ t, lang }) {
     return () => clearTimeout(timer);
   }, [members, scores, comments, teamName, evaluationId, signatures]);
 
-  // ─── Load saved evaluation ─────────────────────────────────
+  // ─── Load saved evaluation (localStorage first, then reconcile with server) ──
   useEffect(() => {
     let isMounted = true;
 
@@ -351,6 +351,25 @@ export default function Evaluation({ t, lang }) {
             if (data.teamName) setTeamName(data.teamName);
             if (data.evaluationId) setEvaluationId(data.evaluationId);
             if (data.signatures) setSignatures(data.signatures);
+
+            // ✅ NEW: if we know the evaluation's DB id, pull the authoritative
+            // copy (including signatures) from MongoDB — this is what makes
+            // signatures retrievable from a fresh browser/device.
+            if (data.evaluationId) {
+              evaluationAPI
+                .getById(data.evaluationId)
+                .then((res) => {
+                  if (isMounted && res?.data?.signatures) {
+                    setSignatures(res.data.signatures);
+                  }
+                })
+                .catch((err) =>
+                  console.warn(
+                    "Could not refresh signatures from server:",
+                    err,
+                  ),
+                );
+            }
           }
         } catch (e) {
           console.error("Failed to load saved evaluation:", e);
@@ -2177,6 +2196,7 @@ export default function Evaluation({ t, lang }) {
               bestPerformerName,
               t,
               comments,
+              signatures,
             );
           }}
         >

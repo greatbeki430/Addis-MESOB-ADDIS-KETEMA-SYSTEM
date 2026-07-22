@@ -2,6 +2,8 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { showErrorToast, showSuccessToast } from "./toastHelper";
+import { loadFonts, FONT_NAMES } from "./pdf/fontLoader";
+import { isAmharic } from "./pdf/language";
 
 // Helper: Get Ethiopian date
 const getEthiopianDate = () => {
@@ -554,6 +556,16 @@ export const exportDailyReportToPDF = (rows, date, t) => {
 };
 
 // ✅ Export Evaluation Report to PDF (with Comments Support)
+// ✅ Helper: pick the right embedded font for whatever script the text uses
+const setSmartFont = (doc, text, bold = false) => {
+  if (isAmharic(text)) {
+    doc.setFont(bold ? FONT_NAMES.ethiopicBold : FONT_NAMES.ethiopic, "normal");
+  } else {
+    doc.setFont(bold ? FONT_NAMES.latinBold : FONT_NAMES.latin, "normal");
+  }
+};
+
+// ✅ Export Evaluation Report to PDF (Amharic-safe + signatures)
 export const exportEvaluationReportToPDF = (
   scores,
   members,
@@ -561,6 +573,7 @@ export const exportEvaluationReportToPDF = (
   bestPerformer,
   t,
   comments = {},
+  signatures = {}, // ⬅️ NEW: pass the signatures object saved on the evaluation
 ) => {
   try {
     console.log("📄 Generating Evaluation Report PDF...");
@@ -576,28 +589,23 @@ export const exportEvaluationReportToPDF = (
       format: "a4",
     });
 
+    // ✅ Embed the real Unicode/Ethiopic fonts into this document
+    loadFonts(doc);
+
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 15;
     let yPos = margin;
 
-    // Header
+    const title = encodeText(t.evaluation?.title || "Evaluation Report");
     doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text(
-      encodeText(t.evaluation?.title || "Evaluation Report"),
-      pageWidth / 2,
-      yPos,
-      {
-        align: "center",
-      },
-    );
+    setSmartFont(doc, title, true);
+    doc.text(title, pageWidth / 2, yPos, { align: "center" });
     yPos += 8;
 
+    const subtitle = encodeText(t.evaluation?.subtitle || "");
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(encodeText(t.evaluation?.subtitle || ""), pageWidth / 2, yPos, {
-      align: "center",
-    });
+    setSmartFont(doc, subtitle, false);
+    doc.text(subtitle, pageWidth / 2, yPos, { align: "center" });
     yPos += 10;
 
     doc.setDrawColor(26, 107, 74);
@@ -607,7 +615,7 @@ export const exportEvaluationReportToPDF = (
 
     // Evaluation Date
     doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
+    setSmartFont(doc, "Evaluation Date", true);
     doc.text(`Evaluation Date: ${getEthiopianDate()}`, margin, yPos);
     yPos += 12;
 
@@ -616,6 +624,7 @@ export const exportEvaluationReportToPDF = (
     doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
+    setSmartFont(doc, "Team Members Summary", true);
     doc.text("Team Members Summary", margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
@@ -625,50 +634,53 @@ export const exportEvaluationReportToPDF = (
       total: totalScores(m),
     }));
 
-    // Sort by score descending
     const sortedMembers = [...memberTotals].sort((a, b) => b.total - a.total);
 
+    // ✅ No emoji medals — no standard font (Latin or Ethiopic) has emoji glyphs,
+    // so they were part of what was rendering as garbage. Use plain-text ranks instead.
     autoTable(doc, {
       startY: yPos,
-      head: [
-        [
-          encodeText("#"),
-          encodeText("Member Name"),
-          encodeText("Total Score (0-100)"),
-          encodeText("Rank"),
-        ],
-      ],
+      head: [["#", "Member Name", "Total Score (0-100)", "Rank"]],
       body: sortedMembers.map((m, idx) => [
         idx + 1,
         encodeText(m.name),
         m.total,
         idx === 0
-          ? "🥇 1st"
+          ? "1st"
           : idx === 1
-            ? "🥈 2nd"
+            ? "2nd"
             : idx === 2
-              ? "🥉 3rd"
+              ? "3rd"
               : `#${idx + 1}`,
       ]),
       margin: { left: margin, right: margin },
       theme: "striped",
       headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
       bodyStyles: { fontSize: 10 },
+      styles: { font: FONT_NAMES.ethiopic }, // covers Amharic member names in the body
+      didParseCell: (data) => {
+        // Use Latin font for pure-Latin cells so kerning/weight looks normal
+        const cellText = String(data.cell.raw ?? "");
+        if (!isAmharic(cellText)) {
+          data.cell.styles.font = FONT_NAMES.latin;
+        }
+      },
     });
 
     yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
 
     // Best Performer
     if (bestPerformer) {
+      const bpText = `Best Performer: ${encodeText(bestPerformer)}`;
       doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
+      setSmartFont(doc, bpText, true);
       doc.setTextColor(26, 107, 74);
-      doc.text(`🏆 Best Performer: ${encodeText(bestPerformer)}`, margin, yPos);
+      doc.text(bpText, margin, yPos);
       doc.setTextColor(0, 0, 0);
       yPos += 10;
     }
 
-    // ✅ Comments Section with Unicode support
+    // Comments Section with Unicode support
     if (comments && Object.keys(comments).length > 0) {
       const hasComments = Object.values(comments).some(
         (c) => c && c.trim() !== "",
@@ -676,8 +688,8 @@ export const exportEvaluationReportToPDF = (
 
       if (hasComments) {
         doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.text("📝 Individual Feedback & Comments", margin, yPos);
+        setSmartFont(doc, "Individual Feedback & Comments", true);
+        doc.text("Individual Feedback & Comments", margin, yPos);
         yPos += 10;
 
         const memberList = members.filter((m) => m.trim() !== "");
@@ -689,14 +701,15 @@ export const exportEvaluationReportToPDF = (
             yPos = margin;
           }
 
+          const memberLabel = `${encodeText(member)}:`;
           doc.setFontSize(11);
-          doc.setFont("helvetica", "bold");
+          setSmartFont(doc, memberLabel, true);
           doc.setTextColor(26, 107, 74);
-          doc.text(`${encodeText(member)}:`, margin, yPos);
+          doc.text(memberLabel, margin, yPos);
           yPos += 6;
 
           doc.setFontSize(10);
-          doc.setFont("helvetica", "normal");
+          setSmartFont(doc, comment, false);
           doc.setTextColor(50, 50, 50);
           const splitComment = doc.splitTextToSize(
             encodeText(comment),
@@ -715,12 +728,61 @@ export const exportEvaluationReportToPDF = (
       }
     }
 
+    // ✅ Digital Signatures Section — pulled from the `signatures` object saved to Mongo
+    const signatureEntries = Object.entries(signatures || {}).filter(
+      ([, data]) =>
+        data && typeof data === "string" && data.startsWith("data:image"),
+    );
+
+    if (signatureEntries.length > 0) {
+      if (yPos > 220) {
+        doc.addPage();
+        yPos = margin;
+      }
+      doc.setFontSize(14);
+      setSmartFont(doc, "Digital Signatures", true);
+      doc.setTextColor(0, 0, 0);
+      doc.text("Digital Signatures", margin, yPos);
+      yPos += 10;
+
+      const sigWidth = 55;
+      const sigHeight = 22;
+      let col = 0;
+      const startX = margin;
+      const colGap = sigWidth + 10;
+
+      signatureEntries.forEach(([name, dataUrl]) => {
+        if (yPos > 250) {
+          doc.addPage();
+          yPos = margin;
+          col = 0;
+        }
+        const x = startX + col * colGap;
+        try {
+          doc.addImage(dataUrl, "PNG", x, yPos, sigWidth, sigHeight);
+        } catch (imgErr) {
+          console.warn("Could not embed signature for", name, imgErr);
+        }
+        doc.setFontSize(8);
+        setSmartFont(doc, name, false);
+        doc.setTextColor(80, 80, 80);
+        doc.text(encodeText(name), x, yPos + sigHeight + 4);
+
+        col += 1;
+        if (col >= 3) {
+          col = 0;
+          yPos += sigHeight + 12;
+        }
+      });
+      yPos += sigHeight + 12;
+    }
+
     // Footer
     doc.setFontSize(8);
-    doc.setFont("helvetica", "italic");
+    setSmartFont(doc, "footer", false);
     doc.setTextColor(150, 150, 150);
     doc.text(
-      `Generated by Addis MESOB One-Stop Service Center · ${getEthiopianDate()}`,
+      `Generated by Addis MESOB One-Stop Service Center - ${getEthiopianDate()}`,
       pageWidth / 2,
       doc.internal.pageSize.getHeight() - 10,
       { align: "center" },
