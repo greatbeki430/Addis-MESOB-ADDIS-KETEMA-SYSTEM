@@ -38,6 +38,7 @@ import {
   FiList,
   FiSend,
   FiEye,
+  FiTrash2,
 } from "react-icons/fi";
 
 // ─── Signature Canvas Component ──────────────────────────────
@@ -358,6 +359,29 @@ export default function Evaluation({ t, lang }) {
     setEvaluationId(evalData._id);
     setActiveTab("form");
     showToast("Evaluation loaded successfully!", "success");
+  };
+
+  // ─── Delete an evaluation ──────────────────────────────────────
+  const deleteEvaluation = async (evalId, evalName) => {
+    if (
+      !window.confirm(
+        `Are you sure you want to delete "${evalName || "Untitled Team"}"? This action cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await evaluationAPI.delete(evalId);
+      setSavedEvaluations((prev) => prev.filter((e) => e._id !== evalId));
+      showToast(
+        `✅ "${evalName || "Untitled Team"}" deleted successfully!`,
+        "success",
+      );
+    } catch (error) {
+      console.error("Failed to delete evaluation:", error);
+      showToast("Failed to delete evaluation. Please try again.", "error");
+    }
   };
 
   // ─── Pass to Super Admin ────────────────────────────────────
@@ -1014,10 +1038,55 @@ export default function Evaluation({ t, lang }) {
                         ...btn.small,
                         padding: "4px 12px",
                         fontSize: "12px",
+                        background: C.primary,
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = C.light;
+                        e.currentTarget.style.transform = "translateY(-1px)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = C.primary;
+                        e.currentTarget.style.transform = "translateY(0)";
                       }}
                     >
                       <FiEye size={14} />
                       Load
+                    </button>
+                    <button
+                      onClick={() =>
+                        deleteEvaluation(evalItem._id, evalItem.teamName)
+                      }
+                      style={{
+                        padding: "4px 12px",
+                        fontSize: "12px",
+                        background: "#fee2e2",
+                        color: "#dc2626",
+                        border: "none",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#fecaca";
+                        e.currentTarget.style.transform = "scale(1.05)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#fee2e2";
+                        e.currentTarget.style.transform = "scale(1)";
+                      }}
+                    >
+                      <FiTrash2 size={14} />
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -1027,7 +1096,7 @@ export default function Evaluation({ t, lang }) {
         </div>
       )}
 
-      {/* ─── Form Content - Only show when activeTab is "form" ─── */}
+      {/* ─── Rest of the form content (same as before) ─── */}
       {activeTab === "form" && (
         <>
           {/* Team Name Input */}
@@ -1147,7 +1216,7 @@ export default function Evaluation({ t, lang }) {
             </div>
           </div>
 
-          {/* Criteria Sections */}
+          {/* Criteria Sections - same as before */}
           {CRITERIA.map((c) => (
             <div
               key={c.id}

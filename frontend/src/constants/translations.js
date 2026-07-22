@@ -19,6 +19,10 @@ export const translations = {
       documents: "Document Vault",
       "golden-monday": "Golden Monday",
       employees: "Employee Management",
+      "digital-attendance": "Digital Attendance",
+      "admin-attendance": "Attendance Management",
+      "admin-digital-attendance": "Digital Attendance Logs",
+      alerts: "Alerts & Notifications",
     },
     sidebar: {
       main: "Main Menu",
@@ -483,6 +487,10 @@ export const translations = {
       documents: "ሰነድ ቋት",
       "golden-monday": "ወርቃማ ሰኞ",
       employees: "የሰራተኞች አስተዳደር",
+      "digital-attendance": "ዲጂታል መገኘት",
+      "admin-attendance": "የመገኘት አስተዳደር",
+      "admin-digital-attendance": "የዲጂታል መገኘት መዝገቦች",
+      alerts: "ማስጠንቀቂያዎች እና ማሳወቂያዎች",
     },
     sidebar: {
       main: "ዋና ምናሌ",
@@ -935,6 +943,10 @@ export const translations = {
       documents: "Kuusaa",
       "golden-monday": "Wiixata Warqee",
       employees: "Bulchiinsa Hojjattootaa",
+      "digital-attendance": "Argama Dijitaalaa",
+      "admin-attendance": "Bulchiinsa Argamaa",
+      "admin-digital-attendance": "Galmee Argamaa Dijitaalaa",
+      alerts: "Akeekkachiisaa fi Beeksisaa",
     },
     sidebar: {
       main: "Mana Galmee",
