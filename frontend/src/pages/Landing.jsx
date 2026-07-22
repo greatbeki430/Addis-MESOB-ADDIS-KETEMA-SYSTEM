@@ -3,26 +3,6 @@
 // Public system-wide landing page for Addis MESOB.
 // Shown to unauthenticated visitors at "/". Introduces the whole
 // platform (not a single feature) and funnels into /login.
-//
-// DESIGN NOTE: the signature visual is a "digital mesob" — a
-// woven-basket motif with service icons orbiting a central core.
-// A mesob is the traditional Ethiopian basket used to serve many
-// dishes from one vessel; that's a literal, specific metaphor for
-// "one platform, many services," so it replaces a generic stock
-// hero image rather than decorating around one.
-//
-// v2 CHANGES:
-// - Fixed the "bento-style asymmetric grid" claim in FEATURES: every
-//   card previously got the same gridColumn span regardless of the
-//   `big` flag, so the layout was actually uniform, not asymmetric.
-//   Big cards now genuinely span more width than small ones.
-// - Added scrollspy nav highlighting, a back-to-top button, an FAQ
-//   section, animated stat counters, marquee pause-on-hover, mobile
-//   nav Escape-to-close + scroll lock, a skip-to-content link, and a
-//   footer with real link slots (Privacy/Terms/Contact — point these
-//   at real routes/emails when ready).
-// - No fabricated testimonials/quotes were added — wire up real ones
-//   when available rather than inventing attributed content.
 // ════════════════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -30,6 +10,7 @@ import { C, F } from "../styles/theme";
 import { useLanguage } from "../hooks/useLanguage";
 import { LANGUAGES } from "../constants/translations";
 import { SERVICES } from "../constants/services";
+import { serviceAPI } from "../services/api";
 import mesobLogo from "../assets/mesoblogo.png";
 import {
   FiMessageSquare,
@@ -51,15 +32,28 @@ import {
   FiArrowUp,
   FiHelpCircle,
   FiMail,
+  FiSearch,
+  FiGrid,
+  FiTool,
+  FiPackage,
+  FiBox,
+  FiCheck,
+  FiBriefcase,
+  FiSettings,
+  FiAward,
+  FiUser,
+  FiClock,
+  FiCalendar,
+  FiPhone,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
 // TOKENS — extending the existing brand palette, not replacing it
 // ─────────────────────────────────────────────────────────────
 const T = {
-  ink: "#060b2e", // deeper than C.dark, for layered hero depth
-  paper: "#fbfaf6", // warm off-white for section alternation (basket-fiber tone)
-  weave: "rgba(245,197,24,0.14)", // gold at low alpha, used for woven line accents
+  ink: "#060b2e",
+  paper: "#fbfaf6",
+  weave: "rgba(245,197,24,0.14)",
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -179,11 +173,9 @@ const LANDING_COPY = {
   backToTop: { en: "Back to top", am: "ወደ ላይ ተመለስ", om: "Gara Olii Deebi'i" },
 };
 
-// FAQ content — plain, non-fabricated answers about the platform's own
-// mechanics (role-based access, languages, login). Amharic/Oromo copy
-// here is a first pass; have a native speaker on the team review before
-// treating it as final, the same way the rest of this file's copy was
-// presumably reviewed.
+// ─────────────────────────────────────────────────────────────
+// FAQ CONTENT
+// ─────────────────────────────────────────────────────────────
 const FAQ_ITEMS = [
   {
     q: {
@@ -235,8 +227,9 @@ const FAQ_ITEMS = [
   },
 ];
 
-// Orbiting service icons for the signature hero graphic — each one
-// maps to a real in-app module, not decorative filler.
+// ─────────────────────────────────────────────────────────────
+// ORBITING SERVICE ICONS
+// ─────────────────────────────────────────────────────────────
 const ORBIT_ICONS = [
   { icon: <FiBarChart2 size={18} />, label: "Dashboard" },
   { icon: <FiMessageSquare size={18} />, label: "Forum" },
@@ -246,6 +239,9 @@ const ORBIT_ICONS = [
   { icon: <FiSunrise size={18} />, label: "Golden Monday" },
 ];
 
+// ─────────────────────────────────────────────────────────────
+// FEATURES
+// ─────────────────────────────────────────────────────────────
 const FEATURES = [
   {
     icon: <FiBarChart2 size={24} />,
@@ -352,6 +348,9 @@ const FEATURES = [
   },
 ];
 
+// ─────────────────────────────────────────────────────────────
+// STEPS
+// ─────────────────────────────────────────────────────────────
 const STEPS = [
   {
     icon: <FiLogIn size={20} />,
@@ -395,9 +394,7 @@ const STEPS = [
 ];
 
 // ─────────────────────────────────────────────────────────────
-// ANIMATED COUNTER — counts up from 0 once its wrapper scrolls into
-// view. Numeric prefix/suffix (e.g. "+" or "/7") passed through as-is;
-// non-numeric values (like "24/7") render statically without animating.
+// ANIMATED COUNTER
 // ─────────────────────────────────────────────────────────────
 function AnimatedStat({ value, active }) {
   const match = /^(\d+)(.*)$/.exec(String(value));
@@ -512,8 +509,7 @@ function FAQAccordion({ items, getText }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SIGNATURE VISUAL — "Digital Mesob": woven basket core with
-// orbiting service icons. Pure SVG + CSS, no external image asset.
+// SIGNATURE VISUAL — "Digital Mesob"
 // ─────────────────────────────────────────────────────────────
 function DigitalMesob() {
   const radius = 150;
@@ -529,7 +525,6 @@ function DigitalMesob() {
         justifyContent: "center",
       }}
     >
-      {/* Woven ring pattern */}
       <svg
         viewBox="0 0 340 340"
         width="340"
@@ -559,7 +554,6 @@ function DigitalMesob() {
             strokeDasharray={ring % 2 === 0 ? "3 7" : "1 5"}
           />
         ))}
-        {/* Basket weave crosshatch at the core */}
         {Array.from({ length: 10 }).map((_, i) => {
           const angle = (i / 10) * Math.PI * 2;
           const x1 = 170 + Math.cos(angle) * 34;
@@ -579,8 +573,6 @@ function DigitalMesob() {
             />
           );
         })}
-
-        {/* Rotating "Addis MESOB" wordmark, curved around the core */}
         <g className="mesob-orbit-text">
           <text
             fill={C.goldLight}
@@ -596,7 +588,6 @@ function DigitalMesob() {
         </g>
       </svg>
 
-      {/* Central basket glyph */}
       <div
         style={{
           width: 92,
@@ -622,7 +613,6 @@ function DigitalMesob() {
         </span>
       </div>
 
-      {/* Orbiting service nodes */}
       {ORBIT_ICONS.map((item, i) => {
         const angle = (i / ORBIT_ICONS.length) * Math.PI * 2 - Math.PI / 2;
         const x = 170 + Math.cos(angle) * radius;
@@ -709,7 +699,7 @@ function SectionHeading({ eyebrow, title, sub, dark, center }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// COMPONENT
+// MAIN LANDING COMPONENT
 // ─────────────────────────────────────────────────────────────
 export default function Landing() {
   const { language, changeLanguage } = useLanguage();
@@ -718,25 +708,133 @@ export default function Landing() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [services, setServices] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [servicesError, setServicesError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterDept, setFilterDept] = useState("All");
   const sectionRefs = useRef({});
 
-  const stats = useMemo(() => {
-    const agencies = new Set((SERVICES || []).map((s) => s.deptEn)).size;
-    return { services: (SERVICES || []).length, agencies };
+  // ─── Load services for display ──────────────────────────────
+  useEffect(() => {
+    const loadServices = async () => {
+      try {
+        setServicesLoading(true);
+        const response = await serviceAPI.getAll();
+
+        let serviceData = [];
+        if (response) {
+          if (Array.isArray(response)) {
+            serviceData = response;
+          } else if (response.data && Array.isArray(response.data)) {
+            serviceData = response.data;
+          } else if (
+            response.data &&
+            response.data.data &&
+            Array.isArray(response.data.data)
+          ) {
+            serviceData = response.data.data;
+          } else if (response.services && Array.isArray(response.services)) {
+            serviceData = response.services;
+          }
+        }
+
+        if (serviceData.length > 0) {
+          setServices(serviceData);
+        } else {
+          setServices(SERVICES);
+        }
+      } catch (error) {
+        console.error("Failed to load services:", error);
+        setServicesError(error.message);
+        setServices(SERVICES);
+      } finally {
+        setServicesLoading(false);
+      }
+    };
+    loadServices();
   }, []);
 
+  // ─── Memoized stats ──────────────────────────────────────────
+  const stats = useMemo(() => {
+    const agencies = new Set((services || []).map((s) => s.deptEn || s.dept))
+      .size;
+    return { services: (services || []).length, agencies };
+  }, [services]);
+
+  // ─── Departments list ──────────────────────────────────────
   const departments = useMemo(() => {
     const seen = new Set();
     const list = [];
-    (SERVICES || []).forEach((s) => {
-      if (s.deptEn && !seen.has(s.deptEn)) {
-        seen.add(s.deptEn);
-        list.push(s.deptEn);
+    (services || []).forEach((s) => {
+      const dept = s.deptEn || s.dept;
+      if (dept && !seen.has(dept)) {
+        seen.add(dept);
+        list.push(dept);
       }
     });
     return list;
-  }, []);
+  }, [services]);
 
+  // ─── Localized services ──────────────────────────────────────
+  const localizedServices = useMemo(() => {
+    return services.map((s) => ({
+      ...s,
+      displayName:
+        language === "en"
+          ? s.nameEn || s.name || "Unnamed Service"
+          : s.name || "Unnamed Service",
+      displayDept:
+        language === "en"
+          ? s.deptEn || s.dept || "Uncategorized"
+          : s.dept || "Uncategorized",
+    }));
+  }, [services, language]);
+
+  // ─── Filtered services ──────────────────────────────────────
+  const filteredServices = useMemo(() => {
+    return localizedServices.filter((s) => {
+      const matchesDept = filterDept === "All" || s.displayDept === filterDept;
+      const matchesSearch =
+        s.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.nameEn?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.displayDept?.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesDept && matchesSearch;
+    });
+  }, [localizedServices, filterDept, searchTerm]);
+
+  // ─── All departments for filter ────────────────────────────
+  const allDepts = useMemo(() => {
+    return [
+      "All",
+      ...new Set(localizedServices.map((s) => s.displayDept).filter(Boolean)),
+    ];
+  }, [localizedServices]);
+
+  // ─── Get service icon ──────────────────────────────────────
+  const getServiceIcon = (index) => {
+    const icons = [
+      <FiTool size={24} />,
+      <FiPackage size={24} />,
+      <FiBox size={24} />,
+      <FiSettings size={24} />,
+      <FiStar size={24} />,
+      <FiAward size={24} />,
+      <FiBriefcase size={24} />,
+      <FiUsers size={24} />,
+      <FiUser size={24} />,
+      <FiClock size={24} />,
+      <FiCalendar size={24} />,
+      <FiMapPin size={24} />,
+      <FiPhone size={24} />,
+      <FiMail size={24} />,
+      <FiGlobe size={24} />,
+    ];
+    return icons[index % icons.length];
+  };
+
+  // ─── Register refs ──────────────────────────────────────────
   const registerRef = useCallback(
     (key) => (el) => {
       if (el) sectionRefs.current[key] = el;
@@ -744,7 +842,7 @@ export default function Landing() {
     [],
   );
 
-  // Reveal-on-scroll + scrollspy (nav active-state) share one observer.
+  // ─── Scroll observer ────────────────────────────────────────
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -766,14 +864,14 @@ export default function Landing() {
     return () => elements.forEach((el) => observer.unobserve(el));
   }, []);
 
-  // Back-to-top visibility.
+  // ─── Back-to-top ──────────────────────────────────────────
   useEffect(() => {
     const onScroll = () => setShowBackToTop(window.scrollY > 640);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Mobile nav: close on Escape, lock body scroll while open.
+  // ─── Mobile nav close ──────────────────────────────────────
   useEffect(() => {
     if (!mobileNavOpen) return;
     const onKeyDown = (e) => {
@@ -797,6 +895,9 @@ export default function Landing() {
   const goLogin = () => navigate("/login");
   const getText = (obj) => obj[language] || obj.en;
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+
+  // ─── Service display limit ──────────────────────────────────
+  const displayServices = filteredServices.slice(0, 12);
 
   return (
     <div
@@ -890,7 +991,7 @@ export default function Landing() {
         }
       `}</style>
 
-      {/* ── SKIP LINK (accessibility) ───────────────────── */}
+      {/* ── SKIP LINK ───────────────────────────────────── */}
       <a href="#main-content" className="lp-skip-link">
         {getText(LANDING_COPY.skipToContent)}
       </a>
@@ -936,7 +1037,6 @@ export default function Landing() {
           <a
             href="#features"
             className={`lp-nav-link${activeSection === "features" ? " active" : ""}`}
-            aria-current={activeSection === "features" ? "true" : undefined}
             style={{
               color: activeSection === "features" ? C.gold : "#c9d0f0",
               textDecoration: "none",
@@ -947,9 +1047,20 @@ export default function Landing() {
             Features
           </a>
           <a
+            href="#services"
+            className="lp-nav-link"
+            style={{
+              color: "#c9d0f0",
+              textDecoration: "none",
+              fontSize: 13,
+              fontWeight: 600,
+            }}
+          >
+            Services
+          </a>
+          <a
             href="#how"
             className={`lp-nav-link${activeSection === "how" ? " active" : ""}`}
-            aria-current={activeSection === "how" ? "true" : undefined}
             style={{
               color: activeSection === "how" ? C.gold : "#c9d0f0",
               textDecoration: "none",
@@ -978,7 +1089,6 @@ export default function Landing() {
                 className="lp-lang-btn"
                 onClick={() => changeLanguage(l.code)}
                 title={l.label}
-                aria-label={`Switch to ${l.label}`}
                 style={{
                   background:
                     language === l.code ? C.gold : "rgba(255,255,255,0.08)",
@@ -1026,7 +1136,6 @@ export default function Landing() {
           className="lp-mobile-toggle"
           onClick={() => setMobileNavOpen((v) => !v)}
           aria-label="Toggle menu"
-          aria-expanded={mobileNavOpen}
           style={{
             background: "rgba(255,255,255,0.08)",
             border: "none",
@@ -1063,6 +1172,13 @@ export default function Landing() {
             Features
           </a>
           <a
+            href="#services"
+            style={{ color: "#c9d0f0", fontSize: 14, fontWeight: 600 }}
+            onClick={() => setMobileNavOpen(false)}
+          >
+            Services
+          </a>
+          <a
             href="#how"
             style={{ color: "#c9d0f0", fontSize: 14, fontWeight: 600 }}
             onClick={() => setMobileNavOpen(false)}
@@ -1081,7 +1197,6 @@ export default function Landing() {
               <button
                 key={l.code}
                 onClick={() => changeLanguage(l.code)}
-                aria-label={`Switch to ${l.label}`}
                 style={{
                   background:
                     language === l.code ? C.gold : "rgba(255,255,255,0.08)",
@@ -1162,7 +1277,6 @@ export default function Landing() {
               <FiMapPin size={13} />
               {getText(LANDING_COPY.eyebrow)}
             </div>
-
             <h1
               style={{
                 fontFamily: F.serif,
@@ -1175,7 +1289,6 @@ export default function Landing() {
             >
               {getText(LANDING_COPY.heroTitle)}
             </h1>
-
             <p
               style={{
                 fontSize: "clamp(15px, 2.2vw, 18px)",
@@ -1187,7 +1300,6 @@ export default function Landing() {
             >
               {getText(LANDING_COPY.heroBody)}
             </p>
-
             <div
               style={{
                 display: "flex",
@@ -1278,7 +1390,6 @@ export default function Landing() {
               ))}
             </div>
           </div>
-
           <div
             style={{
               flex: "1 1 340px",
@@ -1342,7 +1453,7 @@ export default function Landing() {
         </section>
       )}
 
-      {/* ── FEATURES (bento-style asymmetric grid — now actually asymmetric) ── */}
+      {/* ── FEATURES ──────────────────────────────────────── */}
       <section
         id="features"
         ref={registerRef("features")}
@@ -1374,10 +1485,6 @@ export default function Landing() {
               key={i}
               className="lp-card"
               style={{
-                // FIX: big cards now span 2 columns (paired full-width on
-                // row one), small cards span 1 (four per row below) —
-                // previously both spanned 2, so "big" never looked
-                // different from "small" in layout, only in padding.
                 gridColumn: f.big ? "span 2" : "span 1",
                 background: C.white,
                 borderRadius: 18,
@@ -1443,14 +1550,248 @@ export default function Landing() {
           ))}
         </div>
         <style>{`
-          @media (max-width: 900px) {
-            #lp-features-grid { grid-template-columns: repeat(2, 1fr) !important; }
-            #lp-features-grid > div { grid-column: span 1 !important; }
-          }
-          @media (max-width: 560px) {
-            #lp-features-grid { grid-template-columns: 1fr !important; }
-          }
+          @media (max-width: 900px) { #lp-features-grid { grid-template-columns: repeat(2, 1fr) !important; } #lp-features-grid > div { grid-column: span 1 !important; } }
+          @media (max-width: 560px) { #lp-features-grid { grid-template-columns: 1fr !important; } }
         `}</style>
+      </section>
+
+      {/* ── SERVICES SECTION ─────────────────────────────── */}
+      <section
+        id="services"
+        ref={registerRef("services")}
+        data-reveal="services"
+        style={{
+          maxWidth: 1200,
+          margin: "0 auto",
+          padding: "clamp(56px, 8vw, 84px) clamp(20px, 6vw, 40px) 12px",
+          ...revealStyle("services"),
+        }}
+      >
+        <SectionHeading
+          eyebrow={
+            <>
+              <FiGrid size={14} style={{ marginRight: 4 }} />
+              Available Services
+            </>
+          }
+          title="Browse our service catalogue"
+          sub="Explore all available services. Login to access full features and management."
+          center
+        />
+
+        {/* Search and Filter */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 12,
+            marginTop: 24,
+            marginBottom: 20,
+          }}
+        >
+          <div style={{ flex: "2 1 200px", position: "relative" }}>
+            <span
+              style={{
+                position: "absolute",
+                left: 12,
+                top: "50%",
+                transform: "translateY(-50%)",
+                color: C.muted,
+              }}
+            >
+              <FiSearch size={18} />
+            </span>
+            <input
+              type="text"
+              placeholder="Search services..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px 14px 10px 42px",
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                fontSize: 14,
+                background: C.white,
+                outline: "none",
+                transition: "border-color 0.2s",
+              }}
+              onFocus={(e) => (e.currentTarget.style.borderColor = C.primary)}
+              onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
+            />
+          </div>
+          <select
+            value={filterDept}
+            onChange={(e) => setFilterDept(e.target.value)}
+            style={{
+              padding: "10px 14px",
+              border: `1px solid ${C.border}`,
+              borderRadius: 8,
+              fontSize: 14,
+              background: C.white,
+              minWidth: 140,
+              outline: "none",
+              transition: "border-color 0.2s",
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = C.primary)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
+          >
+            {allDepts.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Services Grid */}
+        {servicesLoading ? (
+          <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
+            Loading services...
+          </div>
+        ) : servicesError ? (
+          <div
+            style={{ textAlign: "center", padding: "40px", color: "#dc2626" }}
+          >
+            Error loading services: {servicesError}
+          </div>
+        ) : displayServices.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
+            <FiPackage size={48} style={{ marginBottom: 12, opacity: 0.5 }} />
+            <p>No services found matching your criteria</p>
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(min(100%, 200px), 1fr))",
+              gap: 16,
+            }}
+          >
+            {displayServices.map((s, i) => (
+              <div
+                key={s._id || i}
+                style={{
+                  background: C.white,
+                  borderRadius: 12,
+                  padding: "16px 18px",
+                  border: `1px solid ${C.border}`,
+                  transition: "all 0.3s ease",
+                  cursor: "default",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-4px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 8px 30px rgba(0,0,0,0.1)";
+                  e.currentTarget.style.borderColor = C.primary;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.borderColor = C.border;
+                }}
+              >
+                <div
+                  style={{ fontSize: 28, color: C.primary, marginBottom: 8 }}
+                >
+                  {getServiceIcon(i)}
+                </div>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    fontSize: 14,
+                    color: C.dark,
+                    marginBottom: 2,
+                  }}
+                >
+                  {s.displayName}
+                </div>
+                {s.nameEn && s.nameEn !== s.displayName && (
+                  <div style={{ fontSize: 11, color: "#bbb", marginBottom: 4 }}>
+                    {s.nameEn}
+                  </div>
+                )}
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: "#888",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    marginBottom: 8,
+                  }}
+                >
+                  <FiBriefcase size={12} />
+                  {s.displayDept}
+                </div>
+                <span
+                  style={{
+                    background: s.active ? C.bg : "#ffeee8",
+                    color: s.active ? C.primary : C.orange,
+                    borderRadius: 12,
+                    padding: "2px 10px",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  {s.active ? (
+                    <>
+                      <FiCheck size={10} /> Active
+                    </>
+                  ) : (
+                    "Inactive"
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {filteredServices.length > 12 && (
+          <div style={{ textAlign: "center", marginTop: 20 }}>
+            <button
+              onClick={() => navigate("/services")}
+              style={{
+                padding: "10px 24px",
+                background: C.primary,
+                color: "#fff",
+                border: "none",
+                borderRadius: 8,
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: "pointer",
+                transition: "all 0.3s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = `0 4px 16px ${C.primary}44`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            >
+              View All {filteredServices.length} Services →
+            </button>
+          </div>
+        )}
+
+        <div
+          style={{
+            textAlign: "center",
+            marginTop: 12,
+            fontSize: 12,
+            color: C.muted,
+          }}
+        >
+          {filteredServices.length} services available • Login to access full
+          features
+        </div>
       </section>
 
       {/* ── HOW IT WORKS ─────────────────────────────────── */}
@@ -1636,7 +1977,7 @@ export default function Landing() {
         <SectionHeading
           eyebrow={
             <>
-              <FiHelpCircle size={14} style={{ marginRight: 4 }} />
+              <FiHelpCircle size={14} style={{ marginRight: 4 }} />{" "}
               {getText(LANDING_COPY.faqEyebrow)}
             </>
           }
@@ -1691,7 +2032,6 @@ export default function Landing() {
               {getText(LANDING_COPY.footerTagline)}
             </p>
           </div>
-
           <nav
             aria-label="Footer"
             style={{
@@ -1701,7 +2041,6 @@ export default function Landing() {
               fontSize: 12.5,
             }}
           >
-            {/* Point these at real routes once they exist. */}
             <a
               href="/privacy"
               style={{ color: "#8892c0", textDecoration: "none" }}

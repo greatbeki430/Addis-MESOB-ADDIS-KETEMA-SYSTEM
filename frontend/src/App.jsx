@@ -36,7 +36,11 @@ import Landing from "./pages/Landing";
 // Profile & Settings imports
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+
+// Attendance & Alerts imports
 import DigitalAttendance from "./components/DigitalAttendance";
+import AttendanceManagement from "./pages/admin/AttendanceManagement";
+import AlertsManagement from "./pages/admin/AlertsManagement";
 
 // =============================================
 // ANIMATED A-MESOB TITLE COMPONENT
@@ -438,7 +442,7 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* ✅ Employee Management - Only Admins and Super Admins */}
+              {/* Employee Management - Only Admins and Super Admins */}
               <Route
                 path="/employees"
                 element={
@@ -462,8 +466,50 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* CRRSA Document Vault - All authenticated users */}
+              {/* Document Vault - All authenticated users */}
               <Route path="/documents" element={<DocumentVault />} />
+
+              {/* Digital Attendance - All authenticated users */}
+              <Route
+                path="/digital-attendance"
+                element={<DigitalAttendance />}
+              />
+
+              {/* Attendance Management - Admins and Super Admins */}
+              <Route
+                path="/admin/attendance"
+                element={
+                  isAdminOrSuperAdmin ? (
+                    <AttendanceManagement />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+
+              {/* Digital Attendance Logs - Super Admins only */}
+              <Route
+                path="/admin/digital-attendance"
+                element={
+                  isSuperAdmin ? (
+                    <AttendanceManagement />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+
+              {/* Alerts & Notifications - Admins and Super Admins */}
+              <Route
+                path="/admin/alerts"
+                element={
+                  isAdminOrSuperAdmin ? (
+                    <AlertsManagement />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
 
               {/* Profile - All authenticated users */}
               <Route
@@ -479,16 +525,12 @@ function AuthenticatedApp() {
 
               {/* Catch all - redirect to dashboard */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
-              <Route
-                path="/digital-attendance"
-                element={<DigitalAttendance />}
-              />
             </Routes>
           </div>
         </main>
       </div>
 
-      {/* ✅ Register Modal - with higher z-index than chatbot to prevent overlap */}
+      {/* Register Modal - with higher z-index than chatbot to prevent overlap */}
       {isAdminOrSuperAdmin && showRegister && (
         <div
           style={{
@@ -509,7 +551,7 @@ function AuthenticatedApp() {
         </div>
       )}
 
-      {/* ✅ Add User FAB - positioned above chatbot, smaller on all devices */}
+      {/* Add User FAB - positioned above chatbot, smaller on all devices */}
       {isAdminOrSuperAdmin && (
         <button
           onClick={() => setShowRegister(true)}
@@ -545,7 +587,7 @@ function AuthenticatedApp() {
         </button>
       )}
 
-      {/* ✅ AI Chatbot Widget - smaller on all devices, hidden when register modal is open */}
+      {/* AI Chatbot Widget - smaller on all devices, hidden when register modal is open */}
       {!showRegister && <ChatbotWidget />}
     </div>
   );

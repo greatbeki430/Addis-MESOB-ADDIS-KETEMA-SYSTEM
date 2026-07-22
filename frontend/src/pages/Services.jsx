@@ -1,3 +1,4 @@
+// frontend/src/pages/Services.jsx
 import { useState, useEffect, useMemo } from "react";
 import { card, C, F, inp } from "../styles/theme";
 import { SERVICES } from "../constants/services";
