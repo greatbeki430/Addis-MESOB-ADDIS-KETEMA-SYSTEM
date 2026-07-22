@@ -7,22 +7,35 @@ export const translations = {
     appSub: "Addis Ketema · One-Stop Service",
     year: "2018 E.C.",
     nav: {
+      // Core User Pages
       dashboard: "Dashboard",
       forum: "Peer Forum",
       evaluation: "Evaluation",
       report: "Daily Report",
       services: "Services",
       analytics: "Analytics",
-      users: "User Management",
-      teams: "Team Management",
-      "admin/services": "Service Manager",
       documents: "Document Vault",
       "golden-monday": "Golden Monday",
+
+      // Admin Management Pages
+      users: "User Management",
+      teams: "Team Management",
       employees: "Employee Management",
+      "admin/services": "Service Manager",
+
+      // Attendance & Digital Attendance
       "digital-attendance": "Digital Attendance",
       "admin-attendance": "Attendance Management",
       "admin-digital-attendance": "Digital Attendance Logs",
-      alerts: "Alerts & Notifications",
+
+      // Alerts
+      "admin-alerts": "Alerts & Notifications",
+
+      // ✅ Admin Data Management Pages
+      "admin-evaluations": "Manage Evaluations",
+      "admin-daily-reports": "Manage Daily Reports",
+      "admin-forum-reports": "Manage Forum Reports",
+      "admin-requests": "Manage Requests",
     },
     sidebar: {
       main: "Main Menu",
@@ -475,22 +488,35 @@ export const translations = {
     appSub: "አዲስ ከተማ · የአንድ ማዕከል አገልግሎት",
     year: "2018 ዓ.ም",
     nav: {
+      // Core User Pages
       dashboard: "ዳሽቦርድ",
       forum: "አቻ ፎረም",
       evaluation: "ምዘና",
       report: "ዕለታዊ ሪፖርት",
       services: "አገልግሎቶች",
       analytics: "ትንታኔ",
-      users: "ተጠቃሚዎች",
-      teams: "ቡድኖች",
-      "admin/services": "የአገልግሎት አስተዳዳሪ",
       documents: "ሰነድ ቋት",
       "golden-monday": "ወርቃማ ሰኞ",
+
+      // Admin Management Pages
+      users: "ተጠቃሚዎች",
+      teams: "ቡድኖች",
       employees: "የሰራተኞች አስተዳደር",
+      "admin/services": "የአገልግሎት አስተዳዳሪ",
+
+      // Attendance & Digital Attendance
       "digital-attendance": "ዲጂታል መገኘት",
       "admin-attendance": "የመገኘት አስተዳደር",
       "admin-digital-attendance": "የዲጂታል መገኘት መዝገቦች",
-      alerts: "ማስጠንቀቂያዎች እና ማሳወቂያዎች",
+
+      // Alerts
+      "admin-alerts": "ማስጠንቀቂያዎች እና ማሳወቂያዎች",
+
+      // ✅ Admin Data Management Pages
+      "admin-evaluations": "የምዘና አስተዳደር",
+      "admin-daily-reports": "የዕለታዊ ሪፖርቶች አስተዳደር",
+      "admin-forum-reports": "የመድረክ ሪፖርቶች አስተዳደር",
+      "admin-requests": "የጥያቄ አስተዳደር",
     },
     sidebar: {
       main: "ዋና ምናሌ",
@@ -931,22 +957,35 @@ export const translations = {
     appSub: "Addis Katema · Tajaajila Bakka Tokkoo",
     year: "2018 E.C.",
     nav: {
+      // Core User Pages
       dashboard: "Daashboordii",
       forum: "Fooraamii Hiriyyaa",
       evaluation: "Madaallii",
       report: "Gabaasa Guyyaa",
       services: "Tajaajiloota",
       analytics: "Analiitiksii",
-      users: "Fayyadamtoota",
-      teams: "Bulchiinsa Garee",
-      "admin/services": "Bulchiinsa Tajaajilaa",
       documents: "Kuusaa",
       "golden-monday": "Wiixata Warqee",
+
+      // Admin Management Pages
+      users: "Fayyadamtoota",
+      teams: "Gareewwan",
       employees: "Bulchiinsa Hojjattootaa",
+      "admin/services": "Bulchiinsa Tajaajilaa",
+
+      // Attendance & Digital Attendance
       "digital-attendance": "Argama Dijitaalaa",
       "admin-attendance": "Bulchiinsa Argamaa",
       "admin-digital-attendance": "Galmee Argamaa Dijitaalaa",
-      alerts: "Akeekkachiisaa fi Beeksisaa",
+
+      // Alerts
+      "admin-alerts": "Akeekkachiisaa fi Beeksisaa",
+
+      // ✅ Admin Data Management Pages
+      "admin-evaluations": "Bulchiinsa Madaallii",
+      "admin-daily-reports": "Bulchiinsa Gabaasa Guyyaa",
+      "admin-forum-reports": "Bulchiinsa Gabaasa Fooraamii",
+      "admin-requests": "Bulchiinsa Gaaffii",
     },
     sidebar: {
       main: "Mana Galmee",

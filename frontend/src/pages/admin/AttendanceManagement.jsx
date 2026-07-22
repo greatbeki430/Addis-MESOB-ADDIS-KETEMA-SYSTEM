@@ -11,12 +11,73 @@ import {
   FiLoader,
   FiAlertCircle,
   FiSearch,
+  FiZap,
+  FiSmartphone,
 } from "react-icons/fi";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
-const AttendanceManagement = () => {
+// ✅ Moved generateAIInsights outside the component or define it before use
+const generateAIInsights = (allData, biometrics, digital) => {
+  const insights = {
+    attendanceRate:
+      allData.length > 0
+        ? Math.round(
+            (allData.filter(
+              (d) =>
+                d.status === "present" ||
+                d.status === "verified" ||
+                d.status === "completed",
+            ).length /
+              allData.length) *
+              100,
+          )
+        : 0,
+    digitalPercentage:
+      allData.length > 0
+        ? Math.round((digital.length / allData.length) * 100)
+        : 0,
+    biometricsPercentage:
+      allData.length > 0
+        ? Math.round((biometrics.length / allData.length) * 100)
+        : 0,
+    pendingCount: digital.filter((d) => d.status === "pending_verification")
+      .length,
+    reliability:
+      allData.length > 0
+        ? Math.round((biometrics.length / allData.length) * 100)
+        : 0,
+    recommendation: "",
+    riskLevel: "Low",
+  };
+
+  // Generate recommendations based on data
+  if (insights.digitalPercentage > 50) {
+    insights.recommendation =
+      "⚠️ High digital attendance usage detected. Consider checking biometrics system health.";
+    insights.riskLevel = "High";
+  } else if (insights.digitalPercentage > 25) {
+    insights.recommendation =
+      "📊 Moderate digital attendance usage. Monitor biometrics system performance.";
+    insights.riskLevel = "Medium";
+  } else if (insights.attendanceRate < 70) {
+    insights.recommendation =
+      "⚠️ Low attendance rate detected. Consider investigating causes.";
+    insights.riskLevel = "High";
+  } else if (insights.pendingCount > 0) {
+    insights.recommendation = `📋 ${insights.pendingCount} digital attendance records pending verification. Please review.`;
+    insights.riskLevel = "Medium";
+  } else {
+    insights.recommendation =
+      "✅ Attendance system is functioning well. Biometrics is the primary method.";
+    insights.riskLevel = "Low";
+  }
+
+  return insights;
+};
+
+const AttendanceManagement = ({ isDigitalView = false }) => {
   const { user } = useAuth();
   const [attendanceData, setAttendanceData] = useState([]);
   const [digitalAttendanceData, setDigitalAttendanceData] = useState([]);
@@ -36,8 +97,13 @@ const AttendanceManagement = () => {
     late: 0,
     digitalCount: 0,
     biometricsCount: 0,
+    pendingVerification: 0,
+    verified: 0,
+    rejected: 0,
   });
   const [reportGenerating, setReportGenerating] = useState(false);
+  const [aiInsights, setAiInsights] = useState(null);
+  const [showAIInsights, setShowAIInsights] = useState(false);
   const abortControllerRef = useRef(null);
   const isMountedRef = useRef(true);
   const hasLoadedRef = useRef(false);
@@ -98,7 +164,16 @@ const AttendanceManagement = () => {
           late: allData.filter((d) => d.status === "late").length,
           digitalCount: digital.length,
           biometricsCount: biometrics.length,
+          pendingVerification: digital.filter(
+            (d) => d.status === "pending_verification",
+          ).length,
+          verified: digital.filter((d) => d.status === "verified").length,
+          rejected: digital.filter((d) => d.status === "rejected").length,
         });
+
+        // ✅ Generate AI insights using the function
+        const insights = generateAIInsights(allData, biometrics, digital);
+        setAiInsights(insights);
         hasLoadedRef.current = true;
       }
     } catch (error) {
@@ -112,7 +187,7 @@ const AttendanceManagement = () => {
     }
   }, [user, filters]);
 
-  // Initial load - only run once
+  // Initial load
   useEffect(() => {
     if (user?._id && !hasLoadedRef.current) {
       fetchAttendance();
@@ -131,6 +206,9 @@ const AttendanceManagement = () => {
   }, []);
 
   const getCombinedData = () => {
+    if (isDigitalView) {
+      return digitalAttendanceData;
+    }
     if (activeTab === "biometrics") return attendanceData;
     if (activeTab === "digital") return digitalAttendanceData;
     return [...attendanceData, ...digitalAttendanceData];
@@ -206,7 +284,7 @@ const AttendanceManagement = () => {
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
         gap: 12,
         marginBottom: 20,
       }}
@@ -214,13 +292,13 @@ const AttendanceManagement = () => {
       <div
         style={{
           background: C.white,
-          padding: "14px 16px",
+          padding: "12px 16px",
           borderRadius: 10,
           border: `1px solid ${C.border}`,
           textAlign: "center",
         }}
       >
-        <div style={{ fontSize: 24, fontWeight: 800, color: C.primary }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: C.primary }}>
           {stats.total}
         </div>
         <div style={{ fontSize: 11, color: C.muted }}>Total Records</div>
@@ -228,13 +306,13 @@ const AttendanceManagement = () => {
       <div
         style={{
           background: C.white,
-          padding: "14px 16px",
+          padding: "12px 16px",
           borderRadius: 10,
           border: `1px solid #10b981`,
           textAlign: "center",
         }}
       >
-        <div style={{ fontSize: 24, fontWeight: 800, color: "#10b981" }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: "#10b981" }}>
           {stats.present}
         </div>
         <div style={{ fontSize: 11, color: C.muted }}>Present</div>
@@ -242,35 +320,178 @@ const AttendanceManagement = () => {
       <div
         style={{
           background: C.white,
-          padding: "14px 16px",
+          padding: "12px 16px",
           borderRadius: 10,
           border: `1px solid #ef4444`,
           textAlign: "center",
         }}
       >
-        <div style={{ fontSize: 24, fontWeight: 800, color: "#ef4444" }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: "#ef4444" }}>
           {stats.absent}
         </div>
         <div style={{ fontSize: 11, color: C.muted }}>Absent</div>
       </div>
-      <div
-        style={{
-          background: C.white,
-          padding: "14px 16px",
-          borderRadius: 10,
-          border: `1px solid #f59e0b`,
-          textAlign: "center",
-        }}
-      >
-        <div style={{ fontSize: 24, fontWeight: 800, color: "#f59e0b" }}>
-          {stats.digitalCount}
+      {!isDigitalView && (
+        <div
+          style={{
+            background: C.white,
+            padding: "12px 16px",
+            borderRadius: 10,
+            border: `1px solid #f59e0b`,
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 22, fontWeight: 800, color: "#f59e0b" }}>
+            {stats.digitalCount}
+          </div>
+          <div style={{ fontSize: 11, color: C.muted }}>
+            Digital <span style={{ fontSize: 9 }}>(Backup)</span>
+          </div>
         </div>
-        <div style={{ fontSize: 11, color: C.muted }}>
-          Digital <span style={{ fontSize: 9 }}>(Backup)</span>
-        </div>
-      </div>
+      )}
+      {isDigitalView && (
+        <>
+          <div
+            style={{
+              background: C.white,
+              padding: "12px 16px",
+              borderRadius: 10,
+              border: `1px solid #f59e0b`,
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#f59e0b" }}>
+              {stats.pendingVerification}
+            </div>
+            <div style={{ fontSize: 11, color: C.muted }}>Pending</div>
+          </div>
+          <div
+            style={{
+              background: C.white,
+              padding: "12px 16px",
+              borderRadius: 10,
+              border: `1px solid #10b981`,
+              textAlign: "center",
+            }}
+          >
+            <div style={{ fontSize: 22, fontWeight: 800, color: "#10b981" }}>
+              {stats.verified}
+            </div>
+            <div style={{ fontSize: 11, color: C.muted }}>Verified</div>
+          </div>
+        </>
+      )}
     </div>
   );
+
+  // AI Insights Panel
+  const renderAIInsights = () => {
+    if (!aiInsights) return null;
+    return (
+      <div
+        style={{
+          background: "linear-gradient(135deg, #EFF6FF, #F0FDF4)",
+          border: `1px solid ${C.primary}`,
+          borderRadius: 10,
+          padding: "16px 20px",
+          marginBottom: 20,
+          cursor: "pointer",
+        }}
+        onClick={() => setShowAIInsights(!showAIInsights)}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 10,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <FiZap size={20} color={C.primary} />
+            <span style={{ fontWeight: 700, fontSize: 14, color: C.dark }}>
+              AI Attendance Insights
+            </span>
+            <span
+              style={{
+                background:
+                  aiInsights.riskLevel === "High"
+                    ? "#ef4444"
+                    : aiInsights.riskLevel === "Medium"
+                      ? "#f59e0b"
+                      : "#10b981",
+                color: "#fff",
+                padding: "2px 10px",
+                borderRadius: 12,
+                fontSize: 10,
+                fontWeight: 600,
+              }}
+            >
+              {aiInsights.riskLevel} Risk
+            </span>
+          </div>
+          <span style={{ fontSize: 13, color: C.muted }}>
+            {showAIInsights ? "▲ Hide details" : "▼ View details"}
+          </span>
+        </div>
+
+        {showAIInsights && (
+          <div style={{ marginTop: 14 }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+                gap: 10,
+                marginBottom: 12,
+              }}
+            >
+              <div>
+                <span style={{ fontSize: 11, color: C.muted }}>
+                  Attendance Rate
+                </span>
+                <div
+                  style={{ fontSize: 18, fontWeight: 700, color: C.primary }}
+                >
+                  {aiInsights.attendanceRate}%
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: 11, color: C.muted }}>
+                  System Reliability
+                </span>
+                <div
+                  style={{ fontSize: 18, fontWeight: 700, color: C.primary }}
+                >
+                  {aiInsights.reliability}%
+                </div>
+              </div>
+              <div>
+                <span style={{ fontSize: 11, color: C.muted }}>
+                  Digital vs Biometrics
+                </span>
+                <div style={{ fontSize: 14, fontWeight: 700, color: C.dark }}>
+                  {aiInsights.digitalPercentage}% /{" "}
+                  {aiInsights.biometricsPercentage}%
+                </div>
+              </div>
+            </div>
+            <div
+              style={{
+                background: C.bg,
+                padding: "10px 14px",
+                borderRadius: 8,
+                fontSize: 13,
+                color: C.dark,
+              }}
+            >
+              {aiInsights.recommendation}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderCellValue = (item, key) => {
     const value = item[key];
@@ -334,6 +555,28 @@ const AttendanceManagement = () => {
     return value;
   };
 
+  // Get title based on view
+  const getTitle = () => {
+    if (isDigitalView) {
+      return {
+        title: "Digital Attendance Logs",
+        subtitle:
+          "Monitor and verify digital attendance records from biometrics backup",
+        icon: <FiSmartphone size={24} color={C.primary} />,
+        showTabs: false,
+      };
+    }
+    return {
+      title: "Attendance Management",
+      subtitle:
+        "Combined biometrics and digital attendance records for payroll processing",
+      icon: <FiClock size={24} color={C.primary} />,
+      showTabs: true,
+    };
+  };
+
+  const titleConfig = getTitle();
+
   return (
     <div style={{ padding: "20px", maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
@@ -358,12 +601,11 @@ const AttendanceManagement = () => {
               gap: 10,
             }}
           >
-            <FiClock size={24} color={C.primary} />
-            Attendance Management
+            {titleConfig.icon}
+            {titleConfig.title}
           </h1>
           <p style={{ margin: "4px 0 0", color: C.muted, fontSize: 13 }}>
-            Combined biometrics and digital attendance records for payroll
-            processing
+            {titleConfig.subtitle}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -437,66 +679,72 @@ const AttendanceManagement = () => {
 
       {renderStats()}
 
-      {/* Tabs */}
-      <div
-        style={{
-          display: "flex",
-          gap: 4,
-          borderBottom: `2px solid ${C.border}`,
-          marginBottom: 16,
-          paddingBottom: 8,
-        }}
-      >
-        <button
-          onClick={() => setActiveTab("all")}
+      {/* AI Insights */}
+      {renderAIInsights()}
+
+      {/* Tabs - Only show for Attendance Management, not for Digital Logs */}
+      {titleConfig.showTabs && (
+        <div
           style={{
-            padding: "6px 16px",
-            background: activeTab === "all" ? C.primary : "transparent",
-            color: activeTab === "all" ? "#fff" : C.muted,
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: activeTab === "all" ? 700 : 500,
-            fontSize: 13,
-          }}
-        >
-          All ({stats.total})
-        </button>
-        <button
-          onClick={() => setActiveTab("biometrics")}
-          style={{
-            padding: "6px 16px",
-            background: activeTab === "biometrics" ? C.primary : "transparent",
-            color: activeTab === "biometrics" ? "#fff" : C.muted,
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: activeTab === "biometrics" ? 700 : 500,
-            fontSize: 13,
-          }}
-        >
-          Biometrics ({stats.biometricsCount})
-        </button>
-        <button
-          onClick={() => setActiveTab("digital")}
-          style={{
-            padding: "6px 16px",
-            background: activeTab === "digital" ? C.primary : "transparent",
-            color: activeTab === "digital" ? "#fff" : C.muted,
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            fontWeight: activeTab === "digital" ? 700 : 500,
-            fontSize: 13,
             display: "flex",
-            alignItems: "center",
             gap: 4,
+            borderBottom: `2px solid ${C.border}`,
+            marginBottom: 16,
+            paddingBottom: 8,
           }}
         >
-          <FiAlertCircle size={14} />
-          Digital Backup ({stats.digitalCount})
-        </button>
-      </div>
+          <button
+            onClick={() => setActiveTab("all")}
+            style={{
+              padding: "6px 16px",
+              background: activeTab === "all" ? C.primary : "transparent",
+              color: activeTab === "all" ? "#fff" : C.muted,
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontWeight: activeTab === "all" ? 700 : 500,
+              fontSize: 13,
+            }}
+          >
+            All ({stats.total})
+          </button>
+          <button
+            onClick={() => setActiveTab("biometrics")}
+            style={{
+              padding: "6px 16px",
+              background:
+                activeTab === "biometrics" ? C.primary : "transparent",
+              color: activeTab === "biometrics" ? "#fff" : C.muted,
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontWeight: activeTab === "biometrics" ? 700 : 500,
+              fontSize: 13,
+            }}
+          >
+            Biometrics ({stats.biometricsCount})
+          </button>
+          <button
+            onClick={() => setActiveTab("digital")}
+            style={{
+              padding: "6px 16px",
+              background: activeTab === "digital" ? C.primary : "transparent",
+              color: activeTab === "digital" ? "#fff" : C.muted,
+              border: "none",
+              borderRadius: 6,
+              cursor: "pointer",
+              fontWeight: activeTab === "digital" ? 700 : 500,
+              fontSize: 13,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            <FiAlertCircle size={14} />
+            Digital Backup ({stats.digitalCount})
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div
@@ -524,7 +772,9 @@ const AttendanceManagement = () => {
           />
           <input
             type="text"
-            placeholder="Search employee..."
+            placeholder={
+              isDigitalView ? "Search digital records..." : "Search employee..."
+            }
             value={filters.search}
             onChange={(e) =>
               setFilters((prev) => ({ ...prev, search: e.target.value }))
@@ -560,6 +810,7 @@ const AttendanceManagement = () => {
           <option value="late">Late</option>
           <option value="verified">Verified</option>
           <option value="pending_verification">Pending</option>
+          <option value="rejected">Rejected</option>
         </select>
 
         <input
@@ -615,7 +866,11 @@ const AttendanceManagement = () => {
         ) : combinedData.length === 0 ? (
           <div style={{ padding: "40px", textAlign: "center", color: C.muted }}>
             <FiClock size={32} style={{ marginBottom: 8 }} />
-            <p>No attendance records found</p>
+            <p>
+              {isDigitalView
+                ? "No digital attendance records found"
+                : "No attendance records found"}
+            </p>
           </div>
         ) : (
           <div style={{ overflowX: "auto" }}>
@@ -760,7 +1015,7 @@ const AttendanceManagement = () => {
       </div>
 
       {/* Info Banner */}
-      {stats.digitalCount > 0 && (
+      {!isDigitalView && stats.digitalCount > 0 && (
         <div
           style={{
             marginTop: 16,
@@ -778,6 +1033,28 @@ const AttendanceManagement = () => {
             <strong>⚠️ Biometrics Backup Used:</strong> {stats.digitalCount}{" "}
             digital attendance records found. These have been included in the
             payroll calculation. Please verify all digital entries.
+          </div>
+        </div>
+      )}
+
+      {isDigitalView && stats.pendingVerification > 0 && (
+        <div
+          style={{
+            marginTop: 16,
+            background: "#fef3c7",
+            border: `1px solid #fcd34d`,
+            borderRadius: 10,
+            padding: "12px 16px",
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <FiAlertCircle size={20} color="#92400e" />
+          <div style={{ fontSize: 13, color: "#92400e" }}>
+            <strong>⚠️ Pending Verification:</strong>{" "}
+            {stats.pendingVerification} digital attendance records need
+            verification. Please review each record.
           </div>
         </div>
       )}

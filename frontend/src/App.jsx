@@ -42,6 +42,9 @@ import DigitalAttendance from "./components/DigitalAttendance";
 import AttendanceManagement from "./pages/admin/AttendanceManagement";
 import AlertsManagement from "./pages/admin/AlertsManagement";
 
+// Admin Data Management - Only import the main component, not wrappers
+import AdminDataManagement from "./pages/admin/AdminDataManagement";
+
 // =============================================
 // ANIMATED A-MESOB TITLE COMPONENT
 // =============================================
@@ -351,7 +354,7 @@ function AuthenticatedApp() {
                 element={<GoldenMonday lang={language} />}
               />
 
-              {/* Forum Report */}
+              {/* Forum Report - User facing */}
               <Route
                 path="/forum"
                 element={
@@ -367,13 +370,13 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* Evaluation */}
+              {/* Evaluation - User facing */}
               <Route
                 path="/evaluation"
                 element={<Evaluation t={t} lang={language} />}
               />
 
-              {/* Daily Report - Only Team Leaders and above */}
+              {/* Daily Report - User facing (Team Leaders and above) */}
               <Route
                 path="/report"
                 element={
@@ -385,7 +388,7 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* Services - Only Admins and Super Admins */}
+              {/* Services - User facing (Admins and Super Admins) */}
               <Route
                 path="/services"
                 element={
@@ -409,7 +412,7 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* User Management - Only Admins and Super Admins */}
+              {/* User Management - Admins and Super Admins */}
               <Route
                 path="/users"
                 element={
@@ -442,7 +445,7 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* Employee Management - Only Admins and Super Admins */}
+              {/* Employee Management - Admins and Super Admins */}
               <Route
                 path="/employees"
                 element={
@@ -454,7 +457,7 @@ function AuthenticatedApp() {
                 }
               />
 
-              {/* Analytics - Only Team Leaders and above */}
+              {/* Analytics - Team Leaders and above */}
               <Route
                 path="/analytics"
                 element={
@@ -480,7 +483,7 @@ function AuthenticatedApp() {
                 path="/admin-attendance"
                 element={
                   isAdminOrSuperAdmin ? (
-                    <AttendanceManagement />
+                    <AttendanceManagement isDigitalView={false} />
                   ) : (
                     <Navigate to="/dashboard" replace />
                   )
@@ -492,7 +495,7 @@ function AuthenticatedApp() {
                 path="/admin-digital-attendance"
                 element={
                   isSuperAdmin ? (
-                    <AttendanceManagement />
+                    <AttendanceManagement isDigitalView={true} />
                   ) : (
                     <Navigate to="/dashboard" replace />
                   )
@@ -505,6 +508,52 @@ function AuthenticatedApp() {
                 element={
                   isAdminOrSuperAdmin ? (
                     <AlertsManagement />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+
+              {/* ✅ ADMIN DATA MANAGEMENT ROUTES
+                  These are admin-only views for managing all data.
+                  They use the same AdminDataManagement component with different dataType props.
+                  Only add these if admins need to view/manage ALL data across the organization.
+              */}
+              <Route
+                path="/admin-evaluations"
+                element={
+                  isAdminOrSuperAdmin ? (
+                    <AdminDataManagement dataType="evaluations" />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/admin-daily-reports"
+                element={
+                  isAdminOrSuperAdmin ? (
+                    <AdminDataManagement dataType="daily-reports" />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/admin-forum-reports"
+                element={
+                  isAdminOrSuperAdmin ? (
+                    <AdminDataManagement dataType="forum-reports" />
+                  ) : (
+                    <Navigate to="/dashboard" replace />
+                  )
+                }
+              />
+              <Route
+                path="/admin-requests"
+                element={
+                  isAdminOrSuperAdmin ? (
+                    <AdminDataManagement dataType="requests" />
                   ) : (
                     <Navigate to="/dashboard" replace />
                   )

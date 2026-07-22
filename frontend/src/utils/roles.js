@@ -55,6 +55,9 @@ export const getRoleIcon = (role) => {
 
 // ✅ Navigation items with proper role requirements
 export const NAV_ITEMS = [
+  // =============================================
+  // CORE USER PAGES - Available based on role
+  // =============================================
   {
     id: "dashboard",
     icon: "📊",
@@ -86,11 +89,28 @@ export const NAV_ITEMS = [
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
-    id: "admin-services",
-    icon: "🔧",
-    label: "Service Manager",
-    roles: [ROLES.SUPER_ADMIN],
+    id: "documents",
+    icon: "📁",
+    label: "Document Vault",
+    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
+  {
+    id: "analytics",
+    icon: "📊",
+    label: "Analytics",
+    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
+    id: "golden-monday",
+    icon: "🌅",
+    label: "Golden Monday",
+    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+
+  // =============================================
+  // ADMIN MANAGEMENT PAGES
+  // =============================================
+  // User & Team Management
   {
     id: "users",
     icon: "👥",
@@ -109,50 +129,67 @@ export const NAV_ITEMS = [
     label: "Employee Management",
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
+
+  // Admin Service Management
   {
-    id: "analytics",
-    icon: "📊",
-    label: "Analytics",
-    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    id: "admin-services",
+    icon: "🔧",
+    label: "Service Manager",
+    roles: [ROLES.SUPER_ADMIN],
   },
-  {
-    id: "documents",
-    icon: "📁",
-    label: "Document Vault",
-    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
-  },
-  {
-    id: "golden-monday",
-    icon: "🌅",
-    label: "Golden Monday",
-    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
-  },
-  // Digital Attendance - All authenticated users
+
+  // Attendance & Digital Attendance
   {
     id: "digital-attendance",
     icon: "📱",
     label: "Digital Attendance",
     roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
-  // Attendance Management - Admins and Super Admins
   {
     id: "admin-attendance",
     icon: "⏰",
     label: "Attendance Management",
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
-  // Digital Attendance Logs - Super Admins only
   {
     id: "admin-digital-attendance",
     icon: "📱",
     label: "Digital Attendance Logs",
     roles: [ROLES.SUPER_ADMIN],
   },
-  // Alerts & Notifications - Admins and Super Admins
+
+  // Alerts & Notifications
   {
     id: "admin-alerts",
     icon: "🔔",
     label: "Alerts & Notifications",
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+
+  // ✅ Admin Data Management - Consolidated views for admins
+  // These allow admins to view/manage ALL data across the organization
+  {
+    id: "admin-evaluations",
+    icon: "📝",
+    label: "Manage Evaluations",
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
+    id: "admin-daily-reports",
+    icon: "📄",
+    label: "Manage Daily Reports",
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
+    id: "admin-forum-reports",
+    icon: "💬",
+    label: "Manage Forum Reports",
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
+    id: "admin-requests",
+    icon: "🔧",
+    label: "Manage Requests",
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
 ];
