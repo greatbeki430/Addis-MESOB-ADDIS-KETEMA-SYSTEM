@@ -86,7 +86,7 @@ export const NAV_ITEMS = [
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
-    id: "admin/services",
+    id: "admin-services",
     icon: "🔧",
     label: "Service Manager",
     roles: [ROLES.SUPER_ADMIN],
@@ -127,26 +127,30 @@ export const NAV_ITEMS = [
     label: "Golden Monday",
     roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
+  // Digital Attendance - All authenticated users
   {
     id: "digital-attendance",
     icon: "📱",
     label: "Digital Attendance",
     roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
+  // Attendance Management - Admins and Super Admins
   {
-    id: "admin/attendance",
+    id: "admin-attendance",
     icon: "⏰",
     label: "Attendance Management",
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
+  // Digital Attendance Logs - Super Admins only
   {
-    id: "admin/digital-attendance",
+    id: "admin-digital-attendance",
     icon: "📱",
     label: "Digital Attendance Logs",
     roles: [ROLES.SUPER_ADMIN],
   },
+  // Alerts & Notifications - Admins and Super Admins
   {
-    id: "admin/alerts",
+    id: "admin-alerts",
     icon: "🔔",
     label: "Alerts & Notifications",
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],

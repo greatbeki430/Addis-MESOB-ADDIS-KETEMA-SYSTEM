@@ -477,7 +477,7 @@ function AuthenticatedApp() {
 
               {/* Attendance Management - Admins and Super Admins */}
               <Route
-                path="/admin/attendance"
+                path="/admin-attendance"
                 element={
                   isAdminOrSuperAdmin ? (
                     <AttendanceManagement />
@@ -489,7 +489,7 @@ function AuthenticatedApp() {
 
               {/* Digital Attendance Logs - Super Admins only */}
               <Route
-                path="/admin/digital-attendance"
+                path="/admin-digital-attendance"
                 element={
                   isSuperAdmin ? (
                     <AttendanceManagement />
@@ -501,7 +501,7 @@ function AuthenticatedApp() {
 
               {/* Alerts & Notifications - Admins and Super Admins */}
               <Route
-                path="/admin/alerts"
+                path="/admin-alerts"
                 element={
                   isAdminOrSuperAdmin ? (
                     <AlertsManagement />
