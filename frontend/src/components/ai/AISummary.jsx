@@ -19,6 +19,7 @@ const AISummary = ({
   label = "AI Analysis",
   variant = "default",
   autoGenerate = false,
+  formatResult = null, // ✅ ADD THIS LINE
 }) => {
   const [insight, setInsight] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -69,7 +70,9 @@ const AISummary = ({
 
   const handleCopy = () => {
     if (insight) {
-      navigator.clipboard?.writeText(insight);
+      // ✅ Copy the formatted version if formatter exists
+      const textToCopy = formatResult ? formatResult(insight) : insight;
+      navigator.clipboard?.writeText(textToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -79,6 +82,12 @@ const AISummary = ({
     setGenerated(false);
     setInsight("");
     handleGenerate();
+  };
+
+  // ✅ Get the formatted content
+  const getFormattedContent = () => {
+    if (!insight) return "";
+    return formatResult ? formatResult(insight) : insight;
   };
 
   // ✅ Fixed useEffect with cleanup flag
@@ -145,6 +154,9 @@ const AISummary = ({
   };
 
   const styles = variantStyles[variant] || variantStyles.default;
+
+  // ✅ Get the formatted content for display
+  const displayContent = getFormattedContent();
 
   if (error) {
     return (
@@ -233,7 +245,6 @@ const AISummary = ({
               background: "#DBEAFE",
               color: "#1D4ED8",
               padding: "2px 14px",
-              // borderRadius: radius.pill,
               borderRadius: "10px",
               fontWeight: 500,
             }}
@@ -330,6 +341,7 @@ const AISummary = ({
         </div>
       </div>
 
+      {/* ✅ Display formatted content */}
       <div
         style={{
           fontSize: "clamp(13px, 3vw, 14px)",
@@ -342,7 +354,7 @@ const AISummary = ({
           paddingRight: "4px",
         }}
       >
-        {insight}
+        {displayContent}
       </div>
 
       <div
