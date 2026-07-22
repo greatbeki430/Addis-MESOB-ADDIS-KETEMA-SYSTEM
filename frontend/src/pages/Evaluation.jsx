@@ -294,6 +294,7 @@ export default function Evaluation({ t, lang }) {
   const [evaluationId, setEvaluationId] = useState(null);
   const [signatures, setSignatures] = useState({});
   const [includeAINarrative, setIncludeAINarrative] = useState(true);
+  const [aiNarrativeContent, setAiNarrativeContent] = useState("");
 
   const inputRefs = useRef({});
   const memberInputRefs = useRef([]);
@@ -2192,6 +2193,7 @@ export default function Evaluation({ t, lang }) {
         </button>
 
         {/* Export button - Icon only on mobile, text + icon on desktop */}
+        {/* Export button - Icon only on mobile, text + icon on desktop */}
         <button
           style={{
             background: "#dc2626",
@@ -2219,18 +2221,20 @@ export default function Evaluation({ t, lang }) {
               t,
               comments,
               signatures,
+              includeAINarrative, // ✅ Pass the toggle state
+              aiNarrativeContent, // ✅ Pass the AI narrative content
             );
           }}
         >
           <FiDownload size={16} />
           <span className="export-text">Export PDF</span>
           <style>{`
-            @media (max-width: 480px) {
-              .export-text {
-                display: none !important;
-              }
-            }
-          `}</style>
+    @media (max-width: 480px) {
+      .export-text {
+        display: none !important;
+      }
+    }
+  `}</style>
         </button>
 
         <button
@@ -2300,6 +2304,7 @@ export default function Evaluation({ t, lang }) {
               args={[evaluationId]}
               label="AI Evaluation Narrative"
               formatResult={formatAINarrative}
+              onContentGenerated={(content) => setAiNarrativeContent(content)} // ✅ Add this
             />
           )}
         </div>

@@ -19,7 +19,8 @@ const AISummary = ({
   label = "AI Analysis",
   variant = "default",
   autoGenerate = false,
-  formatResult = null, // ✅ ADD THIS LINE
+  formatResult = null,
+  onContentGenerated = null, // ✅ ADD THIS
 }) => {
   const [insight, setInsight] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -56,6 +57,14 @@ const AISummary = ({
           "No content returned";
         setInsight(content);
         setGenerated(true);
+
+        // ✅ Call the callback with the formatted content
+        if (onContentGenerated) {
+          const formattedContent = formatResult
+            ? formatResult(content)
+            : content;
+          onContentGenerated(formattedContent);
+        }
       }
     } catch (err) {
       if (isMounted.current) {
@@ -66,7 +75,7 @@ const AISummary = ({
         setIsLoading(false);
       }
     }
-  }, [fetchFn, args]);
+  }, [fetchFn, args, formatResult, onContentGenerated]);
 
   const handleCopy = () => {
     if (insight) {
@@ -111,6 +120,14 @@ const AISummary = ({
               "No content returned";
             setInsight(content);
             setGenerated(true);
+
+            // ✅ Call the callback with the formatted content
+            if (onContentGenerated) {
+              const formattedContent = formatResult
+                ? formatResult(content)
+                : content;
+              onContentGenerated(formattedContent);
+            }
           }
         } catch (err) {
           if (isEffectActive && isMounted.current) {
@@ -129,7 +146,14 @@ const AISummary = ({
     return () => {
       isEffectActive = false;
     };
-  }, [autoGenerate, generated, fetchFn, args]);
+  }, [
+    autoGenerate,
+    generated,
+    fetchFn,
+    args,
+    formatResult,
+    onContentGenerated,
+  ]);
 
   const variantStyles = {
     default: {
