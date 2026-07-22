@@ -1,3 +1,4 @@
+// backend/src/controllers/authController.js
 const User = require("../models/User");
 const { generateToken } = require("../config/jwt");
 const bcrypt = require("bcryptjs");

@@ -1,3 +1,4 @@
+// frontend/src/pages/Dashboard.jsx
 import { useState, useEffect } from "react";
 import { C, F, card } from "../styles/theme";
 import StatCard from "../components/ui/StatCard";

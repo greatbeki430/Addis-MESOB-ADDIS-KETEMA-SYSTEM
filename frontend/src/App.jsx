@@ -36,6 +36,7 @@ import Landing from "./pages/Landing";
 // Profile & Settings imports
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import DigitalAttendance from "./components/DigitalAttendance";
 
 // =============================================
 // ANIMATED A-MESOB TITLE COMPONENT
@@ -478,6 +479,10 @@ function AuthenticatedApp() {
 
               {/* Catch all - redirect to dashboard */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
+              <Route
+                path="/digital-attendance"
+                element={<DigitalAttendance />}
+              />
             </Routes>
           </div>
         </main>

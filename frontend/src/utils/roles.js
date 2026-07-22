@@ -127,6 +127,35 @@ export const NAV_ITEMS = [
     label: "Golden Monday",
     roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
+  // frontend/src/utils/roles.js - Add to NAV_ITEMS array
+  {
+    id: "digital-attendance",
+    icon: "📱",
+    label: "Digital Attendance",
+    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    path: "/digital-attendance",
+  },
+  {
+    id: "admin-attendance",
+    icon: "⏰",
+    label: "Attendance Management",
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    path: "/admin/attendance",
+  },
+  {
+    id: "admin-digital-attendance",
+    icon: "📱",
+    label: "Digital Attendance Logs",
+    roles: [ROLES.SUPER_ADMIN],
+    path: "/admin/digital-attendance",
+  },
+  {
+    id: "alerts",
+    icon: "🔔",
+    label: "Alerts & Notifications",
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    path: "/admin/alerts",
+  },
 ];
 
 export const getFilteredNavItems = (userRole) => {

@@ -31,6 +31,7 @@ const departmentRoutes = require("./routes/departmentRoutes");
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 const telegramRoutes = require("./routes/telegramRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
 
@@ -143,6 +144,7 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/golden-monday", goldenMondayRoutes);
 app.use("/api/telegram", telegramRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Departments — NEW
 app.use("/api/departments", departmentRoutes);

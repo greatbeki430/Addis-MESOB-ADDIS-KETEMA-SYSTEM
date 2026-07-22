@@ -1,3 +1,4 @@
+// backend/src/models/DailyReport.js
 const mongoose = require("mongoose");
 
 const dailyReportSchema = new mongoose.Schema(
