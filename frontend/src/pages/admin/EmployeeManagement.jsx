@@ -764,19 +764,44 @@ export default function EmployeeManagement({ t }) {
   };
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+  if (!deleteTarget) return;
 
-    try {
-      await goldenMondayAPI.removeEmployee(deleteTarget);
-      showToast(getTranslation("deleteSuccess"), "success");
-      setShowDeleteConfirm(false);
-      setDeleteTarget(null);
-      await loadEmployees();
-    } catch (error) {
-      console.error("Failed to delete employee:", error);
-      showToast("Failed to delete employee", "error");
-    }
-  };
+  try {
+    // Ask for reason
+    const reason = prompt(
+      "Enter a reason for deleting this employee (optional):",
+      "Account removed by administrator."
+    );
+
+    if (reason === null) return; // User cancelled
+
+    await goldenMondayAPI.deleteEmployeeWithNotification(deleteTarget, reason);
+    
+    showToast("Employee deleted successfully! Telegram notification sent.", "success");
+    setShowDeleteConfirm(false);
+    setDeleteTarget(null);
+    await loadEmployees();
+  } catch (error) {
+    console.error("Failed to delete employee:", error);
+    showToast(error.response?.data?.error || "Failed to delete employee", "error");
+  }
+};
+
+  // Add this function after handleDelete
+const handleDeleteWithReason = async (reason) => {
+  if (!deleteTarget) return;
+
+  try {
+    await goldenMondayAPI.deleteEmployeeWithNotification(deleteTarget, reason);
+    showToast("Employee deleted successfully! Telegram notification sent.", "success");
+    setShowDeleteConfirm(false);
+    setDeleteTarget(null);
+    await loadEmployees();
+  } catch (error) {
+    console.error("Failed to delete employee:", error);
+    showToast(error.response?.data?.error || "Failed to delete employee", "error");
+  }
+};
 
   const resetModal = () => {
     setShowAddModal(false);
@@ -3716,63 +3741,87 @@ export default function EmployeeManagement({ t }) {
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.5)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 1000,
+      padding: 16,
+      backdropFilter: "blur(4px)",
+    }}
+    onClick={() => setShowDeleteConfirm(false)}
+  >
+    <div
+      style={{
+        background: C.white,
+        borderRadius: 16,
+        padding: 28,
+        width: "90%",
+        maxWidth: 400,
+        boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div style={{ textAlign: "center", marginBottom: 16 }}>
+        <div style={{ fontSize: 48, marginBottom: 8 }}>⚠️</div>
+        <h3 style={{ fontSize: 18, fontWeight: 800, color: C.dark }}>
+          {getTranslation("confirmDeleteTitle")}
+        </h3>
+        <p style={{ fontSize: 14, color: C.muted }}>
+          {getTranslation("confirmDeleteMessage")}
+        </p>
+        <p style={{ fontSize: 12, color: "#ef4444", marginTop: 4 }}>
+          {getTranslation("deleteWarning")}
+        </p>
+        <p style={{ fontSize: 12, color: "#8b5cf6", marginTop: 8 }}>
+          A Telegram notification will be sent to the employee.
+        </p>
+      </div>
+      <div style={{ marginBottom: 16 }}>
+        <label style={{ display: "block", marginBottom: 4, fontSize: 13, fontWeight: 600 }}>
+          Reason for deletion (optional):
+        </label>
+        <input
+          type="text"
+          id="deleteReason"
+          placeholder="e.g., Employee resigned, moved to other department..."
           style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: 16,
-            backdropFilter: "blur(4px)",
+            width: "100%",
+            padding: "10px 14px",
+            border: `1.5px solid ${C.border}`,
+            borderRadius: 8,
+            fontSize: 14,
+            outline: "none",
           }}
+        />
+      </div>
+      <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <button
           onClick={() => setShowDeleteConfirm(false)}
+          style={btn.secondary}
         >
-          <div
-            style={{
-              background: C.white,
-              borderRadius: 16,
-              padding: 28,
-              width: "90%",
-              maxWidth: 400,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ textAlign: "center", marginBottom: 16 }}>
-              <div style={{ fontSize: 48, marginBottom: 8 }}>⚠️</div>
-              <h3 style={{ fontSize: 18, fontWeight: 800, color: C.dark }}>
-                {getTranslation("confirmDeleteTitle")}
-              </h3>
-              <p style={{ fontSize: 14, color: C.muted }}>
-                {getTranslation("confirmDeleteMessage")}
-              </p>
-              <p style={{ fontSize: 12, color: "#ef4444", marginTop: 4 }}>
-                {getTranslation("deleteWarning")}
-              </p>
-            </div>
-            <div
-              style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
-            >
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                style={btn.secondary}
-              >
-                {getTranslation("cancel")}
-              </button>
-              <button
-                onClick={handleDelete}
-                style={{ ...btn.primary, background: "#ef4444", color: "#fff" }}
-              >
-                <FiTrash2 size={16} style={{ marginRight: 6 }} />
-                {getTranslation("delete")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          {getTranslation("cancel")}
+        </button>
+        <button
+          onClick={() => {
+            const reasonInput = document.getElementById("deleteReason");
+            const reason = reasonInput?.value || "Account removed by administrator.";
+            setDeleteTarget(deleteTarget);
+            handleDeleteWithReason(reason);
+          }}
+          style={{ ...btn.primary, background: "#ef4444", color: "#fff" }}
+        >
+          <FiTrash2 size={16} style={{ marginRight: 6 }} />
+          {getTranslation("delete")}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       <style>{`
   @keyframes spin {
