@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { C, F, btn, card } from "../../styles/theme";
 import { teamAPI, authAPI } from "../../services/api";
 import { getRoleDisplayName } from "../../utils/roles";
@@ -216,51 +216,59 @@ const TeamActionButtons = ({ onEdit, onDelete }) => {
 };
 
 export default function TeamManagement({ t, isSuperAdmin }) {
-  const safeT = t || {};
-  const tt = safeT.teamManagement || {};
-  const safeCommon = safeT.common || {};
+  // ✅ FIX: Memoize safeT to prevent it from changing on every render
+  const safeT = useMemo(() => t || {}, [t]);
+  const safeCommon = useMemo(() => safeT.common || {}, [safeT]);
 
-  const getTranslation = (key) => {
-    if (tt && tt[key]) {
-      return tt[key];
-    }
-    const fallback = {
-      title: "Team Management",
-      addTeam: "Add New Team",
-      noTeams: "No teams created yet.",
-      noDepartment: "No department",
-      notAssigned: "Not assigned",
-      leader: "Leader",
-      members: "Members",
-      created: "Created",
-      editTeam: "Edit Team",
-      addNewTeam: "Add New Team",
-      teamName: "Team Name",
-      department: "Department",
-      departmentPlaceholder: "e.g., Customer Service",
-      teamLeader: "Team Leader",
-      selectLeader: "Select Team Leader",
-      update: "Update",
-      create: "Create",
-      cancel: "Cancel",
-      delete: "Delete",
-      edit: "Edit",
-      refreshSuccess: "Data refreshed successfully",
-      refreshError: "Failed to refresh data",
-      updateSuccess: "Team updated successfully!",
-      createSuccess: "Team created successfully!",
-      deleteSuccess: "Team deleted successfully!",
-      deleteError: "Delete failed. Please try again.",
-      saveError: "Operation failed. Please try again.",
-      confirmDeleteTitle: "Confirm Delete",
-      confirmDeleteMessage: "Are you sure you want to delete",
-      deleteWarning: "This action cannot be undone.",
-      totalTeams: "TOTAL TEAMS",
-      totalMembers: "TOTAL MEMBERS",
-      teamsWithLeaders: "TEAMS WITH LEADERS",
-    };
-    return fallback[key] || key;
-  };
+  const translations = useMemo(() => {
+    return safeT.teamManagement || {};
+  }, [safeT]);
+
+  // ✅ FIX: getTranslation depends on the memoized translations
+  const getTranslation = useCallback(
+    (key) => {
+      if (translations && translations[key]) {
+        return translations[key];
+      }
+      const fallback = {
+        title: "Team Management",
+        addTeam: "Add New Team",
+        noTeams: "No teams created yet.",
+        noDepartment: "No department",
+        notAssigned: "Not assigned",
+        leader: "Leader",
+        members: "Members",
+        created: "Created",
+        editTeam: "Edit Team",
+        addNewTeam: "Add New Team",
+        teamName: "Team Name",
+        department: "Department",
+        departmentPlaceholder: "e.g., Customer Service",
+        teamLeader: "Team Leader",
+        selectLeader: "Select Team Leader",
+        update: "Update",
+        create: "Create",
+        cancel: "Cancel",
+        delete: "Delete",
+        edit: "Edit",
+        refreshSuccess: "Data refreshed successfully",
+        refreshError: "Failed to refresh data",
+        updateSuccess: "Team updated successfully!",
+        createSuccess: "Team created successfully!",
+        deleteSuccess: "Team deleted successfully!",
+        deleteError: "Delete failed. Please try again.",
+        saveError: "Operation failed. Please try again.",
+        confirmDeleteTitle: "Confirm Delete",
+        confirmDeleteMessage: "Are you sure you want to delete",
+        deleteWarning: "This action cannot be undone.",
+        totalTeams: "TOTAL TEAMS",
+        totalMembers: "TOTAL MEMBERS",
+        teamsWithLeaders: "TEAMS WITH LEADERS",
+      };
+      return fallback[key] || key;
+    },
+    [translations], // ✅ Now depends on memoized translations
+  );
 
   const [teams, setTeams] = useState([]);
   const [users, setUsers] = useState([]);
@@ -310,7 +318,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     } finally {
       setLoading(false);
     }
-  }, [fetchData, showToast]);
+  }, [fetchData, showToast, getTranslation]);
 
   useEffect(() => {
     let isMounted = true;

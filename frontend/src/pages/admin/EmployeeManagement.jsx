@@ -1,7 +1,7 @@
 // frontend/src/pages/admin/EmployeeManagement.jsx
 // Complete Employee Management System - Full CRUD + AI Integration with AI Auto-Fill
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { C, F, btn } from "../../styles/theme";
 import {
   goldenMondayAPI,
@@ -45,9 +45,8 @@ import {
 
 export default function EmployeeManagement({ t }) {
   const { showToast } = useToast();
-  const safeT = t || {};
-  const te = safeT.employeeManagement || {};
-  const safeCommon = safeT.common || {};
+  const safeT = useMemo(() => t || {}, [t]);
+  const safeCommon = useMemo(() => safeT.common || {}, [safeT]);
 
   // ── State ──
   const [employees, setEmployees] = useState([]);
@@ -127,6 +126,7 @@ export default function EmployeeManagement({ t }) {
   // ── Translations ──
   const getTranslation = useCallback(
     (key) => {
+      const translations = safeT.employeeManagement || {};
       const fallback = {
         title: "Employee Management",
         subtitle: "Manage all employees, their roles, and performance",
@@ -211,9 +211,9 @@ export default function EmployeeManagement({ t }) {
         noUsersInSystem:
           "No users found in the system. Please create users first.",
       };
-      return te[key] || fallback[key] || key;
+      return translations[key] || fallback[key] || key;
     },
-    [te],
+    [safeT], // ✅ Now depends on safeT (stable)
   );
 
   // ── Load Data ──

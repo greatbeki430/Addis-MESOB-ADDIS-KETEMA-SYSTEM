@@ -1,5 +1,4 @@
-/* eslint-disable react-hooks/immutability */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { C, F, btn } from "../../styles/theme";
 import { authAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
@@ -331,64 +330,68 @@ const RoleDescription = ({ role }) => {
 };
 
 export default function UserManagement({ t }) {
-  const safeT = t || {};
-  const tu = safeT.userManagement || {};
-  const safeCommon = safeT.common || {};
+  const safeT = useMemo(() => t || {}, [t]);
+  const safeCommon = useMemo(() => safeT.common || {}, [safeT]);
 
-  const getTranslation = (key) => {
-    if (tu && tu[key]) {
-      return tu[key];
-    }
-    const fallback = {
-      title: "User Management",
-      subtitle: "Manage all users in the system",
-      totalUsers: "total users",
-      addUser: "Add New User",
-      searchPlaceholder: "Search users by name or email...",
-      allRoles: "All Roles",
-      noUsersFound: "No users found",
-      noUsersMatch: "No users match your search criteria",
-      tryAdjusting: "Try adjusting your search or filter",
-      createFirstUser: "Click 'Add New User' to create your first user",
-      editUser: "Edit User",
-      addNewUser: "Add New User",
-      updateInfo: "Update information for",
-      createAccount: "Create a new user account with specific role permissions",
-      fullName: "Full Name",
-      email: "Email",
-      password: "Password",
-      role: "Role",
-      phone: "Phone",
-      phoneOptional: "Phone (Optional)",
-      cancel: "Cancel",
-      updateUser: "Update User",
-      createUser: "Create User",
-      viewDetails: "View user details",
-      edit: "Edit",
-      delete: "Delete",
-      view: "View",
-      changeRole: "Change user role",
-      you: "You",
-      confirmDeleteTitle: "Confirm Delete",
-      confirmDeleteMessage: "Are you sure you want to delete",
-      deleteWarning: "This action cannot be undone.",
-      userDetails: "User Details",
-      created: "Created",
-      lastUpdated: "Last Updated",
-      userId: "User ID",
-      actions: "Actions",
-      teamLeader: "Team Leader",
-      superAdmin: "Super Admin",
-      admin: "Admin",
-      employee: "Employee",
-      total: "Total",
-      roleEmployee: "Employee",
-      roleTeamLeader: "Team Leader",
-      roleAdmin: "Admin",
-      roleSuperAdmin: "Super Admin",
-    };
-    return fallback[key] || key;
-  };
+  const getTranslation = useCallback(
+    (key) => {
+      const translations = safeT.userManagement || {};
+      if (translations && translations[key]) {
+        return translations[key];
+      }
+      const fallback = {
+        title: "User Management",
+        subtitle: "Manage all users in the system",
+        totalUsers: "total users",
+        addUser: "Add New User",
+        searchPlaceholder: "Search users by name or email...",
+        allRoles: "All Roles",
+        noUsersFound: "No users found",
+        noUsersMatch: "No users match your search criteria",
+        tryAdjusting: "Try adjusting your search or filter",
+        createFirstUser: "Click 'Add New User' to create your first user",
+        editUser: "Edit User",
+        addNewUser: "Add New User",
+        updateInfo: "Update information for",
+        createAccount:
+          "Create a new user account with specific role permissions",
+        fullName: "Full Name",
+        email: "Email",
+        password: "Password",
+        role: "Role",
+        phone: "Phone",
+        phoneOptional: "Phone (Optional)",
+        cancel: "Cancel",
+        updateUser: "Update User",
+        createUser: "Create User",
+        viewDetails: "View user details",
+        edit: "Edit",
+        delete: "Delete",
+        view: "View",
+        changeRole: "Change user role",
+        you: "You",
+        confirmDeleteTitle: "Confirm Delete",
+        confirmDeleteMessage: "Are you sure you want to delete",
+        deleteWarning: "This action cannot be undone.",
+        userDetails: "User Details",
+        created: "Created",
+        lastUpdated: "Last Updated",
+        userId: "User ID",
+        actions: "Actions",
+        teamLeader: "Team Leader",
+        superAdmin: "Super Admin",
+        admin: "Admin",
+        employee: "Employee",
+        total: "Total",
+        roleEmployee: "Employee",
+        roleTeamLeader: "Team Leader",
+        roleAdmin: "Admin",
+        roleSuperAdmin: "Super Admin",
+      };
+      return fallback[key] || key;
+    },
+    [safeT],
+  ); // ✅ Now depends on memoized safeT
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -428,11 +431,7 @@ export default function UserManagement({ t }) {
 
   const { showToast } = useToast();
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await authAPI.getUsers();
@@ -448,7 +447,28 @@ export default function UserManagement({ t }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [getTranslation]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await authAPI.getUsers();
+        setUsers(response.data);
+      } catch (error) {
+        console.error("Failed to load users:", error);
+        setAlertModal({
+          isOpen: true,
+          title: getTranslation("title"),
+          message: getTranslation("loadError"),
+          type: "error",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchUsers();
+  }, [getTranslation]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
