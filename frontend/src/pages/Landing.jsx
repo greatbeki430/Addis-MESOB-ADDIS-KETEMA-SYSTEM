@@ -45,6 +45,8 @@ import {
   FiCalendar,
   FiPhone,
   FiLoader,
+  FiChevronLeft,
+  FiChevronRight,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
@@ -699,7 +701,7 @@ function SectionHeading({ eyebrow, title, sub, dark, center }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// MAIN LANDING COMPONENT - UPDATED WITH REAL DATA FROM DATABASE
+// MAIN LANDING COMPONENT - With Proper Pagination
 // ─────────────────────────────────────────────────────────────
 export default function Landing() {
   const { language, changeLanguage } = useLanguage();
@@ -709,25 +711,24 @@ export default function Landing() {
   const [activeSection, setActiveSection] = useState("");
   const [showBackToTop, setShowBackToTop] = useState(false);
 
-  // Real data from database via public API (no authentication required)
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDept, setFilterDept] = useState("All");
   const [departments, setDepartments] = useState(["All"]);
-  const [pagination, setPagination] = useState({
-    page: 1,
-    total: 0,
-    totalPages: 1,
-    limit: 12,
-  });
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [itemsPerPage] = useState(12);
+
   const sectionRefs = useRef({});
   const abortControllerRef = useRef(null);
+  const hasLoadedRef = useRef(false);
+  const isInitialMount = useRef(true);
 
   // ─── Load services from database ──────────────────────────────
   const loadServices = useCallback(async () => {
-    // Cancel previous request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
@@ -738,20 +739,16 @@ export default function Landing() {
 
     try {
       const response = await publicAPI.getServices({
-        page: pagination.page,
-        limit: pagination.limit,
+        page: currentPage,
+        limit: itemsPerPage,
         search: searchTerm || undefined,
         department: filterDept !== "All" ? filterDept : undefined,
       });
 
       if (response.data.success) {
         setServices(response.data.data);
-        setPagination({
-          page: response.data.pagination.page,
-          total: response.data.pagination.total,
-          totalPages: response.data.pagination.totalPages,
-          limit: response.data.pagination.limit || 12,
-        });
+        setTotalItems(response.data.pagination.total);
+        setTotalPages(response.data.pagination.totalPages);
       }
     } catch (error) {
       if (error.name !== "AbortError" && error.code !== "ERR_CANCELED") {
@@ -761,7 +758,7 @@ export default function Landing() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, searchTerm, filterDept]);
+  }, [currentPage, itemsPerPage, searchTerm, filterDept]);
 
   // ─── Load departments ──────────────────────────────────────────
   const loadDepartments = useCallback(async () => {
@@ -776,8 +773,6 @@ export default function Landing() {
   }, []);
 
   // ─── Initial load ──────────────────────────────────────────────
-  const hasLoadedRef = useRef(false);
-
   useEffect(() => {
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
@@ -797,12 +792,16 @@ export default function Landing() {
   }, [loadDepartments, loadServices]);
 
   // ─── Handle search/filter changes with debounce ───────────────
-  // ─── Handle search/filter changes with debounce ───────────────
   useEffect(() => {
-    // Skip initial load - only run when search or filter changes
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
     if (!searchTerm && filterDept === "All") return;
 
     const timer = setTimeout(() => {
+      setCurrentPage(1);
       loadServices();
     }, 500);
 
@@ -914,12 +913,19 @@ export default function Landing() {
   const getText = (obj) => obj[language] || obj.en;
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  // ─── Load more ──────────────────────────────────────────────────
-  const loadMore = () => {
-    if (pagination.page < pagination.totalPages) {
-      setPagination((prev) => ({ ...prev, page: prev.page + 1 }));
+  // ─── Pagination handlers ──────────────────────────────────────
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      const gridElement = document.getElementById("services-grid");
+      if (gridElement) {
+        gridElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
   };
+
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
 
   return (
     <div
@@ -1652,7 +1658,7 @@ export default function Landing() {
             value={filterDept}
             onChange={(e) => {
               setFilterDept(e.target.value);
-              setPagination((prev) => ({ ...prev, page: 1 }));
+              setCurrentPage(1);
             }}
             style={{
               padding: "10px 14px",
@@ -1675,6 +1681,51 @@ export default function Landing() {
           </select>
         </div>
 
+        {/* Results count */}
+        {!loading && !error && services.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 12,
+              flexWrap: "wrap",
+              gap: 8,
+            }}
+          >
+            <span
+              style={{ fontSize: "clamp(12px, 3vw, 13px)", color: C.muted }}
+            >
+              Showing {startIndex + 1}–{endIndex} of {totalItems} services
+            </span>
+            <span
+              style={{ fontSize: "clamp(12px, 3vw, 13px)", color: C.muted }}
+            >
+              Page {currentPage} of {totalPages}
+            </span>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div
+            style={{
+              background: "#fee2e2",
+              color: "#dc2626",
+              padding: "12px 16px",
+              borderRadius: 8,
+              marginBottom: 16,
+              border: "1px solid #fecaca",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <span>⚠️</span>
+            {error}
+          </div>
+        )}
+
         {/* Services Grid */}
         {loading ? (
           <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
@@ -1684,12 +1735,6 @@ export default function Landing() {
             />
             <p>Loading services from database...</p>
           </div>
-        ) : error ? (
-          <div
-            style={{ textAlign: "center", padding: "40px", color: "#dc2626" }}
-          >
-            {error}
-          </div>
         ) : services.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
             <FiPackage size={48} style={{ marginBottom: 12, opacity: 0.5 }} />
@@ -1698,6 +1743,7 @@ export default function Landing() {
         ) : (
           <>
             <div
+              id="services-grid"
               style={{
                 display: "grid",
                 gridTemplateColumns:
@@ -1788,31 +1834,41 @@ export default function Landing() {
               ))}
             </div>
 
-            {/* Pagination - Load More */}
-            {pagination.totalPages > 1 && (
-              <div style={{ textAlign: "center", marginTop: 24 }}>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  gap: "clamp(6px, 2vw, 12px)",
+                  marginTop: "clamp(20px, 4vw, 32px)",
+                  padding: "16px 0",
+                  flexWrap: "wrap",
+                }}
+              >
                 <button
-                  onClick={loadMore}
-                  disabled={pagination.page >= pagination.totalPages}
+                  onClick={() => goToPage(currentPage - 1)}
+                  disabled={currentPage === 1}
                   style={{
-                    padding: "10px 24px",
-                    background: C.primary,
-                    color: "#fff",
+                    background: currentPage === 1 ? "#e5e7eb" : C.primary,
+                    color: currentPage === 1 ? "#999" : "#fff",
                     border: "none",
                     borderRadius: 8,
+                    padding: "8px 16px",
+                    fontSize: "clamp(12px, 3vw, 14px)",
                     fontWeight: 600,
-                    fontSize: 14,
-                    cursor:
-                      pagination.page >= pagination.totalPages
-                        ? "not-allowed"
-                        : "pointer",
-                    opacity: pagination.page >= pagination.totalPages ? 0.5 : 1,
+                    cursor: currentPage === 1 ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    opacity: currentPage === 1 ? 0.6 : 1,
                     transition: "all 0.3s ease",
                   }}
                   onMouseEnter={(e) => {
-                    if (pagination.page < pagination.totalPages) {
+                    if (currentPage !== 1) {
                       e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = `0 4px 16px ${C.primary}44`;
+                      e.currentTarget.style.boxShadow = `0 4px 12px ${C.primary}44`;
                     }
                   }}
                   onMouseLeave={(e) => {
@@ -1820,13 +1876,133 @@ export default function Landing() {
                     e.currentTarget.style.boxShadow = "none";
                   }}
                 >
-                  {pagination.page >= pagination.totalPages
-                    ? "No More Services"
-                    : "Load More Services"}
+                  <FiChevronLeft size={16} />
+                  Previous
                 </button>
-                <div style={{ marginTop: 8, fontSize: 12, color: C.muted }}>
-                  Showing {services.length} of {pagination.total} services
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "clamp(4px, 1.5vw, 8px)",
+                    flexWrap: "wrap",
+                    justifyContent: "center",
+                  }}
+                >
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => {
+                      const showPage =
+                        page === 1 ||
+                        page === totalPages ||
+                        Math.abs(page - currentPage) <= 2;
+
+                      if (!showPage) {
+                        if (page === 2 || page === totalPages - 1) {
+                          return (
+                            <span
+                              key={page}
+                              style={{
+                                padding: "8px 6px",
+                                color: "#999",
+                                fontSize: "clamp(12px, 3vw, 14px)",
+                              }}
+                            >
+                              …
+                            </span>
+                          );
+                        }
+                        return null;
+                      }
+
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => goToPage(page)}
+                          style={{
+                            background:
+                              currentPage === page ? C.primary : "#f3f4f6",
+                            color: currentPage === page ? "#fff" : "#555",
+                            border:
+                              currentPage === page
+                                ? `2px solid ${C.primary}`
+                                : "1px solid #e5e7eb",
+                            borderRadius: 8,
+                            padding: "8px 14px",
+                            minWidth: "40px",
+                            fontSize: "clamp(12px, 3vw, 14px)",
+                            fontWeight: currentPage === page ? 700 : 500,
+                            cursor: "pointer",
+                            transition: "all 0.3s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (currentPage !== page) {
+                              e.currentTarget.style.background = "#e5e7eb";
+                              e.currentTarget.style.transform =
+                                "translateY(-2px)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (currentPage !== page) {
+                              e.currentTarget.style.background = "#f3f4f6";
+                              e.currentTarget.style.transform = "translateY(0)";
+                            }
+                          }}
+                        >
+                          {page}
+                        </button>
+                      );
+                    },
+                  )}
                 </div>
+
+                <button
+                  onClick={() => goToPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  style={{
+                    background:
+                      currentPage === totalPages ? "#e5e7eb" : C.primary,
+                    color: currentPage === totalPages ? "#999" : "#fff",
+                    border: "none",
+                    borderRadius: 8,
+                    padding: "8px 16px",
+                    fontSize: "clamp(12px, 3vw, 14px)",
+                    fontWeight: 600,
+                    cursor:
+                      currentPage === totalPages ? "not-allowed" : "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    opacity: currentPage === totalPages ? 0.6 : 1,
+                    transition: "all 0.3s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (currentPage !== totalPages) {
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = `0 4px 12px ${C.primary}44`;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  Next
+                  <FiChevronRight size={16} />
+                </button>
+              </div>
+            )}
+
+            {totalItems > 0 && (
+              <div
+                style={{
+                  textAlign: "center",
+                  marginTop: "clamp(8px, 2vw, 12px)",
+                  fontSize: "clamp(11px, 2.5vw, 12px)",
+                  color: C.muted,
+                  padding: "8px 0",
+                }}
+              >
+                {totalItems} {totalItems === 1 ? "service" : "services"}{" "}
+                available
               </div>
             )}
           </>
