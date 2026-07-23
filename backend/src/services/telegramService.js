@@ -1,6 +1,6 @@
 // backend/src/services/telegramService.js
 // Telegram bot integration for Golden Monday announcements
-// + Employee self-registration (webhook version)
+// + Employee self-registration (webhook version) - FULL VERSION
 
 const crypto = require("crypto");
 const PendingRegistration = require("../models/PendingRegistration");
@@ -53,22 +53,22 @@ const postPresenterAnnouncement = async (session) => {
 
     const imageUrl = await generateAnnouncementImage(presenter, session);
 
-    let message = `🎯 Golden Monday - ${dateFormatted}\n\n`;
-    message += `👤 Presenter: ${presenter.name || "TBD"}\n`;
+    let message = `🎯 *Golden Monday - ${dateFormatted}*\n\n`;
+    message += `👤 *Presenter:* ${presenter.name || "TBD"}\n`;
     if (presenter.department) {
-      message += `🏛️ Department: ${presenter.department}\n`;
+      message += `🏛️ *Department:* ${presenter.department}\n`;
     }
     if (session.presentationTitle) {
-      message += `📖 Topic: "${session.presentationTitle}"\n`;
+      message += `📖 *Topic:* "${session.presentationTitle}"\n`;
     }
     if (session.presentationDescription) {
-      message += `📝 Description: ${session.presentationDescription}\n`;
+      message += `📝 *Description:* ${session.presentationDescription}\n`;
     }
-    message += `\n🕒 Time:* 2:00 - 2:50 PM\n`;
-    message += `📍 Location: Addis MESOB Conference Hall\n\n`;
+    message += `\n🕒 *Time:* 2:00 - 2:50 PM\n`;
+    message += `📍 *Location:* Addis MESOB Conference Hall\n\n`;
 
     if (session.suggestedTopics && session.suggestedTopics.length > 0) {
-      message += `💡 AI Suggested Topics:\n`;
+      message += `💡 *AI Suggested Topics:*\n`;
       session.suggestedTopics.forEach((topic, i) => {
         message += `   ${i + 1}. ${topic}\n`;
       });
@@ -207,7 +207,7 @@ const sendTestMessage = async () => {
 };
 
 // =====================================================================
-// REGISTRATION CODE - Webhook version (REPLACES polling)
+// REGISTRATION CODE - Webhook version with FULL EMPLOYEE DATA
 // =====================================================================
 
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -247,8 +247,22 @@ const STEPS = {
   NAME: "awaiting_name",
   EMAIL: "awaiting_email",
   PHONE: "awaiting_phone",
+  DEPARTMENT: "awaiting_department",
+  POSITION: "awaiting_position",
+  SKILLS: "awaiting_skills",
+  HIRE_DATE: "awaiting_hire_date",
+  PHOTO: "awaiting_photo",
+  EMERGENCY_CONTACT: "awaiting_emergency_contact",
   OTP: "awaiting_otp",
 };
+
+// Helper: Parse skills from comma-separated string
+function parseSkills(input) {
+  return input
+    .split(",")
+    .map(s => s.trim())
+    .filter(s => s.length > 0);
+}
 
 async function handleStart(msg) {
   const chatId = msg.chat.id.toString();
@@ -261,13 +275,13 @@ async function handleStart(msg) {
     if (existingPending.status === "approved") {
       return sendMessage(
         chatId,
-        `You're already registered ✅\nYou can log in with the email you registered with.`,
+        `You're already registered ✅\nYou can log in with the email you registered with.`
       );
     }
     if (existingPending.status === "pending_approval") {
       return sendMessage(
         chatId,
-        "Your registration is already submitted and awaiting admin approval. We'll message you here once it's reviewed.",
+        "Your registration is already submitted and awaiting admin approval. We'll message you here once it's reviewed."
       );
     }
     // pending_otp / rejected -> fall through, let them start a fresh one
@@ -275,11 +289,18 @@ async function handleStart(msg) {
 
   registrationSessions.set(chatId, {
     step: STEPS.NAME,
-    data: { telegramUsername: msg.from.username || "" },
+    data: { 
+      telegramUsername: msg.from.username || "",
+      skills: [],
+    },
   });
+  
   sendMessage(
     chatId,
-    "Welcome to Addis MESOB employee registration 👋\n\nWhat is your full name?",
+    "👋 Welcome to Addis MESOB employee registration!\n\n" +
+    "Please provide the following information to register.\n" +
+    "You can type 'skip' for optional fields.\n\n" +
+    "📝 What is your full name?"
   );
 }
 
@@ -290,13 +311,19 @@ async function handleRegistrationMessage(msg) {
 
   const text = (msg.text || "").trim();
 
+  // Handle photo uploads (special case)
+  if (msg.photo && session.step === STEPS.PHOTO) {
+    await handlePhotoUpload(msg, session, chatId);
+    return;
+  }
+
   switch (session.step) {
     case STEPS.NAME:
       session.data.name = text;
       session.step = STEPS.EMAIL;
       sendMessage(
         chatId,
-        "What is your email address? (this will be your login)",
+        "📧 What is your email address? (this will be your login)"
       );
       break;
 
@@ -307,18 +334,117 @@ async function handleRegistrationMessage(msg) {
       if (existingUser) {
         return sendMessage(
           chatId,
-          "That email is already registered. Please send a different email, or contact an admin if this is your account.",
+          "❌ That email is already registered. Please send a different email, or contact an admin if this is your account."
         );
       }
       session.data.email = email;
       session.step = STEPS.PHONE;
-      sendMessage(chatId, 'What is your phone number? (or type "skip")');
+      sendMessage(chatId, '📱 What is your phone number? (or type "skip")');
       break;
     }
 
     case STEPS.PHONE: {
       session.data.phone = text.toLowerCase() === "skip" ? "" : text;
+      session.step = STEPS.DEPARTMENT;
+      sendMessage(
+        chatId,
+        "🏛️ What is your department? (e.g., IT, HR, Finance)\n" +
+        "Or type 'skip' to skip this step"
+      );
+      break;
+    }
 
+    case STEPS.DEPARTMENT: {
+      session.data.department = text.toLowerCase() === "skip" ? "" : text;
+      session.step = STEPS.POSITION;
+      sendMessage(
+        chatId,
+        "💼 What is your position/title? (e.g., Team Leader, Developer)\n" +
+        "Or type 'skip' to skip this step"
+      );
+      break;
+    }
+
+    case STEPS.POSITION: {
+      session.data.position = text.toLowerCase() === "skip" ? "" : text;
+      session.step = STEPS.SKILLS;
+      sendMessage(
+        chatId,
+        "🛠️ What are your skills? (comma-separated, e.g., JavaScript, React, MongoDB)\n" +
+        "Or type 'skip' to skip this step"
+      );
+      break;
+    }
+
+    case STEPS.SKILLS: {
+      if (text.toLowerCase() === "skip") {
+        session.data.skills = [];
+      } else {
+        session.data.skills = parseSkills(text);
+      }
+      session.step = STEPS.HIRE_DATE;
+      sendMessage(
+        chatId,
+        "📅 When was your hire date? (format: YYYY-MM-DD, e.g., 2024-01-15)\n" +
+        "Or type 'skip' to skip this step"
+      );
+      break;
+    }
+
+    case STEPS.HIRE_DATE: {
+      if (text.toLowerCase() === "skip") {
+        session.data.hireDate = null;
+      } else {
+        try {
+          const date = new Date(text);
+          if (isNaN(date.getTime())) {
+            return sendMessage(
+              chatId,
+              "❌ Invalid date format. Please use YYYY-MM-DD (e.g., 2024-01-15) or type 'skip'"
+            );
+          }
+          session.data.hireDate = date;
+        } catch {
+          return sendMessage(
+            chatId,
+            "❌ Invalid date format. Please use YYYY-MM-DD or type 'skip'"
+          );
+        }
+      }
+      session.step = STEPS.PHOTO;
+      sendMessage(
+        chatId,
+        "📸 Upload your profile photo (optional).\n" +
+        "Click the attachment icon (📎) and select a photo.\n" +
+        "Or type 'skip' to skip this step"
+      );
+      break;
+    }
+
+    case STEPS.PHOTO: {
+      // Photo upload is handled separately in handlePhotoUpload
+      // This case is for text responses (skip)
+      if (text.toLowerCase() === "skip") {
+        session.data.photoUrl = "";
+        session.step = STEPS.EMERGENCY_CONTACT;
+        sendMessage(
+          chatId,
+          "👤 What is your emergency contact? (name and phone number)\n" +
+          "Or type 'skip' to skip this step"
+        );
+      } else {
+        sendMessage(
+          chatId,
+          "📸 Please upload a photo using the attachment button (📎) or type 'skip'"
+        );
+      }
+      break;
+    }
+
+    case STEPS.EMERGENCY_CONTACT: {
+      session.data.emergencyContact = text.toLowerCase() === "skip" ? "" : text;
+      session.step = STEPS.OTP;
+      
       const otpCode = generateOtp();
       const pending = await PendingRegistration.create({
         telegramChatId: chatId,
@@ -326,16 +452,22 @@ async function handleRegistrationMessage(msg) {
         name: session.data.name,
         email: session.data.email,
         phone: session.data.phone,
+        department: session.data.department || "",
+        position: session.data.position || "",
+        skills: session.data.skills || [],
+        hireDate: session.data.hireDate || null,
+        profilePhotoUrl: session.data.photoUrl || "",
+        emergencyContact: session.data.emergencyContact || "",
         status: "pending_otp",
         otpCode,
         otpExpiresAt: otpExpiry(10),
       });
 
-      session.step = STEPS.OTP;
       session.pendingId = pending._id.toString();
       sendMessage(
         chatId,
-        `Thanks! Your verification code is: ${otpCode}\n\nReply with this code to confirm (valid for 10 minutes).`,
+        `✅ Thanks! Your verification code is: *${otpCode}*\n\n` +
+        `Reply with this code to confirm (valid for 10 minutes).`
       );
       break;
     }
@@ -344,24 +476,27 @@ async function handleRegistrationMessage(msg) {
       const pending = await PendingRegistration.findById(
         session.pendingId,
       ).select("+otpCode +otpExpiresAt");
+      
       if (!pending) {
         registrationSessions.delete(chatId);
         return sendMessage(
           chatId,
-          "Something went wrong — please send /start to try again.",
+          "❌ Something went wrong — please send /start to try again."
         );
       }
+      
       if (!pending.otpExpiresAt || pending.otpExpiresAt < new Date()) {
         registrationSessions.delete(chatId);
         return sendMessage(
           chatId,
-          "That code expired. Please send /start to try again.",
+          "❌ That code expired. Please send /start to try again."
         );
       }
+      
       if (text !== pending.otpCode) {
         return sendMessage(
           chatId,
-          "That code doesn't match — please check and try again.",
+          "❌ That code doesn't match — please check and try again."
         );
       }
 
@@ -374,7 +509,8 @@ async function handleRegistrationMessage(msg) {
       registrationSessions.delete(chatId);
       sendMessage(
         chatId,
-        "Verified ✅ Your registration has been sent for admin approval. We'll message you here once it's reviewed.",
+        "✅ Verified! Your registration has been sent for admin approval.\n\n" +
+        "We'll message you here once it's reviewed."
       );
 
       notifyAdminsForApproval(pending);
@@ -383,20 +519,56 @@ async function handleRegistrationMessage(msg) {
   }
 }
 
+async function handlePhotoUpload(msg, session, chatId) {
+  try {
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+    const file = await callTelegramApi("getFile", { file_id: fileId });
+    
+    if (!file.ok) {
+      sendMessage(chatId, "❌ Failed to get photo. Please try again or type 'skip'");
+      return;
+    }
+
+    const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${file.result.file_path}`;
+    const response = await fetch(fileUrl);
+    const buffer = await response.arrayBuffer();
+    
+    // Store as base64 for now (you can implement Cloudinary upload later)
+    const base64Photo = Buffer.from(buffer).toString("base64");
+    session.data.photoUrl = `data:image/jpeg;base64,${base64Photo}`;
+    
+    sendMessage(chatId, "✅ Photo uploaded successfully!");
+    session.step = STEPS.EMERGENCY_CONTACT;
+    sendMessage(
+      chatId,
+      "👤 What is your emergency contact? (name and phone number)\n" +
+      "Or type 'skip' to skip this step"
+    );
+  } catch (error) {
+    console.error("❌ Photo upload error:", error.message);
+    sendMessage(chatId, "❌ Failed to upload photo. Please type 'skip' to continue.");
+  }
+}
+
 async function notifyAdminsForApproval(pending) {
   if (!TELEGRAM_ADMIN_GROUP_ID) {
     console.warn(
-      "[telegramService] TELEGRAM_ADMIN_GROUP_ID not set — cannot notify admins.",
+      "[telegramService] TELEGRAM_ADMIN_GROUP_ID not set — cannot notify admins."
     );
     return;
   }
 
   const text =
-    `📋 New employee registration\n\n` +
-    `Name: ${pending.name}\n` +
-    `Email: ${pending.email}\n` +
-    `Phone: ${pending.phone || "not provided"}\n` +
-    `Telegram: @${pending.telegramUsername || "n/a"}`;
+    `📋 *New Employee Registration*\n\n` +
+    `👤 *Name:* ${pending.name}\n` +
+    `📧 *Email:* ${pending.email}\n` +
+    `📱 *Phone:* ${pending.phone || "Not provided"}\n` +
+    `🏛️ *Department:* ${pending.department || "Not provided"}\n` +
+    `💼 *Position:* ${pending.position || "Not provided"}\n` +
+    `🛠️ *Skills:* ${pending.skills?.length ? pending.skills.join(", ") : "Not provided"}\n` +
+    `📅 *Hire Date:* ${pending.hireDate ? new Date(pending.hireDate).toLocaleDateString() : "Not provided"}\n` +
+    `👤 *Telegram:* @${pending.telegramUsername || "n/a"}\n` +
+    `🖼️ *Photo:* ${pending.profilePhotoUrl ? "✅ Uploaded" : "❌ Not uploaded"}`;
 
   await sendMessage(TELEGRAM_ADMIN_GROUP_ID, text, {
     reply_markup: {
@@ -424,10 +596,10 @@ async function sendLoginLink(chatId, email, tempPassword) {
   const loginUrl = FRONTEND_URL;
   
   const message = 
-    `✅ Your account has been approved!\n\n` +
-    `🔗 Login Link: ${loginUrl}/login\n\n` +
-    `📧 Email: ${email}\n` +
-    `🔑 Temporary Password: ${tempPassword}\n\n` +
+    `✅ **Your account has been approved!**\n\n` +
+    `🔗 **Login Link:** ${loginUrl}/login\n\n` +
+    `📧 **Email:** ${email}\n` +
+    `🔑 **Temporary Password:** ${tempPassword}\n\n` +
     `⚠️ Please log in and change your password immediately.\n\n` +
     `If you have any issues, please contact your administrator.`;
 
@@ -444,13 +616,13 @@ async function sendDeletionNotification(chatId, name, reason = "Your account has
   const loginUrl = FRONTEND_URL;
   
   const message = 
-    `⚠️ Account Deletion Notification\n\n` +
+    `⚠️ **Account Deletion Notification**\n\n` +
     `Dear ${name},\n\n` +
     `${reason}\n\n` +
     `If you believe this is a mistake, please contact your administrator.\n\n` +
     `To re-register, please send /start to this bot again.\n\n` +
-    `🔄 Register Here: https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'addis_mesob_gm_bot'}\n\n` +
-    `🔗 Login URL: ${loginUrl}`;
+    `🔄 **Register Here:** https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'addis_mesob_gm_bot'}\n\n` +
+    `🔗 **Login URL:** ${loginUrl}`;
 
   await sendMessage(chatId, message);
 }
@@ -483,7 +655,7 @@ async function approveRegistration(pendingId, reviewer) {
 
     console.log("✅ User created with ID:", user._id);
 
-    // 🆕 ADD TO GOLDEN MONDAY ROSTER
+    // 🆕 ADD TO GOLDEN MONDAY ROSTER WITH ALL FIELDS
     console.log("📋 Adding user to Golden Monday roster...");
     try {
       const existingPresenter = await GoldenMondayPresenter.findOne({ user: user._id });
@@ -493,6 +665,12 @@ async function approveRegistration(pendingId, reviewer) {
           name: pending.name,
           email: pending.email,
           department: pending.department || "",
+          position: pending.position || "",
+          phone: pending.phone || "",
+          profilePhotoUrl: pending.profilePhotoUrl || "",
+          hireDate: pending.hireDate || null,
+          skills: pending.skills || [],
+          emergencyContact: pending.emergencyContact || "",
           isEligible: true,
           timesPresented: 0,
           registeredAt: new Date(),
@@ -547,7 +725,7 @@ async function rejectRegistration(pendingId, reviewer, reason) {
 
   await sendMessage(
     pending.telegramChatId,
-    "Your registration could not be approved. Please contact HR/admin for details.",
+    "Your registration could not be approved. Please contact HR/admin for details."
   );
 
   return pending;
@@ -568,7 +746,7 @@ async function handleCallbackQuery(query) {
     await callTelegramApi("editMessageText", {
       chat_id: query.message.chat.id,
       message_id: query.message.message_id,
-      text: `${query.message.text}\n\n✅ Already Approved (via admin panel)`,
+      text: `${query.message.text}\n\n✅ **Already Approved** (via admin panel)`,
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [] // Remove buttons
@@ -586,7 +764,7 @@ async function handleCallbackQuery(query) {
     await callTelegramApi("editMessageText", {
       chat_id: query.message.chat.id,
       message_id: query.message.message_id,
-      text: `${query.message.text}\n\n❌ Already Rejected (via admin panel)`,
+      text: `${query.message.text}\n\n❌ **Already Rejected** (via admin panel)`,
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [] // Remove buttons
@@ -749,4 +927,4 @@ module.exports = {
       "⚠️ stopRegistrationPolling is deprecated. Use webhook instead.",
     );
   },
-}
+};
