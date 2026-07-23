@@ -4,11 +4,14 @@
 
 const crypto = require("crypto");
 const PendingRegistration = require("../models/PendingRegistration");
+const GoldenMondayPresenter = require("../models/GoldenMondayPresenter");
 const { createUserAccount } = require("../controllers/authController");
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 const TELEGRAM_ADMIN_GROUP_ID = process.env.TELEGRAM_ADMIN_GROUP_ID;
+// Use environment variable or fallback to your actual frontend URL
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://akmesob.vercel.app";
 
 // =====================================================================
 // EXISTING CODE - Announcement functions (unchanged)
@@ -407,9 +410,55 @@ async function notifyAdminsForApproval(pending) {
   });
 }
 
+// =====================================================================
+// NEW FUNCTIONS: Send Login Link and Deletion Notification
+// =====================================================================
+
 /**
- * Shared approval logic - FIXED with error handling
+ * Send login link to a user after approval
+ * @param {string} chatId - Telegram chat ID
+ * @param {string} email - User's email
+ * @param {string} tempPassword - Temporary password
  */
+async function sendLoginLink(chatId, email, tempPassword) {
+  const loginUrl = FRONTEND_URL;
+  
+  const message = 
+    `✅ **Your account has been approved!**\n\n` +
+    `🔗 **Login Link:** ${loginUrl}/login\n\n` +
+    `📧 **Email:** ${email}\n` +
+    `🔑 **Temporary Password:** ${tempPassword}\n\n` +
+    `⚠️ Please log in and change your password immediately.\n\n` +
+    `If you have any issues, please contact your administrator.`;
+
+  await sendMessage(chatId, message);
+}
+
+/**
+ * Send employee deletion notification
+ * @param {string} chatId - Telegram chat ID
+ * @param {string} name - Employee name
+ * @param {string} reason - Reason for deletion
+ */
+async function sendDeletionNotification(chatId, name, reason = "Your account has been removed by an administrator.") {
+  const loginUrl = FRONTEND_URL;
+  
+  const message = 
+    `⚠️ **Account Deletion Notification**\n\n` +
+    `Dear ${name},\n\n` +
+    `${reason}\n\n` +
+    `If you believe this is a mistake, please contact your administrator.\n\n` +
+    `To re-register, please send /start to this bot again.\n\n` +
+    `🔄 **Register Here:** https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'addis_mesob_gm_bot'}\n\n` +
+    `🔗 **Login URL:** ${loginUrl}`;
+
+  await sendMessage(chatId, message);
+}
+
+// =====================================================================
+// Shared approval logic - FIXED with error handling and roster creation
+// =====================================================================
+
 async function approveRegistration(pendingId, reviewer) {
   console.log("📝 Approving registration:", pendingId);
   
@@ -434,6 +483,30 @@ async function approveRegistration(pendingId, reviewer) {
 
     console.log("✅ User created with ID:", user._id);
 
+    // 🆕 ADD TO GOLDEN MONDAY ROSTER
+    console.log("📋 Adding user to Golden Monday roster...");
+    try {
+      const existingPresenter = await GoldenMondayPresenter.findOne({ user: user._id });
+      if (!existingPresenter) {
+        const presenter = await GoldenMondayPresenter.create({
+          user: user._id,
+          name: pending.name,
+          email: pending.email,
+          department: pending.department || "",
+          isEligible: true,
+          timesPresented: 0,
+          registeredAt: new Date(),
+          registeredBy: reviewer?._id || undefined,
+        });
+        console.log("✅ Added to Golden Monday roster:", presenter._id);
+      } else {
+        console.log("ℹ️ User already in Golden Monday roster");
+      }
+    } catch (rosterError) {
+      console.error("⚠️ Failed to add to Golden Monday roster:", rosterError.message);
+      // Don't fail the whole approval, just log the error
+    }
+
     pending.status = "approved";
     pending.createdUser = user._id;
     pending.reviewedBy = reviewer?._id || undefined;
@@ -441,11 +514,9 @@ async function approveRegistration(pendingId, reviewer) {
     pending.reviewedAt = new Date();
     await pending.save();
 
-    console.log("📤 Sending approval message to:", pending.telegramChatId);
-    await sendMessage(
-      pending.telegramChatId,
-      `You've been approved ✅\n\nYou can now log in:\nEmail: ${pending.email}\nTemporary password: ${tempPassword}\n\nPlease log in and change your password when you get the chance.`,
-    );
+    // 🆕 SEND LOGIN LINK WITH PASSWORD
+    console.log("📤 Sending login link to:", pending.telegramChatId);
+    await sendLoginLink(pending.telegramChatId, pending.email, tempPassword);
 
     return { pending, user };
   } catch (error) {
@@ -597,7 +668,7 @@ async function getWebhookInfo() {
       return null;
     }
   } catch (error) {
-    console.error(`❌ Error getting webhook info:`, error.message);
+    console.error("❌ Error getting webhook info:", error.message);
     return null;
   }
 }
@@ -614,14 +685,18 @@ module.exports = {
   sendTestMessage,
 
   // New webhook exports (replaces polling exports)
-  handleWebhookUpdate, // ← Main webhook handler
-  setWebhook, // ← One-time setup
-  getWebhookInfo, // ← Debug tool
+  handleWebhookUpdate,
+  setWebhook,
+  getWebhookInfo,
 
-  // Registration management (unchanged)
+  // Registration management
   approveRegistration,
   rejectRegistration,
   sendMessage,
+
+  // 🆕 New functions
+  sendLoginLink,
+  sendDeletionNotification,
 
   // Deprecated - kept for backward compatibility but does nothing
   startRegistrationPolling: () => {
