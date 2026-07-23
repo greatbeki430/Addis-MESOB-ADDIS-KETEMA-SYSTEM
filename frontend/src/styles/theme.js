@@ -24,6 +24,14 @@ export const F = {
   serif: "'Noto Serif Ethiopic', serif",
 };
 
+// const T = {
+//   ink: "#081d17", // was #060b2e (navy) → deep charcoal-emerald
+//   paper: "#fbfaf6",
+//   weave: "rgba(245,197,24,0.14)",
+//   heroDeep: "#0d3327", // NEW — rich forest green
+//   heroMid: "#1a6b4a", // NEW — brighter emerald (matches your PDF report header green)
+// };
+
 // ============================================================
 // RESPONSIVE BREAKPOINTS
 // ============================================================

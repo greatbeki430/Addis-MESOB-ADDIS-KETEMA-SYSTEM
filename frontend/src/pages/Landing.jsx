@@ -53,9 +53,11 @@ import {
 // TOKENS — extending the existing brand palette, not replacing it
 // ─────────────────────────────────────────────────────────────
 const T = {
-  ink: "#060b2e",
+  ink: "#081d17", // was "#060b2e"
   paper: "#fbfaf6",
   weave: "rgba(245,197,24,0.14)",
+  heroDeep: "#0d3327", // NEW
+  heroMid: "#1a6b4a", // NEW
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -1270,7 +1272,7 @@ export default function Landing() {
         style={{
           position: "relative",
           overflow: "hidden",
-          background: `linear-gradient(120deg, ${T.ink} 0%, ${C.dark} 40%, ${C.primary} 75%, #8a6a10 100%)`,
+          background: `linear-gradient(120deg, ${T.ink} 0%, ${T.heroDeep} 40%, ${T.heroMid} 75%, #8a6a10 100%)`,
           backgroundSize: "220% 220%",
           animation: "lp-sweep 18s ease infinite alternate",
           padding:
