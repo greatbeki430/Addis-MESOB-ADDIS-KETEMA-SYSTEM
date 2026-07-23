@@ -392,10 +392,20 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
   const date = new Date(session.date);
   const isUpcoming = session.status === "scheduled" || date > new Date();
 
-  const getTranslatedText = (obj) => {
-    if (!obj) return "";
-    return obj[language] || obj.en || obj;
-  };
+  // const getTranslatedText = (obj) => {
+  //   if (!obj) return "";
+  //   return obj[language] || obj.en || obj;
+  // };
+
+  // ── Translation helper for objects - stable reference ──
+  // ── Translation helper for objects inside SessionCard ──
+  const getTranslatedText = useCallback(
+    (obj) => {
+      if (!obj) return "";
+      return obj[language] || obj.en || obj;
+    },
+    [language],
+  );
 
   return (
     <div
@@ -1013,19 +1023,22 @@ export default function GoldenMonday() {
   const { t: translations, language } = useLanguage();
   const { user } = useAuth();
 
-  // ── Translation helper ──
-  const t = (key, fallback) => {
-    const keys = key.split(".");
-    let value = translations;
-    for (const k of keys) {
-      if (value && value[k] !== undefined) {
-        value = value[k];
-      } else {
-        return fallback || key;
+  // ── Translation helper - wrapped in useCallback ──
+  const t = useCallback(
+    (key, fallback) => {
+      const keys = key.split(".");
+      let value = translations;
+      for (const k of keys) {
+        if (value && value[k] !== undefined) {
+          value = value[k];
+        } else {
+          return fallback || key;
+        }
       }
-    }
-    return value || fallback || key;
-  };
+      return value || fallback || key;
+    },
+    [translations],
+  );
 
   const gmCopy = translations?.goldenMonday || {};
   const [visible, setVisible] = useState({});
@@ -1081,10 +1094,19 @@ export default function GoldenMonday() {
   const [photoPreview, setPhotoPreview] = useState(null);
 
   // ── Translation helper for objects ──
-  const getTranslatedText = (obj) => {
-    if (!obj) return "";
-    return obj[language] || obj.en || obj;
-  };
+  // const getTranslatedText = (obj) => {
+  //   if (!obj) return "";
+  //   return obj[language] || obj.en || obj;
+  // };
+
+  // ── Translation helper for objects - stable reference ──
+  const getTranslatedText = useCallback(
+    (obj) => {
+      if (!obj) return "";
+      return obj[language] || obj.en || obj;
+    },
+    [language],
+  );
 
   // ── Load all data from API ──
   const loadAllData = useCallback(async () => {
@@ -1125,12 +1147,19 @@ export default function GoldenMonday() {
     }
   }, [t]);
 
-  const refreshData = async () => {
+  // const refreshData = async () => {
+  //   setRefreshing(true);
+  //   await loadAllData();
+  //   setRefreshing(false);
+  //   showToast(t("common.success") || "Data refreshed", "success");
+  // };
+
+  const refreshData = useCallback(async () => {
     setRefreshing(true);
     await loadAllData();
     setRefreshing(false);
     showToast(t("common.success") || "Data refreshed", "success");
-  };
+  }, [loadAllData, t]);
 
   // ── Load on mount ──
   useEffect(() => {

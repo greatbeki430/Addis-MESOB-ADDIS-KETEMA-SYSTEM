@@ -11,6 +11,7 @@ import { useLanguage } from "../hooks/useLanguage";
 import { LANGUAGES } from "../constants/translations";
 import { publicAPI } from "../services/api";
 import mesobLogo from "../assets/mesoblogo.png";
+import heroBackgroundImage from "../assets/a-mesob-image.jpg"; // 🆕 IMPORT HERO IMAGE
 import {
   FiMessageSquare,
   FiStar,
@@ -703,7 +704,7 @@ function SectionHeading({ eyebrow, title, sub, dark, center }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// MAIN LANDING COMPONENT - With Proper Pagination
+// MAIN LANDING COMPONENT
 // ─────────────────────────────────────────────────────────────
 export default function Landing() {
   const { language, changeLanguage } = useLanguage();
@@ -799,8 +800,6 @@ export default function Landing() {
       isInitialMount.current = false;
       return;
     }
-
-    if (!searchTerm && filterDept === "All") return;
 
     const timer = setTimeout(() => {
       setCurrentPage(1);
@@ -919,10 +918,7 @@ export default function Landing() {
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
-      const gridElement = document.getElementById("services-grid");
-      if (gridElement) {
-        gridElement.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+      // Service grid will auto-update via useEffect
     }
   };
 
@@ -961,6 +957,10 @@ export default function Landing() {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @keyframes hero-zoom {
+          0% { transform: scale(1); }
+          100% { transform: scale(1.05); }
         }
 
         .mesob-orbit-text {
@@ -1266,20 +1266,45 @@ export default function Landing() {
         </div>
       )}
 
-      {/* ── HERO ─────────────────────────────────────────── */}
+      {/* ── HERO WITH BACKGROUND IMAGE ────────────────────── */}
       <section
         id="main-content"
         style={{
           position: "relative",
           overflow: "hidden",
-          background: `linear-gradient(120deg, ${T.ink} 0%, ${T.heroDeep} 40%, ${T.heroMid} 75%, #8a6a10 100%)`,
-          backgroundSize: "220% 220%",
-          animation: "lp-sweep 18s ease infinite alternate",
+          minHeight: "80vh",
+          display: "flex",
+          alignItems: "center",
           padding:
             "clamp(48px, 8vw, 80px) clamp(20px, 6vw, 64px) clamp(56px, 8vw, 88px)",
           color: "#fff",
         }}
       >
+        {/* Background Image with Overlay */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 0,
+            backgroundImage: `url(${heroBackgroundImage})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            animation: "hero-zoom 20s ease-in-out infinite alternate",
+          }}
+        />
+
+        {/* Dark Overlay for Text Readability */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            zIndex: 1,
+            background:
+              "linear-gradient(135deg, rgba(8,29,23,0.88) 0%, rgba(26,107,74,0.75) 50%, rgba(10,40,30,0.85) 100%)",
+          }}
+        />
+
+        {/* Content */}
         <div
           style={{
             maxWidth: 1200,
@@ -1289,7 +1314,8 @@ export default function Landing() {
             alignItems: "center",
             flexWrap: "wrap",
             position: "relative",
-            zIndex: 1,
+            zIndex: 2,
+            width: "100%",
           }}
         >
           <div style={{ flex: "1 1 480px" }}>
@@ -1320,6 +1346,7 @@ export default function Landing() {
                 lineHeight: 1.08,
                 letterSpacing: "-0.015em",
                 margin: 0,
+                textShadow: "0 2px 20px rgba(0,0,0,0.3)",
               }}
             >
               {getText(LANDING_COPY.heroTitle)}
@@ -1331,6 +1358,7 @@ export default function Landing() {
                 color: "#dfe4ff",
                 maxWidth: 600,
                 marginTop: 22,
+                textShadow: "0 1px 10px rgba(0,0,0,0.2)",
               }}
             >
               {getText(LANDING_COPY.heroBody)}
@@ -1359,6 +1387,7 @@ export default function Landing() {
                   fontSize: 14,
                   cursor: "pointer",
                   fontFamily: F.sans,
+                  boxShadow: "0 4px 20px rgba(245,197,24,0.3)",
                 }}
               >
                 {getText(LANDING_COPY.ctaPrimary)}
@@ -1377,6 +1406,8 @@ export default function Landing() {
                   border: "1.5px solid rgba(255,255,255,0.3)",
                   padding: "13px 22px",
                   borderRadius: 10,
+                  backdropFilter: "blur(4px)",
+                  background: "rgba(255,255,255,0.05)",
                 }}
               >
                 {getText(LANDING_COPY.ctaSecondary)}
@@ -1407,6 +1438,7 @@ export default function Landing() {
                       fontSize: 26,
                       fontWeight: 900,
                       color: C.goldLight,
+                      textShadow: "0 1px 10px rgba(0,0,0,0.2)",
                     }}
                   >
                     <AnimatedStat value={num} active={!!visible.stats} />
@@ -1587,10 +1619,8 @@ export default function Landing() {
         <style>{`
           @media (max-width: 900px) { #lp-features-grid { grid-template-columns: repeat(2, 1fr) !important; } #lp-features-grid > div { grid-column: span 1 !important; } }
           @media (max-width: 560px) { #lp-features-grid { grid-template-columns: 1fr !important; } }
-
-          /* ✅ NEW: stack search + filter to equal-width full-width rows on mobile */
           @media (max-width: 640px) {
-          #lp-search-filter { grid-template-columns: 1fr !important; }
+            #lp-search-filter { grid-template-columns: 1fr !important; }
           }
         `}</style>
       </section>
@@ -1843,7 +1873,7 @@ export default function Landing() {
               ))}
             </div>
 
-            {/* Pagination */}
+            {/* ✅ FIXED PAGINATION */}
             {totalPages > 1 && (
               <div
                 style={{
@@ -1899,12 +1929,14 @@ export default function Landing() {
                 >
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map(
                     (page) => {
+                      // Show first page, last page, current page, and 2 pages around current
                       const showPage =
                         page === 1 ||
                         page === totalPages ||
                         Math.abs(page - currentPage) <= 2;
 
                       if (!showPage) {
+                        // Show ellipsis for gaps
                         if (page === 2 || page === totalPages - 1) {
                           return (
                             <span
