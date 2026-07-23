@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { C, F } from "../styles/theme";
 import { useLanguage } from "../hooks/useLanguage";
 import { LANGUAGES } from "../constants/translations";
-import { SERVICES } from "../constants/services";
+import { publicAPI } from "../services/api";
 import mesobLogo from "../assets/mesoblogo.png";
 import {
   FiMessageSquare,
@@ -44,6 +44,7 @@ import {
   FiClock,
   FiCalendar,
   FiPhone,
+  FiLoader,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
@@ -698,7 +699,7 @@ function SectionHeading({ eyebrow, title, sub, dark, center }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// MAIN LANDING COMPONENT
+// MAIN LANDING COMPONENT - UPDATED WITH REAL DATA FROM DATABASE
 // ─────────────────────────────────────────────────────────────
 export default function Landing() {
   const { language, changeLanguage } = useLanguage();
@@ -707,24 +708,120 @@ export default function Landing() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
   const [showBackToTop, setShowBackToTop] = useState(false);
-  const [services] = useState(SERVICES);
+
+  // Real data from database via public API (no authentication required)
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDept, setFilterDept] = useState("All");
+  const [departments, setDepartments] = useState(["All"]);
+  const [pagination, setPagination] = useState({
+    page: 1,
+    total: 0,
+    totalPages: 1,
+    limit: 12,
+  });
   const sectionRefs = useRef({});
+  const abortControllerRef = useRef(null);
+
+  // ─── Load services from database ──────────────────────────────
+  const loadServices = useCallback(async () => {
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await publicAPI.getServices({
+        page: pagination.page,
+        limit: pagination.limit,
+        search: searchTerm || undefined,
+        department: filterDept !== "All" ? filterDept : undefined,
+      });
+
+      if (response.data.success) {
+        setServices(response.data.data);
+        setPagination({
+          page: response.data.pagination.page,
+          total: response.data.pagination.total,
+          totalPages: response.data.pagination.totalPages,
+          limit: response.data.pagination.limit || 12,
+        });
+      }
+    } catch (error) {
+      if (error.name !== "AbortError" && error.code !== "ERR_CANCELED") {
+        console.error("Failed to load services:", error);
+        setError("Failed to load services. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [pagination.page, pagination.limit, searchTerm, filterDept]);
+
+  // ─── Load departments ──────────────────────────────────────────
+  const loadDepartments = useCallback(async () => {
+    try {
+      const response = await publicAPI.getDepartments();
+      if (response.data.success) {
+        setDepartments(["All", ...response.data.data]);
+      }
+    } catch (error) {
+      console.error("Failed to load departments:", error);
+    }
+  }, []);
+
+  // ─── Initial load ──────────────────────────────────────────────
+  const hasLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
+
+    const loadInitialData = async () => {
+      await loadDepartments();
+      await loadServices();
+    };
+
+    loadInitialData();
+
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [loadDepartments, loadServices]);
+
+  // ─── Handle search/filter changes with debounce ───────────────
+  // ─── Handle search/filter changes with debounce ───────────────
+  useEffect(() => {
+    // Skip initial load - only run when search or filter changes
+    if (!searchTerm && filterDept === "All") return;
+
+    const timer = setTimeout(() => {
+      loadServices();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm, filterDept, loadServices]);
 
   // ─── Memoized stats ──────────────────────────────────────────
   const stats = useMemo(() => {
-    const agencies = new Set((services || []).map((s) => s.deptEn || s.dept))
+    const agencies = new Set((services || []).map((s) => s.dept || s.deptEn))
       .size;
     return { services: (services || []).length, agencies };
   }, [services]);
 
-  // ─── Departments list ──────────────────────────────────────
-  const departments = useMemo(() => {
+  // ─── Departments list for marquee ─────────────────────────────
+  const departmentsList = useMemo(() => {
     const seen = new Set();
     const list = [];
     (services || []).forEach((s) => {
-      const dept = s.deptEn || s.dept;
+      const dept = s.dept || s.deptEn;
       if (dept && !seen.has(dept)) {
         seen.add(dept);
         list.push(dept);
@@ -733,43 +830,7 @@ export default function Landing() {
     return list;
   }, [services]);
 
-  // ─── Localized services ──────────────────────────────────────
-  const localizedServices = useMemo(() => {
-    return services.map((s) => ({
-      ...s,
-      displayName:
-        language === "en"
-          ? s.nameEn || s.name || "Unnamed Service"
-          : s.name || "Unnamed Service",
-      displayDept:
-        language === "en"
-          ? s.deptEn || s.dept || "Uncategorized"
-          : s.dept || "Uncategorized",
-    }));
-  }, [services, language]);
-
-  // ─── Filtered services ──────────────────────────────────────
-  const filteredServices = useMemo(() => {
-    return localizedServices.filter((s) => {
-      const matchesDept = filterDept === "All" || s.displayDept === filterDept;
-      const matchesSearch =
-        s.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.nameEn?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.displayDept?.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesDept && matchesSearch;
-    });
-  }, [localizedServices, filterDept, searchTerm]);
-
-  // ─── All departments for filter ────────────────────────────
-  const allDepts = useMemo(() => {
-    return [
-      "All",
-      ...new Set(localizedServices.map((s) => s.displayDept).filter(Boolean)),
-    ];
-  }, [localizedServices]);
-
-  // ─── Get service icon ──────────────────────────────────────
+  // ─── Get service icon ──────────────────────────────────────────
   const getServiceIcon = (index) => {
     const icons = [
       <FiTool size={24} />,
@@ -853,8 +914,12 @@ export default function Landing() {
   const getText = (obj) => obj[language] || obj.en;
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  // ─── Service display limit ──────────────────────────────────
-  const displayServices = filteredServices.slice(0, 12);
+  // ─── Load more ──────────────────────────────────────────────────
+  const loadMore = () => {
+    if (pagination.page < pagination.totalPages) {
+      setPagination((prev) => ({ ...prev, page: prev.page + 1 }));
+    }
+  };
 
   return (
     <div
@@ -885,6 +950,10 @@ export default function Landing() {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
 
         .mesob-orbit-text {
           transform-origin: 170px 170px;
@@ -902,7 +971,9 @@ export default function Landing() {
         .lp-nav-link.active::after {
           content: "";
           position: absolute;
-          left: 0; right: 0; bottom: -6px;
+          left: 0;
+          right: 0;
+          bottom: -6px;
           height: 2px;
           background: ${C.gold};
           border-radius: 2px;
@@ -926,7 +997,6 @@ export default function Landing() {
           background: ${C.gold};
           color: ${C.dark};
           padding: 10px 16px;
-          borderRadius: 8px;
           border-radius: 8px;
           font-weight: 700;
           font-size: 13px;
@@ -961,7 +1031,7 @@ export default function Landing() {
           zIndex: 30,
           background: "rgba(6,11,46,0.9)",
           backdropFilter: "blur(10px)",
-          borderBottom: `1px solid rgba(255,255,255,0.08)`,
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
           padding: "12px clamp(16px, 5vw, 48px)",
           display: "flex",
           alignItems: "center",
@@ -1117,7 +1187,7 @@ export default function Landing() {
             display: "flex",
             flexDirection: "column",
             gap: 14,
-            borderBottom: `1px solid rgba(255,255,255,0.08)`,
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
             animation: "lp-fade-in 0.2s ease",
           }}
         >
@@ -1221,7 +1291,7 @@ export default function Landing() {
                 alignItems: "center",
                 gap: 8,
                 background: "rgba(245,197,24,0.16)",
-                border: `1px solid ${C.gold}55`,
+                border: "1px solid rgba(245,197,24,0.33)",
                 color: C.goldLight,
                 padding: "6px 14px",
                 borderRadius: 999,
@@ -1360,13 +1430,13 @@ export default function Landing() {
       </section>
 
       {/* ── DEPARTMENTS MARQUEE ──────────────────────────── */}
-      {departments.length > 0 && (
+      {departmentsList.length > 0 && (
         <section
           style={{
             background: C.dark,
             padding: "18px 0",
             overflow: "hidden",
-            borderBottom: `1px solid rgba(255,255,255,0.08)`,
+            borderBottom: "1px solid rgba(255,255,255,0.08)",
           }}
         >
           <div
@@ -1392,7 +1462,7 @@ export default function Landing() {
                 animation: "marquee-scroll 32s linear infinite",
               }}
             >
-              {[...departments, ...departments].map((d, i) => (
+              {[...departmentsList, ...departmentsList].map((d, i) => (
                 <span
                   key={i}
                   style={{
@@ -1580,7 +1650,10 @@ export default function Landing() {
           </div>
           <select
             value={filterDept}
-            onChange={(e) => setFilterDept(e.target.value)}
+            onChange={(e) => {
+              setFilterDept(e.target.value);
+              setPagination((prev) => ({ ...prev, page: 1 }));
+            }}
             style={{
               padding: "10px 14px",
               border: `1px solid ${C.border}`,
@@ -1594,7 +1667,7 @@ export default function Landing() {
             onFocus={(e) => (e.currentTarget.style.borderColor = C.primary)}
             onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
           >
-            {allDepts.map((d) => (
+            {departments.map((d) => (
               <option key={d} value={d}>
                 {d}
               </option>
@@ -1603,142 +1676,161 @@ export default function Landing() {
         </div>
 
         {/* Services Grid */}
-        {displayServices.length === 0 ? (
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
+            <FiLoader
+              size={32}
+              style={{ animation: "spin 1s linear infinite" }}
+            />
+            <p>Loading services from database...</p>
+          </div>
+        ) : error ? (
+          <div
+            style={{ textAlign: "center", padding: "40px", color: "#dc2626" }}
+          >
+            {error}
+          </div>
+        ) : services.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
             <FiPackage size={48} style={{ marginBottom: 12, opacity: 0.5 }} />
             <p>No services found matching your criteria</p>
           </div>
         ) : (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns:
-                "repeat(auto-fill, minmax(min(100%, 200px), 1fr))",
-              gap: 16,
-            }}
-          >
-            {displayServices.map((s, i) => (
-              <div
-                key={s._id || i}
-                style={{
-                  background: C.white,
-                  borderRadius: 12,
-                  padding: "16px 18px",
-                  border: `1px solid ${C.border}`,
-                  transition: "all 0.3s ease",
-                  cursor: "default",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-4px)";
-                  e.currentTarget.style.boxShadow =
-                    "0 8px 30px rgba(0,0,0,0.1)";
-                  e.currentTarget.style.borderColor = C.primary;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
-                  e.currentTarget.style.borderColor = C.border;
-                }}
-              >
-                <div
-                  style={{ fontSize: 28, color: C.primary, marginBottom: 8 }}
-                >
-                  {getServiceIcon(i)}
-                </div>
-                <div
-                  style={{
-                    fontWeight: 700,
-                    fontSize: 14,
-                    color: C.dark,
-                    marginBottom: 2,
-                  }}
-                >
-                  {s.displayName}
-                </div>
-                {s.nameEn && s.nameEn !== s.displayName && (
-                  <div style={{ fontSize: 11, color: "#bbb", marginBottom: 4 }}>
-                    {s.nameEn}
-                  </div>
-                )}
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: "#888",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                    marginBottom: 8,
-                  }}
-                >
-                  <FiBriefcase size={12} />
-                  {s.displayDept}
-                </div>
-                <span
-                  style={{
-                    background: s.active ? C.bg : "#ffeee8",
-                    color: s.active ? C.primary : C.orange,
-                    borderRadius: 12,
-                    padding: "2px 10px",
-                    fontSize: 10,
-                    fontWeight: 700,
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  {s.active ? (
-                    <>
-                      <FiCheck size={10} /> Active
-                    </>
-                  ) : (
-                    "Inactive"
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {filteredServices.length > 12 && (
-          <div style={{ textAlign: "center", marginTop: 20 }}>
-            <button
-              onClick={() => navigate("/services")}
+          <>
+            <div
               style={{
-                padding: "10px 24px",
-                background: C.primary,
-                color: "#fff",
-                border: "none",
-                borderRadius: 8,
-                fontWeight: 600,
-                fontSize: 14,
-                cursor: "pointer",
-                transition: "all 0.3s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = `0 4px 16px ${C.primary}44`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(min(100%, 200px), 1fr))",
+                gap: 16,
               }}
             >
-              View All {filteredServices.length} Services →
-            </button>
-          </div>
-        )}
+              {services.map((s, i) => (
+                <div
+                  key={s._id || i}
+                  style={{
+                    background: C.white,
+                    borderRadius: 12,
+                    padding: "16px 18px",
+                    border: `1px solid ${C.border}`,
+                    transition: "all 0.3s ease",
+                    cursor: "default",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-4px)";
+                    e.currentTarget.style.boxShadow =
+                      "0 8px 30px rgba(0,0,0,0.1)";
+                    e.currentTarget.style.borderColor = C.primary;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "none";
+                    e.currentTarget.style.borderColor = C.border;
+                  }}
+                >
+                  <div
+                    style={{ fontSize: 28, color: C.primary, marginBottom: 8 }}
+                  >
+                    {getServiceIcon(i)}
+                  </div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 14,
+                      color: C.dark,
+                      marginBottom: 2,
+                    }}
+                  >
+                    {language === "en" ? s.nameEn || s.name : s.name}
+                  </div>
+                  {s.nameEn && language === "en" && (
+                    <div
+                      style={{ fontSize: 11, color: "#bbb", marginBottom: 4 }}
+                    >
+                      {s.name}
+                    </div>
+                  )}
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "#888",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <FiBriefcase size={12} />
+                    {language === "en" ? s.deptEn || s.dept : s.dept}
+                  </div>
+                  <span
+                    style={{
+                      background: s.active ? C.bg : "#ffeee8",
+                      color: s.active ? C.primary : C.orange,
+                      borderRadius: 12,
+                      padding: "2px 10px",
+                      fontSize: 10,
+                      fontWeight: 700,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    {s.active ? (
+                      <>
+                        <FiCheck size={10} /> Active
+                      </>
+                    ) : (
+                      "Inactive"
+                    )}
+                  </span>
+                </div>
+              ))}
+            </div>
 
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: 12,
-            fontSize: 12,
-            color: C.muted,
-          }}
-        >
-          {filteredServices.length} services available • Login to access full
-          features
-        </div>
+            {/* Pagination - Load More */}
+            {pagination.totalPages > 1 && (
+              <div style={{ textAlign: "center", marginTop: 24 }}>
+                <button
+                  onClick={loadMore}
+                  disabled={pagination.page >= pagination.totalPages}
+                  style={{
+                    padding: "10px 24px",
+                    background: C.primary,
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    fontSize: 14,
+                    cursor:
+                      pagination.page >= pagination.totalPages
+                        ? "not-allowed"
+                        : "pointer",
+                    opacity: pagination.page >= pagination.totalPages ? 0.5 : 1,
+                    transition: "all 0.3s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (pagination.page < pagination.totalPages) {
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = `0 4px 16px ${C.primary}44`;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  {pagination.page >= pagination.totalPages
+                    ? "No More Services"
+                    : "Load More Services"}
+                </button>
+                <div style={{ marginTop: 8, fontSize: 12, color: C.muted }}>
+                  Showing {services.length} of {pagination.total} services
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </section>
 
       {/* ── HOW IT WORKS ─────────────────────────────────── */}
@@ -2047,6 +2139,13 @@ export default function Landing() {
       >
         <FiArrowUp size={18} />
       </button>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
