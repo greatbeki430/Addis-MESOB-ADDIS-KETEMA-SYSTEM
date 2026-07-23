@@ -5,9 +5,75 @@ const {
   postPresenterAnnouncement,
   testTelegramConnection,
   sendTestMessage,
+  handleWebhookUpdate,
+  setWebhook,
+  getWebhookInfo,
 } = require("../services/telegramService");
 const GoldenMondaySession = require("../models/GoldenMondaySession");
 const { protect, adminOrSuperAdmin } = require("../middleware/auth");
+
+/**
+ * TELEGRAM WEBHOOK - Receives updates from Telegram
+ * POST /api/telegram/webhook
+ */
+router.post("/webhook", async (req, res) => {
+  try {
+    console.log("📨 Webhook POST received");
+    await handleWebhookUpdate(req.body);
+    res.sendStatus(200);
+  } catch (error) {
+    console.error("❌ Webhook error:", error.message);
+    res.sendStatus(200);
+  }
+});
+
+/**
+ * Set the webhook URL with Telegram
+ * POST /api/telegram/set-webhook
+ */
+router.post("/set-webhook", protect, adminOrSuperAdmin, async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing 'url' in request body",
+      });
+    }
+    const result = await setWebhook(url);
+    res.json({
+      success: result,
+      message: result ? "Webhook set successfully" : "Failed to set webhook",
+      url: url,
+    });
+  } catch (error) {
+    console.error("Error setting webhook:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+/**
+ * Get current webhook status
+ * GET /api/telegram/webhook-info
+ */
+router.get("/webhook-info", protect, adminOrSuperAdmin, async (req, res) => {
+  try {
+    const info = await getWebhookInfo();
+    res.json({
+      success: true,
+      info,
+    });
+  } catch (error) {
+    console.error("Error getting webhook info:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
 
 /**
  * Test Telegram connection
@@ -21,6 +87,7 @@ router.get("/test", async (req, res) => {
       message: result ? "Bot is connected!" : "Bot connection failed",
       botToken: process.env.TELEGRAM_BOT_TOKEN ? "✅ Set" : "❌ Missing",
       channelId: process.env.TELEGRAM_CHANNEL_ID ? "✅ Set" : "❌ Missing",
+      adminGroupId: process.env.TELEGRAM_ADMIN_GROUP_ID ? "✅ Set" : "❌ Missing",
     });
   } catch (error) {
     console.error("Test error:", error);
@@ -71,7 +138,6 @@ router.post(
 
       const result = await postPresenterAnnouncement(session);
 
-      // Update session with Telegram post info
       if (result.postId) {
         session.telegramPostId = result.postId;
         session.telegramPostedAt = new Date();
