@@ -792,9 +792,10 @@ export default function Landing() {
         abortControllerRef.current.abort();
       }
     };
-  }, [loadDepartments, loadServices]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // ✅ Empty dependency array - only runs once
 
-  // ─── Handle search/filter changes with debounce ───────────────
+  // ─── Handle page, search, and filter changes ───────────────
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -802,12 +803,11 @@ export default function Landing() {
     }
 
     const timer = setTimeout(() => {
-      setCurrentPage(1);
       loadServices();
-    }, 500);
+    }, 300);
 
     return () => clearTimeout(timer);
-  }, [searchTerm, filterDept, loadServices]);
+  }, [currentPage, searchTerm, filterDept, loadServices]); // ✅ Added currentPage
 
   // ─── Memoized stats ──────────────────────────────────────────
   const stats = useMemo(() => {
@@ -917,8 +917,12 @@ export default function Landing() {
   // ─── Pagination handlers ──────────────────────────────────────
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-      // Service grid will auto-update via useEffect
+      setCurrentPage(page); // ✅ This now triggers the useEffect above
+      // Scroll to services grid
+      const gridElement = document.getElementById("services-grid");
+      if (gridElement) {
+        gridElement.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
   };
 
@@ -1496,13 +1500,15 @@ export default function Landing() {
             className="lp-marquee-track"
             style={{
               display: "flex",
-              gap: 32,
-              paddingRight: 32,
-              animation: "marquee-scroll 32s linear infinite",
+              gap: 48, // ✅ Increased gap
+              paddingRight: 48, // ✅ Increased padding
+              animation: "marquee-scroll 40s linear infinite", // ✅ Slower animation
             }}
           >
             {departmentsList.length > 0
-              ? [
+              ? // ✅ Added more repetitions to fill screen
+                [
+                  ...departmentsList,
                   ...departmentsList,
                   ...departmentsList,
                   ...departmentsList,
