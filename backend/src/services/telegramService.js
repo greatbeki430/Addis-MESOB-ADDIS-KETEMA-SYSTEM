@@ -1,8 +1,18 @@
 // backend/src/services/telegramService.js
 // Telegram bot integration for Golden Monday announcements
+// + Employee self-registration (webhook version)
+
+const crypto = require("crypto");
+const PendingRegistration = require("../models/PendingRegistration");
+const { createUserAccount } = require("../controllers/authController");
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
+const TELEGRAM_ADMIN_GROUP_ID = process.env.TELEGRAM_ADMIN_GROUP_ID;
+
+// =====================================================================
+// EXISTING CODE - Announcement functions (unchanged)
+// =====================================================================
 
 /**
  * Generate an announcement image (placeholder until AI service is ready)
@@ -66,14 +76,12 @@ const postPresenterAnnouncement = async (session) => {
 
     const telegramApiUrl = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
-    // Log what we're sending
     console.log(`📤 Sending to Telegram:`);
     console.log(`   Chat ID: ${TELEGRAM_CHANNEL_ID}`);
     console.log(`   Message: ${message.substring(0, 100)}...`);
 
     let response;
     if (imageUrl) {
-      // Send with image using fetch
       response = await fetch(`${telegramApiUrl}/sendPhoto`, {
         method: "POST",
         headers: {
@@ -87,7 +95,6 @@ const postPresenterAnnouncement = async (session) => {
         }),
       });
     } else {
-      // Send text only using fetch
       response = await fetch(`${telegramApiUrl}/sendMessage`, {
         method: "POST",
         headers: {
@@ -103,10 +110,8 @@ const postPresenterAnnouncement = async (session) => {
 
     const data = await response.json();
 
-    // ✅ Log the full response for debugging
     console.log(`📥 Telegram Response:`, JSON.stringify(data, null, 2));
 
-    // ✅ Check if the response was successful
     if (!data.ok) {
       console.error(`❌ Telegram API Error: ${data.description}`);
       return {
@@ -116,7 +121,6 @@ const postPresenterAnnouncement = async (session) => {
       };
     }
 
-    // ✅ Properly extract postId from response
     const postId = data.result?.message_id;
 
     if (!postId) {
@@ -124,7 +128,6 @@ const postPresenterAnnouncement = async (session) => {
       return { postId: null, messageUrl: null };
     }
 
-    // ✅ Get channel username or use channel ID for URL
     const channelUsername = data.result?.chat?.username || "AddisMESOBGM";
     const messageUrl = `https://t.me/${channelUsername}/${postId}`;
 
@@ -200,9 +203,414 @@ const sendTestMessage = async () => {
   }
 };
 
+// =====================================================================
+// REGISTRATION CODE - Webhook version (REPLACES polling)
+// =====================================================================
+
+const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
+
+async function callTelegramApi(method, payload) {
+  const res = await fetch(`${TELEGRAM_API}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!data.ok) {
+    console.error(`❌ Telegram ${method} error:`, data.description);
+  }
+  return data;
+}
+
+const sendMessage = (chatId, text, extra = {}) =>
+  callTelegramApi("sendMessage", { chat_id: chatId, text, ...extra });
+
+function generateOtp() {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+function otpExpiry(minutes = 10) {
+  return new Date(Date.now() + minutes * 60 * 1000);
+}
+
+function generateTempPassword() {
+  return crypto.randomBytes(8).toString("base64url").slice(0, 10);
+}
+
+// In-memory conversation state per chat
+const registrationSessions = new Map();
+
+const STEPS = {
+  NAME: "awaiting_name",
+  EMAIL: "awaiting_email",
+  PHONE: "awaiting_phone",
+  OTP: "awaiting_otp",
+};
+
+async function handleStart(msg) {
+  const chatId = msg.chat.id.toString();
+
+  const existingPending = await PendingRegistration.findOne({
+    telegramChatId: chatId,
+  }).sort({ createdAt: -1 });
+
+  if (existingPending) {
+    if (existingPending.status === "approved") {
+      return sendMessage(
+        chatId,
+        `You're already registered ✅\nYou can log in with the email you registered with.`,
+      );
+    }
+    if (existingPending.status === "pending_approval") {
+      return sendMessage(
+        chatId,
+        "Your registration is already submitted and awaiting admin approval. We'll message you here once it's reviewed.",
+      );
+    }
+    // pending_otp / rejected -> fall through, let them start a fresh one
+  }
+
+  registrationSessions.set(chatId, {
+    step: STEPS.NAME,
+    data: { telegramUsername: msg.from.username || "" },
+  });
+  sendMessage(
+    chatId,
+    "Welcome to Addis MESOB employee registration 👋\n\nWhat is your full name?",
+  );
+}
+
+async function handleRegistrationMessage(msg) {
+  const chatId = msg.chat.id.toString();
+  const session = registrationSessions.get(chatId);
+  if (!session) return;
+
+  const text = (msg.text || "").trim();
+
+  switch (session.step) {
+    case STEPS.NAME:
+      session.data.name = text;
+      session.step = STEPS.EMAIL;
+      sendMessage(
+        chatId,
+        "What is your email address? (this will be your login)",
+      );
+      break;
+
+    case STEPS.EMAIL: {
+      const email = text.toLowerCase();
+      const User = require("../models/User");
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return sendMessage(
+          chatId,
+          "That email is already registered. Please send a different email, or contact an admin if this is your account.",
+        );
+      }
+      session.data.email = email;
+      session.step = STEPS.PHONE;
+      sendMessage(chatId, 'What is your phone number? (or type "skip")');
+      break;
+    }
+
+    case STEPS.PHONE: {
+      session.data.phone = text.toLowerCase() === "skip" ? "" : text;
+
+      const otpCode = generateOtp();
+      const pending = await PendingRegistration.create({
+        telegramChatId: chatId,
+        telegramUsername: session.data.telegramUsername,
+        name: session.data.name,
+        email: session.data.email,
+        phone: session.data.phone,
+        status: "pending_otp",
+        otpCode,
+        otpExpiresAt: otpExpiry(10),
+      });
+
+      session.step = STEPS.OTP;
+      session.pendingId = pending._id.toString();
+      sendMessage(
+        chatId,
+        `Thanks! Your verification code is: ${otpCode}\n\nReply with this code to confirm (valid for 10 minutes).`,
+      );
+      break;
+    }
+
+    case STEPS.OTP: {
+      const pending = await PendingRegistration.findById(
+        session.pendingId,
+      ).select("+otpCode +otpExpiresAt");
+      if (!pending) {
+        registrationSessions.delete(chatId);
+        return sendMessage(
+          chatId,
+          "Something went wrong — please send /start to try again.",
+        );
+      }
+      if (!pending.otpExpiresAt || pending.otpExpiresAt < new Date()) {
+        registrationSessions.delete(chatId);
+        return sendMessage(
+          chatId,
+          "That code expired. Please send /start to try again.",
+        );
+      }
+      if (text !== pending.otpCode) {
+        return sendMessage(
+          chatId,
+          "That code doesn't match — please check and try again.",
+        );
+      }
+
+      pending.otpVerified = true;
+      pending.status = "pending_approval";
+      pending.otpCode = undefined;
+      pending.otpExpiresAt = undefined;
+      await pending.save();
+
+      registrationSessions.delete(chatId);
+      sendMessage(
+        chatId,
+        "Verified ✅ Your registration has been sent for admin approval. We'll message you here once it's reviewed.",
+      );
+
+      notifyAdminsForApproval(pending);
+      break;
+    }
+  }
+}
+
+async function notifyAdminsForApproval(pending) {
+  if (!TELEGRAM_ADMIN_GROUP_ID) {
+    console.warn(
+      "[telegramService] TELEGRAM_ADMIN_GROUP_ID not set — cannot notify admins.",
+    );
+    return;
+  }
+
+  const text =
+    `📋 New employee registration\n\n` +
+    `Name: ${pending.name}\n` +
+    `Email: ${pending.email}\n` +
+    `Phone: ${pending.phone || "not provided"}\n` +
+    `Telegram: @${pending.telegramUsername || "n/a"}`;
+
+  await sendMessage(TELEGRAM_ADMIN_GROUP_ID, text, {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Approve", callback_data: `approve:${pending._id}` },
+          { text: "❌ Reject", callback_data: `reject:${pending._id}` },
+        ],
+      ],
+    },
+  });
+}
+
+/**
+ * Shared approval logic
+ */
+async function approveRegistration(pendingId, reviewer) {
+  const pending = await PendingRegistration.findById(pendingId);
+  if (!pending) throw new Error("Registration not found");
+  if (pending.status !== "pending_approval") {
+    throw new Error(`Cannot approve from status "${pending.status}"`);
+  }
+
+  const tempPassword = generateTempPassword();
+  const user = await createUserAccount({
+    name: pending.name,
+    email: pending.email,
+    password: tempPassword,
+    role: "employee",
+    phone: pending.phone,
+    telegramChatId: pending.telegramChatId,
+  });
+
+  pending.status = "approved";
+  pending.createdUser = user._id;
+  pending.reviewedBy = reviewer?._id || undefined;
+  pending.reviewedByName = reviewer?.name || "unknown";
+  pending.reviewedAt = new Date();
+  await pending.save();
+
+  await sendMessage(
+    pending.telegramChatId,
+    `You've been approved ✅\n\nYou can now log in:\nEmail: ${pending.email}\nTemporary password: ${tempPassword}\n\nPlease log in and change your password when you get the chance.`,
+  );
+
+  return { pending, user };
+}
+
+async function rejectRegistration(pendingId, reviewer, reason) {
+  const pending = await PendingRegistration.findById(pendingId);
+  if (!pending) throw new Error("Registration not found");
+
+  pending.status = "rejected";
+  pending.rejectionReason = reason || "";
+  pending.reviewedBy = reviewer?._id || undefined;
+  pending.reviewedByName = reviewer?.name || "unknown";
+  pending.reviewedAt = new Date();
+  await pending.save();
+
+  await sendMessage(
+    pending.telegramChatId,
+    "Your registration could not be approved. Please contact HR/admin for details.",
+  );
+
+  return pending;
+}
+
+async function handleCallbackQuery(query) {
+  const [action, pendingId] = query.data.split(":");
+  const reviewer = {
+    _id: null,
+    name: query.from.username || query.from.first_name,
+  };
+
+  try {
+    if (action === "approve") {
+      await approveRegistration(pendingId, reviewer);
+      await callTelegramApi("answerCallbackQuery", {
+        callback_query_id: query.id,
+        text: "Approved",
+      });
+      await callTelegramApi("editMessageText", {
+        chat_id: query.message.chat.id,
+        message_id: query.message.message_id,
+        text: `${query.message.text}\n\n✅ Approved by ${reviewer.name}`,
+      });
+    } else if (action === "reject") {
+      await rejectRegistration(pendingId, reviewer);
+      await callTelegramApi("answerCallbackQuery", {
+        callback_query_id: query.id,
+        text: "Rejected",
+      });
+      await callTelegramApi("editMessageText", {
+        chat_id: query.message.chat.id,
+        message_id: query.message.message_id,
+        text: `${query.message.text}\n\n❌ Rejected by ${reviewer.name}`,
+      });
+    }
+  } catch (err) {
+    console.error("❌ Error handling approval callback:", err.message);
+    await callTelegramApi("answerCallbackQuery", {
+      callback_query_id: query.id,
+      text: `Error: ${err.message}`,
+    });
+  }
+}
+
+/**
+ * WEBHOOK HANDLER - Replaces pollLoop()
+ * This gets called by Telegram via POST /api/telegram/webhook
+ */
+async function handleWebhookUpdate(update) {
+  try {
+    console.log(`📨 Webhook update received:`, JSON.stringify(update, null, 2));
+
+    if (update.message) {
+      const msg = update.message;
+      if (msg.text?.startsWith("/start")) {
+        await handleStart(msg);
+      } else {
+        await handleRegistrationMessage(msg);
+      }
+    } else if (update.callback_query) {
+      await handleCallbackQuery(update.callback_query);
+    }
+  } catch (err) {
+    console.error("❌ Error handling webhook update:", err.message);
+  }
+}
+
+/**
+ * Set the webhook URL with Telegram
+ * Call this once after deployment
+ */
+async function setWebhook(webhookUrl) {
+  if (!TELEGRAM_BOT_TOKEN) {
+    console.error("❌ TELEGRAM_BOT_TOKEN not configured");
+    return false;
+  }
+
+  try {
+    const response = await fetch(
+      `${TELEGRAM_API}/setWebhook?url=${encodeURIComponent(webhookUrl)}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      },
+    );
+    const data = await response.json();
+    if (data.ok) {
+      console.log(`✅ Webhook set successfully to: ${webhookUrl}`);
+      return true;
+    } else {
+      console.error(`❌ Failed to set webhook:`, data.description);
+      return false;
+    }
+  } catch (error) {
+    console.error(`❌ Error setting webhook:`, error.message);
+    return false;
+  }
+}
+
+/**
+ * Get current webhook status
+ */
+async function getWebhookInfo() {
+  if (!TELEGRAM_BOT_TOKEN) {
+    console.error("❌ TELEGRAM_BOT_TOKEN not configured");
+    return null;
+  }
+
+  try {
+    const response = await fetch(`${TELEGRAM_API}/getWebhookInfo`);
+    const data = await response.json();
+    if (data.ok) {
+      console.log(`📋 Webhook info:`, data.result);
+      return data.result;
+    } else {
+      console.error(`❌ Failed to get webhook info:`, data.description);
+      return null;
+    }
+  } catch (error) {
+    console.error(`❌ Error getting webhook info:`, error.message);
+    return null;
+  }
+}
+
+// =====================================================================
+// EXPORTS - Updated to webhook version
+// =====================================================================
+
 module.exports = {
+  // Existing exports
   postPresenterAnnouncement,
   generateAnnouncementImage,
   testTelegramConnection,
   sendTestMessage,
+
+  // New webhook exports (replaces polling exports)
+  handleWebhookUpdate, // ← Main webhook handler
+  setWebhook, // ← One-time setup
+  getWebhookInfo, // ← Debug tool
+
+  // Registration management (unchanged)
+  approveRegistration,
+  rejectRegistration,
+  sendMessage,
+
+  // Deprecated - kept for backward compatibility but does nothing
+  startRegistrationPolling: () => {
+    console.warn(
+      "⚠️ startRegistrationPolling is deprecated. Use webhook instead.",
+    );
+  },
+  stopRegistrationPolling: () => {
+    console.warn(
+      "⚠️ stopRegistrationPolling is deprecated. Use webhook instead.",
+    );
+  },
 };

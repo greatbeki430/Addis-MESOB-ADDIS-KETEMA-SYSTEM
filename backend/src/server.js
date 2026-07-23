@@ -33,6 +33,10 @@ const telegramRoutes = require("./routes/telegramRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const publicRoutes = require("./routes/publicRoutes");
+const registrationRoutes = require("./routes/registrationRoutes");
+
+// REMOVED: startRegistrationPolling import - no longer needed for webhook
+// const { startRegistrationPolling } = require("./services/telegramService");
 
 const app = express();
 
@@ -147,6 +151,7 @@ app.use("/api/golden-monday", goldenMondayRoutes);
 app.use("/api/telegram", telegramRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/registrations", registrationRoutes);
 
 // Departments — NEW
 app.use("/api/departments", departmentRoutes);
@@ -177,6 +182,7 @@ app.get("/", (req, res) => {
       documents: "/api/documents",
       "golden-monday": "/api/golden-monday",
       departments: "/api/departments",
+      "telegram-webhook": "/api/telegram/webhook",
     },
   });
 });
@@ -197,6 +203,14 @@ const startServer = async () => {
     await connectDB();
     console.log("✅ Database connected successfully");
 
+    // 🚀 WEBHOOK MODE - Polling disabled
+    // The Telegram bot now uses webhooks via POST /api/telegram/webhook
+    // To set the webhook, call POST /api/telegram/set-webhook after deployment
+    console.log("🤖 Telegram bot configured for WEBHOOK mode");
+    console.log(
+      `🔗 Webhook endpoint: https://your-app.onrender.com/api/telegram/webhook`,
+    );
+
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
@@ -204,6 +218,7 @@ const startServer = async () => {
       console.log(
         `🤖 AI routes: /api/ai, /api/chatbot, /api/documents, /api/golden-monday`,
       );
+      console.log(`📨 Telegram webhook ready at /api/telegram/webhook`);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);

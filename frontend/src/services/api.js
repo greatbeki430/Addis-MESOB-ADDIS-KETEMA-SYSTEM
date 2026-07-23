@@ -271,99 +271,180 @@ export const departmentAPI = {
 // GOLDEN MONDAY API — COMPLETE
 // ============================================================
 export const goldenMondayAPI = {
-  // ── Sessions ──
-  // GET /api/golden-monday - Get all sessions
+  // ──────────────────────────────────────────────────────────────
+  // 📋 SESSIONS MANAGEMENT
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/golden-monday - Get all sessions (past, present, future)
   getAll: () => api.get("/golden-monday"),
   getSessions: () => api.get("/golden-monday"),
 
-  // GET /api/golden-monday/sessions/upcoming - Get upcoming sessions
+  // GET /api/golden-monday/sessions/upcoming - Get only future sessions
   getUpcomingSessions: () => api.get("/golden-monday/sessions/upcoming"),
 
-  // GET /api/golden-monday/sessions/past - Get past sessions
+  // GET /api/golden-monday/sessions/past - Get only past sessions
   getPastSessions: () => api.get("/golden-monday/sessions/past"),
 
-  // POST /api/golden-monday - Create a session
+  // POST /api/golden-monday - Create a new Golden Monday session
   create: (data) => api.post("/golden-monday", data),
   createSession: (data) => api.post("/golden-monday", data),
 
-  // POST /api/golden-monday/recap - Generate AI recap preview
+  // POST /api/golden-monday/recap - Generate AI-powered recap preview
   previewRecap: (data) => api.post("/golden-monday/recap", data),
 
-  // GET /api/golden-monday/suggest-topics - AI topic suggestions
+  // GET /api/golden-monday/suggest-topics - Get AI-suggested topics
   suggestTopics: () => api.get("/golden-monday/suggest-topics"),
   getSuggestedTopics: () => api.get("/golden-monday/suggest-topics"),
 
-  // ── Recordings ──
-  // GET /api/golden-monday/recordings/live - Get live recordings
+  // ──────────────────────────────────────────────────────────────
+  // 🎥 RECORDINGS MANAGEMENT
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/golden-monday/recordings/live - Get currently available recordings
   getLiveRecordings: () => api.get("/golden-monday/recordings/live"),
 
-  // POST /api/golden-monday/:sessionId/recording - Upload recording
+  // POST /api/golden-monday/:sessionId/recording - Upload a recording for a session
+  // @param {string} sessionId - The session ID
+  // @param {File} file - The recording file to upload
+  // @param {number} visibleDays - Days the recording should remain available
   uploadRecording: (sessionId, file, visibleDays) =>
     api.post(`/golden-monday/${sessionId}/recording`, { file, visibleDays }),
 
-  // DELETE /api/golden-monday/:sessionId/recording - Remove recording
+  // DELETE /api/golden-monday/:sessionId/recording - Remove a session's recording
   removeRecording: (sessionId) =>
     api.delete(`/golden-monday/${sessionId}/recording`),
 
-  // ── Rotation Roster ──
-  // GET /api/golden-monday/roster - Get roster
+  // ──────────────────────────────────────────────────────────────
+  // 👥 ROSTER MANAGEMENT (Employee Rotation Pool)
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/golden-monday/roster - Get all employees in the rotation roster
   getRoster: () => api.get("/golden-monday/roster"),
   getEmployees: () => api.get("/golden-monday/roster"),
 
-  // POST /api/golden-monday/roster - Add to roster
-  // Accepts: userId, department, position, profilePhotoUrl, phone,
-  // hireDate, skills, notes, emergencyContact, address, and (for
-  // admin/superadmin callers only — enforced server-side) salary.
+  // POST /api/golden-monday/roster - Add a user to the roster
+  // @param {string} userId - The user ID to add
+  // @param {string} department - The user's department
+  // Accepts additional fields: position, profilePhotoUrl, phone, hireDate,
+  // skills, notes, emergencyContact, address, salary (admin/superadmin only)
   addToRoster: (userId, department) =>
     api.post("/golden-monday/roster", { userId, department }),
   registerEmployee: (data) => api.post("/golden-monday/roster", data),
 
-  // PUT /api/golden-monday/roster/:id - Update roster entry
-  // Same field set as addToRoster/registerEmployee above.
+  // PUT /api/golden-monday/roster/:id - Update an employee's roster entry
+  // @param {string} id - The roster entry ID
+  // @param {Object} updates - Fields to update (name, department, position, etc.)
   updateRosterEntry: (id, updates) =>
     api.put(`/golden-monday/roster/${id}`, updates),
+
+  // PUT /api/golden-monday/roster/:userId - Toggle employee eligibility
+  // @param {string} userId - The user ID
+  // @param {boolean} isEligible - true = eligible for rotation, false = excluded
   updateEmployeeEligibility: (userId, isEligible) =>
     api.put(`/golden-monday/roster/${userId}`, { isEligible }),
 
-  // DELETE /api/golden-monday/roster/:id - Remove from roster
+  // DELETE /api/golden-monday/roster/:id - Remove an employee from the roster
   removeFromRoster: (id) => api.delete(`/golden-monday/roster/${id}`),
   removeEmployee: (userId) => api.delete(`/golden-monday/roster/${userId}`),
 
-  // ── Rotation Engine ──
+  // ──────────────────────────────────────────────────────────────
+  // 🔄 ROTATION ENGINE (Fair Presenter Selection Algorithm)
+  // ──────────────────────────────────────────────────────────────
+
   // GET /api/golden-monday/rotation/preview - Preview rotation ranking
+  // @param {string} weekOf - The week date to preview (e.g., "2026-07-27")
   previewRotation: (weekOf) =>
     api.get("/golden-monday/rotation/preview", { params: { weekOf } }),
   getRanking: () => api.get("/golden-monday/rotation/preview"),
 
-  // GET /api/golden-monday/rotation/next - Get next presenter
+  // GET /api/golden-monday/rotation/next - Get the next scheduled presenter
   getNextPresenter: () => api.get("/golden-monday/rotation/next"),
 
-  // POST /api/golden-monday/rotation/assign - Assign next presenter
+  // POST /api/golden-monday/rotation/assign - Assign a presenter for a week
+  // @param {string} weekOf - The week date to assign
+  // @param {string} manualPresenterId - Optional: override with specific user
   assignRotation: (weekOf, manualPresenterId) =>
     api.post("/golden-monday/rotation/assign", { weekOf, manualPresenterId }),
   assignPresenter: (userId) =>
     api.post("/golden-monday/rotation/assign", { manualPresenterId: userId }),
 
-  // POST /api/golden-monday/rotation/:sessionId/reassign - Reassign
+  // POST /api/golden-monday/rotation/:sessionId/reassign - Reassign a session
+  // @param {string} sessionId - The session to reassign
+  // @param {string} reason - Why the reassignment is happening
   reassignRotation: (sessionId, reason) =>
     api.post(`/golden-monday/rotation/${sessionId}/reassign`, { reason }),
 
-  // ── Per-session actions ──
+  // ──────────────────────────────────────────────────────────────
+  // 📝 PER-SESSION ACTIONS
+  // ──────────────────────────────────────────────────────────────
+
   // PUT /api/golden-monday/:sessionId/title - Set presentation title
+  // @param {string} sessionId - The session ID
+  // @param {string} title - The presentation title
   setPresentationTitle: (sessionId, title) =>
     api.put(`/golden-monday/${sessionId}/title`, { title }),
 
-  // ── Stats ──
-  // GET /api/golden-monday/stats - Get stats
+  // ──────────────────────────────────────────────────────────────
+  // 📊 STATISTICS & ANALYTICS
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/golden-monday/stats - Get Golden Monday program statistics
+  // Returns: total sessions, presenters, attendance rates, department metrics
   getStats: () => api.get("/golden-monday/stats"),
 
-  // ── Pillars ──
-  // GET /api/golden-monday/pillars - Get pillars
+  // ──────────────────────────────────────────────────────────────
+  // 🏛️ PILLARS (Golden Monday Framework/Values)
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/golden-monday/pillars - Get the four pillars of Golden Monday
   getPillars: () => api.get("/golden-monday/pillars"),
 
-  // ── Telegram ──
-  // POST /api/telegram/post/:sessionId - Post to Telegram
+  // ──────────────────────────────────────────────────────────────
+  // 📱 TELEGRAM INTEGRATION
+  // ──────────────────────────────────────────────────────────────
+
+  // POST /api/telegram/post/:sessionId - Post session announcement to Telegram
+  // @param {string} sessionId - The session to announce
   postToTelegram: (sessionId) => api.post(`/telegram/post/${sessionId}`),
+
+  // ──────────────────────────────────────────────────────────────
+  // 📋 PENDING REGISTRATIONS (Telegram Bot Self-Registration)
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/registrations/pending - Get all registrations awaiting admin approval
+  // Returns: Array of pending registrations with user details
+  // Requires: Admin or SuperAdmin role
+  getPendingRegistrations: () =>
+    api.get("/registrations/pending", { withCredentials: true }),
+
+  // PUT /api/registrations/:id/approve - Approve a pending registration
+  // @param {string} id - The registration ID
+  // Creates a User account, sends login credentials via Telegram
+  // Requires: Admin or SuperAdmin role
+  approveRegistration: (id) =>
+    api.put(`/registrations/${id}/approve`, {}, { withCredentials: true }),
+
+  // PUT /api/registrations/:id/reject - Reject a pending registration
+  // @param {string} id - The registration ID
+  // Sends rejection notification via Telegram
+  // Requires: Admin or SuperAdmin role
+  rejectRegistration: (id) =>
+    api.put(`/registrations/${id}/reject`, {}, { withCredentials: true }),
+
+  // GET /api/registrations - Get registrations with filters
+  // @param {Object} params - Query parameters
+  // @param {string} params.status - Filter by status (pending_approval, approved, rejected)
+  // @param {number} params.limit - Results per page (default: 50)
+  // @param {number} params.skip - Pagination offset
+  // Requires: Admin or SuperAdmin role
+  getRegistrations: (params) =>
+    api.get("/registrations", { params, withCredentials: true }),
+
+  // GET /api/registrations/:id - Get a single registration by ID
+  // @param {string} id - The registration ID
+  // Requires: Admin or SuperAdmin role
+  getRegistration: (id) =>
+    api.get(`/registrations/${id}`, { withCredentials: true }),
 };
 
 // ============================================================

@@ -82,6 +82,10 @@ export default function EmployeeManagement({ t }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [showAIInsights, setShowAIInsights] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState([]);
+  const [pendingRegistrations, setPendingRegistrations] = useState([]);
+  const [showPendingRegistrations, setShowPendingRegistrations] =
+    useState(false);
+  const [processingApproval, setProcessingApproval] = useState(null);
 
   // ── Form State ──
   const [formData, setFormData] = useState({
@@ -298,6 +302,43 @@ export default function EmployeeManagement({ t }) {
       setIsLoadingUsers(false);
     }
   }, [showToast, getTranslation]);
+  const loadPendingRegistrations = useCallback(async () => {
+    try {
+      const response = await goldenMondayAPI.getPendingRegistrations();
+      setPendingRegistrations(response.data || []);
+    } catch (error) {
+      console.error("Failed to load pending registrations:", error);
+    }
+  }, []);
+
+  const handleApproveRegistration = async (registrationId) => {
+    setProcessingApproval(registrationId);
+    try {
+      await goldenMondayAPI.approveRegistration(registrationId);
+      showToast("Employee approved successfully! 🎉", "success");
+      await loadPendingRegistrations();
+      await loadEmployees();
+    } catch (error) {
+      console.error("Failed to approve registration:", error);
+      showToast("Failed to approve registration", "error");
+    } finally {
+      setProcessingApproval(null);
+    }
+  };
+
+  const handleRejectRegistration = async (registrationId) => {
+    setProcessingApproval(registrationId);
+    try {
+      await goldenMondayAPI.rejectRegistration(registrationId);
+      showToast("Registration rejected", "info");
+      await loadPendingRegistrations();
+    } catch (error) {
+      console.error("Failed to reject registration:", error);
+      showToast("Failed to reject registration", "error");
+    } finally {
+      setProcessingApproval(null);
+    }
+  };
 
   // ── Refresh Data ──
   const refreshData = async () => {
@@ -311,8 +352,9 @@ export default function EmployeeManagement({ t }) {
     if (initialLoadRef.current) {
       initialLoadRef.current = false;
       loadEmployees();
+      loadPendingRegistrations();
     }
-  }, [loadEmployees]);
+  }, [loadEmployees, loadPendingRegistrations]);
 
   // ── AI Auto-Fill Function ──
   const runAIAnalysis = async (userData) => {
@@ -1010,6 +1052,7 @@ export default function EmployeeManagement({ t }) {
             Total
           </div>
         </div>
+
         <div
           style={{
             background: C.white,
@@ -1036,6 +1079,7 @@ export default function EmployeeManagement({ t }) {
             Active
           </div>
         </div>
+
         <div
           style={{
             background: C.white,
@@ -1062,6 +1106,7 @@ export default function EmployeeManagement({ t }) {
             Inactive
           </div>
         </div>
+
         <div
           style={{
             background: C.white,
@@ -1088,6 +1133,7 @@ export default function EmployeeManagement({ t }) {
             Total Presented
           </div>
         </div>
+
         <div
           style={{
             background: C.white,
@@ -1114,7 +1160,325 @@ export default function EmployeeManagement({ t }) {
             Avg Rating
           </div>
         </div>
+
+        {/* 🆕 PENDING APPROVALS CARD */}
+        <div
+          style={{
+            background: C.white,
+            padding: "14px 16px",
+            borderRadius: 10,
+            textAlign: "center",
+            border: `2px solid ${pendingRegistrations.filter((p) => p.status === "pending_approval").length > 0 ? "#8b5cf6" : C.border}`,
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            position: "relative",
+          }}
+          onClick={() => setShowPendingRegistrations(!showPendingRegistrations)}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.boxShadow =
+              "0 4px 12px rgba(139, 92, 246, 0.15)";
+            e.currentTarget.style.transform = "translateY(-2px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.transform = "translateY(0)";
+          }}
+        >
+          <div style={{ fontSize: 24, fontWeight: 900, color: "#8b5cf6" }}>
+            {
+              pendingRegistrations.filter(
+                (p) => p.status === "pending_approval",
+              ).length
+            }
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: C.muted,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+            }}
+          >
+            <FiUserPlus size={12} />
+            Pending Approvals
+            {pendingRegistrations.filter((p) => p.status === "pending_approval")
+              .length > 0 && (
+              <span
+                style={{
+                  background: "#ef4444",
+                  color: "white",
+                  borderRadius: "50%",
+                  width: 18,
+                  height: 18,
+                  fontSize: 10,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginLeft: 4,
+                  animation: "pulse 2s infinite",
+                }}
+              >
+                {
+                  pendingRegistrations.filter(
+                    (p) => p.status === "pending_approval",
+                  ).length
+                }
+              </span>
+            )}
+          </div>
+          {pendingRegistrations.filter((p) => p.status === "pending_approval")
+            .length > 0 && (
+            <div
+              style={{
+                position: "absolute",
+                top: -6,
+                right: -6,
+                width: 12,
+                height: 12,
+                borderRadius: "50%",
+                background: "#ef4444",
+                animation: "pulse 2s infinite",
+              }}
+            />
+          )}
+        </div>
       </div>
+
+      {/* Pending Registrations Panel */}
+      {showPendingRegistrations && (
+        <div
+          style={{
+            background: C.white,
+            borderRadius: 16,
+            border: `2px solid #8b5cf6`,
+            padding: "20px 24px",
+            marginBottom: 20,
+            animation: "fadeInUp 0.3s ease",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 16,
+            }}
+          >
+            <div>
+              <h3
+                style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: C.dark,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                }}
+              >
+                <FiUserPlus size={20} color="#8b5cf6" />
+                Pending Employee Registrations
+                {pendingRegistrations.filter(
+                  (p) => p.status === "pending_approval",
+                ).length > 0 && (
+                  <span
+                    style={{
+                      background: "#ef4444",
+                      color: "white",
+                      borderRadius: 20,
+                      padding: "2px 12px",
+                      fontSize: 12,
+                    }}
+                  >
+                    {
+                      pendingRegistrations.filter(
+                        (p) => p.status === "pending_approval",
+                      ).length
+                    }{" "}
+                    new
+                  </span>
+                )}
+              </h3>
+              <p style={{ fontSize: 13, color: C.muted }}>
+                Review and approve new employee registrations from Telegram
+              </p>
+            </div>
+            <button
+              onClick={() => setShowPendingRegistrations(false)}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: C.muted,
+              }}
+            >
+              <FiX size={20} />
+            </button>
+          </div>
+
+          {pendingRegistrations.filter((p) => p.status === "pending_approval")
+            .length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "30px 20px",
+                color: C.muted,
+              }}
+            >
+              <div style={{ fontSize: 40, marginBottom: 8 }}>🎉</div>
+              <p style={{ fontSize: 14 }}>No pending registrations to review</p>
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              {pendingRegistrations
+                .filter((p) => p.status === "pending_approval")
+                .map((registration) => (
+                  <div
+                    key={registration._id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "14px 18px",
+                      background: C.bg,
+                      borderRadius: 10,
+                      border: `1px solid ${C.border}`,
+                      flexWrap: "wrap",
+                      gap: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 14,
+                        flex: 1,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: "50%",
+                          background: `linear-gradient(135deg, #8b5cf6, #6d28d9)`,
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontWeight: 700,
+                          fontSize: 16,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {registration.name?.charAt(0) || "?"}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div
+                          style={{
+                            fontWeight: 600,
+                            fontSize: 14,
+                            color: C.dark,
+                          }}
+                        >
+                          {registration.name}
+                        </div>
+                        <div style={{ fontSize: 12, color: C.muted }}>
+                          <FiMail size={12} style={{ marginRight: 4 }} />
+                          {registration.email}
+                          {registration.phone && (
+                            <>
+                              <span style={{ margin: "0 8px" }}>•</span>
+                              <FiPhone size={12} style={{ marginRight: 4 }} />
+                              {registration.phone}
+                            </>
+                          )}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "#8b5cf6",
+                            marginTop: 2,
+                          }}
+                        >
+                          <FiUser size={11} style={{ marginRight: 4 }} />@
+                          {registration.telegramUsername || "n/a"} •
+                          {new Date(
+                            registration.createdAt,
+                          ).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                      <button
+                        onClick={() =>
+                          handleApproveRegistration(registration._id)
+                        }
+                        disabled={processingApproval === registration._id}
+                        style={{
+                          padding: "6px 16px",
+                          background: "#10b981",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 6,
+                          cursor:
+                            processingApproval === registration._id
+                              ? "not-allowed"
+                              : "pointer",
+                          fontWeight: 600,
+                          fontSize: 13,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          opacity:
+                            processingApproval === registration._id ? 0.6 : 1,
+                        }}
+                      >
+                        {processingApproval === registration._id ? (
+                          <FiLoader
+                            size={14}
+                            style={{ animation: "spin 1s linear infinite" }}
+                          />
+                        ) : (
+                          <FiCheck size={14} />
+                        )}
+                        Approve
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleRejectRegistration(registration._id)
+                        }
+                        disabled={processingApproval === registration._id}
+                        style={{
+                          padding: "6px 16px",
+                          background: "#ef4444",
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 6,
+                          cursor:
+                            processingApproval === registration._id
+                              ? "not-allowed"
+                              : "pointer",
+                          fontWeight: 600,
+                          fontSize: 13,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          opacity:
+                            processingApproval === registration._id ? 0.6 : 1,
+                        }}
+                      >
+                        <FiX size={14} />
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* AI Insights Panel */}
       {showAIInsights && (
@@ -3411,15 +3775,20 @@ export default function EmployeeManagement({ t }) {
       )}
 
       <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-        @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+`}</style>
     </div>
   );
 }

@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema(
     team: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
     phone: String,
     signature: String,
+    telegramChatId: { type: String, default: null }, // NEW — set if registered via Telegram bot
   },
   { timestamps: true },
 );
