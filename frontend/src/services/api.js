@@ -445,6 +445,20 @@ export const goldenMondayAPI = {
   // Requires: Admin or SuperAdmin role
   getRegistration: (id) =>
     api.get(`/registrations/${id}`, { withCredentials: true }),
+
+   // ──────────────────────────────────────────────────────────────
+  // 🗑️ EMPLOYEE DELETION WITH TELEGRAM NOTIFICATION
+  // ──────────────────────────────────────────────────────────────
+
+  // DELETE /api/employees/:userId - Delete employee with Telegram notification
+  // @param {string} userId - The user ID to delete
+  // @param {string} reason - Reason for deletion (optional)
+  deleteEmployeeWithNotification: (userId, reason) =>
+    api.delete(`/employees/${userId}`, { 
+      data: { reason }, 
+      withCredentials: true 
+    }),
+};
 };
 
 // ============================================================
