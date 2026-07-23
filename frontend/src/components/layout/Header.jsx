@@ -3,7 +3,7 @@ import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { useAuth } from "../../hooks/useAuth";
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   FiHome,
   FiMessageSquare,
@@ -25,10 +25,13 @@ import {
   FiUserPlus,
   FiCheck,
   FiChevronUp,
+  FiX,
+  FiMenu,
 } from "react-icons/fi";
 
-export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
+export default function Header({ t, lang, setLang, onAddUserClick }) {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const icons = {
     dashboard: <FiHome size={18} />,
@@ -62,8 +65,28 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
     useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef(null);
   const langDropdownRef = useRef(null);
+  const mobileMenuRef = useRef(null);
+
+  // Get current tab from location
+  const currentTab = useMemo(() => {
+    const path = location.pathname;
+    if (path === "/" || path === "/dashboard") return "dashboard";
+    if (path.startsWith("/forum")) return "forum";
+    if (path.startsWith("/evaluations")) return "evaluation";
+    if (path.startsWith("/daily-reports")) return "report";
+    if (path.startsWith("/services")) return "services";
+    if (path.startsWith("/analytics")) return "analytics";
+    if (path.startsWith("/users")) return "users";
+    if (path.startsWith("/teams")) return "teams";
+    if (path.startsWith("/admin/services")) return "admin/services";
+    if (path.startsWith("/documents")) return "documents";
+    if (path.startsWith("/golden-monday")) return "golden-monday";
+    if (path.startsWith("/employees")) return "employees";
+    return "dashboard";
+  }, [location.pathname]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -75,6 +98,12 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
         !langDropdownRef.current.contains(event.target)
       ) {
         setIsLangDropdownOpen(false);
+      }
+      if (
+        mobileMenuRef.current &&
+        !mobileMenuRef.current.contains(event.target)
+      ) {
+        setIsMobileMenuOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -95,7 +124,8 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
   const safeNav = safeT.nav || {};
   const safeAppName = safeT.appName || "A-MESOB";
 
-  const tabLabel = safeNav[tab] || displayNames[tab] || tab;
+  const tabLabel =
+    safeNav[currentTab] || displayNames[currentTab] || currentTab;
 
   const getUserProfilePhoto = () => {
     return user?.profilePhotoUrl || null;
@@ -141,6 +171,10 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
     setIsLangDropdownOpen(!isLangDropdownOpen);
   };
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
   const handleLangSelect = (code) => {
     setLang(code);
     setIsLangDropdownOpen(false);
@@ -149,764 +183,891 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
   const userProfilePhoto = getUserProfilePhoto();
   const canAddUsers = isAdmin || isSuperAdmin;
 
-  // Get current language label
   const currentLang = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
 
+  // Navigation items based on role
+  const navItems = useMemo(() => {
+    const items = [];
+
+    // Everyone can see Dashboard
+    items.push({
+      key: "dashboard",
+      label: "Dashboard",
+      path: "/dashboard",
+      icon: <FiHome size={16} />,
+    });
+
+    // All authenticated users
+    items.push({
+      key: "forum",
+      label: "Peer Forum",
+      path: "/forum",
+      icon: <FiMessageSquare size={16} />,
+    });
+    items.push({
+      key: "evaluation",
+      label: "Evaluation",
+      path: "/evaluations",
+      icon: <FiStar size={16} />,
+    });
+    items.push({
+      key: "report",
+      label: "Daily Report",
+      path: "/daily-reports",
+      icon: <FiFileText size={16} />,
+    });
+    items.push({
+      key: "services",
+      label: "Services",
+      path: "/services",
+      icon: <FiGrid size={16} />,
+    });
+    items.push({
+      key: "golden-monday",
+      label: "Golden Monday",
+      path: "/golden-monday",
+      icon: <FiCalendar size={16} />,
+    });
+
+    // Leaders and above
+    if (isLeader || isAdmin || isSuperAdmin) {
+      items.push({
+        key: "employees",
+        label: "Employees",
+        path: "/employees",
+        icon: <FiUsers size={16} />,
+      });
+      items.push({
+        key: "teams",
+        label: "Teams",
+        path: "/teams",
+        icon: <FiUsers size={16} />,
+      });
+    }
+
+    // Admins and SuperAdmins
+    if (isAdmin || isSuperAdmin) {
+      items.push({
+        key: "users",
+        label: "User Management",
+        path: "/users",
+        icon: <FiUser size={16} />,
+      });
+    }
+
+    // SuperAdmins only
+    if (isSuperAdmin) {
+      items.push({
+        key: "admin/services",
+        label: "Service Manager",
+        path: "/admin/services",
+        icon: <FiGrid size={16} />,
+      });
+    }
+
+    return items;
+  }, [isLeader, isAdmin, isSuperAdmin]);
+
   return (
-    <header
-      style={{
-        height: "auto",
-        minHeight: "clamp(44px, 7vh, 52px)",
-        background: C.white,
-        borderBottom: `2px solid rgba(26, 58, 173, 0.13)`,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "4px clamp(8px, 2vw, 20px)",
-        boxShadow: "0 2px 12px rgba(26,58,173,0.08)",
-        position: "sticky",
-        top: 0,
-        zIndex: 40,
-        flexShrink: 0,
-        gap: "clamp(4px, 1.5vw, 12px)",
-        flexWrap: "nowrap",
-        overflow: "visible",
-      }}
-    >
-      {/* LEFT SECTION - Breadcrumb - Shrinks on mobile */}
-      <div
+    <>
+      <header
         style={{
+          height: "auto",
+          minHeight: "clamp(44px, 7vh, 52px)",
+          background: C.white,
+          borderBottom: `2px solid rgba(26, 58, 173, 0.13)`,
           display: "flex",
           alignItems: "center",
-          gap: "clamp(3px, 1vw, 10px)",
-          flex: "1 1 auto",
-          minWidth: 0,
-          overflow: "hidden",
+          justifyContent: "space-between",
+          padding: "4px clamp(8px, 2vw, 20px)",
+          boxShadow: "0 2px 12px rgba(26,58,173,0.08)",
+          position: "sticky",
+          top: 0,
+          zIndex: 40,
+          flexShrink: 0,
+          gap: "clamp(4px, 1.5vw, 12px)",
+          flexWrap: "nowrap",
+          overflow: "visible",
         }}
       >
-        <span
+        {/* LEFT SECTION - Logo + Breadcrumb */}
+        <div
           style={{
-            fontSize: "clamp(14px, 2.5vw, 18px)",
-            color: C.primary,
-            flexShrink: 0,
             display: "flex",
             alignItems: "center",
-          }}
-          title={tabLabel}
-        >
-          {icons[tab] || <FiGrid size={16} />}
-        </span>
-
-        <span
-          className="header-appname"
-          style={{
-            color: C.muted,
-            fontSize: "clamp(8px, 2vw, 11px)",
-            fontFamily: F.sans,
-            display: "inline-flex",
-            alignItems: "center",
-            whiteSpace: "nowrap",
-            flexShrink: 0,
-          }}
-          title={safeAppName}
-        >
-          {safeAppName}
-        </span>
-
-        <span
-          style={{
-            color: C.gold,
-            fontSize: "clamp(6px, 1.5vw, 12px)",
-            fontWeight: 900,
-            display: "flex",
-            alignItems: "center",
-            flexShrink: 0,
-          }}
-        >
-          <FiChevronRight size={10} />
-        </span>
-
-        <span
-          style={{
-            fontWeight: 700,
-            fontSize: "clamp(9px, 2.5vw, 13px)",
-            color: C.dark,
-            fontFamily: F.sans,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
+            gap: "clamp(3px, 1vw, 10px)",
             flex: "1 1 auto",
             minWidth: 0,
-            background: `linear-gradient(90deg, ${C.primary}, ${C.gold})`,
-            WebkitBackgroundClip: "text",
-            WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
+            overflow: "hidden",
           }}
-          title={tabLabel}
         >
-          {tabLabel}
-        </span>
-      </div>
-
-      {/* RIGHT SECTION */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "clamp(3px, 1vw, 12px)",
-          flexShrink: 0,
-          flexWrap: "nowrap",
-        }}
-      >
-        {/* Date - Hidden on small screens */}
-        <span
-          className="header-date"
-          style={{
-            fontSize: "clamp(7px, 1.5vw, 10px)",
-            color: C.muted,
-            fontFamily: F.sans,
-            whiteSpace: "nowrap",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 2,
-            flexShrink: 0,
-          }}
-          title={dateStr}
-        >
-          <FiCalendar size={9} />
-          {dateStr}
-        </span>
-
-        {/* Language Selector - Beautiful Dropdown on mobile, buttons on desktop */}
-        <div
-          ref={langDropdownRef}
-          style={{ position: "relative", flexShrink: 0 }}
-        >
-          {/* Desktop: Show all language buttons */}
-          <div
-            className="lang-desktop"
-            style={{ display: "flex", gap: "clamp(1px, 0.8vw, 4px)" }}
-          >
-            {LANGUAGES.map((l) => (
-              <button
-                key={l.code}
-                className="header-lang-btn"
-                onClick={() => setLang(l.code)}
-                title={l.label}
-                style={{
-                  background: lang === l.code ? C.primary : "#f0f3ff",
-                  color: lang === l.code ? C.gold : C.primary,
-                  border: `1px solid ${lang === l.code ? C.primary : C.border}`,
-                  borderRadius: 4,
-                  padding: "clamp(1px, 0.8vw, 3px) clamp(3px, 1vw, 6px)",
-                  fontSize: "clamp(7px, 1.5vw, 10px)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: F.sans,
-                  transition: "all 0.2s ease",
-                  whiteSpace: "nowrap",
-                  minWidth: "clamp(18px, 4vw, 28px)",
-                  transform: lang === l.code ? "scale(1.05)" : "scale(1)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 1,
-                  flexShrink: 0,
-                }}
-                onMouseEnter={(e) => {
-                  if (lang !== l.code) {
-                    e.currentTarget.style.background = C.primary + "22";
-                    e.currentTarget.style.transform = "scale(1.05)";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (lang !== l.code) {
-                    e.currentTarget.style.background = "#f0f3ff";
-                    e.currentTarget.style.transform = "scale(1)";
-                  }
-                }}
-              >
-                <FiGlobe size={7} />
-                <span style={{ fontSize: "clamp(6px, 1.2vw, 9px)" }}>
-                  {l.flag}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Mobile: Beautiful Language dropdown button */}
+          {/* Mobile Menu Toggle */}
           <button
-            className="lang-mobile"
-            onClick={toggleLangDropdown}
-            title="Select Language"
+            onClick={toggleMobileMenu}
             style={{
-              background: isLangDropdownOpen
-                ? `linear-gradient(135deg, ${C.primary}, #1a3aad)`
-                : "#f0f3ff",
-              color: isLangDropdownOpen ? C.gold : C.primary,
-              border: `1px solid ${isLangDropdownOpen ? C.primary : C.border}`,
-              borderRadius: 8,
-              padding: "clamp(4px, 1.2vw, 6px) clamp(10px, 2.5vw, 16px)",
-              fontSize: "clamp(11px, 2.5vw, 13px)",
-              fontWeight: 700,
+              display: "none",
+              background: "none",
+              border: "none",
               cursor: "pointer",
-              fontFamily: F.sans,
-              transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-              whiteSpace: "nowrap",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
+              padding: "4px",
+              color: C.dark,
               flexShrink: 0,
-              minHeight: "clamp(32px, 4.5vh, 38px)",
-              boxShadow: isLangDropdownOpen
-                ? `0 4px 20px ${C.primary}44`
-                : "0 2px 8px rgba(0,0,0,0.06)",
-              transform: isLangDropdownOpen ? "scale(1.02)" : "scale(1)",
             }}
-            onMouseEnter={(e) => {
-              if (!isLangDropdownOpen) {
-                e.currentTarget.style.background = C.primary + "22";
-                e.currentTarget.style.transform = "scale(1.03)";
-                e.currentTarget.style.boxShadow = `0 4px 16px ${C.primary}33`;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isLangDropdownOpen) {
-                e.currentTarget.style.background = "#f0f3ff";
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.06)";
-              }
-            }}
+            className="mobile-menu-toggle"
           >
-            <FiGlobe size={16} />
-            <span
-              style={{
-                fontSize: "clamp(14px, 3vw, 18px)",
-                lineHeight: 1,
-              }}
-            >
-              {currentLang.flag}
-            </span>
-            <span
-              style={{
-                fontSize: "clamp(10px, 2vw, 12px)",
-                fontWeight: 600,
-                opacity: 0.8,
-              }}
-            >
-              {currentLang.label}
-            </span>
-            {isLangDropdownOpen ? (
-              <FiChevronUp size={14} />
-            ) : (
-              <FiChevronDown size={14} />
-            )}
+            {isMobileMenuOpen ? <FiX size={20} /> : <FiMenu size={20} />}
           </button>
 
-          {/* Mobile: Beautiful Language Dropdown Menu */}
-          {isLangDropdownOpen && (
-            <div
+          <span
+            style={{
+              fontSize: "clamp(14px, 2.5vw, 18px)",
+              color: C.primary,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+            }}
+            title={tabLabel}
+          >
+            {icons[currentTab] || <FiGrid size={16} />}
+          </span>
+
+          <span
+            className="header-appname"
+            style={{
+              color: C.muted,
+              fontSize: "clamp(8px, 2vw, 11px)",
+              fontFamily: F.sans,
+              display: "inline-flex",
+              alignItems: "center",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+            title={safeAppName}
+          >
+            {safeAppName}
+          </span>
+
+          <span
+            style={{
+              color: C.gold,
+              fontSize: "clamp(6px, 1.5vw, 12px)",
+              fontWeight: 900,
+              display: "flex",
+              alignItems: "center",
+              flexShrink: 0,
+            }}
+          >
+            <FiChevronRight size={10} />
+          </span>
+
+          <span
+            style={{
+              fontWeight: 700,
+              fontSize: "clamp(9px, 2.5vw, 13px)",
+              color: C.dark,
+              fontFamily: F.sans,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              flex: "1 1 auto",
+              minWidth: 0,
+              background: `linear-gradient(90deg, ${C.primary}, ${C.gold})`,
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              backgroundClip: "text",
+            }}
+            title={tabLabel}
+          >
+            {tabLabel}
+          </span>
+        </div>
+
+        {/* DESKTOP NAVIGATION */}
+        <div
+          className="desktop-nav"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "clamp(4px, 1.2vw, 16px)",
+            flexShrink: 0,
+            overflow: "visible",
+          }}
+        >
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => navigate(item.path)}
               style={{
-                position: "absolute",
-                top: "calc(100% + 8px)",
-                right: 0,
-                minWidth: 180,
-                background: C.white,
-                borderRadius: 12,
-                boxShadow: "0 12px 48px rgba(0,0,0,0.18)",
-                border: `1px solid ${C.border}`,
-                overflow: "hidden",
-                animation: "slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
-                zIndex: 101,
-                padding: "6px",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                background: currentTab === item.key ? C.primary : "transparent",
+                color: currentTab === item.key ? "#fff" : C.muted,
+                border: "none",
+                borderRadius: 8,
+                padding: "clamp(4px, 1.2vh, 8px) clamp(6px, 1.5vw, 14px)",
+                fontSize: "clamp(10px, 1.8vw, 12px)",
+                fontWeight: currentTab === item.key ? 700 : 500,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                fontFamily: F.sans,
+                whiteSpace: "nowrap",
+                boxShadow:
+                  currentTab === item.key
+                    ? `0 4px 12px ${C.primary}44`
+                    : "none",
+                transform: currentTab === item.key ? "scale(1.02)" : "scale(1)",
+              }}
+              onMouseEnter={(e) => {
+                if (currentTab !== item.key) {
+                  e.currentTarget.style.background = C.bg;
+                  e.currentTarget.style.color = C.dark;
+                  e.currentTarget.style.transform = "scale(1.05)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (currentTab !== item.key) {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = C.muted;
+                  e.currentTarget.style.transform = "scale(1)";
+                }
               }}
             >
-              <div
-                style={{
-                  padding: "6px 12px 4px",
-                  fontSize: 10,
-                  color: C.muted,
-                  fontWeight: 600,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.8,
-                  borderBottom: `1px solid ${C.border}44`,
-                }}
-              >
-                Select Language
-              </div>
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        {/* RIGHT SECTION - Language & User */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "clamp(3px, 1vw, 12px)",
+            flexShrink: 0,
+            flexWrap: "nowrap",
+          }}
+        >
+          {/* Date */}
+          <span
+            className="header-date"
+            style={{
+              fontSize: "clamp(7px, 1.5vw, 10px)",
+              color: C.muted,
+              fontFamily: F.sans,
+              whiteSpace: "nowrap",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 2,
+              flexShrink: 0,
+            }}
+            title={dateStr}
+          >
+            <FiCalendar size={9} />
+            {dateStr}
+          </span>
+
+          {/* Language Selector */}
+          <div
+            ref={langDropdownRef}
+            style={{ position: "relative", flexShrink: 0 }}
+          >
+            <div
+              className="lang-desktop"
+              style={{ display: "flex", gap: "clamp(1px, 0.8vw, 4px)" }}
+            >
               {LANGUAGES.map((l) => (
                 <button
                   key={l.code}
-                  onClick={() => handleLangSelect(l.code)}
+                  className="header-lang-btn"
+                  onClick={() => setLang(l.code)}
                   title={l.label}
                   style={{
+                    background: lang === l.code ? C.primary : "#f0f3ff",
+                    color: lang === l.code ? C.gold : C.primary,
+                    border: `1px solid ${lang === l.code ? C.primary : C.border}`,
+                    borderRadius: 4,
+                    padding: "clamp(1px, 0.8vw, 3px) clamp(3px, 1vw, 6px)",
+                    fontSize: "clamp(7px, 1.5vw, 10px)",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    fontFamily: F.sans,
+                    transition: "all 0.2s ease",
+                    whiteSpace: "nowrap",
+                    minWidth: "clamp(18px, 4vw, 28px)",
+                    transform: lang === l.code ? "scale(1.05)" : "scale(1)",
                     display: "flex",
                     alignItems: "center",
-                    gap: 10,
-                    padding: "10px 14px",
-                    width: "100%",
-                    border: "none",
-                    borderRadius: 8,
-                    background:
-                      lang === l.code
-                        ? `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`
-                        : "transparent",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    fontWeight: lang === l.code ? 600 : 400,
-                    color: lang === l.code ? C.primary : C.dark,
-                    transition: "all 0.2s ease",
-                    fontFamily: F.sans,
-                    margin: "2px 0",
-                    position: "relative",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background =
-                      lang === l.code
-                        ? `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`
-                        : C.bg;
-                    e.currentTarget.style.transform = "translateX(4px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background =
-                      lang === l.code
-                        ? `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`
-                        : "transparent";
-                    e.currentTarget.style.transform = "translateX(0)";
+                    justifyContent: "center",
+                    gap: 1,
+                    flexShrink: 0,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: 20,
-                      width: 28,
-                      textAlign: "center",
-                    }}
-                  >
+                  <FiGlobe size={7} />
+                  <span style={{ fontSize: "clamp(6px, 1.2vw, 9px)" }}>
                     {l.flag}
                   </span>
-                  <span style={{ flex: 1 }}>{l.label}</span>
-                  {lang === l.code && (
-                    <span
-                      style={{
-                        background: C.primary,
-                        color: "#fff",
-                        borderRadius: "50%",
-                        width: 20,
-                        height: 20,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 11,
-                      }}
-                    >
-                      <FiCheck size={12} />
-                    </span>
-                  )}
                 </button>
               ))}
             </div>
-          )}
-        </div>
 
-        {/* User Avatar with Dropdown - Logout only here */}
-        <div ref={dropdownRef} style={{ position: "relative", flexShrink: 0 }}>
-          <div
-            className="header-avatar"
-            onClick={toggleDropdown}
-            title="Profile & Settings"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              cursor: "pointer",
-              padding: "1px 3px 1px 1px",
-              borderRadius: 18,
-              border: isDropdownOpen
-                ? `2px solid ${C.primary}`
-                : "2px solid transparent",
-              transition: "all 0.3s ease",
-              background: isDropdownOpen ? `${C.primary}11` : "transparent",
-            }}
-            onMouseEnter={(e) => {
-              if (!isDropdownOpen) {
-                e.currentTarget.style.borderColor = C.primary + "44";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isDropdownOpen) {
-                e.currentTarget.style.borderColor = "transparent";
-              }
-            }}
-          >
-            {userProfilePhoto ? (
-              <img
-                src={userProfilePhoto}
-                alt={user?.name || "User"}
-                title={user?.name || "User"}
-                style={{
-                  width: "clamp(22px, 4vw, 30px)",
-                  height: "clamp(22px, 4vw, 30px)",
-                  borderRadius: "50%",
-                  objectFit: "cover",
-                  border: `2px solid ${C.primary}`,
-                  flexShrink: 0,
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "clamp(22px, 4vw, 30px)",
-                  height: "clamp(22px, 4vw, 30px)",
-                  background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
-                  borderRadius: "50%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "clamp(9px, 2vw, 13px)",
-                  color: "#fff",
-                  fontWeight: 900,
-                  fontFamily: F.serif,
-                  boxShadow: `0 2px 8px rgba(26,58,173,0.35)`,
-                  flexShrink: 0,
-                  transition: "transform 0.3s ease, box-shadow 0.3s ease",
-                }}
-                title={user?.name || "User"}
-              >
-                {getUserInitials()}
-              </div>
-            )}
-            <FiChevronDown
-              size={10}
+            <button
+              className="lang-mobile"
+              onClick={toggleLangDropdown}
+              title="Select Language"
               style={{
-                color: C.muted,
-                transition: "transform 0.3s ease",
-                transform: isDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                background: isLangDropdownOpen
+                  ? `linear-gradient(135deg, ${C.primary}, #1a3aad)`
+                  : "#f0f3ff",
+                color: isLangDropdownOpen ? C.gold : C.primary,
+                border: `1px solid ${isLangDropdownOpen ? C.primary : C.border}`,
+                borderRadius: 8,
+                padding: "clamp(4px, 1.2vw, 6px) clamp(10px, 2.5vw, 16px)",
+                fontSize: "clamp(11px, 2.5vw, 13px)",
+                fontWeight: 700,
+                cursor: "pointer",
+                fontFamily: F.sans,
+                transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                whiteSpace: "nowrap",
+                display: "none",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
                 flexShrink: 0,
-              }}
-            />
-          </div>
-
-          {/* User Dropdown Menu - includes Logout here */}
-          {isDropdownOpen && (
-            <div
-              style={{
-                position: "absolute",
-                top: "calc(100% + 6px)",
-                right: 0,
-                minWidth: 200,
-                background: C.white,
-                borderRadius: 12,
-                boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
-                border: `1px solid ${C.border}`,
-                overflow: "hidden",
-                animation: "fadeInUp 0.2s ease",
-                zIndex: 100,
+                minHeight: "clamp(32px, 4.5vh, 38px)",
+                boxShadow: isLangDropdownOpen
+                  ? `0 4px 20px ${C.primary}44`
+                  : "0 2px 8px rgba(0,0,0,0.06)",
+                transform: isLangDropdownOpen ? "scale(1.02)" : "scale(1)",
               }}
             >
-              {/* User Info */}
+              <FiGlobe size={16} />
+              <span
+                style={{ fontSize: "clamp(14px, 3vw, 18px)", lineHeight: 1 }}
+              >
+                {currentLang.flag}
+              </span>
+              <span
+                style={{
+                  fontSize: "clamp(10px, 2vw, 12px)",
+                  fontWeight: 600,
+                  opacity: 0.8,
+                }}
+              >
+                {currentLang.label}
+              </span>
+              {isLangDropdownOpen ? (
+                <FiChevronUp size={14} />
+              ) : (
+                <FiChevronDown size={14} />
+              )}
+            </button>
+
+            {isLangDropdownOpen && (
               <div
                 style={{
-                  padding: "12px 14px 8px",
-                  borderBottom: `1px solid ${C.border}`,
-                  background: C.bg,
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  right: 0,
+                  minWidth: 180,
+                  background: C.white,
+                  borderRadius: 12,
+                  boxShadow: "0 12px 48px rgba(0,0,0,0.18)",
+                  border: `1px solid ${C.border}`,
+                  overflow: "hidden",
+                  animation: "slideDown 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+                  zIndex: 101,
+                  padding: "6px",
                 }}
               >
                 <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  {userProfilePhoto ? (
-                    <img
-                      src={userProfilePhoto}
-                      alt={user?.name || "User"}
-                      title={user?.name || "User"}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: "50%",
-                        objectFit: "cover",
-                        border: `2px solid ${C.primary}`,
-                        flexShrink: 0,
-                      }}
-                    />
-                  ) : (
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
-                        borderRadius: "50%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: 12,
-                        color: "#fff",
-                        fontWeight: 900,
-                        fontFamily: F.serif,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {getUserInitials()}
-                    </div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        color: C.dark,
-                        fontSize: 12,
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                      title={user?.name || "User"}
-                    >
-                      {user?.name || "User"}
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 3,
-                        color: getRoleColor(),
-                        fontSize: 10,
-                        fontWeight: 600,
-                      }}
-                      title={getUserRole()}
-                    >
-                      {getRoleIcon()}
-                      {getUserRole()}
-                    </div>
-                  </div>
-                </div>
-                <div
-                  style={{
-                    fontSize: 9,
-                    color: C.muted,
-                    marginTop: 3,
-                    paddingTop: 3,
-                    borderTop: `1px solid ${C.border}44`,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                  title={user?.email || "No email"}
-                >
-                  {user?.email || "No email"}
-                </div>
-              </div>
-
-              {/* Menu Items */}
-              <div style={{ padding: "4px 0" }}>
-                <div
-                  style={{
-                    padding: "4px 14px",
-                    fontSize: 9,
+                    padding: "6px 12px 4px",
+                    fontSize: 10,
                     color: C.muted,
                     fontWeight: 600,
                     textTransform: "uppercase",
-                    letterSpacing: 0.5,
+                    letterSpacing: 0.8,
+                    borderBottom: `1px solid ${C.border}44`,
                   }}
                 >
-                  Account
+                  Select Language
                 </div>
-                <button
-                  onClick={() => {
-                    setIsDropdownOpen(false);
-                    navigate("/profile");
-                  }}
-                  title="View and edit your profile"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "5px 14px",
-                    width: "100%",
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: 11,
-                    color: C.dark,
-                    transition: "background 0.2s ease",
-                    fontFamily: F.sans,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = C.bg;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <FiUser size={12} style={{ color: C.muted }} />
-                  My Profile
-                </button>
-                <button
-                  onClick={() => {
-                    setIsDropdownOpen(false);
-                    navigate("/settings");
-                  }}
-                  title="App settings and preferences"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "5px 14px",
-                    width: "100%",
-                    border: "none",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: 11,
-                    color: C.dark,
-                    transition: "background 0.2s ease",
-                    fontFamily: F.sans,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = C.bg;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  <FiSettings size={12} style={{ color: C.muted }} />
-                  Settings
-                </button>
-
-                {canAddUsers && (
-                  <>
-                    <div
-                      style={{
-                        padding: "4px 14px 2px",
-                        fontSize: 9,
-                        color: C.muted,
-                        fontWeight: 600,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.5,
-                        borderTop: `1px solid ${C.border}44`,
-                        marginTop: 2,
-                      }}
+                {LANGUAGES.map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => handleLangSelect(l.code)}
+                    title={l.label}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "10px 14px",
+                      width: "100%",
+                      border: "none",
+                      borderRadius: 8,
+                      background:
+                        lang === l.code
+                          ? `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`
+                          : "transparent",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      fontWeight: lang === l.code ? 600 : 400,
+                      color: lang === l.code ? C.primary : C.dark,
+                      transition: "all 0.2s ease",
+                      fontFamily: F.sans,
+                      margin: "2px 0",
+                      position: "relative",
+                    }}
+                  >
+                    <span
+                      style={{ fontSize: 20, width: 28, textAlign: "center" }}
                     >
-                      Admin
-                    </div>
-                    <button
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        if (onAddUserClick) {
-                          onAddUserClick();
-                        }
-                      }}
-                      title="Create a new user account"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "5px 14px",
-                        width: "100%",
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: 11,
-                        color: C.primary,
-                        transition: "background 0.2s ease",
-                        fontFamily: F.sans,
-                        fontWeight: 500,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = C.primary + "11";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "transparent";
-                      }}
-                    >
-                      <FiUserPlus size={12} style={{ color: C.primary }} />
-                      Add New User
-                    </button>
-                    <button
-                      onClick={() => {
-                        setIsDropdownOpen(false);
-                        navigate("/users");
-                      }}
-                      title="Manage all system users"
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "5px 14px",
-                        width: "100%",
-                        border: "none",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: 11,
-                        color: C.dark,
-                        transition: "background 0.2s ease",
-                        fontFamily: F.sans,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = C.bg;
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "transparent";
-                      }}
-                    >
-                      <FiUsers size={12} style={{ color: C.muted }} />
-                      User Management
-                    </button>
-                  </>
-                )}
+                      {l.flag}
+                    </span>
+                    <span style={{ flex: 1 }}>{l.label}</span>
+                    {lang === l.code && (
+                      <span
+                        style={{
+                          background: C.primary,
+                          color: "#fff",
+                          borderRadius: "50%",
+                          width: 20,
+                          height: 20,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 11,
+                        }}
+                      >
+                        <FiCheck size={12} />
+                      </span>
+                    )}
+                  </button>
+                ))}
               </div>
+            )}
+          </div>
 
-              <div
+          {/* User Avatar */}
+          <div
+            ref={dropdownRef}
+            style={{ position: "relative", flexShrink: 0 }}
+          >
+            <div
+              className="header-avatar"
+              onClick={toggleDropdown}
+              title="Profile & Settings"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 3,
+                cursor: "pointer",
+                padding: "1px 3px 1px 1px",
+                borderRadius: 18,
+                border: isDropdownOpen
+                  ? `2px solid ${C.primary}`
+                  : "2px solid transparent",
+                transition: "all 0.3s ease",
+                background: isDropdownOpen ? `${C.primary}11` : "transparent",
+              }}
+            >
+              {userProfilePhoto ? (
+                <img
+                  src={userProfilePhoto}
+                  alt={user?.name || "User"}
+                  title={user?.name || "User"}
+                  style={{
+                    width: "clamp(22px, 4vw, 30px)",
+                    height: "clamp(22px, 4vw, 30px)",
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    border: `2px solid ${C.primary}`,
+                    flexShrink: 0,
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "clamp(22px, 4vw, 30px)",
+                    height: "clamp(22px, 4vw, 30px)",
+                    background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+                    borderRadius: "50%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "clamp(9px, 2vw, 13px)",
+                    color: "#fff",
+                    fontWeight: 900,
+                    fontFamily: F.serif,
+                    boxShadow: `0 2px 8px rgba(26,58,173,0.35)`,
+                    flexShrink: 0,
+                  }}
+                  title={user?.name || "User"}
+                >
+                  {getUserInitials()}
+                </div>
+              )}
+              <FiChevronDown
+                size={10}
                 style={{
-                  height: 1,
-                  background: C.border,
-                  margin: "2px 14px",
+                  color: C.muted,
+                  transition: "transform 0.3s ease",
+                  transform: isDropdownOpen ? "rotate(180deg)" : "rotate(0deg)",
+                  flexShrink: 0,
                 }}
               />
+            </div>
 
-              {/* Logout - Only here in dropdown */}
-              <div style={{ padding: "4px 14px 8px" }}>
-                <button
-                  onClick={() => {
-                    setIsDropdownOpen(false);
-                    logout();
-                  }}
-                  title="Sign out of your account"
+            {isDropdownOpen && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  right: 0,
+                  minWidth: 200,
+                  background: C.white,
+                  borderRadius: 12,
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                  border: `1px solid ${C.border}`,
+                  overflow: "hidden",
+                  animation: "fadeInUp 0.2s ease",
+                  zIndex: 100,
+                }}
+              >
+                {/* User Info */}
+                <div
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "5px 10px",
-                    width: "100%",
-                    border: "none",
-                    borderRadius: 6,
-                    background: "#fee2e2",
-                    cursor: "pointer",
-                    fontSize: 11,
-                    color: "#dc2626",
-                    fontWeight: 600,
-                    transition: "all 0.2s ease",
-                    fontFamily: F.sans,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#fecaca";
-                    e.currentTarget.style.transform = "scale(1.02)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#fee2e2";
-                    e.currentTarget.style.transform = "scale(1)";
+                    padding: "12px 14px 8px",
+                    borderBottom: `1px solid ${C.border}`,
+                    background: C.bg,
                   }}
                 >
-                  <FiLogOut size={12} />
-                  Logout
-                </button>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    {userProfilePhoto ? (
+                      <img
+                        src={userProfilePhoto}
+                        alt={user?.name || "User"}
+                        title={user?.name || "User"}
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: "50%",
+                          objectFit: "cover",
+                          border: `2px solid ${C.primary}`,
+                          flexShrink: 0,
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+                          borderRadius: "50%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12,
+                          color: "#fff",
+                          fontWeight: 900,
+                          fontFamily: F.serif,
+                          flexShrink: 0,
+                        }}
+                      >
+                        {getUserInitials()}
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          color: C.dark,
+                          fontSize: 12,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                        title={user?.name || "User"}
+                      >
+                        {user?.name || "User"}
+                      </div>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 3,
+                          color: getRoleColor(),
+                          fontSize: 10,
+                          fontWeight: 600,
+                        }}
+                        title={getUserRole()}
+                      >
+                        {getRoleIcon()}
+                        {getUserRole()}
+                      </div>
+                    </div>
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 9,
+                      color: C.muted,
+                      marginTop: 3,
+                      paddingTop: 3,
+                      borderTop: `1px solid ${C.border}44`,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                    title={user?.email || "No email"}
+                  >
+                    {user?.email || "No email"}
+                  </div>
+                </div>
+
+                <div style={{ padding: "4px 0" }}>
+                  <div
+                    style={{
+                      padding: "4px 14px",
+                      fontSize: 9,
+                      color: C.muted,
+                      fontWeight: 600,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    Account
+                  </div>
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      navigate("/profile");
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 14px",
+                      width: "100%",
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      color: C.dark,
+                      transition: "background 0.2s ease",
+                      fontFamily: F.sans,
+                    }}
+                  >
+                    <FiUser size={12} style={{ color: C.muted }} />
+                    My Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      navigate("/settings");
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 14px",
+                      width: "100%",
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      color: C.dark,
+                      transition: "background 0.2s ease",
+                      fontFamily: F.sans,
+                    }}
+                  >
+                    <FiSettings size={12} style={{ color: C.muted }} />
+                    Settings
+                  </button>
+
+                  {canAddUsers && (
+                    <>
+                      <div
+                        style={{
+                          padding: "4px 14px 2px",
+                          fontSize: 9,
+                          color: C.muted,
+                          fontWeight: 600,
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                          borderTop: `1px solid ${C.border}44`,
+                          marginTop: 2,
+                        }}
+                      >
+                        Admin
+                      </div>
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          if (onAddUserClick) {
+                            onAddUserClick();
+                          }
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "5px 14px",
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          color: C.primary,
+                          transition: "background 0.2s ease",
+                          fontFamily: F.sans,
+                          fontWeight: 500,
+                        }}
+                      >
+                        <FiUserPlus size={12} style={{ color: C.primary }} />
+                        Add New User
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsDropdownOpen(false);
+                          navigate("/users");
+                        }}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "5px 14px",
+                          width: "100%",
+                          border: "none",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: 11,
+                          color: C.dark,
+                          transition: "background 0.2s ease",
+                          fontFamily: F.sans,
+                        }}
+                      >
+                        <FiUsers size={12} style={{ color: C.muted }} />
+                        User Management
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div
+                  style={{
+                    height: 1,
+                    background: C.border,
+                    margin: "2px 14px",
+                  }}
+                />
+
+                <div style={{ padding: "4px 14px 8px" }}>
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      logout();
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 10px",
+                      width: "100%",
+                      border: "none",
+                      borderRadius: 6,
+                      background: "#fee2e2",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      color: "#dc2626",
+                      fontWeight: 600,
+                      transition: "all 0.2s ease",
+                      fontFamily: F.sans,
+                    }}
+                  >
+                    <FiLogOut size={12} />
+                    Logout
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      </header>
+
+      {/* MOBILE NAVIGATION MENU */}
+      {isMobileMenuOpen && (
+        <div
+          ref={mobileMenuRef}
+          style={{
+            position: "fixed",
+            top: "clamp(44px, 7vh, 52px)",
+            left: 0,
+            right: 0,
+            background: C.white,
+            borderBottom: `2px solid ${C.border}`,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+            zIndex: 39,
+            padding: "8px 16px 16px",
+            animation: "slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+            maxHeight: "calc(100vh - 60px)",
+            overflowY: "auto",
+          }}
+        >
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={() => {
+                navigate(item.path);
+                setIsMobileMenuOpen(false);
+              }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "10px 12px",
+                width: "100%",
+                border: "none",
+                borderRadius: 8,
+                background:
+                  currentTab === item.key ? `${C.primary}11` : "transparent",
+                color: currentTab === item.key ? C.primary : C.dark,
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: currentTab === item.key ? 600 : 400,
+                transition: "all 0.2s ease",
+                fontFamily: F.sans,
+                margin: "2px 0",
+              }}
+              onMouseEnter={(e) => {
+                if (currentTab !== item.key) {
+                  e.currentTarget.style.background = C.bg;
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (currentTab !== item.key) {
+                  e.currentTarget.style.background = "transparent";
+                }
+              }}
+            >
+              <span
+                style={{ color: currentTab === item.key ? C.primary : C.muted }}
+              >
+                {item.icon}
+              </span>
+              {item.label}
+              {currentTab === item.key && (
+                <span style={{ marginLeft: "auto", color: C.primary }}>
+                  <FiCheck size={14} />
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       <style>{`
         @keyframes slideDown {
@@ -929,48 +1090,43 @@ export default function Header({ tab, t, lang, setLang, onAddUserClick }) {
             transform: translateY(0);
           }
         }
-        /* Desktop: Show all language buttons */
+
+        /* Desktop */
         @media (min-width: 769px) {
-          .lang-mobile {
-            display: none !important;
-          }
-          .lang-desktop {
-            display: flex !important;
-          }
+          .lang-mobile { display: none !important; }
+          .lang-desktop { display: flex !important; }
+          .desktop-nav { display: flex !important; }
+          .mobile-menu-toggle { display: none !important; }
           .header-date { display: inline-flex !important; }
           .header-appname { display: inline-flex !important; }
         }
 
-        /* Tablet: Show language dropdown */
+        /* Tablet */
         @media (min-width: 641px) and (max-width: 768px) {
-          .lang-mobile {
-            display: flex !important;
-          }
-          .lang-desktop {
-            display: none !important;
-          }
+          .lang-mobile { display: flex !important; }
+          .lang-desktop { display: none !important; }
+          .desktop-nav { display: none !important; }
+          .mobile-menu-toggle { display: flex !important; }
           .header-date { display: none !important; }
           .header-appname { display: none !important; }
         }
 
-        /* Mobile: Show language dropdown */
+        /* Mobile */
         @media (max-width: 640px) {
-          .lang-mobile {
-            display: flex !important;
-          }
-          .lang-desktop {
-            display: none !important;
-          }
+          .lang-mobile { display: flex !important; }
+          .lang-desktop { display: none !important; }
+          .desktop-nav { display: none !important; }
+          .mobile-menu-toggle { display: flex !important; }
           .header-date { display: none !important; }
           .header-appname { display: none !important; }
         }
 
-        /* Extra small: Even more compact */
+        /* Extra small */
         @media (max-width: 480px) {
           .lang-mobile { padding: 2px 8px !important; font-size: 10px !important; min-height: 24px !important; gap: 4px !important; }
           .lang-mobile span { font-size: 12px !important; }
         }
       `}</style>
-    </header>
+    </>
   );
 }
