@@ -408,38 +408,59 @@ async function notifyAdminsForApproval(pending) {
 }
 
 /**
- * Shared approval logic
+ * Shared approval logic - FIXED with error handling
  */
 async function approveRegistration(pendingId, reviewer) {
+  console.log("📝 Approving registration:", pendingId);
+  
   const pending = await PendingRegistration.findById(pendingId);
   if (!pending) throw new Error("Registration not found");
   if (pending.status !== "pending_approval") {
     throw new Error(`Cannot approve from status "${pending.status}"`);
   }
 
-  const tempPassword = generateTempPassword();
-  const user = await createUserAccount({
-    name: pending.name,
-    email: pending.email,
-    password: tempPassword,
-    role: "employee",
-    phone: pending.phone,
-    telegramChatId: pending.telegramChatId,
-  });
+  try {
+    console.log("👤 Creating user account for:", pending.email);
+    const tempPassword = generateTempPassword();
+    
+    const user = await createUserAccount({
+      name: pending.name,
+      email: pending.email,
+      password: tempPassword,
+      role: "employee",
+      phone: pending.phone,
+      telegramChatId: pending.telegramChatId,
+    });
 
-  pending.status = "approved";
-  pending.createdUser = user._id;
-  pending.reviewedBy = reviewer?._id || undefined;
-  pending.reviewedByName = reviewer?.name || "unknown";
-  pending.reviewedAt = new Date();
-  await pending.save();
+    console.log("✅ User created with ID:", user._id);
 
-  await sendMessage(
-    pending.telegramChatId,
-    `You've been approved ✅\n\nYou can now log in:\nEmail: ${pending.email}\nTemporary password: ${tempPassword}\n\nPlease log in and change your password when you get the chance.`,
-  );
+    pending.status = "approved";
+    pending.createdUser = user._id;
+    pending.reviewedBy = reviewer?._id || undefined;
+    pending.reviewedByName = reviewer?.name || "unknown";
+    pending.reviewedAt = new Date();
+    await pending.save();
 
-  return { pending, user };
+    console.log("📤 Sending approval message to:", pending.telegramChatId);
+    await sendMessage(
+      pending.telegramChatId,
+      `You've been approved ✅\n\nYou can now log in:\nEmail: ${pending.email}\nTemporary password: ${tempPassword}\n\nPlease log in and change your password when you get the chance.`,
+    );
+
+    return { pending, user };
+  } catch (error) {
+    console.error("❌ Approval error:", error.message);
+    console.error("❌ Error stack:", error.stack);
+    
+    // Send error to admin group
+    if (TELEGRAM_ADMIN_GROUP_ID) {
+      await sendMessage(
+        TELEGRAM_ADMIN_GROUP_ID,
+        `❌ Approval failed for ${pending.email}:\n${error.message}`
+      );
+    }
+    throw error;
+  }
 }
 
 async function rejectRegistration(pendingId, reviewer, reason) {
@@ -613,4 +634,4 @@ module.exports = {
       "⚠️ stopRegistrationPolling is deprecated. Use webhook instead.",
     );
   },
-};
+}
