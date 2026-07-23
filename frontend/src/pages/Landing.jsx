@@ -1470,55 +1470,80 @@ export default function Landing() {
       </section>
 
       {/* ── DEPARTMENTS MARQUEE ──────────────────────────── */}
-      {departmentsList.length > 0 && (
-        <section
+      <section
+        style={{
+          background: C.dark,
+          padding: "18px 0",
+          overflow: "hidden",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <div
           style={{
-            background: C.dark,
-            padding: "18px 0",
-            overflow: "hidden",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            textAlign: "center",
+            fontSize: 10.5,
+            fontWeight: 800,
+            letterSpacing: 1.4,
+            textTransform: "uppercase",
+            color: C.gold,
+            marginBottom: 10,
           }}
         >
+          {getText(LANDING_COPY.deptsEyebrow)}
+        </div>
+        <div style={{ display: "flex", width: "max-content" }}>
           <div
+            className="lp-marquee-track"
             style={{
-              textAlign: "center",
-              fontSize: 10.5,
-              fontWeight: 800,
-              letterSpacing: 1.4,
-              textTransform: "uppercase",
-              color: C.gold,
-              marginBottom: 10,
+              display: "flex",
+              gap: 32,
+              paddingRight: 32,
+              animation: "marquee-scroll 32s linear infinite",
             }}
           >
-            {getText(LANDING_COPY.deptsEyebrow)}
+            {departmentsList.length > 0
+              ? [
+                  ...departmentsList,
+                  ...departmentsList,
+                  ...departmentsList,
+                ].map((d, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      color: "#c9d0f0",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {d}
+                  </span>
+                ))
+              : // Fallback departments if none loaded
+                [
+                  "Trade",
+                  "Ethiotelecom",
+                  "Labor & Skills",
+                  "Federal Document",
+                  "Traffic",
+                  "Digital Services",
+                ].map((d, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      color: "#c9d0f0",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      whiteSpace: "nowrap",
+                      opacity: loading ? 0.6 : 0.4,
+                    }}
+                  >
+                    {loading ? "Loading..." : d}
+                  </span>
+                ))}
           </div>
-          <div style={{ display: "flex", width: "max-content" }}>
-            <div
-              className="lp-marquee-track"
-              style={{
-                display: "flex",
-                gap: 32,
-                paddingRight: 32,
-                animation: "marquee-scroll 32s linear infinite",
-              }}
-            >
-              {[...departmentsList, ...departmentsList].map((d, i) => (
-                <span
-                  key={i}
-                  style={{
-                    color: "#c9d0f0",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {d}
-                </span>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {/* ── FEATURES ──────────────────────────────────────── */}
       <section
