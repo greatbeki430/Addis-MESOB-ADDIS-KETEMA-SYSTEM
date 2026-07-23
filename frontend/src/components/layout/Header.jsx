@@ -73,19 +73,22 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
   // Get current tab from location
   const currentTab = useMemo(() => {
     const path = location.pathname;
-    if (path === "/" || path === "/dashboard") return "dashboard";
-    if (path.startsWith("/forum")) return "forum";
-    if (path.startsWith("/evaluations")) return "evaluation";
-    if (path.startsWith("/daily-reports")) return "report";
-    if (path.startsWith("/services")) return "services";
-    if (path.startsWith("/analytics")) return "analytics";
-    if (path.startsWith("/users")) return "users";
-    if (path.startsWith("/teams")) return "teams";
-    if (path.startsWith("/admin/services")) return "admin/services";
-    if (path.startsWith("/documents")) return "documents";
-    if (path.startsWith("/golden-monday")) return "golden-monday";
-    if (path.startsWith("/employees")) return "employees";
-    return "dashboard";
+    console.log("📍 Current path:", path); // ✅ Add this
+    let tab = "dashboard";
+    if (path === "/" || path === "/dashboard") tab = "dashboard";
+    else if (path.startsWith("/forum")) tab = "forum";
+    else if (path.startsWith("/evaluations")) tab = "evaluation";
+    else if (path.startsWith("/daily-reports")) tab = "report";
+    else if (path.startsWith("/services")) tab = "services";
+    else if (path.startsWith("/analytics")) tab = "analytics";
+    else if (path.startsWith("/users")) tab = "users";
+    else if (path.startsWith("/teams")) tab = "teams";
+    else if (path.startsWith("/admin/services")) tab = "admin/services";
+    else if (path.startsWith("/documents")) tab = "documents";
+    else if (path.startsWith("/golden-monday")) tab = "golden-monday";
+    else if (path.startsWith("/employees")) tab = "employees";
+    console.log("✅ Current tab:", tab); // ✅ Add this
+    return tab;
   }, [location.pathname]);
 
   useEffect(() => {
@@ -186,6 +189,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
   const currentLang = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
 
   // Navigation items based on role
+  // Navigation items based on role
   const navItems = useMemo(() => {
     const items = [];
 
@@ -216,12 +220,15 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
       path: "/daily-reports",
       icon: <FiFileText size={16} />,
     });
+
+    // ✅ SERVICES - ALWAYS INCLUDED
     items.push({
       key: "services",
       label: "Services",
       path: "/services",
       icon: <FiGrid size={16} />,
     });
+
     items.push({
       key: "golden-monday",
       label: "Golden Monday",
