@@ -53,22 +53,22 @@ const postPresenterAnnouncement = async (session) => {
 
     const imageUrl = await generateAnnouncementImage(presenter, session);
 
-    let message = `🎯 *Golden Monday - ${dateFormatted}*\n\n`;
-    message += `👤 *Presenter:* ${presenter.name || "TBD"}\n`;
+    let message = `🎯 Golden Monday - ${dateFormatted}\n\n`;
+    message += `👤 Presenter: ${presenter.name || "TBD"}\n`;
     if (presenter.department) {
-      message += `🏛️ *Department:* ${presenter.department}\n`;
+      message += `🏛️ Department: ${presenter.department}\n`;
     }
     if (session.presentationTitle) {
-      message += `📖 *Topic:* "${session.presentationTitle}"\n`;
+      message += `📖 Topic: "${session.presentationTitle}"\n`;
     }
     if (session.presentationDescription) {
-      message += `📝 *Description:* ${session.presentationDescription}\n`;
+      message += `📝 Description: ${session.presentationDescription}\n`;
     }
-    message += `\n🕒 *Time:* 2:00 - 2:50 PM\n`;
-    message += `📍 *Location:* Addis MESOB Conference Hall\n\n`;
+    message += `\n🕒 Time:* 2:00 - 2:50 PM\n`;
+    message += `📍 Location: Addis MESOB Conference Hall\n\n`;
 
     if (session.suggestedTopics && session.suggestedTopics.length > 0) {
-      message += `💡 *AI Suggested Topics:*\n`;
+      message += `💡 AI Suggested Topics:\n`;
       session.suggestedTopics.forEach((topic, i) => {
         message += `   ${i + 1}. ${topic}\n`;
       });
@@ -444,13 +444,13 @@ async function sendDeletionNotification(chatId, name, reason = "Your account has
   const loginUrl = FRONTEND_URL;
   
   const message = 
-    `⚠️ **Account Deletion Notification**\n\n` +
+    `⚠️ Account Deletion Notification\n\n` +
     `Dear ${name},\n\n` +
     `${reason}\n\n` +
     `If you believe this is a mistake, please contact your administrator.\n\n` +
     `To re-register, please send /start to this bot again.\n\n` +
-    `🔄 **Register Here:** https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'addis_mesob_gm_bot'}\n\n` +
-    `🔗 **Login URL:** ${loginUrl}`;
+    `🔄 Register Here: https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'addis_mesob_gm_bot'}\n\n` +
+    `🔗 Login URL: ${loginUrl}`;
 
   await sendMessage(chatId, message);
 }
@@ -554,7 +554,6 @@ async function rejectRegistration(pendingId, reviewer, reason) {
 }
 
 async function handleCallbackQuery(query) {
-async function handleCallbackQuery(query) {
   const [action, pendingId] = query.data.split(":");
   
   // 🔍 Check if registration already has a status
@@ -569,7 +568,7 @@ async function handleCallbackQuery(query) {
     await callTelegramApi("editMessageText", {
       chat_id: query.message.chat.id,
       message_id: query.message.message_id,
-      text: `${query.message.text}\n\n✅ **Already Approved** (via admin panel)`,
+      text: `${query.message.text}\n\n✅ Already Approved (via admin panel)`,
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [] // Remove buttons
@@ -587,7 +586,7 @@ async function handleCallbackQuery(query) {
     await callTelegramApi("editMessageText", {
       chat_id: query.message.chat.id,
       message_id: query.message.message_id,
-      text: `${query.message.text}\n\n❌ **Already Rejected** (via admin panel)`,
+      text: `${query.message.text}\n\n❌ Already Rejected (via admin panel)`,
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [] // Remove buttons
