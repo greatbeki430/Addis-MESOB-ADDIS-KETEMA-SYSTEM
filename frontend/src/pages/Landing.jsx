@@ -1585,6 +1585,11 @@ export default function Landing() {
         <style>{`
           @media (max-width: 900px) { #lp-features-grid { grid-template-columns: repeat(2, 1fr) !important; } #lp-features-grid > div { grid-column: span 1 !important; } }
           @media (max-width: 560px) { #lp-features-grid { grid-template-columns: 1fr !important; } }
+
+          /* ✅ NEW: stack search + filter to equal-width full-width rows on mobile */
+          @media (max-width: 640px) {
+          #lp-search-filter { grid-template-columns: 1fr !important; }
+          }
         `}</style>
       </section>
 
@@ -1614,16 +1619,16 @@ export default function Landing() {
 
         {/* Search and Filter */}
         <div
+          id="lp-search-filter"
           style={{
-            display: "flex",
-            flexDirection: "row",
-            flexWrap: "wrap",
+            display: "grid",
+            gridTemplateColumns: "2fr 1fr",
             gap: 12,
             marginTop: 24,
             marginBottom: 20,
           }}
         >
-          <div style={{ flex: "2 1 200px", position: "relative" }}>
+          <div style={{ position: "relative", width: "100%" }}>
             <span
               style={{
                 position: "absolute",
@@ -1642,6 +1647,7 @@ export default function Landing() {
               onChange={(e) => setSearchTerm(e.target.value)}
               style={{
                 width: "100%",
+                boxSizing: "border-box",
                 padding: "10px 14px 10px 42px",
                 border: `1px solid ${C.border}`,
                 borderRadius: 8,
@@ -1661,12 +1667,13 @@ export default function Landing() {
               setCurrentPage(1);
             }}
             style={{
+              width: "100%",
+              boxSizing: "border-box",
               padding: "10px 14px",
               border: `1px solid ${C.border}`,
               borderRadius: 8,
               fontSize: 14,
               background: C.white,
-              minWidth: 140,
               outline: "none",
               transition: "border-color 0.2s",
             }}
