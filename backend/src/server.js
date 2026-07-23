@@ -17,6 +17,7 @@ const dailyReportRoutes = require("./routes/dailyReportRoutes");
 const serviceRoutes = require("./routes/serviceRoutes");
 const userRoutes = require("./routes/userRoutes");
 const reportRoutes = require("./routes/reportRoutes");
+const employeeRoutes = require("./routes/employeeRoutes");
 
 // AI Features
 const aiRoutes = require("./routes/aiRoutes");
@@ -155,6 +156,7 @@ app.use("/api/registrations", registrationRoutes);
 
 // Departments — NEW
 app.use("/api/departments", departmentRoutes);
+app.use("/api/employees", employeeRoutes);
 
 // =============================================
 // ✅ HEALTH CHECK
