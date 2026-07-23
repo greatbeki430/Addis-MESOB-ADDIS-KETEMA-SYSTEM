@@ -153,7 +153,6 @@ export const serviceAPI = {
 // PUBLIC API - No authentication required
 // ============================================================
 export const publicAPI = {
-  // Get services for public view (landing page)
   getServices: (params = {}) => {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append("page", params.page);
@@ -161,11 +160,10 @@ export const publicAPI = {
     if (params.search) queryParams.append("search", params.search);
     if (params.department) queryParams.append("department", params.department);
 
-    return axios.get(`/api/public/services?${queryParams.toString()}`);
+    return api.get(`/public/services?${queryParams.toString()}`);
   },
 
-  // Get all departments for filter
-  getDepartments: () => axios.get("/api/public/services/departments"),
+  getDepartments: () => api.get("/public/services/departments"),
 };
 
 // ============================================================

@@ -32,6 +32,7 @@ const { notFound, errorHandler } = require("./middleware/errorHandler");
 const telegramRoutes = require("./routes/telegramRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const publicRoutes = require("./routes/publicRoutes");
 
 const app = express();
 
@@ -136,6 +137,7 @@ app.use("/api/daily-reports", dailyReportRoutes);
 app.use("/api/services", serviceRoutes);
 app.use("/api/auth/users", userRoutes);
 app.use("/api/reports", reportRoutes);
+app.use("/api/public", publicRoutes);
 
 // AI Features
 app.use("/api/ai", aiRoutes);
