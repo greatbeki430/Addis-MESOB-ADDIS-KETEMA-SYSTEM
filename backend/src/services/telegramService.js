@@ -424,10 +424,10 @@ async function sendLoginLink(chatId, email, tempPassword) {
   const loginUrl = FRONTEND_URL;
   
   const message = 
-    `✅ **Your account has been approved!**\n\n` +
-    `🔗 **Login Link:** ${loginUrl}/login\n\n` +
-    `📧 **Email:** ${email}\n` +
-    `🔑 **Temporary Password:** ${tempPassword}\n\n` +
+    `✅ Your account has been approved!\n\n` +
+    `🔗 Login Link: ${loginUrl}/login\n\n` +
+    `📧 Email: ${email}\n` +
+    `🔑 Temporary Password: ${tempPassword}\n\n` +
     `⚠️ Please log in and change your password immediately.\n\n` +
     `If you have any issues, please contact your administrator.`;
 
@@ -554,7 +554,48 @@ async function rejectRegistration(pendingId, reviewer, reason) {
 }
 
 async function handleCallbackQuery(query) {
+async function handleCallbackQuery(query) {
   const [action, pendingId] = query.data.split(":");
+  
+  // 🔍 Check if registration already has a status
+  const pending = await PendingRegistration.findById(pendingId);
+  
+  // If already approved, update the message and remove buttons
+  if (pending && pending.status === "approved") {
+    await callTelegramApi("answerCallbackQuery", {
+      callback_query_id: query.id,
+      text: "This registration is already approved!",
+    });
+    await callTelegramApi("editMessageText", {
+      chat_id: query.message.chat.id,
+      message_id: query.message.message_id,
+      text: `${query.message.text}\n\n✅ **Already Approved** (via admin panel)`,
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [] // Remove buttons
+      }
+    });
+    return;
+  }
+
+  // If already rejected, update the message and remove buttons
+  if (pending && pending.status === "rejected") {
+    await callTelegramApi("answerCallbackQuery", {
+      callback_query_id: query.id,
+      text: "This registration is already rejected!",
+    });
+    await callTelegramApi("editMessageText", {
+      chat_id: query.message.chat.id,
+      message_id: query.message.message_id,
+      text: `${query.message.text}\n\n❌ **Already Rejected** (via admin panel)`,
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [] // Remove buttons
+      }
+    });
+    return;
+  }
+
   const reviewer = {
     _id: null,
     name: query.from.username || query.from.first_name,
