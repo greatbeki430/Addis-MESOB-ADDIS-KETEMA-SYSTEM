@@ -448,7 +448,8 @@ export default function Sidebar({
     }
   `;
 
-  const sidebarWidth = collapsed ? 64 : isMobile ? 200 : 260;
+  // ✅ FIX: Mobile sidebar width
+  const sidebarWidth = collapsed ? 64 : isMobile ? 220 : 260;
 
   return (
     <aside
@@ -486,6 +487,37 @@ export default function Sidebar({
           100% { transform: rotate(360deg); }
         }
         ${scrollbarStyles}
+        
+        /* ✅ FIX: Prevent text wrapping in sidebar */
+        .sidebar-nav .nav-label {
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          max-width: 100%;
+        }
+        
+        .sidebar-nav button {
+          white-space: nowrap;
+        }
+        
+        /* ✅ FIX: Mobile specific styles */
+        @media (max-width: 768px) {
+          .sidebar-nav .nav-label {
+            font-size: 12px !important;
+          }
+          .sidebar-nav button {
+            padding: 8px 12px !important;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .sidebar-nav .nav-label {
+            font-size: 11px !important;
+          }
+          .sidebar-nav button {
+            padding: 6px 10px !important;
+          }
+        }
       `}</style>
 
       {/* Collapse Toggle - Fixed at top */}
@@ -577,13 +609,13 @@ export default function Sidebar({
                   width: "100%",
                   display: "flex",
                   alignItems: "center",
-                  gap: collapsed ? 0 : 12,
+                  gap: collapsed ? 0 : 10,
                   justifyContent: collapsed ? "center" : "space-between",
                   padding: collapsed
                     ? "12px 0"
                     : isMobile
-                      ? "10px 16px"
-                      : "11px 16px",
+                      ? "8px 12px"
+                      : "10px 16px",
                   background: isActive ? ACTIVE_BG : "none",
                   border: "none",
                   borderLeft: isActive
@@ -591,11 +623,14 @@ export default function Sidebar({
                     : "4px solid transparent",
                   color: isActive ? ACTIVE_TEXT : MUTED_TEXT,
                   cursor: "pointer",
-                  fontSize: isMobile ? 13 : 14,
+                  fontSize: isMobile ? 12 : 14,
                   fontWeight: isActive ? 700 : 500,
                   fontFamily: F.sans,
                   transition: "all .18s",
                   marginBottom: 2,
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) e.currentTarget.style.background = HOVER_BG;
@@ -608,13 +643,28 @@ export default function Sidebar({
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: collapsed ? 0 : 12,
+                    gap: collapsed ? 0 : 10,
+                    minWidth: 0,
+                    overflow: "hidden",
                   }}
                 >
-                  <span style={{ fontSize: isMobile ? 18 : 20 }}>
+                  <span style={{ fontSize: isMobile ? 16 : 20, flexShrink: 0 }}>
                     {getNavIcon(n.id)}
                   </span>
-                  {!collapsed && <span>{navLabel}</span>}
+                  {!collapsed && (
+                    <span
+                      className="nav-label"
+                      style={{
+                        fontSize: isMobile ? 12 : 14,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        maxWidth: isMobile ? 120 : 180,
+                      }}
+                    >
+                      {navLabel}
+                    </span>
+                  )}
                 </div>
                 {isForum && !collapsed && (
                   <FiChevronDown
@@ -625,6 +675,7 @@ export default function Sidebar({
                         : "rotate(-90deg)",
                       transition: "transform 0.2s ease",
                       color: MUTED_TEXT,
+                      flexShrink: 0,
                     }}
                   />
                 )}
@@ -634,29 +685,29 @@ export default function Sidebar({
               {isForum && forumExpanded && !collapsed && (
                 <div
                   style={{
-                    paddingLeft: 20,
-                    paddingRight: 8,
-                    marginTop: 4,
-                    marginBottom: 8,
+                    paddingLeft: 16,
+                    paddingRight: 6,
+                    marginTop: 2,
+                    marginBottom: 6,
                     borderLeft: `2px solid ${BORDER_COLOR}33`,
-                    marginLeft: 20,
+                    marginLeft: 16,
                   }}
                 >
                   {loading && (
                     <div
                       style={{
-                        padding: "8px 12px",
+                        padding: "6px 10px",
                         color: MUTED_TEXT,
-                        fontSize: 12,
+                        fontSize: 11,
                         textAlign: "center",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        gap: 8,
+                        gap: 6,
                       }}
                     >
                       <FiLoader
-                        size={14}
+                        size={12}
                         style={{ animation: "spin 1s linear infinite" }}
                       />
                       {forumT.loadingTeams || "Loading teams..."}
@@ -665,9 +716,9 @@ export default function Sidebar({
                   {!loading && teams.length === 0 && (
                     <div
                       style={{
-                        padding: "8px 12px",
+                        padding: "6px 10px",
                         color: MUTED_TEXT,
-                        fontSize: 12,
+                        fontSize: 11,
                         textAlign: "center",
                       }}
                     >
@@ -684,12 +735,12 @@ export default function Sidebar({
                       style={{
                         width: "100%",
                         textAlign: "left",
-                        padding: isMobile ? "7px 10px" : "8px 12px",
-                        margin: "3px 0",
+                        padding: isMobile ? "5px 8px" : "6px 10px",
+                        margin: "2px 0",
                         background:
                           selectedTeam?.id === team.id ? ACTIVE_BG : "none",
                         border: "none",
-                        borderRadius: 6,
+                        borderRadius: 4,
                         borderLeft:
                           selectedTeam?.id === team.id
                             ? `3px solid ${ACTIVE_TEXT}`
@@ -699,14 +750,17 @@ export default function Sidebar({
                             ? ACTIVE_TEXT
                             : MUTED_TEXT,
                         cursor: "pointer",
-                        fontSize: isMobile ? 12 : 13,
+                        fontSize: isMobile ? 11 : 12,
                         fontFamily: F.sans,
                         fontWeight: selectedTeam?.id === team.id ? 600 : 400,
                         transition: "all 0.15s",
-                        lineHeight: 1.4,
+                        lineHeight: 1.3,
                         display: "flex",
                         alignItems: "center",
-                        gap: 6,
+                        gap: 4,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = HOVER_BG;
@@ -719,21 +773,31 @@ export default function Sidebar({
                         }
                       }}
                     >
-                      <FiUsers size={12} />
-                      {team.name.length > 18
-                        ? team.name.substring(0, 16) + "…"
-                        : team.name}
+                      <FiUsers size={10} style={{ flexShrink: 0 }} />
+                      <span
+                        style={{
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          maxWidth: isMobile ? 100 : 140,
+                        }}
+                      >
+                        {team.name.length > 14
+                          ? team.name.substring(0, 12) + "…"
+                          : team.name}
+                      </span>
                       {(isEmployee || isLeader) &&
                         team.members?.includes(user?.name) && (
                           <span
                             style={{
                               marginLeft: "auto",
-                              fontSize: 8,
+                              fontSize: 7,
                               background: "#f5c518",
                               color: "#0d1a5e",
-                              padding: "1px 6px",
-                              borderRadius: 10,
+                              padding: "1px 4px",
+                              borderRadius: 8,
                               fontWeight: 700,
+                              flexShrink: 0,
                             }}
                           >
                             {forumT.yourTeam || "Your Team"}
@@ -747,19 +811,20 @@ export default function Sidebar({
                       style={{
                         width: "100%",
                         textAlign: "left",
-                        padding: isMobile ? "7px 10px" : "8px 12px",
-                        marginTop: 6,
+                        padding: isMobile ? "5px 8px" : "6px 10px",
+                        marginTop: 4,
                         background: "none",
                         border: `1px dashed ${BORDER_COLOR}66`,
-                        borderRadius: 6,
+                        borderRadius: 4,
                         color: MUTED_TEXT,
                         cursor: "pointer",
-                        fontSize: isMobile ? 12 : 13,
+                        fontSize: isMobile ? 11 : 12,
                         fontFamily: F.sans,
                         display: "flex",
                         alignItems: "center",
-                        gap: 6,
+                        gap: 4,
                         transition: "all 0.15s",
+                        whiteSpace: "nowrap",
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = HOVER_BG;
@@ -772,7 +837,10 @@ export default function Sidebar({
                         e.currentTarget.style.borderColor = `${BORDER_COLOR}66`;
                       }}
                     >
-                      <FiPlus size={14} style={{ fontWeight: "bold" }} />
+                      <FiPlus
+                        size={12}
+                        style={{ fontWeight: "bold", flexShrink: 0 }}
+                      />
                       {forumT.addTeam || "Add Team"}
                     </button>
                   )}
@@ -792,7 +860,7 @@ export default function Sidebar({
               color: MUTED_TEXT,
               fontWeight: 700,
               letterSpacing: 1,
-              marginBottom: 10,
+              marginBottom: 8,
               textTransform: "uppercase",
               display: "flex",
               alignItems: "center",
@@ -807,7 +875,7 @@ export default function Sidebar({
           style={{
             display: "flex",
             flexDirection: collapsed ? "column" : "row",
-            gap: 6,
+            gap: 4,
             alignItems: "center",
             justifyContent: collapsed ? "center" : "flex-start",
             flexWrap: "wrap",
@@ -822,9 +890,9 @@ export default function Sidebar({
                 background: lang === l.code ? "#f5c518" : "transparent",
                 color: lang === l.code ? "#0d1a5e" : MUTED_TEXT,
                 border: `1px solid ${lang === l.code ? "#f5c518" : `${BORDER_COLOR}55`}`,
-                borderRadius: 5,
-                padding: collapsed ? "5px 7px" : "4px 10px",
-                fontSize: 11,
+                borderRadius: 4,
+                padding: collapsed ? "4px 6px" : "3px 8px",
+                fontSize: 10,
                 fontWeight: 700,
                 cursor: "pointer",
                 fontFamily: F.sans,
@@ -832,16 +900,17 @@ export default function Sidebar({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 4,
-                minWidth: collapsed ? "32px" : "auto",
+                gap: 2,
+                minWidth: collapsed ? "28px" : "auto",
+                flexShrink: 0,
               }}
             >
               {!collapsed ? (
-                <span style={{ fontSize: 10, letterSpacing: "0.5px" }}>
+                <span style={{ fontSize: 9, letterSpacing: "0.5px" }}>
                   {l.flag}
                 </span>
               ) : (
-                <span style={{ fontSize: 12 }}>{l.flag}</span>
+                <span style={{ fontSize: 11 }}>{l.flag}</span>
               )}
             </button>
           ))}
