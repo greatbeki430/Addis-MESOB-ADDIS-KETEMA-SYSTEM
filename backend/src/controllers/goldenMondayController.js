@@ -3,10 +3,12 @@
 
 const GoldenMondaySession = require("../models/GoldenMondaySession");
 const GoldenMondayPresenter = require("../models/GoldenMondayPresenter");
+const GoldenMondayGallery = require("../models/GoldenMondayGallery");
 const User = require("../models/User");
 const {
   generateGoldenMondayRecap,
   generateGoldenMondayTopics,
+  analyzeDocumentImage,
 } = require("../services/aiService");
 const rotation = require("../services/goldenMondayRotationService");
 const recording = require("../services/goldenMondayRecordingService");
@@ -228,14 +230,6 @@ const getRoster = async (req, res) => {
 // POST /api/golden-monday/roster
 // { userId, department, position, profilePhotoUrl, phone, hireDate,
 //   skills, notes, emergencyContact, address, salary? }
-//
-// FIX (previous bug): this used to create the GoldenMondayPresenter
-// document without setting `email`, but the schema has
-// `email: { type: String, required: true }`. That caused a Mongoose
-// validation error on every call, surfaced to the frontend as
-// "Failed to add to roster." Also now persists the HR-lite fields the
-// Employee Management UI collects, which were previously silently
-// dropped since the controller never read them from req.body.
 const addToRoster = async (req, res) => {
   try {
     const {
@@ -265,7 +259,7 @@ const addToRoster = async (req, res) => {
     const doc = {
       user: user._id,
       name: user.name,
-      email: user.email, // required by schema — this was the missing field
+      email: user.email,
       department: department || "",
       position: position || "",
       profilePhotoUrl: profilePhotoUrl || "",
@@ -543,6 +537,419 @@ const getLiveRecordings = async (req, res) => {
   }
 };
 
+// ============================================================
+// 🖼️ AI GALLERY PHOTO CATEGORIZATION - ENHANCED VERSION
+// ============================================================
+
+/**
+ * AI-powered photo categorization for Golden Monday gallery
+ * Uses the existing analyzeDocumentImage AI service with enhanced keyword matching
+ */
+const analyzeAndCategorizePhoto = async (req, res) => {
+  try {
+    const { image, sessionId } = req.body;
+
+    if (!image) {
+      return res.status(400).json({ error: "Image data is required" });
+    }
+
+    // Extract base64 data
+    const base64Data = image.includes(",") ? image.split(",")[1] : image;
+    const mimeType = image.includes("data:")
+      ? image.match(/data:([^;]+)/)?.[1] || "image/jpeg"
+      : "image/jpeg";
+
+    // Use the existing AI service for vision analysis
+    const analysis = await analyzeDocumentImage(base64Data, mimeType);
+
+    // ─── ENHANCED CATEGORY DETECTION ──────────────────────────
+    let detectedCategory = "other";
+    let confidence = 0.5;
+    let matchedKeywords = [];
+    let suggestedCategories = [];
+
+    // Build a rich text context from all analysis fields
+    const fullText = [
+      analysis.title || "",
+      analysis.notes || "",
+      analysis.citizenName || "",
+      analysis.citizenNameAmharic || "",
+      analysis.issuingDepartment || "",
+      (analysis.tags || []).join(" "),
+      analysis.documentType || "",
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    // Also check individual fields for better detection
+    const title = (analysis.title || "").toLowerCase();
+    const notes = (analysis.notes || "").toLowerCase();
+    const department = (analysis.issuingDepartment || "").toLowerCase();
+    const docType = (analysis.documentType || "").toLowerCase();
+
+    // ─── FLAG RAISING DETECTION ──────────────────────────────
+    const flagKeywords = [
+      "flag",
+      "ባንዲራ",
+      "ethiopian flag",
+      "ኢትዮጵያ ባንዲራ",
+      "flag raising",
+      "ባንዲራ ማንሳት",
+      "national flag",
+      "ብሔራዊ ባንዲራ",
+      "flag ceremony",
+      "ባንዲራ ሥነ ሥርዓት",
+      "flagpole",
+      "ባንዲራ ምሰሶ",
+      "flags",
+      "ባንዲራዎች",
+      "ethiopian national flag",
+      "የኢትዮጵያ ብሔራዊ ባንዲራ",
+      "flag raising ceremony",
+      "ባንዲራ ማንሳት ሥነ ሥርዓት",
+      "green yellow red",
+      "ቢጫ ቀይ አረንጓዴ",
+      "flag bearer",
+      "ባንዲራ ተሸካሚ",
+    ];
+
+    for (const keyword of flagKeywords) {
+      if (
+        fullText.includes(keyword) ||
+        title.includes(keyword) ||
+        notes.includes(keyword)
+      ) {
+        matchedKeywords.push(keyword);
+        detectedCategory = "flag-raising";
+        confidence = Math.max(confidence, 0.85);
+        break;
+      }
+    }
+
+    // ─── PRESENTATION DETECTION ───────────────────────────────
+    if (detectedCategory === "other") {
+      const presentationKeywords = [
+        "presentation",
+        "ዝግጅት",
+        "presenter",
+        "አቅራቢ",
+        "slide",
+        "ስላይድ",
+        "powerpoint",
+        "power point",
+        "ppt",
+        "speaker",
+        "ተናጋሪ",
+        "presenting",
+        "በማቅረብ",
+        "presented",
+        "አቅርቧል",
+        "keynote",
+        "lecture",
+        "ትምህርት",
+        "speaking",
+        "ማውራት",
+        "talk",
+        "ንግግር",
+        "presentation skills",
+        "public speaking",
+        "ህዝባዊ ንግግር",
+        "presentation material",
+        "የዝግጅት ቁሳቁስ",
+        "presenter on stage",
+        "መድረክ ላይ አቅራቢ",
+        "presentation screen",
+        "የዝግጅት ማያ",
+        "presenting",
+        "በማቅረብ ላይ",
+        "presentation slides",
+        "የዝግጅት ስላይዶች",
+      ];
+
+      for (const keyword of presentationKeywords) {
+        if (
+          fullText.includes(keyword) ||
+          title.includes(keyword) ||
+          notes.includes(keyword)
+        ) {
+          matchedKeywords.push(keyword);
+          detectedCategory = "presentation";
+          confidence = Math.max(confidence, 0.82);
+          break;
+        }
+      }
+    }
+
+    // ─── GROUP PHOTO DETECTION ────────────────────────────────
+    if (detectedCategory === "other") {
+      const groupKeywords = [
+        "group",
+        "ቡድን",
+        "team",
+        "ቡድን",
+        "group photo",
+        "የቡድን ፎቶ",
+        "group picture",
+        "የቡድን ምስል",
+        "staff photo",
+        "የሰራተኛ ፎቶ",
+        "team photo",
+        "የቡድን ፎቶ",
+        "group of people",
+        "የሰዎች ቡድን",
+        "group shot",
+        "የቡድን ምስል",
+        "together",
+        "አብረው",
+        "group portrait",
+        "የቡድን ሥዕል",
+        "multiple people",
+        "ብዙ ሰዎች",
+        "crowd",
+        "ህዝብ",
+        "gathering",
+        "መሰብሰብ",
+        "team building",
+        "ቡድን መገንባት",
+        "group of employees",
+        "የሰራተኞች ቡድን",
+        "staff group",
+        "የሰራተኛ ቡድን",
+      ];
+
+      for (const keyword of groupKeywords) {
+        if (
+          fullText.includes(keyword) ||
+          title.includes(keyword) ||
+          notes.includes(keyword)
+        ) {
+          matchedKeywords.push(keyword);
+          detectedCategory = "group-photo";
+          confidence = Math.max(confidence, 0.8);
+          break;
+        }
+      }
+    }
+
+    // ─── ATTENDEES DETECTION ──────────────────────────────────
+    if (detectedCategory === "other") {
+      const attendeeKeywords = [
+        "attendee",
+        "ተሳታፊ",
+        "audience",
+        "ተመልካች",
+        "participant",
+        "ተሳታፊ",
+        "attendees",
+        "ተሳታፊዎች",
+        "people",
+        "ሰዎች",
+        "crowd",
+        "ህዝብ",
+        "auditorium",
+        "አዳራሽ",
+        "seated",
+        "ተቀምጧል",
+        "viewers",
+        "ተመልካቾች",
+        "spectators",
+        "ተመልካቾች",
+        "listeners",
+        "አድማጮች",
+        "attendance",
+        "መገኘት",
+        "participating",
+        "በመሳተፍ",
+        "people sitting",
+        "የተቀመጡ ሰዎች",
+        "people watching",
+        "የሚመለከቱ ሰዎች",
+        "audience seating",
+        "የተመልካች መቀመጫ",
+        "filled seats",
+        "የተሞሉ መቀመጫዎች",
+        "people in audience",
+        "በተመልካች ውስጥ ያሉ ሰዎች",
+      ];
+
+      for (const keyword of attendeeKeywords) {
+        if (
+          fullText.includes(keyword) ||
+          title.includes(keyword) ||
+          notes.includes(keyword)
+        ) {
+          matchedKeywords.push(keyword);
+          detectedCategory = "attendees";
+          confidence = Math.max(confidence, 0.78);
+          break;
+        }
+      }
+    }
+
+    // ─── EVENT DETECTION ──────────────────────────────────────
+    if (detectedCategory === "other") {
+      const eventKeywords = [
+        "event",
+        "ዝግጅት",
+        "ceremony",
+        "ሥነ ሥርዓት",
+        "celebration",
+        "ክብረ በዓል",
+        "award",
+        "ሽልማት",
+        "gathering",
+        "መሰብሰብ",
+        "festival",
+        "በዓል",
+        "conference",
+        "ጉባኤ",
+        "seminar",
+        "ሴሚናር",
+        "workshop",
+        "ዎርክሾፕ",
+        "meeting",
+        "ስብሰባ",
+        "summit",
+        "ስብሰባ",
+        "forum",
+        "መድረክ",
+        "symposium",
+        "ሲምፖዚየም",
+        "expo",
+        "ኤክስፖ",
+        "exhibition",
+        "ኤክስቢሽን",
+        "graduation",
+        "ምረቃ",
+        "opening ceremony",
+        "የመክፈቻ ሥነ ሥርዓት",
+        "closing ceremony",
+        "የመዝጊያ ሥነ ሥርዓት",
+        "special event",
+        "ልዩ ዝግጅት",
+        "official event",
+        "ኦፊሴላዊ ዝግጅት",
+        "ceremonial",
+        "ሥነ ሥርዓታዊ",
+        "event hall",
+        "የዝግጅት አዳራሽ",
+        "event venue",
+        "የዝግጅት ቦታ",
+      ];
+
+      for (const keyword of eventKeywords) {
+        if (
+          fullText.includes(keyword) ||
+          title.includes(keyword) ||
+          notes.includes(keyword)
+        ) {
+          matchedKeywords.push(keyword);
+          detectedCategory = "event";
+          confidence = Math.max(confidence, 0.82);
+          break;
+        }
+      }
+    }
+
+    // ─── USE DOCUMENT TYPE MAPPING ────────────────────────────
+    if (detectedCategory === "other" && analysis.documentType) {
+      const categoryMap = {
+        birth_certificate: "event",
+        death_certificate: "event",
+        marriage_certificate: "event",
+        divorce_certificate: "event",
+        residence_id: "attendees",
+        name_change: "attendees",
+        presentation: "presentation",
+        group_photo: "group-photo",
+        flag_raising: "flag-raising",
+        attendees: "attendees",
+        event: "event",
+        certificate: "event",
+        id_card: "attendees",
+        license: "attendees",
+      };
+
+      if (categoryMap[analysis.documentType]) {
+        detectedCategory = categoryMap[analysis.documentType];
+        confidence = analysis.confidence === "high" ? 0.85 : 0.6;
+        matchedKeywords.push(`document_type: ${analysis.documentType}`);
+      }
+    }
+
+    // ─── CONFIDENCE ADJUSTMENT BASED ON ANALYSIS ──────────────
+    if (analysis.confidence === "high") {
+      confidence = Math.max(confidence, 0.8);
+    } else if (analysis.confidence === "medium") {
+      confidence = Math.max(confidence, 0.65);
+    }
+
+    // If we detected something but confidence is still low, boost it
+    if (detectedCategory !== "other" && confidence < 0.6) {
+      confidence = 0.7;
+    }
+
+    // ─── SUGGESTED CATEGORIES ─────────────────────────────────
+    if (detectedCategory !== "other") {
+      const categoryRelations = {
+        "flag-raising": ["event", "attendees", "group-photo"],
+        presentation: ["attendees", "event", "group-photo"],
+        "group-photo": ["attendees", "event", "presentation"],
+        attendees: ["event", "presentation", "group-photo"],
+        event: ["attendees", "presentation", "group-photo"],
+      };
+      suggestedCategories = categoryRelations[detectedCategory] || ["other"];
+    } else {
+      suggestedCategories = [
+        "event",
+        "attendees",
+        "presentation",
+        "group-photo",
+        "flag-raising",
+      ];
+    }
+
+    // Log the categorization result for debugging
+    console.log(
+      `[AI Gallery] Category: ${detectedCategory} (${Math.round(confidence * 100)}%) - Matched: ${matchedKeywords.join(", ") || "none"}`,
+    );
+
+    res.json({
+      category: detectedCategory,
+      confidence: Math.round(confidence * 100) / 100,
+      matchedKeywords: matchedKeywords.slice(0, 5),
+      suggestedCategories: suggestedCategories.slice(0, 3),
+      analysis: {
+        title: analysis.title || "",
+        notes: analysis.notes || "",
+        documentType: analysis.documentType || "other",
+        citizenName: analysis.citizenName || "",
+        tags: analysis.tags || [],
+        issuingDepartment: analysis.issuingDepartment || "",
+        nationalId: analysis.nationalId || "",
+      },
+    });
+  } catch (error) {
+    console.error("AI analysis error:", error);
+    res.json({
+      category: "other",
+      confidence: 0.3,
+      matchedKeywords: [],
+      suggestedCategories: [
+        "event",
+        "presentation",
+        "group-photo",
+        "attendees",
+        "flag-raising",
+      ],
+      analysis: {
+        notes: "AI analysis unavailable. Please select a category manually.",
+        documentType: "other",
+      },
+    });
+  }
+};
+
 module.exports = {
   getSessions,
   previewRecap,
@@ -559,4 +966,5 @@ module.exports = {
   uploadSessionRecording,
   removeSessionRecording,
   getLiveRecordings,
+  analyzeAndCategorizePhoto,
 };

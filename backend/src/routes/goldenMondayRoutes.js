@@ -20,6 +20,7 @@ const {
   uploadSessionRecording,
   removeSessionRecording,
   getLiveRecordings,
+  analyzeAndCategorizePhoto, // ✅ ADD THIS - new function from controller
 } = require("../controllers/goldenMondayController");
 
 const rotationService = require("../services/goldenMondayRotationService");
@@ -528,144 +529,17 @@ router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
-// 🤖 AI PHOTO ANALYSIS - ✅ NEW ROUTE
+// 🤖 AI PHOTO ANALYSIS - ✅ NEW ROUTE (USES CONTROLLER FUNCTION)
 // ──────────────────────────────────────────────────────────────
 
 // POST /api/golden-monday/gallery/analyze - AI analyze and categorize a photo
-router.post("/gallery/analyze", protect, leaderOrAdmin, async (req, res) => {
-  try {
-    const { image, sessionId } = req.body;
-
-    if (!image) {
-      return res.status(400).json({ error: "Image data is required" });
-    }
-
-    // Extract base64 data
-    const base64Data = image.includes(",") ? image.split(",")[1] : image;
-    const mimeType = image.includes("data:")
-      ? image.match(/data:([^;]+)/)?.[1] || "image/jpeg"
-      : "image/jpeg";
-
-    // Use the existing AI service for vision analysis
-    const { analyzeDocumentImage } = require("../services/aiService");
-
-    // Analyze the image using AI
-    const analysis = await analyzeDocumentImage(base64Data, mimeType);
-
-    // Map analysis to gallery categories
-    let detectedCategory = "other";
-    let confidence = 0.5;
-
-    // Check if analysis contains keywords that map to categories
-    const content = (analysis.notes || analysis.title || "").toLowerCase();
-    const citizenName = (analysis.citizenName || "").toLowerCase();
-    const documentType = (analysis.documentType || "").toLowerCase();
-
-    // Flag Raising detection
-    if (
-      content.includes("flag") ||
-      content.includes("ባንዲራ") ||
-      content.includes("ethiopian flag") ||
-      content.includes("ኢትዮጵያ ባንዲራ")
-    ) {
-      detectedCategory = "flag-raising";
-      confidence = 0.85;
-    }
-    // Presentation detection
-    else if (
-      content.includes("presentation") ||
-      content.includes("ዝግጅት") ||
-      content.includes("speaker") ||
-      content.includes("slide") ||
-      content.includes("powerpoint") ||
-      content.includes("presenter")
-    ) {
-      detectedCategory = "presentation";
-      confidence = 0.8;
-    }
-    // Group photo detection
-    else if (
-      content.includes("group") ||
-      content.includes("ቡድን") ||
-      content.includes("team") ||
-      content.includes("meeting") ||
-      content.includes("staff") ||
-      content.includes("group photo")
-    ) {
-      detectedCategory = "group-photo";
-      confidence = 0.75;
-    }
-    // Attendees detection
-    else if (
-      content.includes("attend") ||
-      content.includes("ተሳታፊ") ||
-      content.includes("audience") ||
-      content.includes("participant") ||
-      content.includes("crowd") ||
-      content.includes("people") ||
-      citizenName
-    ) {
-      detectedCategory = "attendees";
-      confidence = 0.7;
-    }
-    // Event detection
-    else if (
-      content.includes("event") ||
-      content.includes("ዝግጅት") ||
-      content.includes("ceremony") ||
-      content.includes("celebration") ||
-      content.includes("award") ||
-      content.includes("ክብረ በዓል")
-    ) {
-      detectedCategory = "event";
-      confidence = 0.75;
-    }
-    // Use document type mapping if available
-    else if (analysis.documentType) {
-      const categoryMap = {
-        birth_certificate: "other",
-        death_certificate: "other",
-        marriage_certificate: "event",
-        divorce_certificate: "other",
-        residence_id: "attendees",
-        name_change: "other",
-      };
-      detectedCategory = categoryMap[analysis.documentType] || "other";
-      confidence = analysis.confidence === "high" ? 0.8 : 0.5;
-    }
-    // If AI is confident but no specific category, use other
-    else if (analysis.confidence === "high") {
-      detectedCategory = "other";
-      confidence = 0.6;
-    }
-
-    res.json({
-      category: detectedCategory,
-      confidence: confidence,
-      analysis: {
-        title: analysis.title || "",
-        notes: analysis.notes || "",
-        documentType: analysis.documentType || "other",
-        citizenName: analysis.citizenName || "",
-        tags: analysis.tags || [],
-        issuingDepartment: analysis.issuingDepartment || "",
-        nationalId: analysis.nationalId || "",
-      },
-    });
-  } catch (error) {
-    console.error("AI analysis error:", error);
-    // Return a fallback response instead of error
-    res.json({
-      category: "other",
-      confidence: 0.3,
-      analysis: {
-        notes:
-          "AI analysis unavailable. Image uploaded without categorization.",
-        documentType: "other",
-      },
-    });
-  }
-});
+// Uses the enhanced analyzeAndCategorizePhoto function from the controller
+router.post(
+  "/gallery/analyze",
+  protect,
+  leaderOrAdmin,
+  analyzeAndCategorizePhoto,
+);
 
 // ──────────────────────────────────────────────────────────────
 // SESSION RECORDING & DOWNLOAD ROUTES
