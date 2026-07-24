@@ -67,6 +67,14 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   });
   const [showAutoClearSettings, setShowAutoClearSettings] = useState(false);
 
+  // ── Use ref for autoClearSettings to avoid dependency issues ──
+  const autoClearSettingsRef = useRef(autoClearSettings);
+
+  // Update ref when autoClearSettings changes
+  useEffect(() => {
+    autoClearSettingsRef.current = autoClearSettings;
+  }, [autoClearSettings]);
+
   // Check if user has previously set "don't ask again"
   useEffect(() => {
     const savedPreference = localStorage.getItem("galleryDeleteDontAskAgain");
@@ -88,42 +96,66 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
 
   const isAdmin = ["admin", "superadmin"].includes(user?.role);
 
-  // Category labels with translations
-  const getCategoryLabel = (cat) => {
-    const categoryMap = {
-      all: t.allPhotos || "All Photos",
-      "flag-raising": t.flagRaising || "🇪🇹 Flag Raising",
-      presentation: t.presentations || "🎤 Presentations",
-      "group-photo": t.groupPhotos || "📸 Group Photos",
-      attendees: t.attendees || "👥 Attendees",
-      event: t.events || "🎉 Events",
-      other: t.other || "📁 Other",
-    };
-    return categoryMap[cat] || cat;
-  };
+  // Category labels with translations - memoized to avoid recreation
+  const getCategoryLabel = useCallback(
+    (cat) => {
+      const categoryMap = {
+        all: t.allPhotos || "All Photos",
+        "flag-raising": t.flagRaising || "🇪🇹 Flag Raising",
+        presentation: t.presentations || "🎤 Presentations",
+        "group-photo": t.groupPhotos || "📸 Group Photos",
+        attendees: t.attendees || "👥 Attendees",
+        event: t.events || "🎉 Events",
+        other: t.other || "📁 Other",
+      };
+      return categoryMap[cat] || cat;
+    },
+    [
+      t.allPhotos,
+      t.flagRaising,
+      t.presentations,
+      t.groupPhotos,
+      t.attendees,
+      t.events,
+      t.other,
+    ],
+  );
 
-  // Categories with translations
-  const CATEGORIES = [
-    { value: "all", label: t.allPhotos || "All Photos" },
-    {
-      value: "flag-raising",
-      label: t.flagRaising || "🇪🇹 Flag Raising",
-      icon: "🇪🇹",
-    },
-    {
-      value: "presentation",
-      label: t.presentations || "🎤 Presentations",
-      icon: "🎤",
-    },
-    {
-      value: "group-photo",
-      label: t.groupPhotos || "📸 Group Photos",
-      icon: "📸",
-    },
-    { value: "attendees", label: t.attendees || "👥 Attendees", icon: "👥" },
-    { value: "event", label: t.events || "🎉 Events", icon: "🎉" },
-    { value: "other", label: t.other || "📁 Other", icon: "📁" },
-  ];
+  // Categories with translations - memoized to avoid recreation
+  const CATEGORIES = useCallback(
+    () => [
+      { value: "all", label: t.allPhotos || "All Photos" },
+      {
+        value: "flag-raising",
+        label: t.flagRaising || "🇪🇹 Flag Raising",
+        icon: "🇪🇹",
+      },
+      {
+        value: "presentation",
+        label: t.presentations || "🎤 Presentations",
+        icon: "🎤",
+      },
+      {
+        value: "group-photo",
+        label: t.groupPhotos || "📸 Group Photos",
+        icon: "📸",
+      },
+      { value: "attendees", label: t.attendees || "👥 Attendees", icon: "👥" },
+      { value: "event", label: t.events || "🎉 Events", icon: "🎉" },
+      { value: "other", label: t.other || "📁 Other", icon: "📁" },
+    ],
+    [
+      t.allPhotos,
+      t.flagRaising,
+      t.presentations,
+      t.groupPhotos,
+      t.attendees,
+      t.events,
+      t.other,
+    ],
+  );
+
+  const categories = CATEGORIES();
 
   const loadGallery = useCallback(async () => {
     try {
@@ -157,16 +189,17 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     }
   }, [loadGallery]);
 
-  // ─── Auto-Clear Check ──
+  // ─── Auto-Clear Check - FIXED with proper dependencies ──
   useEffect(() => {
-    if (!autoClearSettings.enabled) return;
+    const settings = autoClearSettingsRef.current;
+    if (!settings.enabled) return;
 
     const checkAndClear = async () => {
       const now = Date.now();
-      const lastRun = autoClearSettings.lastRun
-        ? new Date(autoClearSettings.lastRun).getTime()
+      const lastRun = settings.lastRun
+        ? new Date(settings.lastRun).getTime()
         : 0;
-      const periodDays = parseInt(autoClearSettings.period) || 30;
+      const periodDays = parseInt(settings.period) || 30;
       const periodMs = periodDays * 24 * 60 * 60 * 1000;
 
       if (now - lastRun >= periodMs) {
@@ -175,9 +208,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         );
         try {
           const filter =
-            autoClearSettings.category !== "all"
-              ? { category: autoClearSettings.category }
-              : {};
+            settings.category !== "all" ? { category: settings.category } : {};
 
           // Get photos to delete
           const response = await goldenMondayAPI.getGallery({
@@ -189,16 +220,14 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           if (photosToDelete.length === 0) {
             console.log("[Auto-Clear] No photos to delete");
             // Update last run even if no photos
-            setAutoClearSettings((prev) => ({
-              ...prev,
+            const newSettings = {
+              ...settings,
               lastRun: new Date().toISOString(),
-            }));
+            };
+            setAutoClearSettings(newSettings);
             localStorage.setItem(
               "galleryAutoClearSettings",
-              JSON.stringify({
-                ...autoClearSettings,
-                lastRun: new Date().toISOString(),
-              }),
+              JSON.stringify(newSettings),
             );
             return;
           }
@@ -214,22 +243,21 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             }
           }
 
+          const categoryLabel = getCategoryLabel(settings.category);
           showToast(
-            `Auto-cleared ${deletedCount} photo${deletedCount > 1 ? "s" : ""} (${getCategoryLabel(autoClearSettings.category)})`,
+            `Auto-cleared ${deletedCount} photo${deletedCount > 1 ? "s" : ""} (${categoryLabel})`,
             "success",
           );
 
           // Update last run
-          setAutoClearSettings((prev) => ({
-            ...prev,
+          const newSettings = {
+            ...settings,
             lastRun: new Date().toISOString(),
-          }));
+          };
+          setAutoClearSettings(newSettings);
           localStorage.setItem(
             "galleryAutoClearSettings",
-            JSON.stringify({
-              ...autoClearSettings,
-              lastRun: new Date().toISOString(),
-            }),
+            JSON.stringify(newSettings),
           );
 
           // Refresh gallery
@@ -246,14 +274,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     const interval = setInterval(checkAndClear, 60 * 60 * 1000); // Check every hour
 
     return () => clearInterval(interval);
-  }, [
-    autoClearSettings.enabled,
-    autoClearSettings.period,
-    autoClearSettings.category,
-    autoClearSettings.lastRun,
-    loadGallery,
-    onRefresh,
-  ]);
+  }, [getCategoryLabel, loadGallery, onRefresh]); // ✅ Fixed: proper dependencies
 
   // AI Auto-Categorization function
   const analyzeAndCategorizePhoto = async (imageData) => {
@@ -401,8 +422,9 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         ),
       );
 
+      const categoryLabel = getCategoryLabel(detectedCategory);
       showToast(
-        `${item.file.name}: ${t.uploadSuccess || "Photo uploaded successfully!"}${detectedCategory !== "other" ? ` (${getCategoryLabel(detectedCategory)})` : ""}`,
+        `${item.file.name}: ${t.uploadSuccess || "Photo uploaded successfully!"}${detectedCategory !== "other" ? ` (${categoryLabel})` : ""}`,
         "success",
       );
 
@@ -591,7 +613,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         }}
       >
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat.value}
               onClick={() => setCategory(cat.value)}
@@ -899,7 +921,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 }}
                 disabled={!autoClearSettings.enabled}
               >
-                {CATEGORIES.map((cat) => (
+                {categories.map((cat) => (
                   <option key={cat.value} value={cat.value}>
                     {cat.label}
                   </option>
@@ -1767,7 +1789,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                     outline: "none",
                   }}
                 >
-                  {CATEGORIES.map((cat) => (
+                  {categories.map((cat) => (
                     <option key={cat.value} value={cat.value}>
                       {cat.label}
                     </option>
