@@ -274,7 +274,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     const interval = setInterval(checkAndClear, 60 * 60 * 1000); // Check every hour
 
     return () => clearInterval(interval);
-  }, [getCategoryLabel, loadGallery, onRefresh]); // ✅ Fixed: proper dependencies
+  }, [getCategoryLabel, loadGallery, onRefresh]);
 
   // AI Auto-Categorization function
   const analyzeAndCategorizePhoto = async (imageData) => {
@@ -518,46 +518,75 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     }
   };
 
-  // ─── Clear All Photos ──
+  // ─── Clear All Photos - FIXED ──
   const clearAllPhotos = async () => {
     try {
-      const filter =
-        clearAllModal.category !== "all"
-          ? { category: clearAllModal.category }
-          : {};
-
-      const response = await goldenMondayAPI.getGallery({
-        ...filter,
+      // Get all photos from the current view (respecting the current category filter)
+      const params = {
         limit: 1000,
-      });
+        page: 1,
+      };
+
+      // If a specific category is selected in the modal, filter by it
+      if (clearAllModal.category !== "all") {
+        params.category = clearAllModal.category;
+      }
+
+      const response = await goldenMondayAPI.getGallery(params);
       const photosToDelete = response.data.photos || [];
 
       if (photosToDelete.length === 0) {
-        showToast("No photos to delete", "info");
+        showToast(
+          `No photos found in ${clearAllModal.category !== "all" ? getCategoryLabel(clearAllModal.category) : "all categories"}`,
+          "info",
+        );
         setClearAllModal({ isOpen: false, category: "all" });
         return;
       }
 
+      // Confirm with user before proceeding with bulk delete
+      const confirmMessage = `This will permanently delete ${photosToDelete.length} photo${photosToDelete.length > 1 ? "s" : ""} from ${clearAllModal.category !== "all" ? getCategoryLabel(clearAllModal.category) : "all categories"}. This action cannot be undone!`;
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+
       let deletedCount = 0;
+      let failedCount = 0;
+
+      // Delete each photo one by one with proper error handling
       for (const photo of photosToDelete) {
         try {
           await goldenMondayAPI.deleteGalleryPhoto(photo._id);
           deletedCount++;
         } catch (e) {
           console.error(`Failed to delete photo ${photo._id}:`, e);
+          failedCount++;
         }
       }
 
-      showToast(
-        `Cleared ${deletedCount} photo${deletedCount > 1 ? "s" : ""} successfully!`,
-        "success",
-      );
+      const categoryLabel =
+        clearAllModal.category !== "all"
+          ? getCategoryLabel(clearAllModal.category)
+          : "all categories";
+
+      if (deletedCount > 0) {
+        showToast(
+          `Successfully cleared ${deletedCount} photo${deletedCount > 1 ? "s" : ""} from ${categoryLabel}${failedCount > 0 ? ` (${failedCount} failed)` : ""}`,
+          failedCount > 0 ? "warning" : "success",
+        );
+      } else if (failedCount > 0) {
+        showToast(
+          `Failed to clear ${failedCount} photo${failedCount > 1 ? "s" : ""}. Please try again.`,
+          "error",
+        );
+      }
+
       setClearAllModal({ isOpen: false, category: "all" });
       await loadGallery();
       if (onRefresh) onRefresh();
     } catch (error) {
       console.error("Clear all error:", error);
-      showToast("Failed to clear photos", "error");
+      showToast("Failed to clear photos. Please try again.", "error");
     }
   };
 
