@@ -101,7 +101,6 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
       isInitialMount.current = false;
       loadAll();
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [loadAll]);
 
   const handleRefresh = async () => {
