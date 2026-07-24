@@ -23,10 +23,10 @@ import {
 
 export default function AttendancePanel({ sessionId, onRefresh }) {
   const { user } = useAuth();
-  const { language } = useLanguage();
+  const { language } = useLanguage(); // ← Get language from context
   const isInitialMount = useRef(true);
 
-  // Get translations based on language
+  // Get translations based on language - use the imported translations
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
   const [attendance, setAttendance] = useState([]);

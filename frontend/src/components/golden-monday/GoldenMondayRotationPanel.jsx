@@ -312,40 +312,44 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
                   </button>
                 </div>
 
-                {currentSession.suggestedTopics?.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <p
-                      style={{
-                        fontSize: 12,
-                        color: C.muted,
-                        margin: "0 0 6px",
-                      }}
-                    >
-                      {t.aiTopicIdeas || "AI topic ideas (tap to use):"}
-                    </p>
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {currentSession.suggestedTopics.map((topic, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setTitleDraft(topic)}
-                          style={{
-                            background: C.bg,
-                            border: `1px solid ${C.border}`,
-                            borderRadius: 20,
-                            padding: "6px 12px",
-                            fontSize: 12,
-                            color: C.dark,
-                            cursor: "pointer",
-                            fontFamily: F.sans,
-                          }}
-                          type="button"
-                        >
-                          {topic}
-                        </button>
-                      ))}
+                {currentSession.suggestedTopics &&
+                  Array.isArray(currentSession.suggestedTopics) &&
+                  currentSession.suggestedTopics.length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <p
+                        style={{
+                          fontSize: 12,
+                          color: C.muted,
+                          margin: "0 0 6px",
+                        }}
+                      >
+                        {t.aiTopicIdeas || "AI topic ideas (tap to use):"}
+                      </p>
+                      <div
+                        style={{ display: "flex", flexWrap: "wrap", gap: 6 }}
+                      >
+                        {currentSession.suggestedTopics.map((topic, i) => (
+                          <button
+                            key={i}
+                            onClick={() => setTitleDraft(topic)}
+                            style={{
+                              background: C.bg,
+                              border: `1px solid ${C.border}`,
+                              borderRadius: 20,
+                              padding: "6px 12px",
+                              fontSize: 12,
+                              color: C.dark,
+                              cursor: "pointer",
+                              fontFamily: F.sans,
+                            }}
+                            type="button"
+                          >
+                            {topic}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             )}
           </div>
@@ -387,7 +391,8 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
                   {r.name}{" "}
                   <span style={{ color: C.muted }}>
                     —{" "}
-                    {r.daysSinceLastPresented === "never presented"
+                    {r.daysSinceLastPresented === "never presented" ||
+                    r.daysSinceLastPresented === null
                       ? t.neverPresented || "never presented"
                       : `${r.daysSinceLastPresented} ${t.daysSince || "days since last time"}`}
                   </span>
@@ -484,13 +489,22 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
               >
                 <div>
                   <p style={{ margin: 0, fontWeight: 600, color: C.dark }}>
-                    {r.presentationTitle || r.title}
+                    {r.presentationTitle || r.title || "Untitled"}
                   </p>
                   <p
                     style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}
                   >
-                    {r.presenterName} ·{" "}
-                    {new Date(r.recordingExpiresAt).toLocaleDateString()}{" "}
+                    {r.presenterName || "Unknown"} ·{" "}
+                    {r.recordingExpiresAt
+                      ? new Date(r.recordingExpiresAt).toLocaleDateString(
+                          language,
+                          {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          },
+                        )
+                      : "N/A"}{" "}
                     {t.expiry || "expiry"}
                   </p>
                 </div>

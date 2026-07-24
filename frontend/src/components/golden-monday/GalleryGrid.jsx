@@ -37,7 +37,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
 
   const isAdmin = ["admin", "superadmin"].includes(user?.role);
 
-  // Category labels with translations
+  // Category labels with translations - define inside component to use t
   const getCategoryLabel = (cat) => {
     const categoryMap = {
       all: t.allPhotos || "All Photos",
@@ -51,6 +51,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     return categoryMap[cat] || cat;
   };
 
+  // Categories with translations - defined inside component to use t
   const CATEGORIES = [
     { value: "all", label: t.allPhotos || "All Photos" },
     {
