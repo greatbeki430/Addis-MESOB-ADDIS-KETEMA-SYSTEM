@@ -75,9 +75,10 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
         goldenMondayAPI.getLiveRecordings().catch(() => ({ data: [] })),
       ]);
 
-      // Ensure ranking is always an array
-      const rankingData = rotationRes?.data?.ranking || [];
-      setRanking(rankingData);
+      // ✅ FIX: Ensure ranking is always an array with proper fallback
+      const rankingData = rotationRes?.data?.ranking;
+      const safeRanking = Array.isArray(rankingData) ? rankingData : [];
+      setRanking(safeRanking);
 
       // Ensure sessions is always an array
       const sessions = sessionsRes?.data || [];
@@ -349,8 +350,8 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
           </button>
         )}
 
-        {/* Ranked queue, for transparency */}
-        {isPrivileged && ranking.length > 0 && (
+        {/* ✅ FIXED: Ranked queue, for transparency - with proper array check */}
+        {isPrivileged && Array.isArray(ranking) && ranking.length > 0 && (
           <div style={{ marginTop: 18 }}>
             <p style={{ fontSize: 13, color: C.muted, margin: "0 0 8px" }}>
               {getText(gmCopy.rotationOrder) ||
