@@ -481,6 +481,12 @@ export const translations = {
       employeeActivatedToast: "Employee activated",
       employeeDeactivatedToast: "Employee deactivated",
       failedUpdateEligibility: "Failed to update eligibility",
+      tabOverview: "Overview",
+      tabAttendance: "Attendance",
+      tabGallery: "Gallery",
+      tabReports: "Reports",
+      noEmployeesFound:
+        "No employees registered yet. Click 'Register Employee' to add.",
     },
   },
   am: {
@@ -950,6 +956,13 @@ export const translations = {
       employeeActivatedToast: "ሰራተኛ ነቅቷል",
       employeeDeactivatedToast: "ሰራተኛ ታግዷል",
       failedUpdateEligibility: "ብቁነት ማዘመን አልተቻለም",
+      tabOverview: "አጠቃላይ እይታ",
+      tabAttendance: "መገኘት",
+      tabGallery: "ማሳያ",
+      tabReports: "ሪፖርቶች",
+
+      // 🆕 Admin Panel
+      noEmployeesFound: "እስካሁን ምንም ሰራተኛ አልተመዘገበም። ለመጨመር 'ሰራተኛ መዝግብ' ን ይጫኑ።",
     },
   },
   om: {
@@ -1437,6 +1450,14 @@ export const translations = {
       employeeActivatedToast: "Hojjataan kaa'ameera",
       employeeDeactivatedToast: "Hojjataan dhaamsameera",
       failedUpdateEligibility: "Ulaagaa haaromsuun hin dandeenye",
+      tabOverview: "Ilaalcha Waliigalaa",
+      tabAttendance: "Argama",
+      tabGallery: "Galerii",
+      tabReports: "Gabaasota",
+
+      // 🆕 Admin Panel
+      noEmployeesFound:
+        "Hojjataan tokko illee hin galmoofne. 'Hojjataa Galmeessi' tuquun dabali.",
     },
   },
 };

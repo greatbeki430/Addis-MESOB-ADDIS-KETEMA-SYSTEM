@@ -1027,10 +1027,26 @@ export default function GoldenMonday() {
   const [selectedSessionId, setSelectedSessionId] = useState(null);
 
   const tabs = [
-    { id: "overview", label: "Overview", icon: <FiGrid size={16} /> },
-    { id: "attendance", label: "Attendance", icon: <FiClipboard size={16} /> },
-    { id: "gallery", label: "Gallery", icon: <FiCamera size={16} /> },
-    { id: "reports", label: "Reports", icon: <FiFileText size={16} /> },
+    {
+      id: "overview",
+      label: t("goldenMonday.tabOverview") || "Overview",
+      icon: <FiGrid size={16} />,
+    },
+    {
+      id: "attendance",
+      label: t("goldenMonday.tabAttendance") || "Attendance",
+      icon: <FiClipboard size={16} />,
+    },
+    {
+      id: "gallery",
+      label: t("goldenMonday.tabGallery") || "Gallery",
+      icon: <FiCamera size={16} />,
+    },
+    {
+      id: "reports",
+      label: t("goldenMonday.tabReports") || "Reports",
+      icon: <FiFileText size={16} />,
+    },
   ];
 
   // ── Translation helper - wrapped in useCallback ──
@@ -1705,6 +1721,9 @@ export default function GoldenMonday() {
                   const IconComponent = PILLAR_ICONS[pillar.icon] || (
                     <FiCompass size={22} />
                   );
+                  const translatedTitle = getTranslatedText(pillar.title);
+                  const translatedBody = getTranslatedText(pillar.body);
+
                   return (
                     <div
                       key={i}
@@ -1741,7 +1760,7 @@ export default function GoldenMonday() {
                           fontFamily: F.serif,
                         }}
                       >
-                        {getTranslatedText(pillar.title) || pillar.title}
+                        {translatedTitle || pillar.title?.en || "Untitled"}
                       </h3>
                       <p
                         style={{
@@ -1751,7 +1770,7 @@ export default function GoldenMonday() {
                           color: C.muted,
                         }}
                       >
-                        {getTranslatedText(pillar.body) || pillar.body}
+                        {translatedBody || pillar.body?.en || ""}
                       </p>
                     </div>
                   );
