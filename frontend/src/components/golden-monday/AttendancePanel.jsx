@@ -39,6 +39,9 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
   const [mySignature, setMySignature] = useState(null);
   const [signingFor, setSigningFor] = useState(null);
 
+  // ✅ Check if user is admin or super admin
+  const isAdmin = user?.role === "admin" || user?.role === "superadmin";
+
   const loadAttendance = useCallback(async () => {
     if (!sessionId) return;
     try {
@@ -311,6 +314,9 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
             const isSigned = emp.attended;
             const isSigning = signingFor === emp.user?._id;
 
+            // ✅ Show Sign In button for current user OR admin/superadmin
+            const canSign = isCurrentUser || isAdmin;
+
             return (
               <div
                 key={emp.user?._id || emp.name}
@@ -361,6 +367,21 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                           }}
                         >
                           {t.you || "You"}
+                        </span>
+                      )}
+                      {isAdmin && (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            fontSize: 9,
+                            background: "#fef3c7",
+                            color: "#92400e",
+                            padding: "1px 8px",
+                            borderRadius: 10,
+                            fontWeight: 600,
+                          }}
+                        >
+                          Admin
                         </span>
                       )}
                     </div>
@@ -448,7 +469,8 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                         </button>
                       </div>
                     </div>
-                  ) : isCurrentUser ? (
+                  ) : canSign ? (
+                    // ✅ Show Sign In button for current user OR admin
                     <button
                       onClick={() => setSigningFor(emp.user?._id)}
                       style={{
@@ -463,6 +485,15 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                         display: "flex",
                         alignItems: "center",
                         gap: 4,
+                        transition: "all 0.2s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#d97706";
+                        e.currentTarget.style.transform = "scale(1.05)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "#f59e0b";
+                        e.currentTarget.style.transform = "scale(1)";
                       }}
                       aria-label={t.signIn || "Sign in"}
                     >
