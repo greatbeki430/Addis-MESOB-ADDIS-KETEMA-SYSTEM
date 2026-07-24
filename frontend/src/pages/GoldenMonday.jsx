@@ -1022,6 +1022,23 @@ export default function GoldenMonday() {
   const { t: translations, language } = useLanguage();
   const { user } = useAuth();
 
+  // ── Translation helper - wrapped in useCallback ──
+  const t = useCallback(
+    (key, fallback) => {
+      const keys = key.split(".");
+      let value = translations;
+      for (const k of keys) {
+        if (value && value[k] !== undefined) {
+          value = value[k];
+        } else {
+          return fallback || key;
+        }
+      }
+      return value || fallback || key;
+    },
+    [translations],
+  );
+
   // ── Active Tab State ──
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedSessionId, setSelectedSessionId] = useState(null);
@@ -1048,23 +1065,6 @@ export default function GoldenMonday() {
       icon: <FiFileText size={16} />,
     },
   ];
-
-  // ── Translation helper - wrapped in useCallback ──
-  const t = useCallback(
-    (key, fallback) => {
-      const keys = key.split(".");
-      let value = translations;
-      for (const k of keys) {
-        if (value && value[k] !== undefined) {
-          value = value[k];
-        } else {
-          return fallback || key;
-        }
-      }
-      return value || fallback || key;
-    },
-    [translations],
-  );
 
   const gmCopy = translations?.goldenMonday || {};
   const [visible, setVisible] = useState({});
