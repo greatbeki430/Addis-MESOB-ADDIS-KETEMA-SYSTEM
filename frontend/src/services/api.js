@@ -297,19 +297,19 @@ export const goldenMondayAPI = {
   getSuggestedTopics: () => api.get("/golden-monday/suggest-topics"),
 
   // ──────────────────────────────────────────────────────────────
-  // 📋 ATTENDANCE MANAGEMENT - ✅ ADD THIS SECTION
+  // 📋 ATTENDANCE MANAGEMENT - ✅ UPDATED TO MATCH BACKEND
   // ──────────────────────────────────────────────────────────────
 
-  // GET /api/golden-monday/attendance/:sessionId - Get attendance for a session
+  // GET /api/golden-monday/:sessionId/attendance - Get attendance for a session
   getAttendance: (sessionId) =>
-    api.get(`/golden-monday/attendance/${sessionId}`),
+    api.get(`/golden-monday/${sessionId}/attendance`),
 
-  // POST /api/golden-monday/attendance/:sessionId - Record attendance for a session
+  // POST /api/golden-monday/:sessionId/attendance - Record attendance for a session
   recordAttendance: (sessionId, data) =>
-    api.post(`/golden-monday/attendance/${sessionId}`, data),
+    api.post(`/golden-monday/${sessionId}/attendance`, data),
 
   // ──────────────────────────────────────────────────────────────
-  // 🖼️ GALLERY MANAGEMENT - ✅ ADD THIS SECTION
+  // 🖼️ GALLERY MANAGEMENT - ✅ UPDATED TO MATCH BACKEND
   // ──────────────────────────────────────────────────────────────
 
   // GET /api/golden-monday/gallery - Get gallery photos with filters
@@ -330,9 +330,6 @@ export const goldenMondayAPI = {
   getLiveRecordings: () => api.get("/golden-monday/recordings/live"),
 
   // POST /api/golden-monday/:sessionId/recording - Upload a recording for a session
-  // @param {string} sessionId - The session ID
-  // @param {File} file - The recording file to upload
-  // @param {number} visibleDays - Days the recording should remain available
   uploadRecording: (sessionId, file, visibleDays) =>
     api.post(`/golden-monday/${sessionId}/recording`, { file, visibleDays }),
 
@@ -349,23 +346,15 @@ export const goldenMondayAPI = {
   getEmployees: () => api.get("/golden-monday/roster"),
 
   // POST /api/golden-monday/roster - Add a user to the roster
-  // @param {string} userId - The user ID to add
-  // @param {string} department - The user's department
-  // Accepts additional fields: position, profilePhotoUrl, phone, hireDate,
-  // skills, notes, emergencyContact, address, salary (admin/superadmin only)
   addToRoster: (userId, department) =>
     api.post("/golden-monday/roster", { userId, department }),
   registerEmployee: (data) => api.post("/golden-monday/roster", data),
 
   // PUT /api/golden-monday/roster/:id - Update an employee's roster entry
-  // @param {string} id - The roster entry ID
-  // @param {Object} updates - Fields to update (name, department, position, etc.)
   updateRosterEntry: (id, updates) =>
     api.put(`/golden-monday/roster/${id}`, updates),
 
   // PUT /api/golden-monday/roster/:userId - Toggle employee eligibility
-  // @param {string} userId - The user ID
-  // @param {boolean} isEligible - true = eligible for rotation, false = excluded
   updateEmployeeEligibility: (userId, isEligible) =>
     api.put(`/golden-monday/roster/${userId}`, { isEligible }),
 
@@ -374,11 +363,10 @@ export const goldenMondayAPI = {
   removeEmployee: (userId) => api.delete(`/golden-monday/roster/${userId}`),
 
   // ──────────────────────────────────────────────────────────────
-  // 🔄 ROTATION ENGINE (Fair Presenter Selection Algorithm)
+  // 🔄 ROTATION ENGINE
   // ──────────────────────────────────────────────────────────────
 
   // GET /api/golden-monday/rotation/preview - Preview rotation ranking
-  // @param {string} weekOf - The week date to preview (e.g., "2026-07-27")
   previewRotation: (weekOf) =>
     api.get("/golden-monday/rotation/preview", { params: { weekOf } }),
   getRanking: () => api.get("/golden-monday/rotation/preview"),
@@ -387,16 +375,12 @@ export const goldenMondayAPI = {
   getNextPresenter: () => api.get("/golden-monday/rotation/next"),
 
   // POST /api/golden-monday/rotation/assign - Assign a presenter for a week
-  // @param {string} weekOf - The week date to assign
-  // @param {string} manualPresenterId - Optional: override with specific user
   assignRotation: (weekOf, manualPresenterId) =>
     api.post("/golden-monday/rotation/assign", { weekOf, manualPresenterId }),
   assignPresenter: (userId) =>
     api.post("/golden-monday/rotation/assign", { manualPresenterId: userId }),
 
   // POST /api/golden-monday/rotation/:sessionId/reassign - Reassign a session
-  // @param {string} sessionId - The session to reassign
-  // @param {string} reason - Why the reassignment is happening
   reassignRotation: (sessionId, reason) =>
     api.post(`/golden-monday/rotation/${sessionId}/reassign`, { reason }),
 
@@ -405,8 +389,6 @@ export const goldenMondayAPI = {
   // ──────────────────────────────────────────────────────────────
 
   // PUT /api/golden-monday/:sessionId/title - Set presentation title
-  // @param {string} sessionId - The session ID
-  // @param {string} title - The presentation title
   setPresentationTitle: (sessionId, title) =>
     api.put(`/golden-monday/${sessionId}/title`, { title }),
 
@@ -415,7 +397,6 @@ export const goldenMondayAPI = {
   // ──────────────────────────────────────────────────────────────
 
   // GET /api/golden-monday/stats - Get Golden Monday program statistics
-  // Returns: total sessions, presenters, attendance rates, department metrics
   getStats: () => api.get("/golden-monday/stats"),
 
   // ──────────────────────────────────────────────────────────────
@@ -430,45 +411,24 @@ export const goldenMondayAPI = {
   // ──────────────────────────────────────────────────────────────
 
   // POST /api/telegram/post/:sessionId - Post session announcement to Telegram
-  // @param {string} sessionId - The session to announce
   postToTelegram: (sessionId) => api.post(`/telegram/post/${sessionId}`),
 
   // ──────────────────────────────────────────────────────────────
   // 📋 PENDING REGISTRATIONS (Telegram Bot Self-Registration)
   // ──────────────────────────────────────────────────────────────
 
-  // GET /api/registrations/pending - Get all registrations awaiting admin approval
-  // Returns: Array of pending registrations with user details
-  // Requires: Admin or SuperAdmin role
   getPendingRegistrations: () =>
     api.get("/registrations/pending", { withCredentials: true }),
 
-  // PUT /api/registrations/:id/approve - Approve a pending registration
-  // @param {string} id - The registration ID
-  // Creates a User account, sends login credentials via Telegram
-  // Requires: Admin or SuperAdmin role
   approveRegistration: (id) =>
     api.put(`/registrations/${id}/approve`, {}, { withCredentials: true }),
 
-  // PUT /api/registrations/:id/reject - Reject a pending registration
-  // @param {string} id - The registration ID
-  // Sends rejection notification via Telegram
-  // Requires: Admin or SuperAdmin role
   rejectRegistration: (id) =>
     api.put(`/registrations/${id}/reject`, {}, { withCredentials: true }),
 
-  // GET /api/registrations - Get registrations with filters
-  // @param {Object} params - Query parameters
-  // @param {string} params.status - Filter by status (pending_approval, approved, rejected)
-  // @param {number} params.limit - Results per page (default: 50)
-  // @param {number} params.skip - Pagination offset
-  // Requires: Admin or SuperAdmin role
   getRegistrations: (params) =>
     api.get("/registrations", { params, withCredentials: true }),
 
-  // GET /api/registrations/:id - Get a single registration by ID
-  // @param {string} id - The registration ID
-  // Requires: Admin or SuperAdmin role
   getRegistration: (id) =>
     api.get(`/registrations/${id}`, { withCredentials: true }),
 
@@ -476,9 +436,6 @@ export const goldenMondayAPI = {
   // 🗑️ EMPLOYEE DELETION WITH TELEGRAM NOTIFICATION
   // ──────────────────────────────────────────────────────────────
 
-  // DELETE /api/employees/:userId - Delete employee with Telegram notification
-  // @param {string} userId - The user ID to delete
-  // @param {string} reason - Reason for deletion (optional)
   deleteEmployeeWithNotification: (userId, reason) =>
     api.delete(`/employees/${userId}`, {
       data: { reason },
