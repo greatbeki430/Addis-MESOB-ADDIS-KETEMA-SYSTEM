@@ -413,6 +413,10 @@ export const goldenMondayAPI = {
   // POST /api/telegram/post/:sessionId - Post session announcement to Telegram
   postToTelegram: (sessionId) => api.post(`/telegram/post/${sessionId}`),
 
+  // POST /api/golden-monday/gallery/analyze - AI analyze and categorize a photo
+  analyzeGalleryPhoto: (data) =>
+    api.post("/golden-monday/gallery/analyze", data),
+
   // ──────────────────────────────────────────────────────────────
   // 📋 PENDING REGISTRATIONS (Telegram Bot Self-Registration)
   // ──────────────────────────────────────────────────────────────

@@ -93,7 +93,6 @@ router.get("/rotation/preview", protect, anyRole, previewRotation);
 router.get("/rotation/next", protect, anyRole, async (req, res) => {
   try {
     const next = await rotationService.getNextPresenter();
-    // Ensure we return an object, not null
     if (!next) {
       return res.json({ name: "No presenter assigned", department: "" });
     }
@@ -200,7 +199,7 @@ router.get("/pillars", protect, anyRole, async (req, res) => {
 // ATTENDANCE ROUTES
 // ──────────────────────────────────────────────────────────────
 
-// GET /api/golden-monday/:sessionId/attendance - Get attendance for a session
+// GET /api/golden-monday/:sessionId/attendance
 router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   try {
     const attendance = await GoldenMondayAttendance.find({
@@ -209,16 +208,10 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       .populate("user", "name email department")
       .sort({ checkedInAt: -1 });
 
-    // Get all eligible employees for this session
     const allEmployees = await GoldenMondayPresenter.find({
       isEligible: true,
     }).select("user name email department");
 
-    const attendedUserIds = new Set(
-      attendance.filter((a) => a.attended).map((a) => a.user._id.toString()),
-    );
-
-    // Build full attendance report with who hasn't attended
     const report = allEmployees.map((emp) => {
       const record = attendance.find(
         (a) => a.user._id.toString() === emp.user._id.toString(),
@@ -249,7 +242,7 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   }
 });
 
-// POST /api/golden-monday/:sessionId/attendance - Record attendance for a single user
+// POST /api/golden-monday/:sessionId/attendance
 router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   try {
     const {
@@ -275,14 +268,12 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Check if already attended
     let attendance = await GoldenMondayAttendance.findOne({
       session: req.params.sessionId,
       user: userId,
     });
 
     if (attendance) {
-      // Update existing record
       attendance.attended = true;
       attendance.checkedInAt = new Date();
       if (signature) attendance.signature = signature;
@@ -292,7 +283,6 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       if (rating) attendance.rating = rating;
       await attendance.save();
     } else {
-      // Create new record
       attendance = new GoldenMondayAttendance({
         session: req.params.sessionId,
         user: userId,
@@ -311,7 +301,6 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       await attendance.save();
     }
 
-    // Also update the session's attendees array for backward compatibility
     const existingAttendee = session.attendees.find(
       (a) => a.user.toString() === userId,
     );
@@ -339,7 +328,7 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   }
 });
 
-// POST /api/golden-monday/:sessionId/attendance/bulk - Bulk attendance
+// POST /api/golden-monday/:sessionId/attendance/bulk
 router.post(
   "/:sessionId/attendance/bulk",
   protect,
@@ -406,7 +395,7 @@ router.post(
 // GALLERY ROUTES
 // ──────────────────────────────────────────────────────────────
 
-// GET /api/golden-monday/gallery - Get all gallery photos
+// GET /api/golden-monday/gallery
 router.get("/gallery", protect, anyRole, async (req, res) => {
   try {
     const { category, session, limit = 50, page = 1 } = req.query;
@@ -439,7 +428,7 @@ router.get("/gallery", protect, anyRole, async (req, res) => {
   }
 });
 
-// POST /api/golden-monday/gallery - Upload gallery photo
+// POST /api/golden-monday/gallery
 router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
   try {
     const {
@@ -457,7 +446,6 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
       return res.status(400).json({ error: "Image data is required" });
     }
 
-    // Upload to Cloudinary
     const cloudinary = require("../config/cloudinary");
     const result = await cloudinary.uploader.upload(image, {
       folder: "golden-monday-gallery",
@@ -465,7 +453,6 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
       overwrite: false,
     });
 
-    // Create thumbnail
     const thumbnailResult = await cloudinary.uploader.upload(image, {
       folder: "golden-monday-gallery/thumbnails",
       public_id: `thumb-${Date.now()}`,
@@ -495,7 +482,6 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
 
     await galleryPhoto.save();
 
-    // If sessionId provided, also add to session photos
     if (sessionId) {
       const session = await GoldenMondaySession.findById(sessionId);
       if (session) {
@@ -519,7 +505,7 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
   }
 });
 
-// DELETE /api/golden-monday/gallery/:photoId - Delete gallery photo
+// DELETE /api/golden-monday/gallery/:photoId
 router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
   try {
     const photo = await GoldenMondayGallery.findById(req.params.photoId);
@@ -527,7 +513,6 @@ router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
       return res.status(404).json({ error: "Photo not found" });
     }
 
-    // Delete from Cloudinary
     const cloudinary = require("../config/cloudinary");
     await cloudinary.uploader.destroy(photo.publicId);
     if (photo.thumbnailPublicId) {
@@ -543,10 +528,150 @@ router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
+// 🤖 AI PHOTO ANALYSIS - ✅ NEW ROUTE
+// ──────────────────────────────────────────────────────────────
+
+// POST /api/golden-monday/gallery/analyze - AI analyze and categorize a photo
+router.post("/gallery/analyze", protect, leaderOrAdmin, async (req, res) => {
+  try {
+    const { image, sessionId } = req.body;
+
+    if (!image) {
+      return res.status(400).json({ error: "Image data is required" });
+    }
+
+    // Extract base64 data
+    const base64Data = image.includes(",") ? image.split(",")[1] : image;
+    const mimeType = image.includes("data:")
+      ? image.match(/data:([^;]+)/)?.[1] || "image/jpeg"
+      : "image/jpeg";
+
+    // Use the existing AI service for vision analysis
+    const { analyzeDocumentImage } = require("../services/aiService");
+
+    // Analyze the image using AI
+    const analysis = await analyzeDocumentImage(base64Data, mimeType);
+
+    // Map analysis to gallery categories
+    let detectedCategory = "other";
+    let confidence = 0.5;
+
+    // Check if analysis contains keywords that map to categories
+    const content = (analysis.notes || analysis.title || "").toLowerCase();
+    const citizenName = (analysis.citizenName || "").toLowerCase();
+    const documentType = (analysis.documentType || "").toLowerCase();
+
+    // Flag Raising detection
+    if (
+      content.includes("flag") ||
+      content.includes("ባንዲራ") ||
+      content.includes("ethiopian flag") ||
+      content.includes("ኢትዮጵያ ባንዲራ")
+    ) {
+      detectedCategory = "flag-raising";
+      confidence = 0.85;
+    }
+    // Presentation detection
+    else if (
+      content.includes("presentation") ||
+      content.includes("ዝግጅት") ||
+      content.includes("speaker") ||
+      content.includes("slide") ||
+      content.includes("powerpoint") ||
+      content.includes("presenter")
+    ) {
+      detectedCategory = "presentation";
+      confidence = 0.8;
+    }
+    // Group photo detection
+    else if (
+      content.includes("group") ||
+      content.includes("ቡድን") ||
+      content.includes("team") ||
+      content.includes("meeting") ||
+      content.includes("staff") ||
+      content.includes("group photo")
+    ) {
+      detectedCategory = "group-photo";
+      confidence = 0.75;
+    }
+    // Attendees detection
+    else if (
+      content.includes("attend") ||
+      content.includes("ተሳታፊ") ||
+      content.includes("audience") ||
+      content.includes("participant") ||
+      content.includes("crowd") ||
+      content.includes("people") ||
+      citizenName
+    ) {
+      detectedCategory = "attendees";
+      confidence = 0.7;
+    }
+    // Event detection
+    else if (
+      content.includes("event") ||
+      content.includes("ዝግጅት") ||
+      content.includes("ceremony") ||
+      content.includes("celebration") ||
+      content.includes("award") ||
+      content.includes("ክብረ በዓል")
+    ) {
+      detectedCategory = "event";
+      confidence = 0.75;
+    }
+    // Use document type mapping if available
+    else if (analysis.documentType) {
+      const categoryMap = {
+        birth_certificate: "other",
+        death_certificate: "other",
+        marriage_certificate: "event",
+        divorce_certificate: "other",
+        residence_id: "attendees",
+        name_change: "other",
+      };
+      detectedCategory = categoryMap[analysis.documentType] || "other";
+      confidence = analysis.confidence === "high" ? 0.8 : 0.5;
+    }
+    // If AI is confident but no specific category, use other
+    else if (analysis.confidence === "high") {
+      detectedCategory = "other";
+      confidence = 0.6;
+    }
+
+    res.json({
+      category: detectedCategory,
+      confidence: confidence,
+      analysis: {
+        title: analysis.title || "",
+        notes: analysis.notes || "",
+        documentType: analysis.documentType || "other",
+        citizenName: analysis.citizenName || "",
+        tags: analysis.tags || [],
+        issuingDepartment: analysis.issuingDepartment || "",
+        nationalId: analysis.nationalId || "",
+      },
+    });
+  } catch (error) {
+    console.error("AI analysis error:", error);
+    // Return a fallback response instead of error
+    res.json({
+      category: "other",
+      confidence: 0.3,
+      analysis: {
+        notes:
+          "AI analysis unavailable. Image uploaded without categorization.",
+        documentType: "other",
+      },
+    });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
 // SESSION RECORDING & DOWNLOAD ROUTES
 // ──────────────────────────────────────────────────────────────
 
-// GET /api/golden-monday/:sessionId/download-slides - Download presentation slides
+// GET /api/golden-monday/:sessionId/download-slides
 router.get(
   "/:sessionId/download-slides",
   protect,
@@ -574,7 +699,7 @@ router.get(
   },
 );
 
-// POST /api/golden-monday/:sessionId/slides - Upload presentation slides
+// POST /api/golden-monday/:sessionId/slides
 router.post("/:sessionId/slides", protect, leaderOrAdmin, async (req, res) => {
   try {
     const { slides } = req.body;

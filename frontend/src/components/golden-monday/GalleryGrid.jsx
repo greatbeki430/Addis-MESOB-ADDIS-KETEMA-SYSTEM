@@ -1,5 +1,5 @@
 // components/golden-monday/GalleryGrid.jsx
-// Golden Monday Gallery with categories and lightbox
+// Golden Monday Gallery with categories, lightbox, multi-upload, and AI categorization
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { C, F } from "../../styles/theme";
@@ -16,6 +16,10 @@ import {
   FiList,
   FiUpload,
   FiTrash2,
+  FiLoader,
+  FiCheck,
+  FiAlertCircle,
+  FiCpu,
 } from "react-icons/fi";
 
 export default function GalleryGrid({ sessionId = null, onRefresh }) {
@@ -34,10 +38,12 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   const [totalPages, setTotalPages] = useState(1);
   const [viewMode, setViewMode] = useState("grid");
   const [uploading, setUploading] = useState(false);
+  const [uploadQueue, setUploadQueue] = useState([]);
+  const [isAIAnalyzing, setIsAIAnalyzing] = useState(false);
 
   const isAdmin = ["admin", "superadmin"].includes(user?.role);
 
-  // Category labels with translations - define inside component to use t
+  // Category labels with translations
   const getCategoryLabel = (cat) => {
     const categoryMap = {
       all: t.allPhotos || "All Photos",
@@ -51,7 +57,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     return categoryMap[cat] || cat;
   };
 
-  // Categories with translations - defined inside component to use t
+  // Categories with translations
   const CATEGORIES = [
     { value: "all", label: t.allPhotos || "All Photos" },
     {
@@ -106,50 +112,196 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     }
   }, [loadGallery]);
 
-  const handleUpload = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      showToast(t.selectImage || "Please select an image file", "warning");
-      return;
+  // AI Auto-Categorization function
+  const analyzeAndCategorizePhoto = async (imageData) => {
+    try {
+      const response = await goldenMondayAPI.analyzeGalleryPhoto({
+        image: imageData,
+        sessionId: sessionId || undefined,
+      });
+      return response.data;
+    } catch (error) {
+      console.error("AI categorization failed:", error);
+      return { category: "other", confidence: 0 };
     }
+  };
 
-    if (file.size > 10 * 1024 * 1024) {
-      showToast(t.imageTooLarge || "Image must be less than 10MB", "warning");
-      return;
-    }
+  // Handle multiple file selection
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    // Validate files
+    const validFiles = files.filter((file) => {
+      if (!file.type.startsWith("image/")) {
+        showToast(
+          `${file.name}: ${t.selectImage || "Please select an image file"}`,
+          "warning",
+        );
+        return false;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        showToast(
+          `${file.name}: ${t.imageTooLarge || "Image must be less than 10MB"}`,
+          "warning",
+        );
+        return false;
+      }
+      return true;
+    });
+
+    if (validFiles.length === 0) return;
+
+    // Add to upload queue
+    const newQueue = validFiles.map((file) => ({
+      file,
+      id: Date.now() + Math.random(),
+      status: "pending",
+      progress: 0,
+      category: category !== "all" ? category : null,
+      error: null,
+    }));
+
+    setUploadQueue((prev) => [...prev, ...newQueue]);
+
+    // Start upload process
+    processUploadQueue(newQueue);
+
+    // Reset input
+    e.target.value = "";
+  };
+
+  // Process upload queue
+  const processUploadQueue = async (queue = uploadQueue) => {
+    if (uploading) return;
+    if (queue.length === 0) return;
 
     setUploading(true);
+
+    const pendingItems = queue.filter((item) => item.status === "pending");
+    if (pendingItems.length === 0) {
+      setUploading(false);
+      return;
+    }
+
+    // Process one at a time to avoid overloading
+    const item = pendingItems[0];
+
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
+      // Update status to uploading
+      setUploadQueue((prev) =>
+        prev.map((q) =>
+          q.id === item.id ? { ...q, status: "uploading", progress: 10 } : q,
+        ),
+      );
+
+      // Convert to base64
+      const imageData = await fileToBase64(item.file);
+
+      setUploadQueue((prev) =>
+        prev.map((q) => (q.id === item.id ? { ...q, progress: 30 } : q)),
+      );
+
+      // AI Auto-Categorization (if no category selected)
+      let detectedCategory = item.category;
+      let aiConfidence = 0;
+
+      if (!detectedCategory) {
+        setIsAIAnalyzing(true);
         try {
-          await goldenMondayAPI.uploadGalleryPhoto({
-            image: reader.result,
-            category: category !== "all" ? category : "other",
-            sessionId: sessionId || undefined,
-            lang: language,
-          });
-          showToast(
-            t.uploadSuccess || "Photo uploaded successfully!",
-            "success",
+          const aiResult = await analyzeAndCategorizePhoto(imageData);
+          detectedCategory = aiResult.category || "other";
+          aiConfidence = aiResult.confidence || 0;
+
+          setUploadQueue((prev) =>
+            prev.map((q) =>
+              q.id === item.id
+                ? {
+                    ...q,
+                    progress: 50,
+                    aiCategory: detectedCategory,
+                    aiConfidence,
+                  }
+                : q,
+            ),
           );
-          await loadGallery();
-          if (onRefresh) onRefresh();
-        } catch (err) {
-          console.error("Upload error:", err);
-          showToast(t.uploadError || "Failed to upload photo", "error");
+        } catch (aiError) {
+          console.warn("AI analysis failed, using fallback:", aiError);
+          detectedCategory = "other";
         } finally {
+          setIsAIAnalyzing(false);
+        }
+      } else {
+        setUploadQueue((prev) =>
+          prev.map((q) => (q.id === item.id ? { ...q, progress: 50 } : q)),
+        );
+      }
+
+      // Upload to server
+      await goldenMondayAPI.uploadGalleryPhoto({
+        image: imageData,
+        category: detectedCategory,
+        sessionId: sessionId || undefined,
+        lang: language,
+      });
+
+      setUploadQueue((prev) =>
+        prev.map((q) =>
+          q.id === item.id
+            ? {
+                ...q,
+                status: "completed",
+                progress: 100,
+                category: detectedCategory,
+              }
+            : q,
+        ),
+      );
+
+      showToast(
+        `${item.file.name}: ${t.uploadSuccess || "Photo uploaded successfully!"}${detectedCategory !== "other" ? ` (${getCategoryLabel(detectedCategory)})` : ""}`,
+        "success",
+      );
+
+      // Remove from queue after delay
+      setTimeout(() => {
+        setUploadQueue((prev) => prev.filter((q) => q.id !== item.id));
+      }, 2000);
+
+      // Refresh gallery
+      await loadGallery();
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      console.error("Upload error:", error);
+      setUploadQueue((prev) =>
+        prev.map((q) =>
+          q.id === item.id
+            ? { ...q, status: "error", error: error.message || "Upload failed" }
+            : q,
+        ),
+      );
+      showToast(
+        `${item.file.name}: ${t.uploadError || "Failed to upload photo"}`,
+        "error",
+      );
+    } finally {
+      setIsAIAnalyzing(false);
+      // Process next item
+      setUploadQueue((prev) => {
+        const remaining = prev.filter((q) => q.status === "pending");
+        if (remaining.length > 0) {
+          setTimeout(() => processUploadQueue(prev), 500);
+        } else {
           setUploading(false);
         }
-      };
-      reader.readAsDataURL(file);
-    } catch (err) {
-      console.error("Upload error:", err);
-      showToast(t.uploadError || "Failed to upload photo", "error");
-      setUploading(false);
+        return prev;
+      });
     }
+  };
+
+  // Remove a file from queue
+  const removeFromQueue = (id) => {
+    setUploadQueue((prev) => prev.filter((q) => q.id !== id));
   };
 
   const handleDelete = async (photoId) => {
@@ -170,6 +322,16 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       month: "short",
       day: "numeric",
       year: "numeric",
+    });
+  };
+
+  // Helper to convert file to base64
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
   };
 
@@ -209,39 +371,72 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           ))}
         </div>
 
-        <div style={{ display: "flex", gap: 6, marginLeft: "auto" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            marginLeft: "auto",
+            alignItems: "center",
+          }}
+        >
           {isAdmin && (
-            <label
-              style={{
-                padding: "6px 14px",
-                borderRadius: 8,
-                border: `1px dashed ${C.primary}`,
-                background: C.primary + "11",
-                color: C.primary,
-                fontSize: 12,
-                cursor: uploading ? "not-allowed" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                opacity: uploading ? 0.6 : 1,
-              }}
-            >
-              {uploading ? (
-                t.uploading || "Uploading..."
-              ) : (
-                <>
-                  <FiUpload size={14} /> {t.upload || "Upload"}
-                </>
+            <>
+              <label
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: 8,
+                  border: `1px dashed ${C.primary}`,
+                  background: C.primary + "11",
+                  color: C.primary,
+                  fontSize: 12,
+                  cursor: uploading ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  opacity: uploading ? 0.6 : 1,
+                }}
+              >
+                {uploading || uploadQueue.length > 0 ? (
+                  <>
+                    <FiLoader
+                      size={14}
+                      style={{ animation: "spin 1s linear infinite" }}
+                    />
+                    {isAIAnalyzing ? "AI Analyzing..." : "Uploading..."}
+                  </>
+                ) : (
+                  <>
+                    <FiUpload size={14} /> {t.upload || "Upload"}
+                  </>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileSelect}
+                  style={{ display: "none" }}
+                  disabled={uploading}
+                />
+              </label>
+
+              {/* AI Auto-Categorization Indicator */}
+              {uploadQueue.some((q) => q.aiCategory) && (
+                <span
+                  style={{
+                    fontSize: 11,
+                    color: C.primary,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <FiCpu size={14} />
+                  AI Categorizing
+                </span>
               )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleUpload}
-                style={{ display: "none" }}
-                disabled={uploading}
-              />
-            </label>
+            </>
           )}
+
           <button
             onClick={() => setViewMode("grid")}
             style={{
@@ -272,6 +467,174 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           </button>
         </div>
       </div>
+
+      {/* Upload Queue */}
+      {uploadQueue.length > 0 && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "12px 16px",
+            borderRadius: 8,
+            background: C.bg,
+            border: `1px solid ${C.border}`,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 8,
+            }}
+          >
+            <span style={{ fontWeight: 600, fontSize: 13, color: C.dark }}>
+              Uploading {uploadQueue.length} file
+              {uploadQueue.length > 1 ? "s" : ""}
+            </span>
+            {isAIAnalyzing && (
+              <span
+                style={{
+                  fontSize: 12,
+                  color: C.primary,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <FiCpu size={14} /> AI analyzing...
+              </span>
+            )}
+          </div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {uploadQueue.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "6px 10px",
+                  borderRadius: 6,
+                  background: C.white,
+                  border: `1px solid ${
+                    item.status === "error"
+                      ? "#fecaca"
+                      : item.status === "completed"
+                        ? "#6ee7b7"
+                        : C.border
+                  }`,
+                }}
+              >
+                <div
+                  style={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: "50%",
+                    background:
+                      item.status === "completed"
+                        ? "#d1fae5"
+                        : item.status === "error"
+                          ? "#fee2e2"
+                          : "#e5e7eb",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 12,
+                    flexShrink: 0,
+                  }}
+                >
+                  {item.status === "completed" && (
+                    <FiCheck size={14} color="#065f46" />
+                  )}
+                  {item.status === "error" && (
+                    <FiAlertCircle size={14} color="#991b1b" />
+                  )}
+                  {item.status === "uploading" && (
+                    <FiLoader
+                      size={14}
+                      style={{ animation: "spin 1s linear infinite" }}
+                    />
+                  )}
+                  {item.status === "pending" && <span>⏳</span>}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: C.dark,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {item.file.name}
+                  </div>
+                  <div
+                    style={{ display: "flex", alignItems: "center", gap: 8 }}
+                  >
+                    <div
+                      style={{
+                        flex: 1,
+                        height: 4,
+                        borderRadius: 2,
+                        background: "#e5e7eb",
+                        overflow: "hidden",
+                        maxWidth: 150,
+                      }}
+                    >
+                      <div
+                        style={{
+                          height: "100%",
+                          width: `${item.progress || 0}%`,
+                          borderRadius: 2,
+                          background:
+                            item.status === "error"
+                              ? "#ef4444"
+                              : item.status === "completed"
+                                ? "#10b981"
+                                : C.primary,
+                          transition: "width 0.3s ease",
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: 10, color: C.muted }}>
+                      {item.progress || 0}%
+                    </span>
+                    {item.aiCategory && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          color: C.primary,
+                          background: C.primary + "11",
+                          padding: "1px 6px",
+                          borderRadius: 10,
+                        }}
+                      >
+                        {getCategoryLabel(item.aiCategory)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {item.status === "pending" && (
+                  <button
+                    onClick={() => removeFromQueue(item.id)}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      color: "#999",
+                      cursor: "pointer",
+                      padding: "2px",
+                    }}
+                  >
+                    <FiX size={14} />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Photos Grid */}
       {loading ? (
