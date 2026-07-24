@@ -50,6 +50,18 @@ import {
   FiClipboard,
 } from "react-icons/fi";
 
+// SAFE DATA HELPERS
+// ─────────────────────────────────────────────────────────────
+const safeArray = (data, fallback = []) => {
+  if (!data) return fallback;
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object") {
+    if (Array.isArray(data.data)) return data.data;
+    if (Array.isArray(Object.values(data)[0])) return Object.values(data)[0];
+  }
+  return fallback;
+};
+
 // ─────────────────────────────────────────────────────────────
 // STATIC PILLARS (fallback data, but should come from DB)
 // ─────────────────────────────────────────────────────────────
@@ -1173,33 +1185,39 @@ export default function GoldenMonday() {
         goldenMondayAPI.getPillars().catch(() => ({ data: FALLBACK_PILLARS })),
       ]);
 
-      setUpcomingSessions(upcomingRes.data || []);
-      setPastSessions(pastRes.data?.sessions || []);
+      // SAFE: Ensure all data is properly set with fallbacks
+      setUpcomingSessions(safeArray(upcomingRes.data));
+      setPastSessions(safeArray(pastRes.data?.sessions));
       setNextPresenter(nextPresenterRes.data || null);
-      setEmployees(employeesRes.data || []);
+      setEmployees(safeArray(employeesRes.data));
       setStats(statsRes.data || null);
 
-      // FIX: Ensure pillars is always an array
+      // SAFE: Ensure pillars is always an array
       const pillarsData = pillarsRes.data;
-      if (Array.isArray(pillarsData)) {
-        setPillars(pillarsData.length > 0 ? pillarsData : FALLBACK_PILLARS);
+      if (Array.isArray(pillarsData) && pillarsData.length > 0) {
+        setPillars(pillarsData);
       } else {
-        setPillars(FALLBACK_PILLARS);
+        // Try to extract from nested structure if needed
+        const extracted = safeArray(pillarsData);
+        setPillars(extracted.length > 0 ? extracted : FALLBACK_PILLARS);
       }
 
       // Set default selected session for attendance
-      if (upcomingRes.data && upcomingRes.data.length > 0) {
-        setSelectedSessionId(upcomingRes.data[0]._id);
-      } else if (pastRes.data?.sessions && pastRes.data.sessions.length > 0) {
-        setSelectedSessionId(pastRes.data.sessions[0]._id);
+      const upcoming = safeArray(upcomingRes.data);
+      const past = safeArray(pastRes.data?.sessions);
+      if (upcoming.length > 0) {
+        setSelectedSessionId(upcoming[0]._id);
+      } else if (past.length > 0) {
+        setSelectedSessionId(past[0]._id);
       }
-    } catch {
-      console.error("Failed to load Golden Monday data");
+    } catch (error) {
+      console.error("Failed to load Golden Monday data:", error);
       showToast(t("common.error") || "Failed to load data", "error");
     } finally {
       setLoading(false);
     }
   }, [t]);
+  // ─── END OF REPLACED FUNCTION ─────────────────────────────
 
   const refreshData = useCallback(async () => {
     setRefreshing(true);
@@ -1753,7 +1771,8 @@ export default function GoldenMonday() {
                   marginTop: 28,
                 }}
               >
-                {Array.isArray(pillars) &&
+                {/* ✅ FIXED: Added safety check with fallback */}
+                {Array.isArray(pillars) && pillars.length > 0 ? (
                   pillars.map((pillar, i) => {
                     const IconComponent = PILLAR_ICONS[pillar.icon] || (
                       <FiCompass size={22} />
@@ -1811,7 +1830,24 @@ export default function GoldenMonday() {
                         </p>
                       </div>
                     );
-                  })}
+                  })
+                ) : (
+                  /* ✅ ADDED: Fallback when pillars data is not available */
+                  <div
+                    style={{
+                      gridColumn: "1 / -1",
+                      textAlign: "center",
+                      color: C.muted,
+                      padding: "40px 0",
+                    }}
+                  >
+                    <FiCompass
+                      size={32}
+                      style={{ marginBottom: 12, opacity: 0.5 }}
+                    />
+                    <p>{t("common.loading") || "Loading pillars..."}</p>
+                  </div>
+                )}
               </div>
             </div>
 
