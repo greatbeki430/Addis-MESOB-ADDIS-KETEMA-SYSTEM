@@ -45,6 +45,9 @@ import AlertsManagement from "./pages/admin/AlertsManagement";
 // Admin Data Management - Only import the main component, not wrappers
 import AdminDataManagement from "./pages/admin/AdminDataManagement";
 
+// ✅ ADD THIS IMPORT
+import { FiUserPlus } from "react-icons/fi";
+
 // =============================================
 // ANIMATED A-MESOB TITLE COMPONENT
 // =============================================
@@ -672,7 +675,7 @@ function AuthenticatedApp() {
             e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.2)";
           }}
         >
-          +
+          <FiUserPlus size={20} />
         </button>
       )}
 

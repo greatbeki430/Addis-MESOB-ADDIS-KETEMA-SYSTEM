@@ -484,15 +484,16 @@ const QuickChip = ({ label, onClick, icon }) => (
 );
 
 // ─── Tab button ───────────────────────────────────────────────
+// ─── Tab button ───────────────────────────────────────────────
 const TabBtn = ({ label, active, onClick, icon }) => (
   <button
     onClick={onClick}
     style={{
       flex: 1,
       padding: "7px 4px",
-      background: active ? "#2563EB" : "transparent",
-      color: active ? "#fff" : "#64748B",
-      border: "none",
+      background: active ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)",
+      color: active ? "#fff" : "rgba(255,255,255,0.7)",
+      border: active ? "1px solid rgba(255,255,255,0.3)" : "none",
       borderRadius: "8px",
       fontSize: "11px",
       fontWeight: active ? 600 : 400,
