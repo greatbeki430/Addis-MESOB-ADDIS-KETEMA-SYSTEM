@@ -1,11 +1,11 @@
 // src/pages/GoldenMonday.jsx
 // ════════════════════════════════════════════════════════════
-// COMPLETE Golden Monday Management System
+// COMPLETE Golden Monday Management System - FIXED
 // All data dynamic from database, full CRUD, AI integration,
 // Telegram posting, and role-based access control
 // ════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { C, F } from "../styles/theme";
 import { useAuth } from "../hooks/useAuth";
@@ -227,22 +227,22 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
 
   const statItems = [
     {
-      label: t("goldenMonday.statsTotalSessions") || "Total Sessions",
+      label: t("goldenMonday.statTotalSessions") || "Total Sessions",
       value: stats.totalSessions || 0,
       icon: <FiCalendar size={20} />,
     },
     {
-      label: t("goldenMonday.statsPresenters") || "Presenters",
+      label: t("goldenMonday.statPresenters") || "Presenters",
       value: stats.totalPresenters || 0,
       icon: <FiUsers size={20} />,
     },
     {
-      label: t("goldenMonday.statsUpcoming") || "Upcoming",
+      label: t("goldenMonday.statUpcoming") || "Upcoming",
       value: stats.upcomingSessions || 0,
       icon: <FiClock size={20} />,
     },
     {
-      label: t("goldenMonday.statsAvgRating") || "Avg Rating",
+      label: t("goldenMonday.statAvgRating") || "Avg Rating",
       value: stats.averageRating ? stats.averageRating.toFixed(1) : "N/A",
       icon: <FiStar size={20} />,
     },
@@ -293,7 +293,7 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
           }}
         >
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>
-            {t("goldenMonday.nextPresenter") || "Next Presenter"}
+            {t("goldenMonday.statNextPresenter") || "Next Presenter"}
           </div>
           <div
             style={{
@@ -358,13 +358,14 @@ function TelegramPostButton({ sessionId, onPosted, t }) {
     try {
       await goldenMondayAPI.postToTelegram(sessionId);
       showToast(
-        t("goldenMonday.telegramSuccess") || "Posted to Telegram successfully!",
+        t("goldenMonday.postedToTelegramToast") ||
+          "Posted to Telegram successfully!",
         "success",
       );
       if (onPosted) onPosted();
     } catch {
       showToast(
-        t("goldenMonday.telegramError") || "Failed to post to Telegram",
+        t("goldenMonday.failedPostTelegram") || "Failed to post to Telegram",
         "error",
       );
     } finally {
@@ -384,27 +385,35 @@ function TelegramPostButton({ sessionId, onPosted, t }) {
     >
       <FiBell size={14} />
       {posting
-        ? t("common.loading") || "Posting..."
+        ? t("goldenMonday.postingToTelegram") || "Posting..."
         : t("goldenMonday.postToTelegram") || "Post to Telegram"}
     </button>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// SESSION CARD COMPONENT
+// SESSION CARD COMPONENT - FIXED (useCallback moved before early return)
 // ─────────────────────────────────────────────────────────────
 function SessionCard({ session, language, isAdmin, onRefresh, t }) {
+  // ✅ All hooks called first - unconditionally
   const [expanded, setExpanded] = useState(false);
-  const date = new Date(session.date);
-  const isUpcoming = session.status === "scheduled" || date > new Date();
 
   const getTranslatedText = useCallback(
     (obj) => {
       if (!obj) return "";
-      return obj[language] || obj.en || obj;
+      if (typeof obj === "string") return obj;
+      return obj[language] || obj.en || "";
     },
     [language],
   );
+
+  // ✅ Early return AFTER all hooks
+  if (!session) {
+    return null;
+  }
+
+  const date = session.date ? new Date(session.date) : new Date();
+  const isUpcoming = session.status === "scheduled" || date > new Date();
 
   return (
     <div
@@ -474,7 +483,7 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
                     color: C.gold,
                   }}
                 >
-                  {t("goldenMonday.upcoming") || "Upcoming"}
+                  {t("goldenMonday.upcomingBadge") || "Upcoming"}
                 </span>
               )}
               {session.averageRating > 0 && (
@@ -501,7 +510,7 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
                 fontWeight: 600,
               }}
             >
-              <FiVideo size={14} /> {t("goldenMonday.watch") || "Watch"}
+              <FiVideo size={14} /> {t("goldenMonday.watchLabel") || "Watch"}
             </a>
           )}
           {isAdmin && isUpcoming && (
@@ -542,43 +551,45 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
               {getTranslatedText(session.presentationDescription)}
             </p>
           )}
-          {session.suggestedTopics && session.suggestedTopics.length > 0 && (
-            <div style={{ marginBottom: 8 }}>
-              <span style={{ fontSize: 11, color: C.muted }}>
-                {t("goldenMonday.aiSuggested") || "AI Suggested:"}
-              </span>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 4,
-                  marginTop: 4,
-                }}
-              >
-                {session.suggestedTopics.slice(0, 3).map((topic, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      fontSize: 11,
-                      background: C.bg,
-                      padding: "2px 10px",
-                      borderRadius: 999,
-                      color: C.dark,
-                    }}
-                  >
-                    {topic}
-                  </span>
-                ))}
+          {session.suggestedTopics &&
+            Array.isArray(session.suggestedTopics) &&
+            session.suggestedTopics.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <span style={{ fontSize: 11, color: C.muted }}>
+                  {t("goldenMonday.aiSuggestedLabel") || "AI Suggested:"}
+                </span>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 4,
+                    marginTop: 4,
+                  }}
+                >
+                  {session.suggestedTopics.slice(0, 3).map((topic, i) => (
+                    <span
+                      key={i}
+                      style={{
+                        fontSize: 11,
+                        background: C.bg,
+                        padding: "2px 10px",
+                        borderRadius: 999,
+                        color: C.dark,
+                      }}
+                    >
+                      {topic}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
           {session.recapEn && (
             <details style={{ marginTop: 8 }}>
               <summary
                 style={{ fontSize: 12, color: C.primary, cursor: "pointer" }}
               >
                 <FiInfo size={12} style={{ marginRight: 4 }} />
-                {t("goldenMonday.viewAIRecap") || "View AI Recap"}
+                {t("goldenMonday.viewAiRecap") || "View AI Recap"}
               </summary>
               <p
                 style={{
@@ -594,30 +605,32 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
               </p>
             </details>
           )}
-          {session.photos && session.photos.length > 0 && (
-            <div
-              style={{
-                display: "flex",
-                gap: 8,
-                marginTop: 8,
-                flexWrap: "wrap",
-              }}
-            >
-              {session.photos.slice(0, 3).map((photo, i) => (
-                <img
-                  key={i}
-                  src={photo.url}
-                  alt={photo.caption || "Session photo"}
-                  style={{
-                    width: 60,
-                    height: 60,
-                    objectFit: "cover",
-                    borderRadius: 8,
-                  }}
-                />
-              ))}
-            </div>
-          )}
+          {session.photos &&
+            Array.isArray(session.photos) &&
+            session.photos.length > 0 && (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  marginTop: 8,
+                  flexWrap: "wrap",
+                }}
+              >
+                {session.photos.slice(0, 3).map((photo, i) => (
+                  <img
+                    key={i}
+                    src={photo.url}
+                    alt={photo.caption || "Session photo"}
+                    style={{
+                      width: 60,
+                      height: 60,
+                      objectFit: "cover",
+                      borderRadius: 8,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
         </div>
       )}
     </div>
@@ -1016,7 +1029,7 @@ function EmployeeRegistrationModal({
 }
 
 // ─────────────────────────────────────────────────────────────
-// MAIN COMPONENT
+// MAIN COMPONENT - FIXED (useMemo for tabs and gmCopy)
 // ─────────────────────────────────────────────────────────────
 export default function GoldenMonday() {
   const { t: translations, language } = useLanguage();
@@ -1043,30 +1056,39 @@ export default function GoldenMonday() {
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedSessionId, setSelectedSessionId] = useState(null);
 
-  const tabs = [
-    {
-      id: "overview",
-      label: t("goldenMonday.tabOverview") || "Overview",
-      icon: <FiGrid size={16} />,
-    },
-    {
-      id: "attendance",
-      label: t("goldenMonday.tabAttendance") || "Attendance",
-      icon: <FiClipboard size={16} />,
-    },
-    {
-      id: "gallery",
-      label: t("goldenMonday.tabGallery") || "Gallery",
-      icon: <FiCamera size={16} />,
-    },
-    {
-      id: "reports",
-      label: t("goldenMonday.tabReports") || "Reports",
-      icon: <FiFileText size={16} />,
-    },
-  ];
+  // ✅ FIX: Use useMemo for tabs to ensure translations are applied
+  const tabs = useMemo(
+    () => [
+      {
+        id: "overview",
+        label: t("goldenMonday.tabOverview") || "Overview",
+        icon: <FiGrid size={16} />,
+      },
+      {
+        id: "attendance",
+        label: t("goldenMonday.tabAttendance") || "Attendance",
+        icon: <FiClipboard size={16} />,
+      },
+      {
+        id: "gallery",
+        label: t("goldenMonday.tabGallery") || "Gallery",
+        icon: <FiCamera size={16} />,
+      },
+      {
+        id: "reports",
+        label: t("goldenMonday.tabReports") || "Reports",
+        icon: <FiFileText size={16} />,
+      },
+    ],
+    [t],
+  );
 
-  const gmCopy = translations?.goldenMonday || {};
+  // ✅ FIX: Use useMemo for gmCopy
+  const gmCopy = useMemo(
+    () => translations?.goldenMonday || {},
+    [translations],
+  );
+
   const [visible, setVisible] = useState({});
   const sectionRefs = useRef({});
 
@@ -1097,7 +1119,7 @@ export default function GoldenMonday() {
     description: "",
   });
   const [generating, setGenerating] = useState(false);
-  const [topics, setTopics] = useState(null);
+  const [topics, setTopics] = useState([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
 
   // ── Admin Panel State ──
@@ -1122,7 +1144,8 @@ export default function GoldenMonday() {
   const getTranslatedText = useCallback(
     (obj) => {
       if (!obj) return "";
-      return obj[language] || obj.en || obj;
+      if (typeof obj === "string") return obj;
+      return obj[language] || obj.en || "";
     },
     [language],
   );
@@ -1153,10 +1176,16 @@ export default function GoldenMonday() {
       setUpcomingSessions(upcomingRes.data || []);
       setPastSessions(pastRes.data?.sessions || []);
       setNextPresenter(nextPresenterRes.data || null);
-      // setRanking(rankingRes.data || []);
       setEmployees(employeesRes.data || []);
       setStats(statsRes.data || null);
-      setPillars(pillarsRes.data || FALLBACK_PILLARS);
+
+      // FIX: Ensure pillars is always an array
+      const pillarsData = pillarsRes.data;
+      if (Array.isArray(pillarsData)) {
+        setPillars(pillarsData.length > 0 ? pillarsData : FALLBACK_PILLARS);
+      } else {
+        setPillars(FALLBACK_PILLARS);
+      }
 
       // Set default selected session for attendance
       if (upcomingRes.data && upcomingRes.data.length > 0) {
@@ -1319,12 +1348,19 @@ export default function GoldenMonday() {
     try {
       setLoadingTopics(true);
       const response = await goldenMondayAPI.suggestTopics();
-      setTopics(response.data?.topics || []);
+      // FIX: Ensure topics is always an array
+      const topicsData = response.data?.topics;
+      if (Array.isArray(topicsData)) {
+        setTopics(topicsData);
+      } else {
+        setTopics([]);
+      }
     } catch {
       showToast(
         t("goldenMonday.aiError") || "Failed to suggest topics",
         "error",
       );
+      setTopics([]);
     } finally {
       setLoadingTopics(false);
     }
@@ -1603,7 +1639,7 @@ export default function GoldenMonday() {
                   }}
                 />
                 {refreshing
-                  ? t("common.loading") || "Refreshing..."
+                  ? t("goldenMonday.refreshing") || "Refreshing..."
                   : t("common.refresh") || "Refresh"}
               </button>
             )}
@@ -1717,64 +1753,65 @@ export default function GoldenMonday() {
                   marginTop: 28,
                 }}
               >
-                {pillars.map((pillar, i) => {
-                  const IconComponent = PILLAR_ICONS[pillar.icon] || (
-                    <FiCompass size={22} />
-                  );
-                  const translatedTitle = getTranslatedText(pillar.title);
-                  const translatedBody = getTranslatedText(pillar.body);
+                {Array.isArray(pillars) &&
+                  pillars.map((pillar, i) => {
+                    const IconComponent = PILLAR_ICONS[pillar.icon] || (
+                      <FiCompass size={22} />
+                    );
+                    const translatedTitle = getTranslatedText(pillar.title);
+                    const translatedBody = getTranslatedText(pillar.body);
 
-                  return (
-                    <div
-                      key={i}
-                      className="gm-card"
-                      style={{
-                        background: C.white,
-                        borderRadius: 16,
-                        padding: 24,
-                        border: `1px solid ${C.border}`,
-                        transition:
-                          "transform 0.25s ease, box-shadow 0.25s ease",
-                      }}
-                    >
+                    return (
                       <div
+                        key={i}
+                        className="gm-card"
                         style={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: 12,
-                          background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-                          color: "#fff",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          marginBottom: 16,
+                          background: C.white,
+                          borderRadius: 16,
+                          padding: 24,
+                          border: `1px solid ${C.border}`,
+                          transition:
+                            "transform 0.25s ease, box-shadow 0.25s ease",
                         }}
                       >
-                        {IconComponent}
+                        <div
+                          style={{
+                            width: 42,
+                            height: 42,
+                            borderRadius: 12,
+                            background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                            color: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginBottom: 16,
+                          }}
+                        >
+                          {IconComponent}
+                        </div>
+                        <h3
+                          style={{
+                            margin: "0 0 8px",
+                            fontSize: 16,
+                            color: C.dark,
+                            fontFamily: F.serif,
+                          }}
+                        >
+                          {translatedTitle || pillar.title?.en || "Untitled"}
+                        </h3>
+                        <p
+                          style={{
+                            margin: 0,
+                            fontSize: 13.5,
+                            lineHeight: 1.6,
+                            color: C.muted,
+                          }}
+                        >
+                          {translatedBody || pillar.body?.en || ""}
+                        </p>
                       </div>
-                      <h3
-                        style={{
-                          margin: "0 0 8px",
-                          fontSize: 16,
-                          color: C.dark,
-                          fontFamily: F.serif,
-                        }}
-                      >
-                        {translatedTitle || pillar.title?.en || "Untitled"}
-                      </h3>
-                      <p
-                        style={{
-                          margin: 0,
-                          fontSize: 13.5,
-                          lineHeight: 1.6,
-                          color: C.muted,
-                        }}
-                      >
-                        {translatedBody || pillar.body?.en || ""}
-                      </p>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             </div>
 
@@ -2019,7 +2056,7 @@ export default function GoldenMonday() {
                     </div>
 
                     <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-                      {topics === null && (
+                      {(!Array.isArray(topics) || topics.length === 0) && (
                         <p
                           style={{
                             fontSize: 12.5,
@@ -2031,49 +2068,38 @@ export default function GoldenMonday() {
                             "Log a couple of sessions first so AI has something to build on."}
                         </p>
                       )}
-                      {topics?.length === 0 && (
-                        <p
-                          style={{
-                            fontSize: 12.5,
-                            color: "#a9b3e0",
-                            margin: 0,
-                          }}
-                        >
-                          {gmCopy.aiTopicsEmpty ||
-                            "Log a couple of sessions first so AI has something to build on."}
-                        </p>
-                      )}
-                      {topics?.map((topic, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            background: "rgba(255,255,255,0.06)",
-                            border: "1px solid rgba(255,255,255,0.1)",
-                            borderRadius: 10,
-                            padding: "10px 14px",
-                          }}
-                        >
+                      {Array.isArray(topics) &&
+                        topics.map((topic, i) => (
                           <div
+                            key={i}
                             style={{
-                              fontSize: 13,
-                              fontWeight: 700,
-                              color: C.goldLight,
-                              marginBottom: 4,
+                              background: "rgba(255,255,255,0.06)",
+                              border: "1px solid rgba(255,255,255,0.1)",
+                              borderRadius: 10,
+                              padding: "10px 14px",
                             }}
                           >
-                            {topic.title}
+                            <div
+                              style={{
+                                fontSize: 13,
+                                fontWeight: 700,
+                                color: C.goldLight,
+                                marginBottom: 4,
+                              }}
+                            >
+                              {topic.title}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 12,
+                                color: "#c9d0f0",
+                                lineHeight: 1.5,
+                              }}
+                            >
+                              {topic.rationale}
+                            </div>
                           </div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: "#c9d0f0",
-                              lineHeight: 1.5,
-                            }}
-                          >
-                            {topic.rationale}
-                          </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 </div>
@@ -2106,7 +2132,8 @@ export default function GoldenMonday() {
                     style={{ color: C.primary, fontSize: 16, marginBottom: 16 }}
                   >
                     <FiClock size={16} style={{ marginRight: 8 }} />
-                    {t("goldenMonday.upcomingSessions") || "Upcoming Sessions"}
+                    {t("goldenMonday.upcomingSessionsHeader") ||
+                      "Upcoming Sessions"}
                   </h3>
                   <div style={{ display: "grid", gap: 12 }}>
                     {upcomingSessions.map((session) => (
@@ -2130,7 +2157,7 @@ export default function GoldenMonday() {
                     style={{ color: C.muted, fontSize: 16, marginBottom: 16 }}
                   >
                     <FiStar size={16} style={{ marginRight: 8 }} />
-                    {t("goldenMonday.pastSessions") || "Past Sessions"}
+                    {t("goldenMonday.pastSessionsHeader") || "Past Sessions"}
                   </h3>
                   <div style={{ display: "grid", gap: 12 }}>
                     {pastSessions.slice(0, 10).map((session) => (
@@ -2155,7 +2182,7 @@ export default function GoldenMonday() {
                     padding: "40px 0",
                   }}
                 >
-                  {t("goldenMonday.noSessions") ||
+                  {t("goldenMonday.noSessionsYet") ||
                     "No sessions recorded yet. Start by logging a session with AI!"}
                 </p>
               )}
