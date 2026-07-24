@@ -47,6 +47,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
     try {
       setLoading(true);
       const response = await goldenMondayAPI.getAttendance(sessionId);
+      console.log("📊 Attendance data received:", response.data);
       setAttendance(response.data.attendance || []);
 
       const depts = [
@@ -74,6 +75,10 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
   };
 
   const handleSignAttendance = async (userId) => {
+    console.log("🖊️ handleSignAttendance called with userId:", userId);
+    console.log("🖊️ userId type:", typeof userId);
+    console.log("🖊️ mySignature present:", !!mySignature);
+    
     if (!mySignature) {
       showToast(
         t.pleaseSignFirst || "Please sign first by drawing or typing your name",
@@ -83,11 +88,27 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
     }
 
     try {
-      await goldenMondayAPI.recordAttendance(sessionId, {
-        userId,
+      // ✅ Get the full user object for debugging
+      console.log("📝 Recording attendance...");
+      console.log("  userId:", userId);
+      console.log("  sessionId:", sessionId);
+      console.log("  signature length:", mySignature?.length || 0);
+      console.log("  user role:", user?.role);
+
+      // ✅ Find the employee in the attendance list to verify the user exists
+      const employee = attendance.find((a) => a.user?._id === userId || a.user === userId);
+      console.log("  Employee found in attendance:", employee?.name || "NOT FOUND");
+
+      const payload = {
+        userId: userId,
         signature: mySignature,
         signatureType: "draw",
-      });
+      };
+
+      const response = await goldenMondayAPI.recordAttendance(sessionId, payload);
+      
+      console.log("✅ Attendance recorded:", response.data);
+      
       showToast(
         t.attendanceRecorded || "Attendance recorded successfully!",
         "success",
@@ -97,11 +118,31 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
       await loadAttendance();
       if (onRefresh) onRefresh();
     } catch (error) {
-      console.error("Failed to record attendance:", error);
-      showToast(
-        t.failedToRecordAttendance || "Failed to record attendance",
-        "error",
-      );
+      // ✅ Log the full error details
+      console.error("❌ Failed to record attendance:");
+      console.error("  Message:", error.message);
+      console.error("  Response data:", error.response?.data);
+      console.error("  Status:", error.response?.status);
+      console.error("  Full error:", error);
+      
+      // ✅ Show a more specific error message
+      let errorMessage = t.failedToRecordAttendance || "Failed to record attendance";
+      
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 400) {
+        errorMessage = "Invalid request. Please check your input.";
+      } else if (error.response?.status === 401) {
+        errorMessage = "Your session has expired. Please login again.";
+      } else if (error.response?.status === 404) {
+        errorMessage = "Session not found. Please refresh and try again.";
+      } else if (error.response?.status === 500) {
+        errorMessage = "Server error. Please try again later.";
+      }
+      
+      showToast(errorMessage, "error");
     }
   };
 
@@ -310,16 +351,20 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {filteredAttendance.map((emp) => {
-            const isCurrentUser = user?._id === emp.user?._id;
+            // ✅ Get the actual userId from the employee object
+            const userId = emp.user?._id || emp.user || emp.userId;
+            const isCurrentUser = user?._id === userId;
             const isSigned = emp.attended;
-            const isSigning = signingFor === emp.user?._id;
+            const isSigning = signingFor === userId;
 
             // ✅ Show Sign In button for current user OR admin/superadmin
             const canSign = isCurrentUser || isAdmin;
 
+            console.log(`👤 Employee: ${emp.name}, userId: ${userId}, isCurrentUser: ${isCurrentUser}`);
+
             return (
               <div
-                key={emp.user?._id || emp.name}
+                key={userId || emp.name}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -417,10 +462,12 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                         maxWidth: "220px",
                       }}
                     >
-                      {/* ✅ Show SignatureCanvas when signing */}
                       <div style={{ width: "100%" }}>
                         <SignatureCanvas
-                          onSave={(data) => setMySignature(data)}
+                          onSave={(data) => {
+                            console.log("✍️ Signature saved:", data ? "✅ Yes" : "❌ No");
+                            setMySignature(data);
+                          }}
                           height={60}
                           width={220}
                           label=""
@@ -428,7 +475,10 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                       </div>
                       <div style={{ display: "flex", gap: 8 }}>
                         <button
-                          onClick={() => handleSignAttendance(emp.user?._id)}
+                          onClick={() => {
+                            console.log("🔄 Confirm clicked for user:", userId);
+                            handleSignAttendance(userId);
+                          }}
                           style={{
                             padding: "4px 12px",
                             background: C.primary,
@@ -470,9 +520,11 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                       </div>
                     </div>
                   ) : canSign ? (
-                    // ✅ Show Sign In button for current user OR admin
                     <button
-                      onClick={() => setSigningFor(emp.user?._id)}
+                      onClick={() => {
+                        console.log("🖊️ Sign In clicked for:", emp.name, "userId:", userId);
+                        setSigningFor(userId);
+                      }}
                       style={{
                         padding: "4px 14px",
                         background: "#f59e0b",
