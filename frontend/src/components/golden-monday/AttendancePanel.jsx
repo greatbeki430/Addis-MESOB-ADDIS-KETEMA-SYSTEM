@@ -93,7 +93,6 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
         loadAttendance();
       }
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
   }, [sessionId, loadAttendance]);
 
   const filteredAttendance = attendance.filter((a) => {
