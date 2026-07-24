@@ -446,7 +446,7 @@ export const goldenMondayAPI = {
   getRegistration: (id) =>
     api.get(`/registrations/${id}`, { withCredentials: true }),
 
-   // ──────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────
   // 🗑️ EMPLOYEE DELETION WITH TELEGRAM NOTIFICATION
   // ──────────────────────────────────────────────────────────────
 
@@ -454,11 +454,10 @@ export const goldenMondayAPI = {
   // @param {string} userId - The user ID to delete
   // @param {string} reason - Reason for deletion (optional)
   deleteEmployeeWithNotification: (userId, reason) =>
-    api.delete(`/employees/${userId}`, { 
-      data: { reason }, 
-      withCredentials: true 
+    api.delete(`/employees/${userId}`, {
+      data: { reason },
+      withCredentials: true,
     }),
-};
 };
 
 // ============================================================
