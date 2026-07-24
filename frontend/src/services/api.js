@@ -297,6 +297,32 @@ export const goldenMondayAPI = {
   getSuggestedTopics: () => api.get("/golden-monday/suggest-topics"),
 
   // ──────────────────────────────────────────────────────────────
+  // 📋 ATTENDANCE MANAGEMENT - ✅ ADD THIS SECTION
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/golden-monday/attendance/:sessionId - Get attendance for a session
+  getAttendance: (sessionId) =>
+    api.get(`/golden-monday/attendance/${sessionId}`),
+
+  // POST /api/golden-monday/attendance/:sessionId - Record attendance for a session
+  recordAttendance: (sessionId, data) =>
+    api.post(`/golden-monday/attendance/${sessionId}`, data),
+
+  // ──────────────────────────────────────────────────────────────
+  // 🖼️ GALLERY MANAGEMENT - ✅ ADD THIS SECTION
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/golden-monday/gallery - Get gallery photos with filters
+  getGallery: (params) => api.get("/golden-monday/gallery", { params }),
+
+  // POST /api/golden-monday/gallery - Upload a gallery photo
+  uploadGalleryPhoto: (data) => api.post("/golden-monday/gallery", data),
+
+  // DELETE /api/golden-monday/gallery/:photoId - Delete a gallery photo
+  deleteGalleryPhoto: (photoId) =>
+    api.delete(`/golden-monday/gallery/${photoId}`),
+
+  // ──────────────────────────────────────────────────────────────
   // 🎥 RECORDINGS MANAGEMENT
   // ──────────────────────────────────────────────────────────────
 
