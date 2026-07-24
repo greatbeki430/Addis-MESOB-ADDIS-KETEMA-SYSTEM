@@ -211,7 +211,6 @@ function AuthenticatedApp() {
   }
 
   return (
-  return (
   <div
     style={{
       minHeight: "100vh",
