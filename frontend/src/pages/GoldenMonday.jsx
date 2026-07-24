@@ -14,6 +14,9 @@ import { goldenMondayAPI, authAPI, uploadAPI } from "../services/api";
 import { showToast } from "../utils/toastHelper";
 import { ROLES, hasMinRole } from "../utils/roles";
 import GoldenMondayRotationPanel from "../components/golden-monday/GoldenMondayRotationPanel";
+import AttendancePanel from "../components/golden-monday/AttendancePanel";
+import GalleryGrid from "../components/golden-monday/GalleryGrid";
+import ReportExport from "../components/golden-monday/ReportExport";
 import {
   FiSunrise,
   FiUsers,
@@ -42,6 +45,9 @@ import {
   FiUserX,
   FiVideo,
   FiBell,
+  FiCamera,
+  FiFileText,
+  FiClipboard,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
@@ -392,13 +398,6 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
   const date = new Date(session.date);
   const isUpcoming = session.status === "scheduled" || date > new Date();
 
-  // const getTranslatedText = (obj) => {
-  //   if (!obj) return "";
-  //   return obj[language] || obj.en || obj;
-  // };
-
-  // ── Translation helper for objects - stable reference ──
-  // ── Translation helper for objects inside SessionCard ──
   const getTranslatedText = useCallback(
     (obj) => {
       if (!obj) return "";
@@ -1023,6 +1022,17 @@ export default function GoldenMonday() {
   const { t: translations, language } = useLanguage();
   const { user } = useAuth();
 
+  // ── Active Tab State ──
+  const [activeTab, setActiveTab] = useState("overview");
+  const [selectedSessionId, setSelectedSessionId] = useState(null);
+
+  const tabs = [
+    { id: "overview", label: "Overview", icon: <FiGrid size={16} /> },
+    { id: "attendance", label: "Attendance", icon: <FiClipboard size={16} /> },
+    { id: "gallery", label: "Gallery", icon: <FiCamera size={16} /> },
+    { id: "reports", label: "Reports", icon: <FiFileText size={16} /> },
+  ];
+
   // ── Translation helper - wrapped in useCallback ──
   const t = useCallback(
     (key, fallback) => {
@@ -1054,7 +1064,6 @@ export default function GoldenMonday() {
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [pastSessions, setPastSessions] = useState([]);
   const [nextPresenter, setNextPresenter] = useState(null);
-  const [ranking, setRanking] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [stats, setStats] = useState(null);
   const [pillars, setPillars] = useState(FALLBACK_PILLARS);
@@ -1093,12 +1102,6 @@ export default function GoldenMonday() {
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
 
-  // ── Translation helper for objects ──
-  // const getTranslatedText = (obj) => {
-  //   if (!obj) return "";
-  //   return obj[language] || obj.en || obj;
-  // };
-
   // ── Translation helper for objects - stable reference ──
   const getTranslatedText = useCallback(
     (obj) => {
@@ -1116,7 +1119,6 @@ export default function GoldenMonday() {
         upcomingRes,
         pastRes,
         nextPresenterRes,
-        rankingRes,
         employeesRes,
         statsRes,
         pillarsRes,
@@ -1135,10 +1137,17 @@ export default function GoldenMonday() {
       setUpcomingSessions(upcomingRes.data || []);
       setPastSessions(pastRes.data?.sessions || []);
       setNextPresenter(nextPresenterRes.data || null);
-      setRanking(rankingRes.data || []);
+      // setRanking(rankingRes.data || []);
       setEmployees(employeesRes.data || []);
       setStats(statsRes.data || null);
       setPillars(pillarsRes.data || FALLBACK_PILLARS);
+
+      // Set default selected session for attendance
+      if (upcomingRes.data && upcomingRes.data.length > 0) {
+        setSelectedSessionId(upcomingRes.data[0]._id);
+      } else if (pastRes.data?.sessions && pastRes.data.sessions.length > 0) {
+        setSelectedSessionId(pastRes.data.sessions[0]._id);
+      }
     } catch {
       console.error("Failed to load Golden Monday data");
       showToast(t("common.error") || "Failed to load data", "error");
@@ -1146,13 +1155,6 @@ export default function GoldenMonday() {
       setLoading(false);
     }
   }, [t]);
-
-  // const refreshData = async () => {
-  //   setRefreshing(true);
-  //   await loadAllData();
-  //   setRefreshing(false);
-  //   showToast(t("common.success") || "Data refreshed", "success");
-  // };
 
   const refreshData = useCallback(async () => {
     setRefreshing(true);
@@ -1404,6 +1406,13 @@ export default function GoldenMonday() {
     }
   };
 
+  // ── Get sessions for dropdown ──
+  const allSessions = [...upcomingSessions, ...pastSessions];
+  const sessionOptions = allSessions.map((s) => ({
+    id: s._id,
+    label: `${s.presentationTitle || s.title || "Untitled"} - ${new Date(s.date).toLocaleDateString()}`,
+  }));
+
   return (
     <div style={{ fontFamily: F.sans, background: C.gray }}>
       <style>{`
@@ -1607,682 +1616,843 @@ export default function GoldenMonday() {
         />
       </section>
 
-      {/* ── PILLARS ── */}
+      {/* ── TAB NAVIGATION ── */}
       <section
-        id="gm-pillars"
-        ref={registerRef("pillars")}
-        data-reveal="pillars"
         style={{
-          maxWidth: 1200,
+          maxWidth: 1000,
           margin: "0 auto",
-          padding: "clamp(48px, 8vw, 72px) clamp(20px, 6vw, 40px) 12px",
-          ...revealStyle("pillars"),
+          padding: "clamp(20px, 4vw, 32px) clamp(20px, 6vw, 40px) 0",
         }}
       >
-        <SectionHeading
-          eyebrow={<FiCompass size={14} />}
-          title={gmCopy.pillarsTitle || "Why a golden morning"}
-          sub={gmCopy.pillarsSub || "Three things every session comes back to."}
-        />
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: 20,
-            marginTop: 28,
+            display: "flex",
+            gap: 4,
+            borderBottom: `2px solid ${C.border}`,
+            paddingBottom: 8,
+            flexWrap: "wrap",
+            background: C.white,
+            borderRadius: 12,
+            padding: "8px 12px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
           }}
         >
-          {pillars.map((pillar, i) => {
-            const IconComponent = PILLAR_ICONS[pillar.icon] || (
-              <FiCompass size={22} />
-            );
-            return (
-              <div
-                key={i}
-                className="gm-card"
-                style={{
-                  background: C.white,
-                  borderRadius: 16,
-                  padding: 24,
-                  border: `1px solid ${C.border}`,
-                  transition: "transform 0.25s ease, box-shadow 0.25s ease",
-                }}
-              >
-                <div
-                  style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 12,
-                    background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-                    color: "#fff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    marginBottom: 16,
-                  }}
-                >
-                  {IconComponent}
-                </div>
-                <h3
-                  style={{
-                    margin: "0 0 8px",
-                    fontSize: 16,
-                    color: C.dark,
-                    fontFamily: F.serif,
-                  }}
-                >
-                  {getTranslatedText(pillar.title) || pillar.title}
-                </h3>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 13.5,
-                    lineHeight: 1.6,
-                    color: C.muted,
-                  }}
-                >
-                  {getTranslatedText(pillar.body) || pillar.body}
-                </p>
-              </div>
-            );
-          })}
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 16px",
+                borderRadius: 8,
+                background: activeTab === tab.id ? C.primary : "transparent",
+                color: activeTab === tab.id ? "#fff" : C.muted,
+                border: "none",
+                fontSize: 13,
+                fontWeight: activeTab === tab.id ? 600 : 400,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                fontFamily: F.sans,
+              }}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
         </div>
       </section>
 
-      {/* ── AI SESSION STUDIO (Leader/Admin only) ── */}
-      {isLeaderOrAbove && (
-        <section
-          ref={registerRef("aiStudio")}
-          data-reveal="aiStudio"
-          style={{
-            maxWidth: 1000,
-            margin: "0 auto",
-            padding: "clamp(40px, 7vw, 60px) clamp(20px, 6vw, 40px) 12px",
-            ...revealStyle("aiStudio"),
-          }}
-        >
-          <SectionHeading
-            eyebrow={<FiCpu size={14} />}
-            title={gmCopy.aiTitle || "AI session recap"}
-            sub={
-              gmCopy.aiSub ||
-              "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds."
-            }
-          />
-
-          <div
-            style={{
-              marginTop: 24,
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-              gap: 20,
-            }}
-          >
-            {/* Composer card */}
+      {/* ── TAB CONTENT ── */}
+      <section
+        style={{
+          maxWidth: 1000,
+          margin: "0 auto",
+          padding: "clamp(20px, 4vw, 32px) clamp(20px, 6vw, 40px)",
+        }}
+      >
+        {/* ─── OVERVIEW TAB ─── */}
+        {activeTab === "overview" && (
+          <div>
+            {/* PILLARS */}
             <div
+              id="gm-pillars"
+              ref={registerRef("pillars")}
+              data-reveal="pillars"
               style={{
-                background: C.white,
-                borderRadius: 16,
-                border: `1px solid ${C.border}`,
-                padding: 22,
+                marginBottom: 32,
+                ...revealStyle("pillars"),
               }}
             >
-              {!showComposer ? (
-                <button
-                  onClick={() => setShowComposer(true)}
+              <SectionHeading
+                eyebrow={<FiCompass size={14} />}
+                title={gmCopy.pillarsTitle || "Why a golden morning"}
+                sub={
+                  gmCopy.pillarsSub ||
+                  "Three things every session comes back to."
+                }
+              />
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                  gap: 20,
+                  marginTop: 28,
+                }}
+              >
+                {pillars.map((pillar, i) => {
+                  const IconComponent = PILLAR_ICONS[pillar.icon] || (
+                    <FiCompass size={22} />
+                  );
+                  return (
+                    <div
+                      key={i}
+                      className="gm-card"
+                      style={{
+                        background: C.white,
+                        borderRadius: 16,
+                        padding: 24,
+                        border: `1px solid ${C.border}`,
+                        transition:
+                          "transform 0.25s ease, box-shadow 0.25s ease",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 42,
+                          height: 42,
+                          borderRadius: 12,
+                          background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                          color: "#fff",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginBottom: 16,
+                        }}
+                      >
+                        {IconComponent}
+                      </div>
+                      <h3
+                        style={{
+                          margin: "0 0 8px",
+                          fontSize: 16,
+                          color: C.dark,
+                          fontFamily: F.serif,
+                        }}
+                      >
+                        {getTranslatedText(pillar.title) || pillar.title}
+                      </h3>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13.5,
+                          lineHeight: 1.6,
+                          color: C.muted,
+                        }}
+                      >
+                        {getTranslatedText(pillar.body) || pillar.body}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* AI SESSION STUDIO (Leader/Admin only) */}
+            {isLeaderOrAbove && (
+              <div
+                ref={registerRef("aiStudio")}
+                data-reveal="aiStudio"
+                style={{
+                  marginBottom: 32,
+                  ...revealStyle("aiStudio"),
+                }}
+              >
+                <SectionHeading
+                  eyebrow={<FiCpu size={14} />}
+                  title={gmCopy.aiTitle || "AI session recap"}
+                  sub={
+                    gmCopy.aiSub ||
+                    "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds."
+                  }
+                />
+
+                <div
                   style={{
-                    width: "100%",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: 8,
-                    padding: "14px 18px",
-                    borderRadius: 10,
-                    border: `1.5px dashed ${C.primary}66`,
-                    background: C.bg,
-                    color: C.primary,
-                    fontWeight: 700,
-                    fontSize: 14,
-                    cursor: "pointer",
-                    fontFamily: F.sans,
+                    marginTop: 24,
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                    gap: 20,
                   }}
                 >
-                  <FiPlus size={16} />
-                  {gmCopy.aiNewSession || "Log a new session"}
-                </button>
-              ) : (
-                <div style={{ display: "grid", gap: 10 }}>
-                  <input
-                    placeholder={gmCopy.aiFormTitle || "Session title"}
-                    value={form.title}
-                    onChange={handleFormChange("title")}
-                    style={inputStyle}
-                  />
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <input
-                      placeholder={gmCopy.aiFormOrg || "Organization"}
-                      value={form.organization}
-                      onChange={handleFormChange("organization")}
-                      style={{ ...inputStyle, flex: "1 1 160px" }}
-                    />
-                    <input
-                      placeholder={
-                        gmCopy.aiFormSpeaker || "Speaker / facilitator"
-                      }
-                      value={form.speaker}
-                      onChange={handleFormChange("speaker")}
-                      style={{ ...inputStyle, flex: "1 1 160px" }}
-                    />
-                  </div>
-                  <input
-                    type="date"
-                    value={form.date}
-                    onChange={handleFormChange("date")}
-                    style={inputStyle}
-                  />
-                  <textarea
-                    placeholder={
-                      gmCopy.aiFormNotes ||
-                      "Raw notes — write it however you like, AI will clean it up"
-                    }
-                    value={form.rawNotes}
-                    onChange={handleFormChange("rawNotes")}
-                    rows={5}
-                    style={{
-                      ...inputStyle,
-                      resize: "vertical",
-                      fontFamily: F.sans,
-                    }}
-                  />
+                  {/* Composer card */}
                   <div
                     style={{
-                      display: "flex",
-                      gap: 10,
-                      justifyContent: "flex-end",
+                      background: C.white,
+                      borderRadius: 16,
+                      border: `1px solid ${C.border}`,
+                      padding: 22,
                     }}
                   >
-                    <button
-                      onClick={() => setShowComposer(false)}
-                      disabled={generating}
+                    {!showComposer ? (
+                      <button
+                        onClick={() => setShowComposer(true)}
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 8,
+                          padding: "14px 18px",
+                          borderRadius: 10,
+                          border: `1.5px dashed ${C.primary}66`,
+                          background: C.bg,
+                          color: C.primary,
+                          fontWeight: 700,
+                          fontSize: 14,
+                          cursor: "pointer",
+                          fontFamily: F.sans,
+                        }}
+                      >
+                        <FiPlus size={16} />
+                        {gmCopy.aiNewSession || "Log a new session"}
+                      </button>
+                    ) : (
+                      <div style={{ display: "grid", gap: 10 }}>
+                        <input
+                          placeholder={gmCopy.aiFormTitle || "Session title"}
+                          value={form.title}
+                          onChange={handleFormChange("title")}
+                          style={inputStyle}
+                        />
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 10,
+                            flexWrap: "wrap",
+                          }}
+                        >
+                          <input
+                            placeholder={gmCopy.aiFormOrg || "Organization"}
+                            value={form.organization}
+                            onChange={handleFormChange("organization")}
+                            style={{ ...inputStyle, flex: "1 1 160px" }}
+                          />
+                          <input
+                            placeholder={
+                              gmCopy.aiFormSpeaker || "Speaker / facilitator"
+                            }
+                            value={form.speaker}
+                            onChange={handleFormChange("speaker")}
+                            style={{ ...inputStyle, flex: "1 1 160px" }}
+                          />
+                        </div>
+                        <input
+                          type="date"
+                          value={form.date}
+                          onChange={handleFormChange("date")}
+                          style={inputStyle}
+                        />
+                        <textarea
+                          placeholder={
+                            gmCopy.aiFormNotes ||
+                            "Raw notes — write it however you like, AI will clean it up"
+                          }
+                          value={form.rawNotes}
+                          onChange={handleFormChange("rawNotes")}
+                          rows={5}
+                          style={{
+                            ...inputStyle,
+                            resize: "vertical",
+                            fontFamily: F.sans,
+                          }}
+                        />
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: 10,
+                            justifyContent: "flex-end",
+                          }}
+                        >
+                          <button
+                            onClick={() => setShowComposer(false)}
+                            disabled={generating}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              padding: "9px 16px",
+                              borderRadius: 8,
+                              border: "none",
+                              background: "#e5e7eb",
+                              color: "#444",
+                              fontWeight: 600,
+                              fontSize: 13,
+                              cursor: generating ? "not-allowed" : "pointer",
+                              fontFamily: F.sans,
+                            }}
+                          >
+                            <FiX size={14} />
+                            {gmCopy.aiCancel || "Cancel"}
+                          </button>
+                          <button
+                            onClick={handleGenerateAndSave}
+                            disabled={generating}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: "9px 18px",
+                              borderRadius: 8,
+                              border: "none",
+                              background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                              color: "#fff",
+                              fontWeight: 700,
+                              fontSize: 13,
+                              cursor: generating ? "not-allowed" : "pointer",
+                              opacity: generating ? 0.75 : 1,
+                              fontFamily: F.sans,
+                            }}
+                          >
+                            {generating ? (
+                              <>
+                                <FiLoader
+                                  size={14}
+                                  style={{
+                                    animation: "spin 1s linear infinite",
+                                  }}
+                                />
+                                {gmCopy.aiGenerating || "Writing recap…"}
+                              </>
+                            ) : (
+                              <>
+                                <FiSend size={14} />
+                                {gmCopy.aiGenerate || "Generate & save with AI"}
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Topic suggestions card */}
+                  <div
+                    style={{
+                      background: C.dark,
+                      color: "#fff",
+                      borderRadius: 16,
+                      padding: 22,
+                    }}
+                  >
+                    <div
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 6,
-                        padding: "9px 16px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: "#e5e7eb",
-                        color: "#444",
-                        fontWeight: 600,
-                        fontSize: 13,
-                        cursor: generating ? "not-allowed" : "pointer",
-                        fontFamily: F.sans,
+                        justifyContent: "space-between",
+                        gap: 10,
+                        flexWrap: "wrap",
                       }}
                     >
-                      <FiX size={14} />
-                      {gmCopy.aiCancel || "Cancel"}
-                    </button>
-                    <button
-                      onClick={handleGenerateAndSave}
-                      disabled={generating}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        padding: "9px 18px",
-                        borderRadius: 8,
-                        border: "none",
-                        background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-                        color: "#fff",
-                        fontWeight: 700,
-                        fontSize: 13,
-                        cursor: generating ? "not-allowed" : "pointer",
-                        opacity: generating ? 0.75 : 1,
-                        fontFamily: F.sans,
-                      }}
-                    >
-                      {generating ? (
-                        <>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          fontWeight: 700,
+                          fontSize: 14,
+                        }}
+                      >
+                        <FiSun size={16} color={C.gold} />
+                        {gmCopy.aiTopicsTitle || "AI: suggest next topics"}
+                      </div>
+                      <button
+                        onClick={handleSuggestTopics}
+                        disabled={loadingTopics}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "7px 14px",
+                          borderRadius: 999,
+                          border: `1px solid ${C.gold}88`,
+                          background: "transparent",
+                          color: C.gold,
+                          fontWeight: 700,
+                          fontSize: 12,
+                          cursor: loadingTopics ? "not-allowed" : "pointer",
+                          fontFamily: F.sans,
+                        }}
+                      >
+                        {loadingTopics ? (
                           <FiLoader
-                            size={14}
+                            size={13}
                             style={{ animation: "spin 1s linear infinite" }}
                           />
-                          {gmCopy.aiGenerating || "Writing recap…"}
-                        </>
-                      ) : (
-                        <>
-                          <FiSend size={14} />
-                          {gmCopy.aiGenerate || "Generate & save with AI"}
-                        </>
+                        ) : (
+                          <FiCpu size={13} />
+                        )}
+                        {loadingTopics
+                          ? gmCopy.aiTopicsLoading || "Thinking of topics…"
+                          : gmCopy.aiTopicsBtn || "Suggest topics"}
+                      </button>
+                    </div>
+
+                    <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
+                      {topics === null && (
+                        <p
+                          style={{
+                            fontSize: 12.5,
+                            color: "#a9b3e0",
+                            margin: 0,
+                          }}
+                        >
+                          {gmCopy.aiTopicsEmpty ||
+                            "Log a couple of sessions first so AI has something to build on."}
+                        </p>
                       )}
-                    </button>
+                      {topics?.length === 0 && (
+                        <p
+                          style={{
+                            fontSize: 12.5,
+                            color: "#a9b3e0",
+                            margin: 0,
+                          }}
+                        >
+                          {gmCopy.aiTopicsEmpty ||
+                            "Log a couple of sessions first so AI has something to build on."}
+                        </p>
+                      )}
+                      {topics?.map((topic, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            background: "rgba(255,255,255,0.06)",
+                            border: "1px solid rgba(255,255,255,0.1)",
+                            borderRadius: 10,
+                            padding: "10px 14px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: C.goldLight,
+                              marginBottom: 4,
+                            }}
+                          >
+                            {topic.title}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#c9d0f0",
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {topic.rationale}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ROTATION PANEL */}
+            <div style={{ marginBottom: 32 }}>
+              <GoldenMondayRotationPanel onRefresh={refreshData} />
+            </div>
+
+            {/* UPCOMING & PAST SESSIONS TIMELINE */}
+            <div
+              ref={registerRef("timeline")}
+              data-reveal="timeline"
+              style={revealStyle("timeline")}
+            >
+              <SectionHeading
+                eyebrow={<FiCalendar size={14} />}
+                title={gmCopy.timelineTitle || "Sessions Timeline"}
+                sub={
+                  gmCopy.timelineSub || "A running record, not a one-off event."
+                }
+              />
+
+              {/* Upcoming Sessions */}
+              {upcomingSessions.length > 0 && (
+                <div style={{ marginTop: 30 }}>
+                  <h3
+                    style={{ color: C.primary, fontSize: 16, marginBottom: 16 }}
+                  >
+                    <FiClock size={16} style={{ marginRight: 8 }} />
+                    {t("goldenMonday.upcomingSessions") || "Upcoming Sessions"}
+                  </h3>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {upcomingSessions.map((session) => (
+                      <SessionCard
+                        key={session._id}
+                        session={session}
+                        language={language}
+                        isAdmin={isAdminOrAbove}
+                        onRefresh={refreshData}
+                        t={t}
+                      />
+                    ))}
                   </div>
                 </div>
               )}
-            </div>
 
-            {/* Topic suggestions card */}
-            <div
-              style={{
-                background: C.dark,
-                color: "#fff",
-                borderRadius: 16,
-                padding: 22,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 10,
-                  flexWrap: "wrap",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    fontWeight: 700,
-                    fontSize: 14,
-                  }}
-                >
-                  <FiSun size={16} color={C.gold} />
-                  {gmCopy.aiTopicsTitle || "AI: suggest next topics"}
-                </div>
-                <button
-                  onClick={handleSuggestTopics}
-                  disabled={loadingTopics}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    padding: "7px 14px",
-                    borderRadius: 999,
-                    border: `1px solid ${C.gold}88`,
-                    background: "transparent",
-                    color: C.gold,
-                    fontWeight: 700,
-                    fontSize: 12,
-                    cursor: loadingTopics ? "not-allowed" : "pointer",
-                    fontFamily: F.sans,
-                  }}
-                >
-                  {loadingTopics ? (
-                    <FiLoader
-                      size={13}
-                      style={{ animation: "spin 1s linear infinite" }}
-                    />
-                  ) : (
-                    <FiCpu size={13} />
-                  )}
-                  {loadingTopics
-                    ? gmCopy.aiTopicsLoading || "Thinking of topics…"
-                    : gmCopy.aiTopicsBtn || "Suggest topics"}
-                </button>
-              </div>
-
-              <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-                {topics === null && (
-                  <p style={{ fontSize: 12.5, color: "#a9b3e0", margin: 0 }}>
-                    {gmCopy.aiTopicsEmpty ||
-                      "Log a couple of sessions first so AI has something to build on."}
-                  </p>
-                )}
-                {topics?.length === 0 && (
-                  <p style={{ fontSize: 12.5, color: "#a9b3e0", margin: 0 }}>
-                    {gmCopy.aiTopicsEmpty ||
-                      "Log a couple of sessions first so AI has something to build on."}
-                  </p>
-                )}
-                {topics?.map((topic, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      background: "rgba(255,255,255,0.06)",
-                      border: "1px solid rgba(255,255,255,0.1)",
-                      borderRadius: 10,
-                      padding: "10px 14px",
-                    }}
+              {/* Past Sessions */}
+              {pastSessions.length > 0 && (
+                <div style={{ marginTop: 40 }}>
+                  <h3
+                    style={{ color: C.muted, fontSize: 16, marginBottom: 16 }}
                   >
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 700,
-                        color: C.goldLight,
-                        marginBottom: 4,
-                      }}
-                    >
-                      {topic.title}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 12,
-                        color: "#c9d0f0",
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      {topic.rationale}
-                    </div>
+                    <FiStar size={16} style={{ marginRight: 8 }} />
+                    {t("goldenMonday.pastSessions") || "Past Sessions"}
+                  </h3>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    {pastSessions.slice(0, 10).map((session) => (
+                      <SessionCard
+                        key={session._id}
+                        session={session}
+                        language={language}
+                        isAdmin={isAdminOrAbove}
+                        onRefresh={refreshData}
+                        t={t}
+                      />
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
+                </div>
+              )}
 
-      {/* ── ROTATION PANEL ── */}
-      <section
-        style={{
-          maxWidth: 1000,
-          margin: "0 auto",
-          padding: "0 clamp(16px, 4vw, 32px) 40px",
-        }}
-      >
-        <GoldenMondayRotationPanel
-          nextPresenter={nextPresenter}
-          ranking={ranking}
-          employees={employees}
-          onRefresh={refreshData}
-          isAdmin={isAdminOrAbove}
-          onAssignPresenter={async (userId) => {
-            try {
-              await goldenMondayAPI.assignPresenter(userId);
-              showToast(
-                t("goldenMonday.presenterAssigned") || "Presenter assigned!",
-                "success",
-              );
-              await refreshData();
-            } catch {
-              showToast(
-                t("common.error") || "Failed to assign presenter",
-                "error",
-              );
-            }
-          }}
-        />
-      </section>
-
-      {/* ── UPCOMING & PAST SESSIONS TIMELINE ── */}
-      <section
-        ref={registerRef("timeline")}
-        data-reveal="timeline"
-        style={{
-          maxWidth: 1000,
-          margin: "0 auto",
-          padding: "clamp(48px, 8vw, 72px) clamp(20px, 6vw, 40px) 12px",
-          ...revealStyle("timeline"),
-        }}
-      >
-        <SectionHeading
-          eyebrow={<FiCalendar size={14} />}
-          title={gmCopy.timelineTitle || "Sessions Timeline"}
-          sub={gmCopy.timelineSub || "A running record, not a one-off event."}
-        />
-
-        {/* Upcoming Sessions */}
-        {upcomingSessions.length > 0 && (
-          <div style={{ marginTop: 30 }}>
-            <h3 style={{ color: C.primary, fontSize: 16, marginBottom: 16 }}>
-              <FiClock size={16} style={{ marginRight: 8 }} />
-              {t("goldenMonday.upcomingSessions") || "Upcoming Sessions"}
-            </h3>
-            <div style={{ display: "grid", gap: 12 }}>
-              {upcomingSessions.map((session) => (
-                <SessionCard
-                  key={session._id}
-                  session={session}
-                  language={language}
-                  isAdmin={isAdminOrAbove}
-                  onRefresh={refreshData}
-                  t={t}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Past Sessions */}
-        {pastSessions.length > 0 && (
-          <div style={{ marginTop: 40 }}>
-            <h3 style={{ color: C.muted, fontSize: 16, marginBottom: 16 }}>
-              <FiStar size={16} style={{ marginRight: 8 }} />
-              {t("goldenMonday.pastSessions") || "Past Sessions"}
-            </h3>
-            <div style={{ display: "grid", gap: 12 }}>
-              {pastSessions.slice(0, 10).map((session) => (
-                <SessionCard
-                  key={session._id}
-                  session={session}
-                  language={language}
-                  isAdmin={isAdminOrAbove}
-                  onRefresh={refreshData}
-                  t={t}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {upcomingSessions.length === 0 && pastSessions.length === 0 && (
-          <p style={{ color: C.muted, textAlign: "center", padding: "40px 0" }}>
-            {t("goldenMonday.noSessions") ||
-              "No sessions recorded yet. Start by logging a session with AI!"}
-          </p>
-        )}
-      </section>
-
-      {/* ── ADMIN PANEL (Admin/SuperAdmin only) ── */}
-      {isAdminOrAbove && (
-        <section
-          ref={registerRef("admin")}
-          data-reveal="admin"
-          style={{
-            maxWidth: 1000,
-            margin: "0 auto",
-            padding: "clamp(48px, 8vw, 72px) clamp(20px, 6vw, 40px) 12px",
-            ...revealStyle("admin"),
-          }}
-        >
-          <SectionHeading
-            eyebrow={<FiUsers size={14} />}
-            title={t("employeeManagement.title") || "Employee Management"}
-            sub={
-              t("employeeManagement.subtitle") ||
-              "Register and manage employees for Golden Monday rotation"
-            }
-          />
-
-          <div
-            style={{
-              background: C.white,
-              borderRadius: 16,
-              padding: 24,
-              border: `1px solid ${C.border}`,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 16,
-              }}
-            >
-              <div>
-                <span style={{ fontWeight: 600, color: C.dark }}>
-                  {t("employeeManagement.totalEmployees") ||
-                    "Registered Employees"}
-                  : {employees.length}
-                </span>
-              </div>
-              <button
-                onClick={() => setShowEmployeeModal(true)}
-                style={btnStyle(C.primary)}
-              >
-                <FiUserPlus size={14} />{" "}
-                {t("employeeManagement.addEmployee") || "Register Employee"}
-              </button>
-            </div>
-
-            <div style={{ display: "grid", gap: 8 }}>
-              {employees.length === 0 ? (
+              {upcomingSessions.length === 0 && pastSessions.length === 0 && (
                 <p
                   style={{
                     color: C.muted,
                     textAlign: "center",
-                    padding: "20px 0",
+                    padding: "40px 0",
                   }}
                 >
-                  {t("employeeManagement.noEmployeesFound") ||
-                    'No employees registered yet. Click "Register Employee" to add.'}
+                  {t("goldenMonday.noSessions") ||
+                    "No sessions recorded yet. Start by logging a session with AI!"}
                 </p>
-              ) : (
-                employees.map((emp) => (
-                  <div
-                    key={emp.user?._id || emp._id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "10px 14px",
-                      borderRadius: 8,
-                      background: emp.isEligible ? C.bg : "#fef2f2",
-                      border: `1px solid ${emp.isEligible ? C.border : "#fecaca"}`,
-                      flexWrap: "wrap",
-                      gap: 8,
-                    }}
-                  >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 12 }}
-                    >
-                      {emp.profilePhotoUrl ? (
-                        <img
-                          src={emp.profilePhotoUrl}
-                          alt={emp.name}
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: "50%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: "50%",
-                            background: C.primary,
-                            color: "#fff",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            fontSize: 14,
-                            fontWeight: 700,
-                          }}
-                        >
-                          {emp.name?.charAt(0) || "?"}
-                        </div>
-                      )}
-                      <div>
-                        <div
-                          style={{
-                            fontWeight: 600,
-                            color: C.dark,
-                            fontSize: 14,
-                          }}
-                        >
-                          {emp.name}
-                        </div>
-                        <div style={{ fontSize: 12, color: C.muted }}>
-                          {emp.department ||
-                            t("employeeManagement.noDepartment") ||
-                            "No department"}{" "}
-                          ·{" "}
-                          {emp.position ||
-                            t("employeeManagement.noPosition") ||
-                            "No position"}
-                        </div>
-                      </div>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          padding: "2px 10px",
-                          borderRadius: 999,
-                          background: emp.isEligible ? "#d1fae5" : "#fef2f2",
-                          color: emp.isEligible ? "#065f46" : "#991b1b",
-                        }}
-                      >
-                        {emp.isEligible
-                          ? t("employeeManagement.activeStatus") || "Active"
-                          : t("employeeManagement.inactiveStatus") ||
-                            "Inactive"}
-                      </span>
-                      <span style={{ fontSize: 11, color: C.muted }}>
-                        {t("employeeManagement.timesPresented") || "Presented"}:{" "}
-                        {emp.timesPresented || 0}x
-                      </span>
-                      <button
-                        onClick={() =>
-                          handleToggleEligibility(
-                            emp.user?._id || emp._id,
-                            emp.isEligible,
-                          )
-                        }
-                        style={{
-                          ...btnStyle(
-                            emp.isEligible ? "#f59e0b" : "#10b981",
-                            "#fff",
-                          ),
-                          fontSize: 11,
-                          padding: "4px 10px",
-                        }}
-                      >
-                        {emp.isEligible ? (
-                          <FiUserX size={12} />
-                        ) : (
-                          <FiUserCheck size={12} />
-                        )}
-                        {emp.isEligible
-                          ? t("employeeManagement.deactivate") || "Deactivate"
-                          : t("employeeManagement.activate") || "Activate"}
-                      </button>
-                      {isSuperAdmin && (
-                        <button
-                          onClick={() =>
-                            handleRemoveEmployee(emp.user?._id || emp._id)
-                          }
-                          style={{
-                            ...btnStyle("#ef4444", "#fff"),
-                            fontSize: 11,
-                            padding: "4px 10px",
-                          }}
-                        >
-                          <FiTrash2 size={12} />
-                          {t("employeeManagement.remove") || "Remove"}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))
               )}
             </div>
+
+            {/* ADMIN PANEL (Admin/SuperAdmin only) */}
+            {isAdminOrAbove && (
+              <div
+                ref={registerRef("admin")}
+                data-reveal="admin"
+                style={{
+                  marginTop: 40,
+                  ...revealStyle("admin"),
+                }}
+              >
+                <SectionHeading
+                  eyebrow={<FiUsers size={14} />}
+                  title={t("employeeManagement.title") || "Employee Management"}
+                  sub={
+                    t("employeeManagement.subtitle") ||
+                    "Register and manage employees for Golden Monday rotation"
+                  }
+                />
+
+                <div
+                  style={{
+                    background: C.white,
+                    borderRadius: 16,
+                    padding: 24,
+                    border: `1px solid ${C.border}`,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div>
+                      <span style={{ fontWeight: 600, color: C.dark }}>
+                        {t("employeeManagement.totalEmployees") ||
+                          "Registered Employees"}
+                        : {employees.length}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => setShowEmployeeModal(true)}
+                      style={btnStyle(C.primary)}
+                    >
+                      <FiUserPlus size={14} />{" "}
+                      {t("employeeManagement.addEmployee") ||
+                        "Register Employee"}
+                    </button>
+                  </div>
+
+                  <div style={{ display: "grid", gap: 8 }}>
+                    {employees.length === 0 ? (
+                      <p
+                        style={{
+                          color: C.muted,
+                          textAlign: "center",
+                          padding: "20px 0",
+                        }}
+                      >
+                        {t("employeeManagement.noEmployeesFound") ||
+                          'No employees registered yet. Click "Register Employee" to add.'}
+                      </p>
+                    ) : (
+                      employees.map((emp) => (
+                        <div
+                          key={emp.user?._id || emp._id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            padding: "10px 14px",
+                            borderRadius: 8,
+                            background: emp.isEligible ? C.bg : "#fef2f2",
+                            border: `1px solid ${emp.isEligible ? C.border : "#fecaca"}`,
+                            flexWrap: "wrap",
+                            gap: 8,
+                          }}
+                        >
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 12,
+                            }}
+                          >
+                            {emp.profilePhotoUrl ? (
+                              <img
+                                src={emp.profilePhotoUrl}
+                                alt={emp.name}
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: "50%",
+                                  objectFit: "cover",
+                                }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: "50%",
+                                  background: C.primary,
+                                  color: "#fff",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 14,
+                                  fontWeight: 700,
+                                }}
+                              >
+                                {emp.name?.charAt(0) || "?"}
+                              </div>
+                            )}
+                            <div>
+                              <div
+                                style={{
+                                  fontWeight: 600,
+                                  color: C.dark,
+                                  fontSize: 14,
+                                }}
+                              >
+                                {emp.name}
+                              </div>
+                              <div style={{ fontSize: 12, color: C.muted }}>
+                                {emp.department ||
+                                  t("employeeManagement.noDepartment") ||
+                                  "No department"}{" "}
+                                ·{" "}
+                                {emp.position ||
+                                  t("employeeManagement.noPosition") ||
+                                  "No position"}
+                              </div>
+                            </div>
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              flexWrap: "wrap",
+                            }}
+                          >
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                padding: "2px 10px",
+                                borderRadius: 999,
+                                background: emp.isEligible
+                                  ? "#d1fae5"
+                                  : "#fef2f2",
+                                color: emp.isEligible ? "#065f46" : "#991b1b",
+                              }}
+                            >
+                              {emp.isEligible
+                                ? t("employeeManagement.activeStatus") ||
+                                  "Active"
+                                : t("employeeManagement.inactiveStatus") ||
+                                  "Inactive"}
+                            </span>
+                            <span style={{ fontSize: 11, color: C.muted }}>
+                              {t("employeeManagement.timesPresented") ||
+                                "Presented"}
+                              : {emp.timesPresented || 0}x
+                            </span>
+                            <button
+                              onClick={() =>
+                                handleToggleEligibility(
+                                  emp.user?._id || emp._id,
+                                  emp.isEligible,
+                                )
+                              }
+                              style={{
+                                ...btnStyle(
+                                  emp.isEligible ? "#f59e0b" : "#10b981",
+                                  "#fff",
+                                ),
+                                fontSize: 11,
+                                padding: "4px 10px",
+                              }}
+                            >
+                              {emp.isEligible ? (
+                                <FiUserX size={12} />
+                              ) : (
+                                <FiUserCheck size={12} />
+                              )}
+                              {emp.isEligible
+                                ? t("employeeManagement.deactivate") ||
+                                  "Deactivate"
+                                : t("employeeManagement.activate") ||
+                                  "Activate"}
+                            </button>
+                            {isSuperAdmin && (
+                              <button
+                                onClick={() =>
+                                  handleRemoveEmployee(emp.user?._id || emp._id)
+                                }
+                                style={{
+                                  ...btnStyle("#ef4444", "#fff"),
+                                  fontSize: 11,
+                                  padding: "4px 10px",
+                                }}
+                              >
+                                <FiTrash2 size={12} />
+                                {t("employeeManagement.remove") || "Remove"}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </section>
-      )}
+        )}
+
+        {/* ─── ATTENDANCE TAB ─── */}
+        {activeTab === "attendance" && (
+          <div>
+            {/* Session Selector */}
+            {sessionOptions.length > 0 && (
+              <div
+                style={{
+                  marginBottom: 16,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  flexWrap: "wrap",
+                }}
+              >
+                <label
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: C.dark,
+                  }}
+                >
+                  Select Session:
+                </label>
+                <select
+                  value={selectedSessionId || ""}
+                  onChange={(e) => setSelectedSessionId(e.target.value)}
+                  style={{
+                    padding: "8px 12px",
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 8,
+                    fontSize: 13,
+                    background: C.white,
+                    outline: "none",
+                    minWidth: 200,
+                    flex: 1,
+                  }}
+                >
+                  {sessionOptions.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {selectedSessionId ? (
+              <AttendancePanel
+                sessionId={selectedSessionId}
+                t={t}
+                onRefresh={refreshData}
+              />
+            ) : (
+              <div
+                style={{
+                  textAlign: "center",
+                  padding: "60px 20px",
+                  color: C.muted,
+                }}
+              >
+                <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+                <p style={{ fontSize: 16, marginBottom: 4 }}>
+                  No sessions available
+                </p>
+                <p style={{ fontSize: 13, color: "#999" }}>
+                  Create a session first to record attendance
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── GALLERY TAB ─── */}
+        {activeTab === "gallery" && (
+          <div>
+            <GalleryGrid
+              sessionId={selectedSessionId}
+              onRefresh={refreshData}
+              t={t}
+            />
+          </div>
+        )}
+
+        {/* ─── REPORTS TAB ─── */}
+        {activeTab === "reports" && (
+          <div>
+            <ReportExport sessionId={selectedSessionId} t={t} />
+          </div>
+        )}
+      </section>
 
       {/* ── MESOB PLATFORM ── */}
       <section

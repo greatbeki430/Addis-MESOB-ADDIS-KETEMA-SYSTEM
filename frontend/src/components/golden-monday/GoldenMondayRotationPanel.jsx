@@ -4,7 +4,7 @@
 // landing page. Self-contained so it drops into GoldenMonday.jsx with a
 // single import + render call.
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { C, F } from "../../styles/theme";
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
@@ -42,16 +42,17 @@ const btn = (bg = C.primary, color = C.white) => ({
   gap: 8,
 });
 
-export default function GoldenMondayRotationPanel() {
+export default function GoldenMondayRotationPanel({ onRefresh }) {
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const gmCopy = t?.goldenMonday || {};
   const isPrivileged = ["leader", "admin", "superadmin"].includes(user?.role);
+  const isInitialMount = useRef(true);
 
   const [ranking, setRanking] = useState([]);
   const [currentSession, setCurrentSession] = useState(null);
   const [recordings, setRecordings] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [assigning, setAssigning] = useState(false);
 
   const [titleDraft, setTitleDraft] = useState("");
@@ -59,9 +60,6 @@ export default function GoldenMondayRotationPanel() {
 
   const [recordingFile, setRecordingFile] = useState(null);
   const [uploadingRecording, setUploadingRecording] = useState(false);
-
-  // Track if initial load has been done
-  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   // Helper for translations
   const getText = (obj) => obj?.[language] || obj?.en || obj;
@@ -87,18 +85,29 @@ export default function GoldenMondayRotationPanel() {
       setTitleDraft(upcoming?.presentationTitle || "");
 
       setRecordings(recordingsRes.data || []);
+
+      // Call parent refresh if provided
+      if (onRefresh) onRefresh();
     } catch (err) {
       console.error("Golden Monday rotation load failed:", err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onRefresh]);
 
-  // Load data on first render using a state flag - no useEffect needed
-  if (!initialLoadDone) {
-    setInitialLoadDone(true);
-    loadAll();
-  }
+  // Load data on mount
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      loadAll();
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+  }, [loadAll]);
+
+  const handleRefresh = async () => {
+    await loadAll();
+    showToast("Data refreshed", "success");
+  };
 
   const handleAssignNext = async () => {
     setAssigning(true);
@@ -180,6 +189,26 @@ export default function GoldenMondayRotationPanel() {
           <h3 style={{ margin: 0, color: C.dark, fontFamily: F.sans }}>
             {getText(gmCopy.rotationTitle) || "Presenter Rotation"}
           </h3>
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            style={{
+              marginLeft: "auto",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: C.muted,
+              padding: "4px",
+            }}
+            aria-label="Refresh data"
+          >
+            <FiRefreshCw
+              size={16}
+              style={{
+                animation: loading ? "spin 1s linear infinite" : "none",
+              }}
+            />
+          </button>
         </div>
 
         {loading ? (
@@ -242,6 +271,7 @@ export default function GoldenMondayRotationPanel() {
                       border: `1px solid ${C.border}`,
                       fontFamily: F.sans,
                     }}
+                    aria-label="Presentation title"
                   />
                   <button
                     style={btn()}
@@ -268,10 +298,10 @@ export default function GoldenMondayRotationPanel() {
                         "AI topic ideas (tap to use):"}
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {currentSession.suggestedTopics.map((t, i) => (
+                      {currentSession.suggestedTopics.map((topic, i) => (
                         <button
                           key={i}
-                          onClick={() => setTitleDraft(t)}
+                          onClick={() => setTitleDraft(topic)}
                           style={{
                             background: C.bg,
                             border: `1px solid ${C.border}`,
@@ -282,8 +312,9 @@ export default function GoldenMondayRotationPanel() {
                             cursor: "pointer",
                             fontFamily: F.sans,
                           }}
+                          type="button"
                         >
-                          {t}
+                          {topic}
                         </button>
                       ))}
                     </div>
@@ -375,6 +406,7 @@ export default function GoldenMondayRotationPanel() {
               type="file"
               accept="video/*"
               onChange={(e) => setRecordingFile(e.target.files?.[0] || null)}
+              aria-label="Upload recording file"
             />
             <button
               style={btn()}
@@ -451,6 +483,13 @@ export default function GoldenMondayRotationPanel() {
           </div>
         )}
       </div>
+
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
