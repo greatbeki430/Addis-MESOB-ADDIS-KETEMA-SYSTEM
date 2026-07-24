@@ -7,6 +7,7 @@ import { goldenMondayAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
 import { showToast } from "../../utils/toastHelper";
+import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
 import {
   FiX,
   FiChevronLeft,
@@ -17,64 +18,13 @@ import {
   FiTrash2,
 } from "react-icons/fi";
 
-const CATEGORIES = [
-  { value: "all", label: "All Photos" },
-  { value: "flag-raising", label: "🇪🇹 Flag Raising", icon: "🇪🇹" },
-  { value: "presentation", label: "🎤 Presentations", icon: "🎤" },
-  { value: "group-photo", label: "📸 Group Photos", icon: "📸" },
-  { value: "attendees", label: "👥 Attendees", icon: "👥" },
-  { value: "event", label: "🎉 Events", icon: "🎉" },
-  { value: "other", label: "📁 Other", icon: "📁" },
-];
-
-// Translations
-const TRANSLATIONS = {
-  en: {
-    loading: "Loading gallery...",
-    noPhotos: "No photos yet",
-    uploadPhotos: "Upload photos from Golden Monday events",
-    checkBackLater: "Check back later for photos",
-    untitled: "Untitled",
-    upload: "Upload",
-    uploading: "Uploading...",
-    deleteConfirm: "Delete this photo?",
-    deleteSuccess: "Photo deleted",
-    deleteError: "Failed to delete photo",
-    uploadSuccess: "Photo uploaded successfully!",
-    uploadError: "Failed to upload photo",
-    selectImage: "Please select an image file",
-    imageTooLarge: "Image must be less than 10MB",
-    loadError: "Failed to load gallery photos",
-    page: "Page",
-    of: "of",
-    by: "By",
-  },
-  am: {
-    loading: "ምስሎች በመጫን ላይ...",
-    noPhotos: "ምንም ፎቶዎች የሉም",
-    uploadPhotos: "ከጎልደን ሰኞ ዝግጅቶች ፎቶዎችን ያስገቡ",
-    checkBackLater: "ለፎቶዎች በኋላ ይመለሱ",
-    untitled: "ርዕስ የሌለው",
-    upload: "አስገባ",
-    uploading: "በማስገባት ላይ...",
-    deleteConfirm: "ይህን ፎቶ መሰረዝ ይፈልጋሉ?",
-    deleteSuccess: "ፎቶ ተሰርዟል",
-    deleteError: "ፎቶ መሰረዝ አልተቻለም",
-    uploadSuccess: "ፎቶ በተሳካ ሁኔታ ተስተካክሏል!",
-    uploadError: "ፎቶ ማስገባት አልተቻለም",
-    selectImage: "እባክዎ የምስል ፋይል ይምረጡ",
-    imageTooLarge: "ምስሉ ከ10ሜባ በታች መሆን አለበት",
-    loadError: "የጋለሪ ፎቶዎችን ማግኘት አልተቻለም",
-    page: "ገጽ",
-    of: "ከ",
-    by: "በ",
-  },
-};
-
 export default function GalleryGrid({ sessionId = null, onRefresh }) {
   const { user } = useAuth();
   const { language } = useLanguage();
   const isInitialMount = useRef(true);
+
+  // Get translations based on language
+  const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -85,10 +35,43 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   const [viewMode, setViewMode] = useState("grid");
   const [uploading, setUploading] = useState(false);
 
-  // Get translations based on language
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
-
   const isAdmin = ["admin", "superadmin"].includes(user?.role);
+
+  // Category labels with translations
+  const getCategoryLabel = (cat) => {
+    const categoryMap = {
+      all: t.allPhotos || "All Photos",
+      "flag-raising": t.flagRaising || "🇪🇹 Flag Raising",
+      presentation: t.presentations || "🎤 Presentations",
+      "group-photo": t.groupPhotos || "📸 Group Photos",
+      attendees: t.attendees || "👥 Attendees",
+      event: t.events || "🎉 Events",
+      other: t.other || "📁 Other",
+    };
+    return categoryMap[cat] || cat;
+  };
+
+  const CATEGORIES = [
+    { value: "all", label: t.allPhotos || "All Photos" },
+    {
+      value: "flag-raising",
+      label: t.flagRaising || "🇪🇹 Flag Raising",
+      icon: "🇪🇹",
+    },
+    {
+      value: "presentation",
+      label: t.presentations || "🎤 Presentations",
+      icon: "🎤",
+    },
+    {
+      value: "group-photo",
+      label: t.groupPhotos || "📸 Group Photos",
+      icon: "📸",
+    },
+    { value: "attendees", label: t.attendees || "👥 Attendees", icon: "👥" },
+    { value: "event", label: t.events || "🎉 Events", icon: "🎉" },
+    { value: "other", label: t.other || "📁 Other", icon: "📁" },
+  ];
 
   const loadGallery = useCallback(async () => {
     try {
@@ -106,7 +89,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       setTotalPages(response.data.pagination?.pages || 1);
     } catch (error) {
       console.error("Failed to load gallery:", error);
-      showToast(t.loadError, "error");
+      showToast(t.loadError || "Failed to load gallery photos", "error");
     } finally {
       setLoading(false);
     }
@@ -114,7 +97,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
 
   // Effect for data fetching
   useEffect(() => {
-    // Skip the first render if it's the initial mount
     if (isInitialMount.current) {
       isInitialMount.current = false;
       loadGallery();
@@ -128,12 +110,12 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
-      showToast(t.selectImage, "warning");
+      showToast(t.selectImage || "Please select an image file", "warning");
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      showToast(t.imageTooLarge, "warning");
+      showToast(t.imageTooLarge || "Image must be less than 10MB", "warning");
       return;
     }
 
@@ -148,12 +130,15 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             sessionId: sessionId || undefined,
             lang: language,
           });
-          showToast(t.uploadSuccess, "success");
+          showToast(
+            t.uploadSuccess || "Photo uploaded successfully!",
+            "success",
+          );
           await loadGallery();
           if (onRefresh) onRefresh();
         } catch (err) {
           console.error("Upload error:", err);
-          showToast(t.uploadError, "error");
+          showToast(t.uploadError || "Failed to upload photo", "error");
         } finally {
           setUploading(false);
         }
@@ -161,27 +146,22 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       reader.readAsDataURL(file);
     } catch (err) {
       console.error("Upload error:", err);
-      showToast(t.uploadError, "error");
+      showToast(t.uploadError || "Failed to upload photo", "error");
       setUploading(false);
     }
   };
 
   const handleDelete = async (photoId) => {
-    if (!window.confirm(t.deleteConfirm)) return;
+    if (!window.confirm(t.deleteConfirm || "Delete this photo?")) return;
     try {
       await goldenMondayAPI.deleteGalleryPhoto(photoId);
-      showToast(t.deleteSuccess, "success");
+      showToast(t.deleteSuccess || "Photo deleted", "success");
       await loadGallery();
       if (onRefresh) onRefresh();
     } catch (error) {
       console.error("Delete error:", error);
-      showToast(t.deleteError, "error");
+      showToast(t.deleteError || "Failed to delete photo", "error");
     }
-  };
-
-  const getCategoryLabel = (cat) => {
-    const found = CATEGORIES.find((c) => c.value === cat);
-    return found ? found.label : cat;
   };
 
   const formatDate = (date) => {
@@ -246,10 +226,10 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               }}
             >
               {uploading ? (
-                t.uploading
+                t.uploading || "Uploading..."
               ) : (
                 <>
-                  <FiUpload size={14} /> {t.upload}
+                  <FiUpload size={14} /> {t.upload || "Upload"}
                 </>
               )}
               <input
@@ -271,7 +251,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               color: viewMode === "grid" ? "#fff" : C.muted,
               cursor: "pointer",
             }}
-            aria-label="Grid view"
+            aria-label={t.gridView || "Grid view"}
           >
             <FiGrid size={16} />
           </button>
@@ -285,7 +265,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               color: viewMode === "list" ? "#fff" : C.muted,
               cursor: "pointer",
             }}
-            aria-label="List view"
+            aria-label={t.listView || "List view"}
           >
             <FiList size={16} />
           </button>
@@ -296,16 +276,20 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       {loading ? (
         <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🖼️</div>
-          <p>{t.loading}</p>
+          <p>{t.loadingGallery || "Loading gallery..."}</p>
         </div>
       ) : photos.length === 0 ? (
         <div
           style={{ textAlign: "center", padding: "60px 20px", color: C.muted }}
         >
           <div style={{ fontSize: 48, marginBottom: 12 }}>📸</div>
-          <p style={{ fontSize: 16, marginBottom: 4 }}>{t.noPhotos}</p>
+          <p style={{ fontSize: 16, marginBottom: 4 }}>
+            {t.noPhotos || "No photos yet"}
+          </p>
           <p style={{ fontSize: 13, color: "#999" }}>
-            {isAdmin ? t.uploadPhotos : t.checkBackLater}
+            {isAdmin
+              ? t.uploadPhotos || "Upload photos from Golden Monday events"
+              : t.checkBackLater || "Check back later for photos"}
           </p>
         </div>
       ) : viewMode === "grid" ? (
@@ -392,7 +376,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                     alignItems: "center",
                     justifyContent: "center",
                   }}
-                  aria-label="Delete photo"
+                  aria-label={t.delete || "Delete photo"}
                 >
                   <FiTrash2 size={14} />
                 </button>
@@ -438,7 +422,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               />
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600, color: C.dark, fontSize: 13 }}>
-                  {photo.title || photo.caption || t.untitled}
+                  {photo.title || photo.caption || t.untitled || "Untitled"}
                 </div>
                 <div style={{ fontSize: 11, color: C.muted }}>
                   {getCategoryLabel(photo.category)} •{" "}
@@ -446,7 +430,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                   {photo.uploadedByName && (
                     <>
                       {" "}
-                      • {t.by} {photo.uploadedByName}
+                      • {t.by || "By"} {photo.uploadedByName}
                     </>
                   )}
                 </div>
@@ -466,7 +450,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                     cursor: "pointer",
                     fontSize: 11,
                   }}
-                  aria-label="Delete photo"
+                  aria-label={t.delete || "Delete photo"}
                 >
                   <FiTrash2 size={14} />
                 </button>
@@ -502,7 +486,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             <FiChevronLeft size={14} />
           </button>
           <span style={{ padding: "6px 12px", color: C.muted, fontSize: 13 }}>
-            {t.page} {page} {t.of} {totalPages}
+            {t.page || "Page"} {page} {t.of || "of"} {totalPages}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}

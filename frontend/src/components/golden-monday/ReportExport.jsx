@@ -6,6 +6,7 @@ import { C, F } from "../../styles/theme";
 import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
+import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
 import {
   FiDownload,
   FiFileText,
@@ -16,36 +17,13 @@ import {
   FiCheck,
 } from "react-icons/fi";
 
-// Translations
-const TRANSLATIONS = {
-  en: {
-    attendance: "Attendance Report",
-    sessions: "Sessions Report",
-    gallery: "Gallery Report",
-    export: "Export Report",
-    exporting: "Exporting...",
-    success: "Report exported successfully!",
-    error: "Failed to export report",
-    to: "to",
-    title: "Report",
-  },
-  am: {
-    attendance: "የተሳትፎ ሪፖርት",
-    sessions: "የክፍለ ጊዜ ሪፖርት",
-    gallery: "የጋለሪ ሪፖርት",
-    export: "ሪፖርት አውርድ",
-    exporting: "በማውረድ ላይ...",
-    success: "ሪፖርት በተሳካ ሁኔታ ወርዷል!",
-    error: "ሪፖርት ማውረድ አልተቻለም",
-    to: "እስከ",
-    title: "ሪፖርት",
-  },
-};
-
 export default function ReportExport({ sessionId }) {
   const { language } = useLanguage();
   const [exporting, setExporting] = useState(false);
   const [reportType, setReportType] = useState("attendance");
+
+  // Get translations based on language
+  const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
   // Use useMemo to avoid impure Date.now() during render
   const [dateRange, setDateRange] = useState(() => {
@@ -59,23 +37,20 @@ export default function ReportExport({ sessionId }) {
     };
   });
 
-  // Get translations based on language
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
-
   const reportTypes = [
     {
       value: "attendance",
-      label: t.attendance,
+      label: t.attendanceReport || "Attendance Report",
       icon: <FiUsers size={14} />,
     },
     {
       value: "sessions",
-      label: t.sessions,
+      label: t.sessionsReport || "Sessions Report",
       icon: <FiFileText size={14} />,
     },
     {
       value: "gallery",
-      label: t.gallery,
+      label: t.galleryReport || "Gallery Report",
       icon: <FiCamera size={14} />,
     },
   ];
@@ -142,10 +117,10 @@ export default function ReportExport({ sessionId }) {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      showToast(t.success, "success");
+      showToast(t.exportSuccess || "Report exported successfully!", "success");
     } catch (error) {
       console.error("Export failed:", error);
-      showToast(t.error, "error");
+      showToast(t.exportError || "Failed to export report", "error");
     } finally {
       setExporting(false);
     }
@@ -221,9 +196,9 @@ export default function ReportExport({ sessionId }) {
               outline: "none",
               fontFamily: F.sans,
             }}
-            aria-label="Start date"
+            aria-label={t.startDate || "Start date"}
           />
-          <span style={{ color: C.muted }}>{t.to}</span>
+          <span style={{ color: C.muted }}>{t.to || "to"}</span>
           <input
             type="date"
             value={dateRange.end}
@@ -238,7 +213,7 @@ export default function ReportExport({ sessionId }) {
               outline: "none",
               fontFamily: F.sans,
             }}
-            aria-label="End date"
+            aria-label={t.endDate || "End date"}
           />
         </div>
 
@@ -261,7 +236,7 @@ export default function ReportExport({ sessionId }) {
             opacity: exporting ? 0.6 : 1,
             transition: "all 0.2s ease",
           }}
-          aria-label={t.export}
+          aria-label={t.exportReport || "Export Report"}
         >
           {exporting ? (
             <>
@@ -269,12 +244,12 @@ export default function ReportExport({ sessionId }) {
                 size={16}
                 style={{ animation: "spin 1s linear infinite" }}
               />
-              {t.exporting}
+              {t.exporting || "Exporting..."}
             </>
           ) : (
             <>
               <FiDownload size={16} />
-              {t.export}
+              {t.exportReport || "Export Report"}
             </>
           )}
         </button>

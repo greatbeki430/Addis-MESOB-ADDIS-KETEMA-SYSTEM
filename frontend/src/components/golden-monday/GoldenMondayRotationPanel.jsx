@@ -10,6 +10,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
+import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
 import {
   FiUsers,
   FiRefreshCw,
@@ -44,10 +45,13 @@ const btn = (bg = C.primary, color = C.white) => ({
 
 export default function GoldenMondayRotationPanel({ onRefresh }) {
   const { user } = useAuth();
-  const { language, t } = useLanguage();
-  const gmCopy = t?.goldenMonday || {};
-  const isPrivileged = ["leader", "admin", "superadmin"].includes(user?.role);
+  const { language } = useLanguage();
   const isInitialMount = useRef(true);
+
+  // Get translations based on language
+  const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
+
+  const isPrivileged = ["leader", "admin", "superadmin"].includes(user?.role);
 
   const [ranking, setRanking] = useState([]);
   const [currentSession, setCurrentSession] = useState(null);
@@ -61,9 +65,6 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
   const [recordingFile, setRecordingFile] = useState(null);
   const [uploadingRecording, setUploadingRecording] = useState(false);
 
-  // Helper for translations
-  const getText = (obj) => obj?.[language] || obj?.en || obj;
-
   const loadAll = useCallback(async () => {
     setLoading(true);
     try {
@@ -75,7 +76,7 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
         goldenMondayAPI.getLiveRecordings().catch(() => ({ data: [] })),
       ]);
 
-      // ✅ FIX: Ensure ranking is always an array with proper fallback
+      // Ensure ranking is always an array with proper fallback
       const rankingData = rotationRes?.data?.ranking;
       const safeRanking = Array.isArray(rankingData) ? rankingData : [];
       setRanking(safeRanking);
@@ -113,7 +114,7 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
 
   const handleRefresh = async () => {
     await loadAll();
-    showToast("Data refreshed", "success");
+    showToast(t.refresh || "Data refreshed", "success");
   };
 
   const handleAssignNext = async () => {
@@ -121,17 +122,22 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
     try {
       const res = await goldenMondayAPI.assignRotation();
       if (res.data.alreadyAssigned) {
-        showToast("This week's presenter is already assigned", "info");
+        showToast(
+          t.alreadyAssigned || "This week's presenter is already assigned",
+          "info",
+        );
       } else {
         showToast(
-          `${res.data.session.presenterName} assigned to present next`,
+          `${res.data.session.presenterName} ${t.assignedNext || "assigned to present next"}`,
           "success",
         );
       }
       await loadAll();
     } catch (err) {
       showToast(
-        err.response?.data?.message || "Failed to assign presenter",
+        err.response?.data?.message ||
+          t.assignError ||
+          "Failed to assign presenter",
         "error",
       );
     } finally {
@@ -147,10 +153,15 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
         currentSession._id,
         titleDraft.trim(),
       );
-      showToast("Presentation title saved", "success");
+      showToast(t.titleSaved || "Presentation title saved", "success");
       await loadAll();
     } catch (err) {
-      showToast(err.response?.data?.message || "Failed to save title", "error");
+      showToast(
+        err.response?.data?.message ||
+          t.titleSaveError ||
+          "Failed to save title",
+        "error",
+      );
     } finally {
       setSavingTitle(false);
     }
@@ -162,12 +173,18 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
     try {
       const base64 = await fileToBase64(recordingFile);
       await goldenMondayAPI.uploadRecording(currentSession._id, base64, 7);
-      showToast("Recording uploaded — visible to staff for 7 days", "success");
+      showToast(
+        t.recordingUploaded ||
+          "Recording uploaded — visible to staff for 7 days",
+        "success",
+      );
       setRecordingFile(null);
       await loadAll();
     } catch (err) {
       showToast(
-        err.response?.data?.message || "Failed to upload recording",
+        err.response?.data?.message ||
+          t.recordingUploadError ||
+          "Failed to upload recording",
         "error",
       );
     } finally {
@@ -194,7 +211,7 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
         >
           <FiUsers color={C.primary} size={20} />
           <h3 style={{ margin: 0, color: C.dark, fontFamily: F.sans }}>
-            {getText(gmCopy.rotationTitle) || "Presenter Rotation"}
+            {t.rotationTitle || "Presenter Rotation"}
           </h3>
           <button
             onClick={handleRefresh}
@@ -207,7 +224,7 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
               color: C.muted,
               padding: "4px",
             }}
-            aria-label="Refresh data"
+            aria-label={t.refresh || "Refresh data"}
           >
             <FiRefreshCw
               size={16}
@@ -220,12 +237,12 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
 
         {loading ? (
           <p style={{ color: C.muted }}>
-            {getText(gmCopy.loadingRotation) || "Loading rotation…"}
+            {t.loadingRotation || "Loading rotation…"}
           </p>
         ) : currentSession?.presenter ? (
           <div>
             <p style={{ margin: "0 0 6px", color: C.muted, fontSize: 14 }}>
-              {getText(gmCopy.thisWeekPresenter) || "This week's presenter"}
+              {t.thisWeekPresenter || "This week's presenter"}
             </p>
             <p
               style={{
@@ -244,8 +261,8 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
             </p>
             <p style={{ margin: "0 0 14px", color: C.muted, fontSize: 13 }}>
               {currentSession.presentationTitle
-                ? `Presenting: "${currentSession.presentationTitle}"`
-                : getText(gmCopy.titleNotChosen) || "Title not chosen yet"}
+                ? `${t.presenting || "Presenting"}: "${currentSession.presentationTitle}"`
+                : t.titleNotChosen || "Title not chosen yet"}
             </p>
 
             {/* Presenter (or a leader/admin on their behalf) picks a title */}
@@ -260,16 +277,17 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
                   }}
                 >
                   {isMyTurn
-                    ? getText(gmCopy.chooseTitle) ||
-                      "Choose your presentation title"
-                    : getText(gmCopy.setTitleOnBehalf) ||
-                      "Set title on presenter's behalf"}
+                    ? t.chooseTitle || "Choose your presentation title"
+                    : t.setTitleOnBehalf || "Set title on presenter's behalf"}
                 </label>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                   <input
                     value={titleDraft}
                     onChange={(e) => setTitleDraft(e.target.value)}
-                    placeholder="e.g. Handling Difficult Citizen Requests"
+                    placeholder={
+                      t.titlePlaceholder ||
+                      "e.g. Handling Difficult Citizen Requests"
+                    }
                     style={{
                       flex: 1,
                       minWidth: 220,
@@ -278,7 +296,9 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
                       border: `1px solid ${C.border}`,
                       fontFamily: F.sans,
                     }}
-                    aria-label="Presentation title"
+                    aria-label={
+                      t.presentationTitleLabel || "Presentation title"
+                    }
                   />
                   <button
                     style={btn()}
@@ -287,8 +307,8 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
                   >
                     <FiEdit3 size={14} />{" "}
                     {savingTitle
-                      ? getText(gmCopy.saving) || "Saving…"
-                      : getText(gmCopy.saveTitle) || "Save Title"}
+                      ? t.saving || "Saving…"
+                      : t.saveTitle || "Save Title"}
                   </button>
                 </div>
 
@@ -301,8 +321,7 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
                         margin: "0 0 6px",
                       }}
                     >
-                      {getText(gmCopy.aiTopicIdeas) ||
-                        "AI topic ideas (tap to use):"}
+                      {t.aiTopicIdeas || "AI topic ideas (tap to use):"}
                     </p>
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                       {currentSession.suggestedTopics.map((topic, i) => (
@@ -332,8 +351,7 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
           </div>
         ) : (
           <p style={{ color: C.muted, marginBottom: 14 }}>
-            {getText(gmCopy.nobodyAssigned) ||
-              "Nobody assigned yet for the coming Monday."}
+            {t.nobodyAssigned || "Nobody assigned yet for the coming Monday."}
           </p>
         )}
 
@@ -345,17 +363,16 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
           >
             <FiRefreshCw size={14} />{" "}
             {assigning
-              ? getText(gmCopy.assigning) || "Assigning…"
-              : getText(gmCopy.assignNext) || "Assign Next Presenter"}
+              ? t.assigning || "Assigning…"
+              : t.assignNext || "Assign Next Presenter"}
           </button>
         )}
 
-        {/* ✅ FIXED: Ranked queue, for transparency - with proper array check */}
+        {/* Ranked queue, for transparency - with proper array check */}
         {isPrivileged && Array.isArray(ranking) && ranking.length > 0 && (
           <div style={{ marginTop: 18 }}>
             <p style={{ fontSize: 13, color: C.muted, margin: "0 0 8px" }}>
-              {getText(gmCopy.rotationOrder) ||
-                "Rotation order (longest-waiting first):"}
+              {t.rotationOrder || "Rotation order (longest-waiting first):"}
             </p>
             <ol
               style={{
@@ -371,8 +388,8 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
                   <span style={{ color: C.muted }}>
                     —{" "}
                     {r.daysSinceLastPresented === "never presented"
-                      ? getText(gmCopy.neverPresented) || "never presented"
-                      : `${r.daysSinceLastPresented} ${getText(gmCopy.daysSince) || "days since last time"}`}
+                      ? t.neverPresented || "never presented"
+                      : `${r.daysSinceLastPresented} ${t.daysSince || "days since last time"}`}
                   </span>
                 </li>
               ))}
@@ -394,11 +411,11 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
           >
             <FiVideo color={C.primary} size={20} />
             <h3 style={{ margin: 0, color: C.dark, fontFamily: F.sans }}>
-              {getText(gmCopy.sessionRecording) || "Session Recording"}
+              {t.sessionRecording || "Session Recording"}
             </h3>
           </div>
           <p style={{ fontSize: 13, color: C.muted, marginBottom: 12 }}>
-            {getText(gmCopy.recordingDescription) ||
+            {t.recordingDescription ||
               "Uploads are visible to all staff for 7 days, then automatically removed."}
           </p>
           <div
@@ -413,7 +430,7 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
               type="file"
               accept="video/*"
               onChange={(e) => setRecordingFile(e.target.files?.[0] || null)}
-              aria-label="Upload recording file"
+              aria-label={t.uploadRecordingFile || "Upload recording file"}
             />
             <button
               style={btn()}
@@ -422,8 +439,8 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
             >
               <FiVideo size={14} />{" "}
               {uploadingRecording
-                ? getText(gmCopy.uploading) || "Uploading…"
-                : getText(gmCopy.uploadRecording) || "Upload Recording"}
+                ? t.uploading || "Uploading…"
+                : t.uploadRecording || "Upload Recording"}
             </button>
           </div>
         </div>
@@ -441,12 +458,12 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
         >
           <FiClock color={C.primary} size={20} />
           <h3 style={{ margin: 0, color: C.dark, fontFamily: F.sans }}>
-            {getText(gmCopy.catchUp) || "Catch Up — Recent Recordings"}
+            {t.catchUp || "Catch Up — Recent Recordings"}
           </h3>
         </div>
         {recordings.length === 0 ? (
           <p style={{ color: C.muted, fontSize: 14 }}>
-            {getText(gmCopy.noRecordings) ||
+            {t.noRecordings ||
               "No recordings currently available (recordings expire 7 days after upload)."}
           </p>
         ) : (
@@ -474,7 +491,7 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
                   >
                     {r.presenterName} ·{" "}
                     {new Date(r.recordingExpiresAt).toLocaleDateString()}{" "}
-                    {getText(gmCopy.expiry) || "expiry"}
+                    {t.expiry || "expiry"}
                   </p>
                 </div>
                 <a
@@ -483,7 +500,7 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
                   rel="noopener noreferrer"
                   style={{ ...btn(C.bg, C.dark), textDecoration: "none" }}
                 >
-                  <FiCheckCircle size={14} /> {getText(gmCopy.watch) || "Watch"}
+                  <FiCheckCircle size={14} /> {t.watch || "Watch"}
                 </a>
               </div>
             ))}

@@ -5,8 +5,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { C, F } from "../../styles/theme";
 import { goldenMondayAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
+import { useLanguage } from "../../hooks/useLanguage";
 import { showToast } from "../../utils/toastHelper";
 import SignatureCanvas from "./SignatureCanvas";
+import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
 import {
   FiUsers,
   FiUserCheck,
@@ -21,7 +23,11 @@ import {
 
 export default function AttendancePanel({ sessionId, onRefresh }) {
   const { user } = useAuth();
+  const { language } = useLanguage();
   const isInitialMount = useRef(true);
+
+  // Get translations based on language
+  const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
   const [attendance, setAttendance] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,11 +53,14 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
       setDepartments(depts);
     } catch (error) {
       console.error("Failed to load attendance:", error);
-      showToast("Failed to load attendance", "error");
+      showToast(
+        t.failedToLoadAttendance || "Failed to load attendance",
+        "error",
+      );
     } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -62,7 +71,10 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
 
   const handleSignAttendance = async (userId) => {
     if (!mySignature) {
-      showToast("Please sign first by drawing or typing your name", "warning");
+      showToast(
+        t.pleaseSignFirst || "Please sign first by drawing or typing your name",
+        "warning",
+      );
       return;
     }
 
@@ -72,14 +84,20 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
         signature: mySignature,
         signatureType: "draw",
       });
-      showToast("Attendance recorded successfully!", "success");
+      showToast(
+        t.attendanceRecorded || "Attendance recorded successfully!",
+        "success",
+      );
       setMySignature(null);
       setSigningFor(null);
       await loadAttendance();
       if (onRefresh) onRefresh();
     } catch (error) {
       console.error("Failed to record attendance:", error);
-      showToast("Failed to record attendance", "error");
+      showToast(
+        t.failedToRecordAttendance || "Failed to record attendance",
+        "error",
+      );
     }
   };
 
@@ -132,7 +150,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
           </div>
           <div style={{ fontSize: 11, color: C.muted }}>
             <FiUsers size={12} style={{ marginRight: 4 }} />
-            Total
+            {t.total || "Total"}
           </div>
         </div>
         <div
@@ -148,7 +166,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
           </div>
           <div style={{ fontSize: 11, color: "#065f46" }}>
             <FiUserCheck size={12} style={{ marginRight: 4 }} />
-            Present
+            {t.present || "Present"}
           </div>
         </div>
         <div
@@ -164,7 +182,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
           </div>
           <div style={{ fontSize: 11, color: "#991b1b" }}>
             <FiUserX size={12} style={{ marginRight: 4 }} />
-            Absent
+            {t.absent || "Absent"}
           </div>
         </div>
         <div
@@ -180,7 +198,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
           </div>
           <div style={{ fontSize: 11, color: C.muted }}>
             <FiClock size={12} style={{ marginRight: 4 }} />
-            Attendance Rate
+            {t.attendanceRate || "Attendance Rate"}
           </div>
         </div>
       </div>
@@ -208,7 +226,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
           />
           <input
             type="text"
-            placeholder="Search employees..."
+            placeholder={t.searchEmployees || "Search employees..."}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             style={{
@@ -219,7 +237,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
               fontSize: 12,
               outline: "none",
             }}
-            aria-label="Search employees"
+            aria-label={t.searchEmployees || "Search employees"}
           />
         </div>
         <select
@@ -234,9 +252,9 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
             outline: "none",
             minWidth: 120,
           }}
-          aria-label="Filter by department"
+          aria-label={t.allDepartments || "Filter by department"}
         >
-          <option value="all">All Departments</option>
+          <option value="all">{t.allDepartments || "All Departments"}</option>
           {departments.map((d) => (
             <option key={d} value={d}>
               {d}
@@ -257,7 +275,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
             cursor: "pointer",
             fontSize: 12,
           }}
-          aria-label="Refresh attendance"
+          aria-label={t.refresh || "Refresh attendance"}
         >
           <FiRefreshCw
             size={14}
@@ -265,7 +283,9 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
               animation: refreshing ? "spin 1s linear infinite" : "none",
             }}
           />
-          {refreshing ? "Refreshing..." : "Refresh"}
+          {refreshing
+            ? t.refreshing || "Refreshing..."
+            : t.refresh || "Refresh"}
         </button>
       </div>
 
@@ -276,12 +296,12 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
             size={24}
             style={{ animation: "spin 1s linear infinite" }}
           />
-          <p>Loading attendance...</p>
+          <p>{t.loadingAttendance || "Loading attendance..."}</p>
         </div>
       ) : filteredAttendance.length === 0 ? (
         <div style={{ textAlign: "center", padding: "30px", color: C.muted }}>
           <FiUsers size={32} style={{ opacity: 0.3 }} />
-          <p>No employees found</p>
+          <p>{t.noEmployeesFound || "No employees found"}</p>
         </div>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
@@ -339,13 +359,13 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                             fontWeight: 600,
                           }}
                         >
-                          You
+                          {t.you || "You"}
                         </span>
                       )}
                     </div>
                     <div style={{ fontSize: 11, color: C.muted }}>
-                      {emp.department || "No department"} •{" "}
-                      {emp.email || "No email"}
+                      {emp.department || t.noDepartment || "No department"} •{" "}
+                      {emp.email || t.noEmail || "No email"}
                     </div>
                   </div>
                 </div>
@@ -362,7 +382,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                         fontWeight: 600,
                       }}
                     >
-                      <FiCheck size={14} /> Signed
+                      <FiCheck size={14} /> {t.signed || "Signed"}
                     </span>
                   ) : isSigning ? (
                     <div
@@ -387,10 +407,10 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                           fontSize: 11,
                           fontWeight: 600,
                         }}
-                        aria-label="Confirm signature"
+                        aria-label={t.confirmSignature || "Confirm signature"}
                       >
                         <FiCheck size={12} style={{ marginRight: 4 }} />
-                        Confirm
+                        {t.confirmSignature || "Confirm"}
                       </button>
                       <button
                         onClick={() => {
@@ -404,7 +424,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                           cursor: "pointer",
                           color: "#999",
                         }}
-                        aria-label="Cancel signing"
+                        aria-label={t.cancelSignature || "Cancel signing"}
                       >
                         <FiX size={14} />
                       </button>
@@ -422,13 +442,13 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                         fontSize: 11,
                         fontWeight: 600,
                       }}
-                      aria-label="Sign in"
+                      aria-label={t.signIn || "Sign in"}
                     >
-                      Sign In
+                      {t.signIn || "Sign In"}
                     </button>
                   ) : (
                     <span style={{ fontSize: 11, color: C.muted }}>
-                      Not signed
+                      {t.notSigned || "Not signed"}
                     </span>
                   )}
                 </div>
