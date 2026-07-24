@@ -1542,51 +1542,6 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── DEPARTMENTS MARQUEE ──────────────────────────── */}
-      <section
-        style={{
-          background: C.dark,
-          padding: "18px 0",
-          overflow: "hidden",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-        }}
-      >
-        <div
-          style={{
-            textAlign: "center",
-            fontSize: 10.5,
-            fontWeight: 800,
-            letterSpacing: 1.4,
-            textTransform: "uppercase",
-            color: C.gold,
-            marginBottom: 10,
-          }}
-        >
-          {getText(LANDING_COPY.deptsEyebrow)}
-        </div>
-        <div style={{ display: "flex", width: "max-content" }}>
-          <div
-            className="lp-marquee-track"
-            style={{
-              display: "flex",
-              gap: 48, // ✅ Increased gap
-              paddingRight: 48, // ✅ Increased padding
-              animation: "marquee-scroll 40s linear infinite", // ✅ Slower animation
-            }}
-          >
-            {departmentsList.length > 0
-              ? // ✅ Added more repetitions to fill screen
-                [
-                  ...departmentsList,
-                  ...departmentsList,
-                  ...departmentsList,
-                  ...departmentsList,
-                ].map((d, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      color: "#c9d0f0",
-                      fontSize: 13,
 {/* ── DEPARTMENTS MARQUEE ──────────────────────────── */}
 <section
   style={{
@@ -1678,7 +1633,7 @@ export default function Landing() {
   <div
     className="lp-marquee-mobile"
     style={{
-      display: "none", // Hidden by default, shown on mobile
+      display: "none",
       flexDirection: "column",
       gap: "8px",
       overflow: "hidden",
@@ -1797,7 +1752,7 @@ export default function Landing() {
     </div>
   </div>
 </section>
-
+      
       {/* ── FEATURES ──────────────────────────────────────── */}
       <section
         id="features"
