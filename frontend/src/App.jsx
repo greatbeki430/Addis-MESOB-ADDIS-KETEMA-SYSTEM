@@ -297,6 +297,41 @@ function AuthenticatedApp() {
           background: ${pdfReady ? "#4caf50" : "#ff9800"};
           animation: ${pdfReady ? "pulseGlow 2s ease-in-out infinite" : "none"};
         }
+        
+        /* ✅ FIX: Chatbot and FAB equal sizes */
+        .fab-button {
+          width: 48px !important;
+          height: 48px !important;
+          min-width: 48px !important;
+          min-height: 48px !important;
+          border-radius: 50% !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          font-size: 20px !important;
+          line-height: 1 !important;
+          padding: 0 !important;
+        }
+        
+        @media (max-width: 768px) {
+          .fab-button {
+            width: 40px !important;
+            height: 40px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+            font-size: 16px !important;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .fab-button {
+            width: 36px !important;
+            height: 36px !important;
+            min-width: 36px !important;
+            min-height: 36px !important;
+            font-size: 14px !important;
+          }
+        }
       `}</style>
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -600,10 +635,11 @@ function AuthenticatedApp() {
         </div>
       )}
 
-      {/* Add User FAB - positioned above chatbot, smaller on all devices */}
+      {/* ✅ FIXED: Add User FAB - Same size as Chatbot */}
       {isAdminOrSuperAdmin && (
         <button
           onClick={() => setShowRegister(true)}
+          className="fab-button"
           style={{
             position: "fixed",
             bottom: "clamp(80px, 12vh, 100px)",
@@ -612,9 +648,11 @@ function AuthenticatedApp() {
             color: "#fff",
             border: "none",
             borderRadius: "50%",
-            width: "clamp(40px, 6vw, 52px)",
-            height: "clamp(40px, 6vw, 52px)",
-            fontSize: "clamp(18px, 3vw, 24px)",
+            width: 48,
+            height: 48,
+            minWidth: 48,
+            minHeight: 48,
+            fontSize: 20,
             cursor: "pointer",
             boxShadow: "0 4px 12px rgba(0,0,0,0.2)",
             display: "flex",
@@ -622,6 +660,8 @@ function AuthenticatedApp() {
             justifyContent: "center",
             zIndex: 100,
             transition: "transform 0.3s ease, box-shadow 0.3s ease",
+            lineHeight: 1,
+            padding: 0,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = "scale(1.1)";
@@ -636,7 +676,7 @@ function AuthenticatedApp() {
         </button>
       )}
 
-      {/* AI Chatbot Widget - smaller on all devices, hidden when register modal is open */}
+      {/* AI Chatbot Widget - hidden when register modal is open */}
       {!showRegister && <ChatbotWidget />}
     </div>
   );
