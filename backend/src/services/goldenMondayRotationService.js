@@ -86,21 +86,41 @@ const stableHashUnit = (str) => {
 // ============================================================
 // Score a single candidate for a given target week.
 // ============================================================
+// NEW: Enhanced scoring with onboarding priority
 const scoreCandidate = (presenter, weekOf, rosterAvgPresented) => {
   const daysSinceLast = presenter.lastPresentedAt
     ? Math.floor(
         (weekOf.getTime() - new Date(presenter.lastPresentedAt).getTime()) /
           (1000 * 60 * 60 * 24),
       )
-    : NEVER_PRESENTED_DAYS;
+    : 0;
+
+  // 🆕 Onboarding Priority - NEW employees get higher priority
+  const daysSinceRegistration = presenter.registeredAt
+    ? Math.floor(
+        (weekOf.getTime() - new Date(presenter.registeredAt).getTime()) /
+          (1000 * 60 * 60 * 24),
+      )
+    : 0;
+
+  // 🆕 Department quota - ensure fair distribution
+  const departmentGap = departmentDistribution[presenter.department] || 0;
 
   const frequencyGap = rosterAvgPresented - (presenter.timesPresented || 0);
+
+  // 🆕 Registration bonus - NEW employees get priority
+  const registrationBonus =
+    presenter.timesPresented === 0
+      ? Math.min(daysSinceRegistration * 0.5, 30) // Max 30 bonus days
+      : 0;
 
   const score =
     W_RECENCY * daysSinceLast +
     W_FREQUENCY * frequencyGap +
     W_SKIPPED * (presenter.timesSkipped || 0) +
-    stableHashUnit(`${presenter.user}-${weekOf.toISOString()}`); // tie-break, negligible weight
+    registrationBonus + // 🆕 Registration priority
+    departmentGap + // 🆕 Department fairness
+    stableHashUnit(`${presenter.user}-${weekOf.toISOString()}`);
 
   return { presenter, score, daysSinceLast };
 };
