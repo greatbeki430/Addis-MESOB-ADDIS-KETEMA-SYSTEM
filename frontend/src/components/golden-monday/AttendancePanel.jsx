@@ -19,14 +19,15 @@ import {
   FiRefreshCw,
   FiLoader,
   FiSearch,
+  FiPenTool,
 } from "react-icons/fi";
 
 export default function AttendancePanel({ sessionId, onRefresh }) {
   const { user } = useAuth();
-  const { language } = useLanguage(); // ← Get language from context
+  const { language } = useLanguage();
   const isInitialMount = useRef(true);
 
-  // Get translations based on language - use the imported translations
+  // Get translations based on language
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
   const [attendance, setAttendance] = useState([]);
@@ -386,48 +387,66 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                     </span>
                   ) : isSigning ? (
                     <div
-                      style={{ display: "flex", alignItems: "center", gap: 8 }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        gap: 8,
+                        width: "100%",
+                        maxWidth: "220px",
+                      }}
                     >
-                      <div style={{ width: 120 }}>
+                      {/* ✅ Show SignatureCanvas when signing */}
+                      <div style={{ width: "100%" }}>
                         <SignatureCanvas
                           onSave={(data) => setMySignature(data)}
-                          height={50}
-                          width={120}
+                          height={60}
+                          width={220}
+                          label=""
                         />
                       </div>
-                      <button
-                        onClick={() => handleSignAttendance(emp.user?._id)}
-                        style={{
-                          padding: "4px 12px",
-                          background: C.primary,
-                          color: "#fff",
-                          border: "none",
-                          borderRadius: 4,
-                          cursor: "pointer",
-                          fontSize: 11,
-                          fontWeight: 600,
-                        }}
-                        aria-label={t.confirmSignature || "Confirm signature"}
-                      >
-                        <FiCheck size={12} style={{ marginRight: 4 }} />
-                        {t.confirmSignature || "Confirm"}
-                      </button>
-                      <button
-                        onClick={() => {
-                          setSigningFor(null);
-                          setMySignature(null);
-                        }}
-                        style={{
-                          padding: "4px 8px",
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          color: "#999",
-                        }}
-                        aria-label={t.cancelSignature || "Cancel signing"}
-                      >
-                        <FiX size={14} />
-                      </button>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          onClick={() => handleSignAttendance(emp.user?._id)}
+                          style={{
+                            padding: "4px 12px",
+                            background: C.primary,
+                            color: "#fff",
+                            border: "none",
+                            borderRadius: 4,
+                            cursor: "pointer",
+                            fontSize: 11,
+                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                          aria-label={t.confirmSignature || "Confirm signature"}
+                        >
+                          <FiCheck size={12} />
+                          {t.confirmSignature || "Confirm"}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSigningFor(null);
+                            setMySignature(null);
+                          }}
+                          style={{
+                            padding: "4px 8px",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "#999",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                          aria-label={t.cancelSignature || "Cancel signing"}
+                        >
+                          <FiX size={14} />
+                          {t.cancelSignature || "Cancel"}
+                        </button>
+                      </div>
                     </div>
                   ) : isCurrentUser ? (
                     <button
@@ -441,9 +460,13 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                         cursor: "pointer",
                         fontSize: 11,
                         fontWeight: 600,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
                       }}
                       aria-label={t.signIn || "Sign in"}
                     >
+                      <FiPenTool size={12} />
                       {t.signIn || "Sign In"}
                     </button>
                   ) : (
