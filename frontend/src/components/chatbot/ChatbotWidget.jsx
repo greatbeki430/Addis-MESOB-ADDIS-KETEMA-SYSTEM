@@ -1,5 +1,5 @@
 // frontend/src/components/chatbot/ChatbotWidget.jsx
-// Full-featured AI chatbot widget — global, Amharic + English
+// Full-featured AI chatbot widget — Global, Amharic + English
 // Features: chat history, quick actions, complaint helper, translation, service search
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -1073,30 +1073,39 @@ export default function ChatbotWidget() {
       );
   };
 
+  // ✅ FIX: Same size as FAB button - Only keep the variables we actually use
+  const buttonSize = 48;
+  const iconSize = 20;
+
   return (
     <>
-      {/* ─── Floating button ─── */}
+      {/* ─── Floating button - SAME SIZE AS FAB ─── */}
       <button
         onClick={() => setIsOpen((o) => !o)}
         aria-label="Open MESOB Assistant"
+        className="chatbot-toggle"
         style={{
           position: "fixed",
-          bottom: "24px",
-          right: "24px",
-          width: "56px",
-          height: "56px",
+          bottom: "clamp(80px, 12vh, 100px)",
+          right: "clamp(12px, 2vw, 20px)",
+          width: buttonSize,
+          height: buttonSize,
+          minWidth: buttonSize,
+          minHeight: buttonSize,
           borderRadius: "50%",
           background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
           color: "#fff",
           border: "none",
           cursor: "pointer",
-          boxShadow: "0 4px 20px rgba(37,99,235,0.45)",
+          boxShadow: "0 4px 16px rgba(37,99,235,0.45)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: "22px",
+          fontSize: iconSize,
           zIndex: 1000,
           transition: "transform 0.2s, box-shadow 0.2s",
+          padding: 0,
+          lineHeight: 1,
         }}
         onMouseEnter={(e) => {
           e.currentTarget.style.transform = "scale(1.1)";
@@ -1104,16 +1113,16 @@ export default function ChatbotWidget() {
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.boxShadow = "0 4px 20px rgba(37,99,235,0.45)";
+          e.currentTarget.style.boxShadow = "0 4px 16px rgba(37,99,235,0.45)";
         }}
       >
-        {isOpen ? <FiX size={22} /> : <FiMessageSquare size={22} />}
+        {isOpen ? <FiX size={iconSize} /> : <FiMessageSquare size={iconSize} />}
         {unreadCount > 0 && !isOpen && (
           <div
             style={{
               position: "absolute",
-              top: 0,
-              right: 0,
+              top: -2,
+              right: -2,
               background: "#EF4444",
               color: "#fff",
               borderRadius: "50%",
@@ -1124,6 +1133,7 @@ export default function ChatbotWidget() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              border: "2px solid #fff",
             }}
           >
             {unreadCount}
@@ -1136,12 +1146,12 @@ export default function ChatbotWidget() {
         <div
           style={{
             position: "fixed",
-            bottom: "92px",
-            right: "24px",
+            bottom: "clamp(92px, 14vh, 120px)",
+            right: "clamp(12px, 2vw, 20px)",
             width: "420px",
             maxWidth: "calc(100vw - 48px)",
             height: "560px",
-            maxHeight: "calc(100vh - 120px)",
+            maxHeight: "calc(100vh - 140px)",
             background: "#fff",
             borderRadius: "20px",
             boxShadow: "0 8px 48px rgba(0,0,0,0.18)",
@@ -1152,7 +1162,7 @@ export default function ChatbotWidget() {
             border: "1px solid #E2E8F0",
           }}
         >
-          {/* Header */}
+          {/* ─── Header ─── */}
           <div
             style={{
               background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
@@ -1319,7 +1329,7 @@ export default function ChatbotWidget() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Quick actions (show only on first load) */}
+              {/* Quick actions */}
               {messages.length <= 1 && (
                 <div
                   style={{
@@ -1784,6 +1794,33 @@ export default function ChatbotWidget() {
         strong {
           color: #0F172A;
           font-weight: 700;
+        }
+        
+        /* ✅ FIX: Mobile responsive for chatbot button */
+        @media (max-width: 768px) {
+          .chatbot-toggle {
+            width: 40px !important;
+            height: 40px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+          }
+          .chatbot-toggle svg {
+            width: 16px !important;
+            height: 16px !important;
+          }
+        }
+        
+        @media (max-width: 480px) {
+          .chatbot-toggle {
+            width: 36px !important;
+            height: 36px !important;
+            min-width: 36px !important;
+            min-height: 36px !important;
+          }
+          .chatbot-toggle svg {
+            width: 14px !important;
+            height: 14px !important;
+          }
         }
       `}</style>
     </>
