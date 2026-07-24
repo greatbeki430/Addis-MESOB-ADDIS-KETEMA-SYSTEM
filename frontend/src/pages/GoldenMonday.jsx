@@ -1,8 +1,6 @@
 // src/pages/GoldenMonday.jsx
 // ════════════════════════════════════════════════════════════
-// COMPLETE Golden Monday Management System - FIXED
-// All data dynamic from database, full CRUD, AI integration,
-// Telegram posting, and role-based access control
+// COMPLETE Golden Monday Management System - Using goldenMondayTranslations
 // ════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
@@ -13,6 +11,7 @@ import { useLanguage } from "../hooks/useLanguage";
 import { goldenMondayAPI, authAPI, uploadAPI } from "../services/api";
 import { showToast } from "../utils/toastHelper";
 import { ROLES, hasMinRole } from "../utils/roles";
+import { goldenMondayTranslations } from "../constants/goldenMondayTranslations";
 import GoldenMondayRotationPanel from "../components/golden-monday/GoldenMondayRotationPanel";
 import AttendancePanel from "../components/golden-monday/AttendancePanel";
 import GalleryGrid from "../components/golden-monday/GalleryGrid";
@@ -50,6 +49,7 @@ import {
   FiClipboard,
 } from "react-icons/fi";
 
+// ─────────────────────────────────────────────────────────────
 // SAFE DATA HELPERS
 // ─────────────────────────────────────────────────────────────
 const safeArray = (data, fallback = []) => {
@@ -63,7 +63,7 @@ const safeArray = (data, fallback = []) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// STATIC PILLARS (fallback data, but should come from DB)
+// STATIC PILLARS (fallback data)
 // ─────────────────────────────────────────────────────────────
 const FALLBACK_PILLARS = [
   {
@@ -230,31 +230,29 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
           textAlign: "center",
         }}
       >
-        <p style={{ color: C.muted }}>
-          {t("common.loading") || "Loading stats..."}
-        </p>
+        <p style={{ color: C.muted }}>{t.loading || "Loading stats..."}</p>
       </div>
     );
   }
 
   const statItems = [
     {
-      label: t("goldenMonday.statTotalSessions") || "Total Sessions",
+      label: t.statTotalSessions || "Total Sessions",
       value: stats.totalSessions || 0,
       icon: <FiCalendar size={20} />,
     },
     {
-      label: t("goldenMonday.statPresenters") || "Presenters",
+      label: t.statPresenters || "Presenters",
       value: stats.totalPresenters || 0,
       icon: <FiUsers size={20} />,
     },
     {
-      label: t("goldenMonday.statUpcoming") || "Upcoming",
+      label: t.statUpcoming || "Upcoming",
       value: stats.upcomingSessions || 0,
       icon: <FiClock size={20} />,
     },
     {
-      label: t("goldenMonday.statAvgRating") || "Avg Rating",
+      label: t.statAvgRating || "Avg Rating",
       value: stats.averageRating ? stats.averageRating.toFixed(1) : "N/A",
       icon: <FiStar size={20} />,
     },
@@ -305,7 +303,7 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
           }}
         >
           <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>
-            {t("goldenMonday.statNextPresenter") || "Next Presenter"}
+            {t.statNextPresenter || "Next Presenter"}
           </div>
           <div
             style={{
@@ -370,16 +368,12 @@ function TelegramPostButton({ sessionId, onPosted, t }) {
     try {
       await goldenMondayAPI.postToTelegram(sessionId);
       showToast(
-        t("goldenMonday.postedToTelegramToast") ||
-          "Posted to Telegram successfully!",
+        t.postedToTelegramToast || "Posted to Telegram successfully!",
         "success",
       );
       if (onPosted) onPosted();
     } catch {
-      showToast(
-        t("goldenMonday.failedPostTelegram") || "Failed to post to Telegram",
-        "error",
-      );
+      showToast(t.failedPostTelegram || "Failed to post to Telegram", "error");
     } finally {
       setPosting(false);
     }
@@ -397,17 +391,16 @@ function TelegramPostButton({ sessionId, onPosted, t }) {
     >
       <FiBell size={14} />
       {posting
-        ? t("goldenMonday.postingToTelegram") || "Posting..."
-        : t("goldenMonday.postToTelegram") || "Post to Telegram"}
+        ? t.postingToTelegram || "Posting..."
+        : t.postToTelegram || "Post to Telegram"}
     </button>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// SESSION CARD COMPONENT - FIXED (useCallback moved before early return)
+// SESSION CARD COMPONENT
 // ─────────────────────────────────────────────────────────────
 function SessionCard({ session, language, isAdmin, onRefresh, t }) {
-  // ✅ All hooks called first - unconditionally
   const [expanded, setExpanded] = useState(false);
 
   const getTranslatedText = useCallback(
@@ -419,7 +412,6 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
     [language],
   );
 
-  // ✅ Early return AFTER all hooks
   if (!session) {
     return null;
   }
@@ -470,12 +462,12 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
             <div style={{ fontWeight: 600, color: C.dark }}>
               {getTranslatedText(session.presentationTitle) ||
                 session.title ||
-                t("goldenMonday.untitledSession") ||
+                t.untitledSession ||
                 "Untitled Session"}
             </div>
             <div style={{ fontSize: 12, color: C.muted }}>
               {getTranslatedText(session.presenterName) ||
-                t("goldenMonday.noPresenter") ||
+                t.noPresenter ||
                 "No presenter"}{" "}
               ·{" "}
               {date.toLocaleDateString("en-US", {
@@ -495,7 +487,7 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
                     color: C.gold,
                   }}
                 >
-                  {t("goldenMonday.upcomingBadge") || "Upcoming"}
+                  {t.upcomingBadge || "Upcoming"}
                 </span>
               )}
               {session.averageRating > 0 && (
@@ -522,7 +514,7 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
                 fontWeight: 600,
               }}
             >
-              <FiVideo size={14} /> {t("goldenMonday.watchLabel") || "Watch"}
+              <FiVideo size={14} /> {t.watchLabel || "Watch"}
             </a>
           )}
           {isAdmin && isUpcoming && (
@@ -568,7 +560,7 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
             session.suggestedTopics.length > 0 && (
               <div style={{ marginBottom: 8 }}>
                 <span style={{ fontSize: 11, color: C.muted }}>
-                  {t("goldenMonday.aiSuggestedLabel") || "AI Suggested:"}
+                  {t.aiSuggestedLabel || "AI Suggested:"}
                 </span>
                 <div
                   style={{
@@ -601,7 +593,7 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
                 style={{ fontSize: 12, color: C.primary, cursor: "pointer" }}
               >
                 <FiInfo size={12} style={{ marginRight: 4 }} />
-                {t("goldenMonday.viewAiRecap") || "View AI Recap"}
+                {t.viewAiRecap || "View AI Recap"}
               </summary>
               <p
                 style={{
@@ -710,7 +702,7 @@ function EmployeeRegistrationModal({
           }}
         >
           <h3 style={{ margin: 0, color: C.dark, fontFamily: F.serif }}>
-            {t("employeeManagement.register") || "Register Employee"}
+            {t.registerEmployeeTitle || "Register Employee"}
           </h3>
           <button
             onClick={onClose}
@@ -738,7 +730,7 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              {t("employeeManagement.fullName") || "Employee"} *
+              {t.employeeLabel || "Employee"} *
             </label>
             {selectedUser ? (
               <div
@@ -796,8 +788,7 @@ function EmployeeRegistrationModal({
               <>
                 <input
                   placeholder={
-                    t("employeeManagement.searchPlaceholder") ||
-                    "Search by name or email…"
+                    t.searchUserPlaceholder || "Search by name or email…"
                   }
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
@@ -814,8 +805,7 @@ function EmployeeRegistrationModal({
                 >
                   {filteredUsers.length === 0 ? (
                     <div style={{ padding: 10, fontSize: 12, color: C.muted }}>
-                      {t("employeeManagement.noUsersFound") ||
-                        "No matching users"}
+                      {t.noMatchingUsers || "No matching users"}
                     </div>
                   ) : (
                     filteredUsers.map((u) => (
@@ -857,12 +847,10 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              {t("employeeManagement.department") || "Department"}
+              {t.departmentLabel || "Department"}
             </label>
             <input
-              placeholder={
-                t("employeeManagement.department") || "Department name"
-              }
+              placeholder={t.departmentPlaceholder || "Department name"}
               value={employeeForm.department}
               onChange={(e) =>
                 setEmployeeForm({ ...employeeForm, department: e.target.value })
@@ -881,10 +869,10 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              {t("employeeManagement.position") || "Position"}
+              {t.positionLabel || "Position"}
             </label>
             <input
-              placeholder={t("employeeManagement.position") || "Job position"}
+              placeholder={t.positionPlaceholder || "Job position"}
               value={employeeForm.position}
               onChange={(e) =>
                 setEmployeeForm({ ...employeeForm, position: e.target.value })
@@ -903,7 +891,7 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              {t("employeeManagement.photoUrl") || "Profile Photo"}
+              {t.profilePhotoLabel || "Profile Photo"}
             </label>
             <div
               style={{
@@ -967,12 +955,12 @@ function EmployeeRegistrationModal({
                     fontSize: 12,
                   }}
                 >
-                  {t("common.delete") || "Remove"}
+                  {t.removeBtn || "Remove"}
                 </button>
               </div>
             )}
             <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-              {t("employeeManagement.photoUploadHint") ||
+              {t.photoUploadHint ||
                 "Upload a photo from your computer (JPG, PNG, GIF) - Max 5MB"}
             </div>
           </div>
@@ -987,11 +975,12 @@ function EmployeeRegistrationModal({
                 marginBottom: 4,
               }}
             >
-              {t("employeeManagement.photoUrl") || "Photo URL"} (
-              {t("common.optional") || "optional"})
+              {t.photoUrlLabel || "Photo URL"} ({t.optional || "optional"})
             </label>
             <input
-              placeholder="https://example.com/photo.jpg"
+              placeholder={
+                t.photoUrlPlaceholder || "https://example.com/photo.jpg"
+              }
               value={employeeForm.profilePhotoUrl}
               onChange={(e) =>
                 setEmployeeForm({
@@ -1015,7 +1004,7 @@ function EmployeeRegistrationModal({
             }}
           >
             <button onClick={onClose} style={btnStyle("#e5e7eb", "#444")}>
-              {t("common.cancel") || "Cancel"}
+              {t.cancelBtn || "Cancel"}
             </button>
             <button
               onClick={onRegister}
@@ -1029,8 +1018,8 @@ function EmployeeRegistrationModal({
               }}
             >
               {registering || uploadingPhoto
-                ? t("common.loading") || "Processing..."
-                : t("employeeManagement.register") || "Register Employee"}
+                ? t.processingBtn || "Processing..."
+                : t.registerBtn || "Register Employee"}
             </button>
           </div>
         </div>
@@ -1041,64 +1030,44 @@ function EmployeeRegistrationModal({
 }
 
 // ─────────────────────────────────────────────────────────────
-// MAIN COMPONENT - FIXED (useMemo for tabs and gmCopy)
+// MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────
 export default function GoldenMonday() {
-  const { t: translations, language } = useLanguage();
+  const { language } = useLanguage();
   const { user } = useAuth();
 
-  // ── Translation helper - wrapped in useCallback ──
-  const t = useCallback(
-    (key, fallback) => {
-      const keys = key.split(".");
-      let value = translations;
-      for (const k of keys) {
-        if (value && value[k] !== undefined) {
-          value = value[k];
-        } else {
-          return fallback || key;
-        }
-      }
-      return value || fallback || key;
-    },
-    [translations],
-  );
+  // ── Get translations from goldenMondayTranslations ──
+  const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
   // ── Active Tab State ──
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedSessionId, setSelectedSessionId] = useState(null);
 
-  // ✅ FIX: Use useMemo for tabs to ensure translations are applied
+  // ── Tabs with translations ──
   const tabs = useMemo(
     () => [
       {
         id: "overview",
-        label: t("goldenMonday.tabOverview") || "Overview",
+        label: t.tabOverview || "Overview",
         icon: <FiGrid size={16} />,
       },
       {
         id: "attendance",
-        label: t("goldenMonday.tabAttendance") || "Attendance",
+        label: t.tabAttendance || "Attendance",
         icon: <FiClipboard size={16} />,
       },
       {
         id: "gallery",
-        label: t("goldenMonday.tabGallery") || "Gallery",
+        label: t.tabGallery || "Gallery",
         icon: <FiCamera size={16} />,
       },
       {
         id: "reports",
-        label: t("goldenMonday.tabReports") || "Reports",
+        label: t.tabReports || "Reports",
         icon: <FiFileText size={16} />,
       },
     ],
     [t],
-  );
-
-  // ✅ FIX: Use useMemo for gmCopy
-  const gmCopy = useMemo(
-    () => translations?.goldenMonday || {},
-    [translations],
   );
 
   const [visible, setVisible] = useState({});
@@ -1185,24 +1154,20 @@ export default function GoldenMonday() {
         goldenMondayAPI.getPillars().catch(() => ({ data: FALLBACK_PILLARS })),
       ]);
 
-      // SAFE: Ensure all data is properly set with fallbacks
       setUpcomingSessions(safeArray(upcomingRes.data));
       setPastSessions(safeArray(pastRes.data?.sessions));
       setNextPresenter(nextPresenterRes.data || null);
       setEmployees(safeArray(employeesRes.data));
       setStats(statsRes.data || null);
 
-      // SAFE: Ensure pillars is always an array
       const pillarsData = pillarsRes.data;
       if (Array.isArray(pillarsData) && pillarsData.length > 0) {
         setPillars(pillarsData);
       } else {
-        // Try to extract from nested structure if needed
         const extracted = safeArray(pillarsData);
         setPillars(extracted.length > 0 ? extracted : FALLBACK_PILLARS);
       }
 
-      // Set default selected session for attendance
       const upcoming = safeArray(upcomingRes.data);
       const past = safeArray(pastRes.data?.sessions);
       if (upcoming.length > 0) {
@@ -1212,18 +1177,17 @@ export default function GoldenMonday() {
       }
     } catch (error) {
       console.error("Failed to load Golden Monday data:", error);
-      showToast(t("common.error") || "Failed to load data", "error");
+      showToast(t.error || "Failed to load data", "error");
     } finally {
       setLoading(false);
     }
   }, [t]);
-  // ─── END OF REPLACED FUNCTION ─────────────────────────────
 
   const refreshData = useCallback(async () => {
     setRefreshing(true);
     await loadAllData();
     setRefreshing(false);
-    showToast(t("common.success") || "Data refreshed", "success");
+    showToast(t.success || "Data refreshed", "success");
   }, [loadAllData, t]);
 
   // ── Load on mount ──
@@ -1275,7 +1239,7 @@ export default function GoldenMonday() {
       .getUsers()
       .then((res) => setAllUsers(res.data || []))
       .catch(() =>
-        showToast(t("common.error") || "Failed to load users", "error"),
+        showToast(t.failedLoadUsers || "Failed to load users", "error"),
       );
   }, [showEmployeeModal, t]);
 
@@ -1303,11 +1267,7 @@ export default function GoldenMonday() {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        showToast(
-          t("employeeManagement.photoTooLarge") ||
-            "Photo must be less than 5MB",
-          "error",
-        );
+        showToast(t.photoTooLarge || "Photo must be less than 5MB", "error");
         e.target.value = "";
         return;
       }
@@ -1330,7 +1290,10 @@ export default function GoldenMonday() {
 
   const handleGenerateAndSave = async () => {
     if (!form.title.trim() || !form.rawNotes.trim()) {
-      showToast(t("common.error") || "Title and notes are required", "warning");
+      showToast(
+        t.titleNotesRequired || "Title and notes are required",
+        "warning",
+      );
       return;
     }
     try {
@@ -1347,13 +1310,13 @@ export default function GoldenMonday() {
       });
       setShowComposer(false);
       showToast(
-        t("goldenMonday.aiSaved") || "Session saved with AI recap!",
+        t.sessionSavedToast || "Session saved with AI recap!",
         "success",
       );
     } catch (error) {
       showToast(
         error.response?.data?.message ||
-          t("goldenMonday.aiError") ||
+          t.failedSaveSession ||
           "Failed to save session",
         "error",
       );
@@ -1366,7 +1329,6 @@ export default function GoldenMonday() {
     try {
       setLoadingTopics(true);
       const response = await goldenMondayAPI.suggestTopics();
-      // FIX: Ensure topics is always an array
       const topicsData = response.data?.topics;
       if (Array.isArray(topicsData)) {
         setTopics(topicsData);
@@ -1374,10 +1336,7 @@ export default function GoldenMonday() {
         setTopics([]);
       }
     } catch {
-      showToast(
-        t("goldenMonday.aiError") || "Failed to suggest topics",
-        "error",
-      );
+      showToast(t.failedSuggestTopics || "Failed to suggest topics", "error");
       setTopics([]);
     } finally {
       setLoadingTopics(false);
@@ -1387,10 +1346,7 @@ export default function GoldenMonday() {
   // ── Admin Handlers ──
   const handleRegisterEmployee = async () => {
     if (!employeeForm.userId) {
-      showToast(
-        t("employeeManagement.selectUserError") || "Please select an employee",
-        "warning",
-      );
+      showToast(t.selectEmployeeWarn || "Please select an employee", "warning");
       return;
     }
     setRegistering(true);
@@ -1412,8 +1368,7 @@ export default function GoldenMonday() {
       });
 
       showToast(
-        t("employeeManagement.createSuccess") ||
-          "Employee registered successfully!",
+        t.employeeRegisteredToast || "Employee registered successfully!",
         "success",
       );
       setShowEmployeeModal(false);
@@ -1431,7 +1386,7 @@ export default function GoldenMonday() {
     } catch (error) {
       showToast(
         error.response?.data?.message ||
-          t("common.error") ||
+          t.failedRegisterEmployee ||
           "Failed to register employee",
         "error",
       );
@@ -1444,20 +1399,16 @@ export default function GoldenMonday() {
   const handleRemoveEmployee = async (userId) => {
     if (
       !window.confirm(
-        t("employeeManagement.confirmDeleteMessage") ||
-          "Remove this employee from rotation?",
+        t.confirmRemoveEmployee || "Remove this employee from rotation?",
       )
     )
       return;
     try {
       await goldenMondayAPI.removeEmployee(userId);
-      showToast(
-        t("employeeManagement.deleteSuccess") || "Employee removed",
-        "success",
-      );
+      showToast(t.employeeRemovedToast || "Employee removed", "success");
       await refreshData();
     } catch {
-      showToast(t("common.error") || "Failed to remove employee", "error");
+      showToast(t.failedRemoveEmployee || "Failed to remove employee", "error");
     }
   };
 
@@ -1466,13 +1417,16 @@ export default function GoldenMonday() {
       await goldenMondayAPI.updateEmployeeEligibility(userId, !isEligible);
       showToast(
         isEligible
-          ? t("employeeManagement.inactiveStatus") || "Deactivated"
-          : t("employeeManagement.activeStatus") || "Activated",
+          ? t.inactiveLabel || "Deactivated"
+          : t.activeLabel || "Activated",
         "success",
       );
       await refreshData();
     } catch {
-      showToast(t("common.error") || "Failed to update eligibility", "error");
+      showToast(
+        t.failedUpdateEligibility || "Failed to update eligibility",
+        "error",
+      );
     }
   };
 
@@ -1557,7 +1511,7 @@ export default function GoldenMonday() {
             }}
           >
             <FiClock size={13} />
-            {gmCopy.eyebrow || "Every Monday · 2:00 – 2:50"}
+            {t.eyebrow || "Every Monday · 2:00 – 2:50"}
           </div>
 
           <h1
@@ -1589,7 +1543,7 @@ export default function GoldenMonday() {
             >
               <FiSunrise size={30} />
             </span>
-            {gmCopy.title || "Golden Monday"}
+            {t.title || "Golden Monday"}
           </h1>
 
           <p
@@ -1601,7 +1555,7 @@ export default function GoldenMonday() {
               marginTop: 22,
             }}
           >
-            {gmCopy.subtitle ||
+            {t.subtitle ||
               "The organization's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all."}
           </p>
 
@@ -1627,7 +1581,7 @@ export default function GoldenMonday() {
                 paddingBottom: 4,
               }}
             >
-              {gmCopy.scroll || "Explore the story"}
+              {t.scroll || "Explore the story"}
               <FiChevronDown size={16} />
             </a>
 
@@ -1657,8 +1611,8 @@ export default function GoldenMonday() {
                   }}
                 />
                 {refreshing
-                  ? t("goldenMonday.refreshing") || "Refreshing..."
-                  : t("common.refresh") || "Refresh"}
+                  ? t.refreshing || "Refreshing..."
+                  : t.refresh || "Refresh"}
               </button>
             )}
           </div>
@@ -1757,10 +1711,9 @@ export default function GoldenMonday() {
             >
               <SectionHeading
                 eyebrow={<FiCompass size={14} />}
-                title={gmCopy.pillarsTitle || "Why a golden morning"}
+                title={t.pillarsTitle || "Why a golden morning"}
                 sub={
-                  gmCopy.pillarsSub ||
-                  "Three things every session comes back to."
+                  t.pillarsSub || "Three things every session comes back to."
                 }
               />
               <div
@@ -1771,7 +1724,6 @@ export default function GoldenMonday() {
                   marginTop: 28,
                 }}
               >
-                {/* ✅ FIXED: Added safety check with fallback */}
                 {Array.isArray(pillars) && pillars.length > 0 ? (
                   pillars.map((pillar, i) => {
                     const IconComponent = PILLAR_ICONS[pillar.icon] || (
@@ -1832,7 +1784,6 @@ export default function GoldenMonday() {
                     );
                   })
                 ) : (
-                  /* ✅ ADDED: Fallback when pillars data is not available */
                   <div
                     style={{
                       gridColumn: "1 / -1",
@@ -1845,7 +1796,7 @@ export default function GoldenMonday() {
                       size={32}
                       style={{ marginBottom: 12, opacity: 0.5 }}
                     />
-                    <p>{t("common.loading") || "Loading pillars..."}</p>
+                    <p>{t.loading || "Loading pillars..."}</p>
                   </div>
                 )}
               </div>
@@ -1863,9 +1814,9 @@ export default function GoldenMonday() {
               >
                 <SectionHeading
                   eyebrow={<FiCpu size={14} />}
-                  title={gmCopy.aiTitle || "AI session recap"}
+                  title={t.aiTitle || "AI session recap"}
                   sub={
-                    gmCopy.aiSub ||
+                    t.aiSub ||
                     "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds."
                   }
                 />
@@ -1908,12 +1859,12 @@ export default function GoldenMonday() {
                         }}
                       >
                         <FiPlus size={16} />
-                        {gmCopy.aiNewSession || "Log a new session"}
+                        {t.aiNewSession || "Log a new session"}
                       </button>
                     ) : (
                       <div style={{ display: "grid", gap: 10 }}>
                         <input
-                          placeholder={gmCopy.aiFormTitle || "Session title"}
+                          placeholder={t.aiFormTitle || "Session title"}
                           value={form.title}
                           onChange={handleFormChange("title")}
                           style={inputStyle}
@@ -1926,14 +1877,14 @@ export default function GoldenMonday() {
                           }}
                         >
                           <input
-                            placeholder={gmCopy.aiFormOrg || "Organization"}
+                            placeholder={t.aiFormOrg || "Organization"}
                             value={form.organization}
                             onChange={handleFormChange("organization")}
                             style={{ ...inputStyle, flex: "1 1 160px" }}
                           />
                           <input
                             placeholder={
-                              gmCopy.aiFormSpeaker || "Speaker / facilitator"
+                              t.aiFormSpeaker || "Speaker / facilitator"
                             }
                             value={form.speaker}
                             onChange={handleFormChange("speaker")}
@@ -1948,7 +1899,7 @@ export default function GoldenMonday() {
                         />
                         <textarea
                           placeholder={
-                            gmCopy.aiFormNotes ||
+                            t.aiFormNotes ||
                             "Raw notes — write it however you like, AI will clean it up"
                           }
                           value={form.rawNotes}
@@ -1986,7 +1937,7 @@ export default function GoldenMonday() {
                             }}
                           >
                             <FiX size={14} />
-                            {gmCopy.aiCancel || "Cancel"}
+                            {t.aiCancel || "Cancel"}
                           </button>
                           <button
                             onClick={handleGenerateAndSave}
@@ -2015,12 +1966,12 @@ export default function GoldenMonday() {
                                     animation: "spin 1s linear infinite",
                                   }}
                                 />
-                                {gmCopy.aiGenerating || "Writing recap…"}
+                                {t.aiGenerating || "Writing recap…"}
                               </>
                             ) : (
                               <>
                                 <FiSend size={14} />
-                                {gmCopy.aiGenerate || "Generate & save with AI"}
+                                {t.aiGenerate || "Generate & save with AI"}
                               </>
                             )}
                           </button>
@@ -2057,7 +2008,7 @@ export default function GoldenMonday() {
                         }}
                       >
                         <FiSun size={16} color={C.gold} />
-                        {gmCopy.aiTopicsTitle || "AI: suggest next topics"}
+                        {t.aiTopicsTitle || "AI: suggest next topics"}
                       </div>
                       <button
                         onClick={handleSuggestTopics}
@@ -2086,8 +2037,8 @@ export default function GoldenMonday() {
                           <FiCpu size={13} />
                         )}
                         {loadingTopics
-                          ? gmCopy.aiTopicsLoading || "Thinking of topics…"
-                          : gmCopy.aiTopicsBtn || "Suggest topics"}
+                          ? t.aiTopicsLoading || "Thinking of topics…"
+                          : t.aiTopicsBtn || "Suggest topics"}
                       </button>
                     </div>
 
@@ -2100,7 +2051,7 @@ export default function GoldenMonday() {
                             margin: 0,
                           }}
                         >
-                          {gmCopy.aiTopicsEmpty ||
+                          {t.aiTopicsEmpty ||
                             "Log a couple of sessions first so AI has something to build on."}
                         </p>
                       )}
@@ -2155,10 +2106,8 @@ export default function GoldenMonday() {
             >
               <SectionHeading
                 eyebrow={<FiCalendar size={14} />}
-                title={gmCopy.timelineTitle || "Sessions Timeline"}
-                sub={
-                  gmCopy.timelineSub || "A running record, not a one-off event."
-                }
+                title={t.timelineTitle || "Sessions Timeline"}
+                sub={t.timelineSub || "A running record, not a one-off event."}
               />
 
               {/* Upcoming Sessions */}
@@ -2168,8 +2117,7 @@ export default function GoldenMonday() {
                     style={{ color: C.primary, fontSize: 16, marginBottom: 16 }}
                   >
                     <FiClock size={16} style={{ marginRight: 8 }} />
-                    {t("goldenMonday.upcomingSessionsHeader") ||
-                      "Upcoming Sessions"}
+                    {t.upcomingSessionsHeader || "Upcoming Sessions"}
                   </h3>
                   <div style={{ display: "grid", gap: 12 }}>
                     {upcomingSessions.map((session) => (
@@ -2193,7 +2141,7 @@ export default function GoldenMonday() {
                     style={{ color: C.muted, fontSize: 16, marginBottom: 16 }}
                   >
                     <FiStar size={16} style={{ marginRight: 8 }} />
-                    {t("goldenMonday.pastSessionsHeader") || "Past Sessions"}
+                    {t.pastSessionsHeader || "Past Sessions"}
                   </h3>
                   <div style={{ display: "grid", gap: 12 }}>
                     {pastSessions.slice(0, 10).map((session) => (
@@ -2218,7 +2166,7 @@ export default function GoldenMonday() {
                     padding: "40px 0",
                   }}
                 >
-                  {t("goldenMonday.noSessionsYet") ||
+                  {t.noSessionsYet ||
                     "No sessions recorded yet. Start by logging a session with AI!"}
                 </p>
               )}
@@ -2236,9 +2184,9 @@ export default function GoldenMonday() {
               >
                 <SectionHeading
                   eyebrow={<FiUsers size={14} />}
-                  title={t("employeeManagement.title") || "Employee Management"}
+                  title={t.adminPanelTitle || "Employee Management"}
                   sub={
-                    t("employeeManagement.subtitle") ||
+                    t.adminPanelSub ||
                     "Register and manage employees for Golden Monday rotation"
                   }
                 />
@@ -2261,9 +2209,8 @@ export default function GoldenMonday() {
                   >
                     <div>
                       <span style={{ fontWeight: 600, color: C.dark }}>
-                        {t("employeeManagement.totalEmployees") ||
-                          "Registered Employees"}
-                        : {employees.length}
+                        {t.registeredEmployeesLabel || "Registered Employees"}:{" "}
+                        {employees.length}
                       </span>
                     </div>
                     <button
@@ -2271,8 +2218,7 @@ export default function GoldenMonday() {
                       style={btnStyle(C.primary)}
                     >
                       <FiUserPlus size={14} />{" "}
-                      {t("employeeManagement.addEmployee") ||
-                        "Register Employee"}
+                      {t.registerEmployeeBtn || "Register Employee"}
                     </button>
                   </div>
 
@@ -2285,7 +2231,7 @@ export default function GoldenMonday() {
                           padding: "20px 0",
                         }}
                       >
-                        {t("employeeManagement.noEmployeesFound") ||
+                        {t.noEmployeesFound ||
                           'No employees registered yet. Click "Register Employee" to add.'}
                       </p>
                     ) : (
@@ -2352,12 +2298,10 @@ export default function GoldenMonday() {
                               </div>
                               <div style={{ fontSize: 12, color: C.muted }}>
                                 {emp.department ||
-                                  t("employeeManagement.noDepartment") ||
+                                  t.noDepartment ||
                                   "No department"}{" "}
                                 ·{" "}
-                                {emp.position ||
-                                  t("employeeManagement.noPosition") ||
-                                  "No position"}
+                                {emp.position || t.noPosition || "No position"}
                               </div>
                             </div>
                           </div>
@@ -2382,15 +2326,12 @@ export default function GoldenMonday() {
                               }}
                             >
                               {emp.isEligible
-                                ? t("employeeManagement.activeStatus") ||
-                                  "Active"
-                                : t("employeeManagement.inactiveStatus") ||
-                                  "Inactive"}
+                                ? t.activeLabel || "Active"
+                                : t.inactiveLabel || "Inactive"}
                             </span>
                             <span style={{ fontSize: 11, color: C.muted }}>
-                              {t("employeeManagement.timesPresented") ||
-                                "Presented"}
-                              : {emp.timesPresented || 0}x
+                              {t.presentedLabel || "Presented"}:{" "}
+                              {emp.timesPresented || 0}x
                             </span>
                             <button
                               onClick={() =>
@@ -2414,10 +2355,8 @@ export default function GoldenMonday() {
                                 <FiUserCheck size={12} />
                               )}
                               {emp.isEligible
-                                ? t("employeeManagement.deactivate") ||
-                                  "Deactivate"
-                                : t("employeeManagement.activate") ||
-                                  "Activate"}
+                                ? t.deactivateBtn || "Deactivate"
+                                : t.activateBtn || "Activate"}
                             </button>
                             {isSuperAdmin && (
                               <button
@@ -2431,7 +2370,7 @@ export default function GoldenMonday() {
                                 }}
                               >
                                 <FiTrash2 size={12} />
-                                {t("employeeManagement.remove") || "Remove"}
+                                {t.removeBtn || "Remove"}
                               </button>
                             )}
                           </div>
@@ -2494,7 +2433,6 @@ export default function GoldenMonday() {
             {selectedSessionId ? (
               <AttendancePanel
                 sessionId={selectedSessionId}
-                t={t}
                 onRefresh={refreshData}
               />
             ) : (
@@ -2523,7 +2461,6 @@ export default function GoldenMonday() {
             <GalleryGrid
               sessionId={selectedSessionId}
               onRefresh={refreshData}
-              t={t}
             />
           </div>
         )}
@@ -2531,7 +2468,7 @@ export default function GoldenMonday() {
         {/* ─── REPORTS TAB ─── */}
         {activeTab === "reports" && (
           <div>
-            <ReportExport sessionId={selectedSessionId} t={t} />
+            <ReportExport sessionId={selectedSessionId} />
           </div>
         )}
       </section>
@@ -2560,9 +2497,9 @@ export default function GoldenMonday() {
             <div style={{ flex: "1 1 320px" }}>
               <SectionHeading
                 eyebrow={<FiGrid size={14} />}
-                title={gmCopy.mesobTitle || "The platform this mindset built"}
+                title={t.mesobTitle || "The platform this mindset built"}
                 sub={
-                  gmCopy.mesobSub ||
+                  t.mesobSub ||
                   "MESOB is the organization's one-stop digital service platform — the same drive for less friction, applied to how citizens actually get things done."
                 }
                 dark
@@ -2585,7 +2522,7 @@ export default function GoldenMonday() {
                   transition: "transform 0.2s ease, box-shadow 0.2s ease",
                 }}
               >
-                {gmCopy.mesobCta || "Open Document Vault"}
+                {t.mesobCta || "Open Document Vault"}
                 <FiArrowRight size={16} />
               </a>
             </div>
@@ -2651,7 +2588,7 @@ export default function GoldenMonday() {
             margin: "0 0 8px",
           }}
         >
-          {gmCopy.closingTitle || "Start your week here"}
+          {t.closingTitle || "Start your week here"}
         </h3>
         <p
           style={{
@@ -2661,7 +2598,7 @@ export default function GoldenMonday() {
             margin: "0 auto",
           }}
         >
-          {gmCopy.closingBody ||
+          {t.closingBody ||
             "Golden Monday is a standing fixture — check back weekly for the next session's write-up."}
         </p>
       </section>

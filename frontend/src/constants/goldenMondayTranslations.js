@@ -23,8 +23,70 @@ export const goldenMondayTranslations = {
     loading: "Loading...",
     error: "Error",
     success: "Success",
+    optional: "optional",
 
-    // Rotation Panel
+    // Hero & Header
+    eyebrow: "Every Monday · 2:00 – 2:50",
+    title: "Golden Monday",
+    subtitle:
+      "The organization's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all.",
+    scroll: "Explore the story",
+
+    // Pillars
+    pillarsTitle: "Why a golden morning",
+    pillarsSub: "Three things every session comes back to.",
+    pillarResetTitle: "A weekly reset",
+    pillarResetBody:
+      "Every Monday morning, offices across the organization pause the routine for shared learning — a deliberate start to the work week instead of a rushed one.",
+    pillarPeerTitle: "Peer-led, not top-down",
+    pillarPeerBody:
+      "Sessions are usually carried by colleagues themselves — department heads, team leaders, and long-serving staff sharing real experience, not scripted lectures.",
+    pillarMultiTitle: "Built for multiskilling",
+    pillarMultiBody:
+      "The stated goal is to push every employee beyond a single fixed skill set — technology literacy, service standards, and adaptability all get airtime over time.",
+
+    // Timeline
+    timelineTitle: "Recent sessions",
+    timelineSub: "A running record, not a one-off event.",
+    upcomingSessionsHeader: "Upcoming Sessions",
+    pastSessionsHeader: "Past Sessions",
+    noSessionsYet:
+      "No sessions recorded yet. Start by logging a session with AI!",
+
+    // AI Studio
+    aiTitle: "AI session recap",
+    aiSub:
+      "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds.",
+    aiNewSession: "Log a new session",
+    aiFormTitle: "Session title",
+    aiFormOrg: "Organization",
+    aiFormSpeaker: "Speaker / facilitator",
+    aiFormDate: "Date",
+    aiFormNotes: "Raw notes — write it however you like, AI will clean it up",
+    aiGenerate: "Generate & save with AI",
+    aiGenerating: "Writing recap…",
+    aiCancel: "Cancel",
+    aiLive: "AI-generated",
+    aiTopicsTitle: "AI: suggest next topics",
+    aiTopicsBtn: "Suggest topics",
+    aiTopicsLoading: "Thinking of topics…",
+    aiTopicsEmpty:
+      "Log a couple of sessions first so AI has something to build on.",
+    aiError: "AI couldn't complete that — please try again in a moment.",
+    aiSaved: "Session saved with an AI-generated recap.",
+
+    // MESOB Platform
+    mesobTitle: "The platform this mindset built",
+    mesobSub:
+      "MESOB is the organization's one-stop digital service platform — the same drive for less friction, applied to how citizens actually get things done.",
+    mesobCta: "Open Document Vault",
+
+    // Closing
+    closingTitle: "Start your week here",
+    closingBody:
+      "Golden Monday is a standing fixture — check back weekly for the next session's write-up.",
+
+    // Rotation Panel (with additional keys)
     rotationTitle: "Presenter Rotation",
     thisWeekPresenter: "This week's presenter",
     titleNotChosen: "Title not chosen yet",
@@ -51,6 +113,49 @@ export const goldenMondayTranslations = {
     loadingRotation: "Loading rotation…",
     nobodyAssigned: "Nobody assigned yet for the coming Monday.",
     presenterAssigned: "Presenter assigned!",
+    alreadyAssigned: "This week's presenter is already assigned",
+    assignedNext: "assigned to present next",
+    assignError: "Failed to assign presenter",
+    titleSaved: "Presentation title saved",
+    titleSaveError: "Failed to save title",
+    titlePlaceholder: "e.g. Handling Difficult Citizen Requests",
+    presentationTitleLabel: "Presentation title",
+    presenting: "Presenting",
+    recordingUploaded: "Recording uploaded — visible to staff for 7 days",
+    recordingUploadError: "Failed to upload recording",
+    uploadRecordingFile: "Upload recording file",
+
+    // Session Card
+    untitledSession: "Untitled Session",
+    noPresenter: "No presenter",
+    upcomingBadge: "Upcoming",
+    watchLabel: "Watch",
+    aiSuggestedLabel: "AI Suggested:",
+    viewAiRecap: "View AI Recap",
+    upcoming: "Upcoming",
+
+    // Telegram
+    postingToTelegram: "Posting...",
+    postToTelegram: "Post to Telegram",
+    postedToTelegramToast: "Posted to Telegram successfully!",
+    failedPostTelegram: "Failed to post to Telegram",
+
+    // AI Studio toasts
+    titleNotesRequired: "Title and notes are required",
+    sessionSavedToast: "Session saved with AI recap!",
+    failedSaveSession: "Failed to save session",
+    failedSuggestTopics: "Failed to suggest topics",
+
+    // Signature Canvas
+    touchToSign: "Touch to sign",
+    clickToSign: "Click to sign",
+    clearSignature: "Clear signature",
+    typeNameToSign: "Or type your name to sign",
+    typeSignature: "Type your signature",
+    signatureRecorded: "✓ Signature recorded",
+    drawOrTypeSignature: "Draw or type your signature",
+    downloadPNG: "Download PNG",
+    signatureVerified: "✓ Signature verified",
 
     // Attendance
     attendanceTitle: "Attendance",
@@ -90,6 +195,7 @@ export const goldenMondayTranslations = {
     checkBackLater: "Check back later for photos",
     untitled: "Untitled",
     upload: "Upload",
+    delete: "Delete",
     deleteConfirm: "Delete this photo?",
     deleteSuccess: "Photo deleted",
     deleteError: "Failed to delete photo",
@@ -116,6 +222,47 @@ export const goldenMondayTranslations = {
     to: "to",
     startDate: "Start Date",
     endDate: "End Date",
+
+    // Admin Panel
+    adminPanelTitle: "Employee Management",
+    adminPanelSub: "Register and manage employees for Golden Monday rotation",
+    registeredEmployeesLabel: "Registered Employees:",
+    registerEmployeeBtn: "Register Employee",
+    activeLabel: "Active",
+    inactiveLabel: "Inactive",
+    presentedLabel: "Presented:",
+    deactivateBtn: "Deactivate",
+    activateBtn: "Activate",
+    failedUpdateEligibility: "Failed to update eligibility",
+
+    // Employee Registration Modal
+    registerEmployeeTitle: "Register Employee",
+    employeeLabel: "Employee *",
+    searchUserPlaceholder: "Search by name or email…",
+    noMatchingUsers: "No matching users",
+    departmentLabel: "Department",
+    departmentPlaceholder: "Department name",
+    positionLabel: "Position",
+    positionPlaceholder: "Job position",
+    profilePhotoLabel: "Profile Photo",
+    photoUploadHint:
+      "Upload a photo from your computer (JPG, PNG, GIF) - Max 5MB",
+    photoUrlLabel: "Photo URL (optional, or use upload above)",
+    photoUrlPlaceholder: "https://example.com/photo.jpg",
+    cancelBtn: "Cancel",
+    registerBtn: "Register Employee",
+    processingBtn: "Processing...",
+    removeBtn: "Remove",
+    photoTooLarge: "Photo must be less than 5MB",
+    failedLoadUsers: "Failed to load users",
+    selectEmployeeWarn: "Please select an employee",
+    employeeRegisteredToast: "Employee registered successfully!",
+    failedRegisterEmployee: "Failed to register employee",
+    confirmRemoveEmployee: "Remove this employee from rotation?",
+    employeeRemovedToast: "Employee removed",
+    failedRemoveEmployee: "Failed to remove employee",
+    employeeActivatedToast: "Employee activated",
+    employeeDeactivatedToast: "Employee deactivated",
   },
   am: {
     // Stats Dashboard
@@ -138,6 +285,65 @@ export const goldenMondayTranslations = {
     loading: "በመጫን ላይ...",
     error: "ስህተት",
     success: "ተሳክቷል",
+    optional: "አማራጭ",
+
+    // Hero & Header
+    eyebrow: "በየሳምንቱ ሰኞ · ከ2፡00 – 2፡50",
+    title: "ወርቃማ ሰኞ",
+    subtitle:
+      "የድርጅቱ ሳምንታዊ የጋራ ትምህርት ልማድ — እና አዲስ መሶብ ለምን እንደተቋቋመ የሚያሳይ አስተሳሰብ።",
+    scroll: "ታሪኩን ይመልከቱ",
+
+    // Pillars
+    pillarsTitle: "ወርቃማ ማለዳ ለምን አስፈለገ",
+    pillarsSub: "እያንዳንዱ መርሃ-ግብር የሚመለስባቸው ሶስት ነጥቦች።",
+    pillarResetTitle: "ሳምንታዊ ዳግም መነሳት",
+    pillarResetBody:
+      "በየሳምንቱ ሰኞ ጠዋት፣ በድርጅቱ ውስጥ ያሉ ቢሮዎች ለጋራ ትምህርት የወትሮውን ተግባር ያቋርጣሉ — የስራ ሳምንቱ በፍጥነት ሳይሆን በአስተዋይ ሁኔታ ይጀምራል።",
+    pillarPeerTitle: "በእኩዮች የሚመራ፣ ከላይ ወደ ታች አይደለም",
+    pillarPeerBody:
+      "መርሃ-ግብሮቹ ብዙውን ጊዜ የሚካሄዱት በራሱ ሰራተኞች ነው — የዘርፍ ኃላፊዎች፣ የቡድን መሪዎች እና የረጅም ጊዜ ሰራተኞች ከተሞክሮ የተገኘ እውቀት ያካፍላሉ፣ ከመጽሀፍ የተዘጋጁ ትምህርቶች አይደሉም።",
+    pillarMultiTitle: "ለብዙ ክህሎት የተገነባ",
+    pillarMultiBody:
+      "ዋናው ግብ እያንዳንዱን ሰራተኛ ከአንድ የተወሰነ ክህሎት ባሻገር ማሳደግ ነው — የቴክኖሎጂ እውቀት፣ የአገልግሎት ደረጃዎች እና መላመድ ሁሉም ጊዜያቸውን ያገኛሉ።",
+
+    // Timeline
+    timelineTitle: "የቅርብ ጊዜ መርሃ-ግብሮች",
+    timelineSub: "ቀጣይነት ያለው ልማድ እንጂ የአንድ ጊዜ ዝግጅት አይደለም።",
+    upcomingSessionsHeader: "መጪ መርሃ-ግብሮች",
+    pastSessionsHeader: "ያለፉ መርሃ-ግብሮች",
+    noSessionsYet: "እስካሁን ምንም መርሃ-ግብር አልተመዘገበም። በAI መርሃ-ግብር በመመዝገብ ይጀምሩ!",
+
+    // AI Studio
+    aiTitle: "በAI የተዘጋጀ ማጠቃለያ",
+    aiSub:
+      "መርሃ-ግብሩን በቀላል ማስታወሻ ይመዝግቡ — AI በሰከንዶች ውስጥ ወደ ጥራት ያለው ሁለት-ቋንቋ ማጠቃለያ ይቀይረዋል።",
+    aiNewSession: "አዲስ መርሃ-ግብር ይመዝግቡ",
+    aiFormTitle: "የመርሃ-ግብር ርዕስ",
+    aiFormOrg: "ተቋም",
+    aiFormSpeaker: "አቅራቢ / አስተባባሪ",
+    aiFormDate: "ቀን",
+    aiFormNotes: "ጥሬ ማስታወሻ — በፈለጉት መልኩ ይጻፉ፣ AI ያስተካክለዋል",
+    aiGenerate: "በAI ይፍጠሩና ያስቀምጡ",
+    aiGenerating: "ማጠቃለያ በመጻፍ ላይ…",
+    aiCancel: "ይቅር",
+    aiLive: "በAI የተዘጋጀ",
+    aiTopicsTitle: "AI፦ ቀጣይ ርዕሶችን ይጠቁም",
+    aiTopicsBtn: "ርዕሶችን ጠቁም",
+    aiTopicsLoading: "ርዕሶችን በማሰብ ላይ…",
+    aiTopicsEmpty: "AI እንዲመሰረትበት መጀመሪያ ጥቂት መርሃ-ግብሮችን ይመዝግቡ።",
+    aiError: "AI ጥያቄውን ማጠናቀቅ አልቻለም — እባክዎ ትንሽ ቆይተው ይሞክሩ።",
+    aiSaved: "መርሃ-ግብሩ በAI ማጠቃለያ ተመዝግቧል።",
+
+    // MESOB Platform
+    mesobTitle: "ይህ አስተሳሰብ የገነባው መድረክ",
+    mesobSub:
+      "መሶብ የድርጅቱ የአንድ ማዕከል ዲጂታል አገልግሎት መድረክ ነው — ተመሳሳይ ውጣ ውረድን የመቀነስ ጥረት፣ ዜጎች አገልግሎት እንዲያገኙ በሚያግዝ መልኩ የተተገበረ።",
+    mesobCta: "ሰነድ ቋት ይክፈቱ",
+
+    // Closing
+    closingTitle: "ሳምንትዎን ከዚህ ይጀምሩ",
+    closingBody: "ወርቃማ ሰኞ ቋሚ መርሃ-ግብር ነው — ለቀጣዩ መርሃ-ግብር ማጠቃለያ በየሳምንቱ ይመልከቱ።",
 
     // Rotation Panel
     rotationTitle: "አቅራቢ ሽክርክር",
@@ -165,6 +371,49 @@ export const goldenMondayTranslations = {
     loadingRotation: "ሽክርክሩን በማጫን ላይ…",
     nobodyAssigned: "ለመጪው ሰኞ አቅራቢ አልተመደበም።",
     presenterAssigned: "አቅራቢ ተመድቧል!",
+    alreadyAssigned: "የዚህ ሳምንት አቅራቢ ተመድቧል",
+    assignedNext: "ለማቅረብ ተመድቧል",
+    assignError: "አቅራቢ መሾም አልተቻለም",
+    titleSaved: "የዝግጅት ርዕስ ተቀምጧል",
+    titleSaveError: "ርዕስ ማስቀመጥ አልተቻለም",
+    titlePlaceholder: "ለምሳሌ የዜጎችን ጥያቄ አስተናገድ",
+    presentationTitleLabel: "የዝግጅት ርዕስ",
+    presenting: "በማቅረብ ላይ",
+    recordingUploaded: "ቅጂ ተስቀሏል — ለሰራተኞች ለ7 ቀናት ይታያል",
+    recordingUploadError: "ቅጂ ማስቀመጥ አልተቻለም",
+    uploadRecordingFile: "የቅጂ ፋይል ያስገቡ",
+
+    // Session Card
+    untitledSession: "ርዕስ የሌለው መርሃ-ግብር",
+    noPresenter: "አቅራቢ የለም",
+    upcomingBadge: "መጪ",
+    watchLabel: "ተመልከት",
+    aiSuggestedLabel: "በAI የተጠቆመ፦",
+    viewAiRecap: "የAI ማጠቃለያ ይመልከቱ",
+    upcoming: "መጪ",
+
+    // Telegram
+    postingToTelegram: "በመላክ ላይ...",
+    postToTelegram: "ወደ ቴሌግራም ላክ",
+    postedToTelegramToast: "ወደ ቴሌግራም በተሳካ ሁኔታ ተልኳል!",
+    failedPostTelegram: "ወደ ቴሌግራም መላክ አልተቻለም",
+
+    // AI Studio toasts
+    titleNotesRequired: "ርዕስ እና ማስታወሻ ያስፈልጋሉ",
+    sessionSavedToast: "መርሃ-ግብሩ በAI ማጠቃለያ ተመዝግቧል!",
+    failedSaveSession: "መርሃ-ግብሩን ማስቀመጥ አልተቻለም",
+    failedSuggestTopics: "ርዕሶችን መጠቆም አልተቻለም",
+
+    // Signature Canvas
+    touchToSign: "በመንካት ይፈረሙ",
+    clickToSign: "በመጫን ይፈረሙ",
+    clearSignature: "ፊርማ አጽዳ",
+    typeNameToSign: "ወይም ስምዎን በመተየብ ይፈረሙ",
+    typeSignature: "ፊርማዎን ይተይቡ",
+    signatureRecorded: "✓ ፊርማ ተመዝግቧል",
+    drawOrTypeSignature: "ፊርማዎን ይሳሉ ወይም ይተይቡ",
+    downloadPNG: "PNG ያውርዱ",
+    signatureVerified: "✓ ፊርማ ተረጋግጧል",
 
     // Attendance
     attendanceTitle: "መገኘት",
@@ -204,6 +453,7 @@ export const goldenMondayTranslations = {
     checkBackLater: "ለፎቶዎች በኋላ ይመለሱ",
     untitled: "ርዕስ የሌለው",
     upload: "አስገባ",
+    delete: "ሰርዝ",
     deleteConfirm: "ይህን ፎቶ መሰረዝ ይፈልጋሉ?",
     deleteSuccess: "ፎቶ ተሰርዟል",
     deleteError: "ፎቶ መሰረዝ አልተቻለም",
@@ -230,6 +480,46 @@ export const goldenMondayTranslations = {
     to: "እስከ",
     startDate: "መጀመሪያ ቀን",
     endDate: "መጨረሻ ቀን",
+
+    // Admin Panel
+    adminPanelTitle: "የሰራተኞች አስተዳደር",
+    adminPanelSub: "ለወርቃማ ሰኞ ሽክርክር ሰራተኞችን ይመዝግቡ እና ያስተዳድሩ",
+    registeredEmployeesLabel: "የተመዘገቡ ሰራተኞች፦",
+    registerEmployeeBtn: "ሰራተኛ መዝግብ",
+    activeLabel: "ንቁ",
+    inactiveLabel: "ያልነቃ",
+    presentedLabel: "ያቀረቡ፦",
+    deactivateBtn: "አቦዝን",
+    activateBtn: "አንቃ",
+    failedUpdateEligibility: "ብቁነት ማዘመን አልተቻለም",
+
+    // Employee Registration Modal
+    registerEmployeeTitle: "ሰራተኛ መዝግብ",
+    employeeLabel: "ሰራተኛ *",
+    searchUserPlaceholder: "በስም ወይም በኢሜል ይፈልጉ…",
+    noMatchingUsers: "ምንም ተዛማጅ ተጠቃሚ የለም",
+    departmentLabel: "ዘርፍ",
+    departmentPlaceholder: "የዘርፍ ስም",
+    positionLabel: "ኃላፊነት",
+    positionPlaceholder: "የስራ መደብ",
+    profilePhotoLabel: "የመገለጫ ፎቶ",
+    photoUploadHint: "ከኮምፒዩተርዎ ፎቶ ይስቀሉ (JPG, PNG, GIF) - ከፍተኛ 5MB",
+    photoUrlLabel: "የፎቶ አድራሻ (አማራጭ፣ ወይም ከላይ ያለውን ስቀላ ይጠቀሙ)",
+    photoUrlPlaceholder: "https://example.com/photo.jpg",
+    cancelBtn: "ይቅር",
+    registerBtn: "ሰራተኛ መዝግብ",
+    processingBtn: "በሂደት ላይ...",
+    removeBtn: "አስወግድ",
+    photoTooLarge: "ፎቶ ከ5MB በታች መሆን አለበት",
+    failedLoadUsers: "ተጠቃሚዎችን መጫን አልተቻለም",
+    selectEmployeeWarn: "እባክዎ ሰራተኛ ይምረጡ",
+    employeeRegisteredToast: "ሰራተኛ በተሳካ ሁኔታ ተመዝግቧል!",
+    failedRegisterEmployee: "ሰራተኛ መመዝገብ አልተቻለም",
+    confirmRemoveEmployee: "ይህን ሰራተኛ ከሽክርክር ማስወገድ ይፈልጋሉ?",
+    employeeRemovedToast: "ሰራተኛ ተወግዷል",
+    failedRemoveEmployee: "ሰራተኛ ማስወገድ አልተቻለም",
+    employeeActivatedToast: "ሰራተኛ ነቅቷል",
+    employeeDeactivatedToast: "ሰራተኛ ታግዷል",
   },
   om: {
     // Stats Dashboard
@@ -252,6 +542,67 @@ export const goldenMondayTranslations = {
     loading: "Fe'amaa jira...",
     error: "Dogoggora",
     success: "Milkiin",
+    optional: "filannoo",
+
+    // Hero & Header
+    eyebrow: "Wiixata hundaa · 2:00 – 2:50",
+    title: "Wiixata Warqee",
+    subtitle:
+      "Aadaa torbanii waliin barachuuf dhaabbilee — fi filooftuu Addis MESOB maaliif akka jiraatu.",
+    scroll: "Akeekkachiisa ilaali",
+
+    // Pillars
+    pillarsTitle: "Wiixata warqee maaliif",
+    pillarsSub: "Waan walga'ii hundi itti deebi'u sadan.",
+    pillarResetTitle: "Torbanii haaraa bu'uura",
+    pillarResetBody:
+      "Guyyaa wiixata ganama hunda, biiroowwan dhaabbilee keessatti sochii yeroo barachuuf ni addaan kutu — jalqaba itti yaadame kan torbanii hojii.",
+    pillarPeerTitle: "Hiriyaan durfama, gubbaa gaditti miti",
+    pillarPeerBody:
+      "Walga'iin yeroo baay'ee hiriyaan ofii isaanii — hoogganaa kutaa, hoogganaa garee, fi hojjattoota yeroo dheeraa, muuxannoo dhugaa qoodu, utuu hin taane barsiisa qophaa'e.",
+    pillarMultiTitle: "Dandeettii hedduutiif ijaarame",
+    pillarMultiBody:
+      "Kaayyoon ibsame hojjetaa tokkoon tokkoo dandeettii tokkoo ol isa dabarsuu — ogummaa teeknoolojii, sadarkaa tajaajila, fi mirkanaa'uu yeroo hundaaf bakka kenname.",
+
+    // Timeline
+    timelineTitle: "Walga'iiwwan Dhiyoo",
+    timelineSub: "Galmeen itti fufuu, utuu hin taane waan yeroo tokkoo.",
+    upcomingSessionsHeader: "Walga'iiwwan Dhufaa Jiran",
+    pastSessionsHeader: "Walga'iiwwan Darban",
+    noSessionsYet:
+      "Hanga ammaatti walga'iin hin galmoofne. AI'n walga'ii galmeessuun jalqabi!",
+
+    // AI Studio
+    aiTitle: "Ibsa walga'ii AI",
+    aiSub:
+      "Walga'ii yaadannoo qabxii galchi — AI saniitiin ibsa lama afaan ta'e qopheessa.",
+    aiNewSession: "Walga'ii haaraa galchi",
+    aiFormTitle: "Mataduree walga'ii",
+    aiFormOrg: "Dhaabbata",
+    aiFormSpeaker: "Dubbisu / Qopheessituu",
+    aiFormDate: "Guyyaa",
+    aiFormNotes: "Yaadannoo — akka barbaaddu barreessi, AI ni fooyyessa",
+    aiGenerate: "AI qopheessi fi olkaayi",
+    aiGenerating: "Ibsa barreessaa jira…",
+    aiCancel: "Haqi",
+    aiLive: "AI-qopheessuu",
+    aiTopicsTitle: "AI: matadureewwan itti aanu",
+    aiTopicsBtn: "Matadureewwan",
+    aiTopicsLoading: "Mataduree irratti yaadaa jira…",
+    aiTopicsEmpty: "AI irratti hundaa'uuf walga'ii muraasa dura galchi.",
+    aiError: "AI xumuruu hin dandeenye — maaloo yeroo xinnoo booda yaali.",
+    aiSaved: "Walga'iin ibsa AI qopheessaan galmeeffame.",
+
+    // MESOB Platform
+    mesobTitle: "Bu'uura gochima kanaan",
+    mesobSub:
+      "MESOB buufata tajaajila dijitaalaa bakka tokkoo kan dhaabbilee — yaada dadhabbii hir'isu, akka lammiin tajaajila argatan.",
+    mesobCta: "Kuusaa Dookumantii Bani",
+
+    // Closing
+    closingTitle: "Torban keessan as eegaluu",
+    closingBody:
+      "Wiixata Warqee waan dhaabbataa — ibsa walga'ii itti aanuu torbaniin ilaalaa.",
 
     // Rotation Panel
     rotationTitle: "Naanna'iinsa Dhiheessituu",
@@ -280,6 +631,50 @@ export const goldenMondayTranslations = {
     loadingRotation: "Naanna'iinsa fe'aa jira…",
     nobodyAssigned: "Wiixata dhufuuf dhiheessituun hin ramadne.",
     presenterAssigned: "Dhiheessituun ramadame!",
+    alreadyAssigned: "Dhiheessituun torban kanaa ramadameera",
+    assignedNext: "dhiheessuuf ramadame",
+    assignError: "Dhiheessituu ramachuun hin dandeenye",
+    titleSaved: "Matadureen dhiheessaa olkaayame",
+    titleSaveError: "Mataduree olkaa'uun hin dandeenye",
+    titlePlaceholder: "Fakkeenyaaf, Gaaffii Lammii iddoo to'achuu",
+    presentationTitleLabel: "Mataduree dhiheessaa",
+    presenting: "Dhiheessaa jira",
+    recordingUploaded: "Waraabbiin fe'ame — hojjattootaaf guyyaa 7 hafa",
+    recordingUploadError: "Waraabbiisa fe'uun hin dandeenye",
+    uploadRecordingFile: "Faayilii waraabbiisa fe'i",
+
+    // Session Card
+    untitledSession: "Walga'ii Mataduree Hin Qabne",
+    noPresenter: "Dhiheessituun hin jiru",
+    upcomingBadge: "Dhufaa jiru",
+    watchLabel: "Ilaali",
+    aiSuggestedLabel: "AI-n Yaadame:",
+    viewAiRecap: "Ibsa AI Ilaali",
+    upcoming: "Dhufaa jiru",
+
+    // Telegram
+    postingToTelegram: "Ergaa jira...",
+    postToTelegram: "Telegiraamitti Ergi",
+    postedToTelegramToast: "Milkiin Telegiraamitti ergame!",
+    failedPostTelegram: "Telegiraamitti ergu hin dandeenye",
+
+    // AI Studio toasts
+    titleNotesRequired: "Mataduree fi yaadannoo barbaachisa",
+    sessionSavedToast: "Walga'iin ibsa AI qopheessaan galmeeffame!",
+    failedSaveSession: "Walga'ii olkaa'uun hin dandeenye",
+    failedSuggestTopics: "Mataduree yaaduun hin dandeenye",
+
+    // Signature Canvas
+    touchToSign: "Tuquun mallatteessi",
+    clickToSign: "Cuqaasuun mallatteessi",
+    clearSignature: "Mallattoo haqi",
+    typeNameToSign: "Ykn maqaa keessan barreessaadhaan mallatteessi",
+    typeSignature: "Mallattoo keessan barreessi",
+    signatureRecorded: "✓ Mallattoon galmeeffame",
+    drawOrTypeSignature:
+      "Mallattoo keessan suubaadhaan ykn barreessaadhaan kaa'i",
+    downloadPNG: "PNG Buussi",
+    signatureVerified: "✓ Mallattoon mirkanaa'e",
 
     // Attendance
     attendanceTitle: "Argama",
@@ -320,6 +715,7 @@ export const goldenMondayTranslations = {
     checkBackLater: "Suurawwaniif yeroo booda deebi'i",
     untitled: "Mataduree hin qabne",
     upload: "Fe'i",
+    delete: "Haqi",
     deleteConfirm: "Suuraa kana haquu barbaaddaa?",
     deleteSuccess: "Suuraan haqame",
     deleteError: "Suuraa haquun hin dandeenye",
@@ -346,5 +742,49 @@ export const goldenMondayTranslations = {
     to: "hanga",
     startDate: "Guyyaa Jalqabaa",
     endDate: "Guyyaa Xumuraa",
+
+    // Admin Panel
+    adminPanelTitle: "Bulchiinsa Hojjattootaa",
+    adminPanelSub:
+      "Naanna'iinsa Wiixata Warqee tiif hojjattoota galmeessi fi bulchi",
+    registeredEmployeesLabel: "Hojjattoota Galmaa'an:",
+    registerEmployeeBtn: "Hojjataa Galmeessi",
+    activeLabel: "Aktiivii",
+    inactiveLabel: "Aktiivii hin taane",
+    presentedLabel: "Dhiheessan:",
+    deactivateBtn: "Dhaamsi",
+    activateBtn: "Kaa'i",
+    failedUpdateEligibility: "Ulaagaa haaromsuun hin dandeenye",
+
+    // Employee Registration Modal
+    registerEmployeeTitle: "Hojjataa Galmeessi",
+    employeeLabel: "Hojjataa *",
+    searchUserPlaceholder: "Maqaa ykn imeelii barbaadi…",
+    noMatchingUsers: "Fayyadamaan walsimu hin jiru",
+    departmentLabel: "Kutaa",
+    departmentPlaceholder: "Maqaa kutaa",
+    positionLabel: "Galma",
+    positionPlaceholder: "Sadarkaa hojii",
+    profilePhotoLabel: "Suuraa Piroofaayilii",
+    photoUploadHint:
+      "Kompiitara keessan irraa suuraa fe'aa (JPG, PNG, GIF) - Hamma 5MB",
+    photoUrlLabel:
+      "Teessoo Suuraa (filannoo, ykn fe'iinsa armaan olii fayyadami)",
+    photoUrlPlaceholder: "https://example.com/photo.jpg",
+    cancelBtn: "Haqi",
+    registerBtn: "Hojjataa Galmeessi",
+    processingBtn: "Adeemsisaa jira...",
+    removeBtn: "Balleessi",
+    photoTooLarge: "Suuraan MB 5 gadi ta'uu qaba",
+    failedLoadUsers: "Fayyadamtoota fe'uun hin dandeenye",
+    selectEmployeeWarn: "Maaloo hojjataa filadhu",
+    employeeRegisteredToast: "Hojjataan milkiin galmeeffame!",
+    failedRegisterEmployee: "Hojjataa galmeessuun hin dandeenye",
+    confirmRemoveEmployee:
+      "Hojjataa kana naanna'iinsaa irraa balleessuu barbaaddaa?",
+    employeeRemovedToast: "Hojjataan balleeffame",
+    failedRemoveEmployee: "Hojjataa balleessuun hin dandeenye",
+    employeeActivatedToast: "Hojjataan kaa'ameera",
+    employeeDeactivatedToast: "Hojjataan dhaamsameera",
   },
 };
