@@ -86,14 +86,16 @@ const stableHashUnit = (str) => {
 // ============================================================
 // Score a single candidate for a given target week.
 // ============================================================
-// NEW: Enhanced scoring with onboarding priority
+// Enhanced scoring with onboarding priority for new employees
 const scoreCandidate = (presenter, weekOf, rosterAvgPresented) => {
   const daysSinceLast = presenter.lastPresentedAt
     ? Math.floor(
         (weekOf.getTime() - new Date(presenter.lastPresentedAt).getTime()) /
           (1000 * 60 * 60 * 24),
       )
-    : 0;
+    : NEVER_PRESENTED_DAYS;
+
+  const frequencyGap = rosterAvgPresented - (presenter.timesPresented || 0);
 
   // 🆕 Onboarding Priority - NEW employees get higher priority
   const daysSinceRegistration = presenter.registeredAt
@@ -103,12 +105,7 @@ const scoreCandidate = (presenter, weekOf, rosterAvgPresented) => {
       )
     : 0;
 
-  // 🆕 Department quota - ensure fair distribution
-  const departmentGap = departmentDistribution[presenter.department] || 0;
-
-  const frequencyGap = rosterAvgPresented - (presenter.timesPresented || 0);
-
-  // 🆕 Registration bonus - NEW employees get priority
+  // 🆕 Registration bonus - NEW employees get priority (max 30 bonus days)
   const registrationBonus =
     presenter.timesPresented === 0
       ? Math.min(daysSinceRegistration * 0.5, 30) // Max 30 bonus days
@@ -119,8 +116,7 @@ const scoreCandidate = (presenter, weekOf, rosterAvgPresented) => {
     W_FREQUENCY * frequencyGap +
     W_SKIPPED * (presenter.timesSkipped || 0) +
     registrationBonus + // 🆕 Registration priority
-    departmentGap + // 🆕 Department fairness
-    stableHashUnit(`${presenter.user}-${weekOf.toISOString()}`);
+    stableHashUnit(`${presenter.user}-${weekOf.toISOString()}`); // tie-break
 
   return { presenter, score, daysSinceLast };
 };
@@ -141,20 +137,39 @@ const getEligibleRoster = async () => {
 // Used by the dashboard to show "next up" and the reasoning behind it.
 // ============================================================
 const computeRanking = async (weekOf = nextMondayFrom()) => {
-  const roster = await getEligibleRoster();
-  if (roster.length === 0) return { ranking: [], weekOf };
+  try {
+    const roster = await getEligibleRoster();
+    if (!roster || roster.length === 0) {
+      return { ranking: [], weekOf, rosterAvgPresented: 0 };
+    }
 
-  const totalPresented = roster.reduce(
-    (sum, p) => sum + (p.timesPresented || 0),
-    0,
-  );
-  const rosterAvgPresented = totalPresented / roster.length;
+    const totalPresented = roster.reduce(
+      (sum, p) => sum + (p.timesPresented || 0),
+      0,
+    );
+    const rosterAvgPresented = totalPresented / roster.length;
 
-  const ranking = roster
-    .map((p) => scoreCandidate(p, weekOf, rosterAvgPresented))
-    .sort((a, b) => b.score - a.score);
+    const ranking = roster
+      .map((p) => {
+        try {
+          return scoreCandidate(p, weekOf, rosterAvgPresented);
+        } catch (err) {
+          console.error(
+            "Error scoring candidate:",
+            p?.name || "unknown",
+            err.message,
+          );
+          return null;
+        }
+      })
+      .filter(Boolean) // Remove any null entries
+      .sort((a, b) => b.score - a.score);
 
-  return { ranking, weekOf, rosterAvgPresented };
+    return { ranking, weekOf, rosterAvgPresented };
+  } catch (error) {
+    console.error("Error in computeRanking:", error);
+    return { ranking: [], weekOf, rosterAvgPresented: 0 };
+  }
 };
 
 // ============================================================
