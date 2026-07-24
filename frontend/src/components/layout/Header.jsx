@@ -3,15 +3,9 @@ import { C, F } from "../../styles/theme";
 import { LANGUAGES } from "../../constants/translations";
 import { useAuth } from "../../hooks/useAuth";
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import {
-  FiHome,
-  FiMessageSquare,
-  FiStar,
-  FiFileText,
   FiGrid,
-  FiUsers,
-  FiBarChart2,
   FiLogOut,
   FiCalendar,
   FiChevronRight,
@@ -25,14 +19,19 @@ import {
   FiUserPlus,
   FiCheck,
   FiChevronUp,
-  FiX,
-  FiMenu,
+  FiUsers,
+  FiHome,
+  FiMessageSquare,
+  FiStar,
+  FiFileText,
+  FiSunrise,
+  FiBarChart2,
 } from "react-icons/fi";
 
 export default function Header({ t, lang, setLang, onAddUserClick }) {
-  const navigate = useNavigate();
   const location = useLocation();
 
+  // ── Icons Map for Breadcrumb ──
   const icons = {
     dashboard: <FiHome size={18} />,
     forum: <FiMessageSquare size={18} />,
@@ -42,10 +41,21 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     users: <FiUsers size={18} />,
     teams: <FiUsers size={18} />,
     analytics: <FiBarChart2 size={18} />,
-    "golden-monday": <FiCalendar size={18} />,
+    "golden-monday": <FiSunrise size={18} />,
     employees: <FiUsers size={18} />,
+    "admin/services": <FiGrid size={18} />,
+    "digital-attendance": <FiGrid size={18} />,
+    "admin-attendance": <FiGrid size={18} />,
+    "admin-digital-attendance": <FiGrid size={18} />,
+    "admin-alerts": <FiGrid size={18} />,
+    "admin-evaluations": <FiStar size={18} />,
+    "admin-daily-reports": <FiFileText size={18} />,
+    "admin-forum-reports": <FiMessageSquare size={18} />,
+    "admin-requests": <FiGrid size={18} />,
+    documents: <FiFileText size={18} />,
   };
 
+  // ── Display Names for Breadcrumb ──
   const displayNames = {
     dashboard: "Dashboard",
     forum: "Peer Forum",
@@ -59,38 +69,56 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     documents: "Document Vault",
     "golden-monday": "Golden Monday",
     employees: "Employee Management",
+    "digital-attendance": "Digital Attendance",
+    "admin-attendance": "Attendance",
+    "admin-digital-attendance": "Digital Attendance",
+    "admin-alerts": "Alerts",
+    "admin-evaluations": "Evaluations",
+    "admin-daily-reports": "Daily Reports",
+    "admin-forum-reports": "Forum Reports",
+    "admin-requests": "Requests",
   };
 
+  // ── Auth ──
   const { logout, user, isAdmin, isSuperAdmin, isLeader, isEmployee } =
     useAuth();
+
+  // ── State ──
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // ── Refs ──
   const dropdownRef = useRef(null);
   const langDropdownRef = useRef(null);
-  const mobileMenuRef = useRef(null);
 
-  // Get current tab from location
+  // ── Get Current Tab from Location ──
   const currentTab = useMemo(() => {
     const path = location.pathname;
-    console.log("📍 Current path:", path); // ✅ Add this
-    let tab = "dashboard";
-    if (path === "/" || path === "/dashboard") tab = "dashboard";
-    else if (path.startsWith("/forum")) tab = "forum";
-    else if (path.startsWith("/evaluations")) tab = "evaluation";
-    else if (path.startsWith("/daily-reports")) tab = "report";
-    else if (path.startsWith("/services")) tab = "services";
-    else if (path.startsWith("/analytics")) tab = "analytics";
-    else if (path.startsWith("/users")) tab = "users";
-    else if (path.startsWith("/teams")) tab = "teams";
-    else if (path.startsWith("/admin/services")) tab = "admin/services";
-    else if (path.startsWith("/documents")) tab = "documents";
-    else if (path.startsWith("/golden-monday")) tab = "golden-monday";
-    else if (path.startsWith("/employees")) tab = "employees";
-    console.log("✅ Current tab:", tab); // ✅ Add this
-    return tab;
+    if (path === "/" || path === "/dashboard") return "dashboard";
+    if (path.startsWith("/forum")) return "forum";
+    if (path.startsWith("/evaluations")) return "evaluation";
+    if (path.startsWith("/daily-reports")) return "report";
+    if (path.startsWith("/services")) return "services";
+    if (path.startsWith("/analytics")) return "analytics";
+    if (path.startsWith("/users")) return "users";
+    if (path.startsWith("/teams")) return "teams";
+    if (path.startsWith("/admin/services")) return "admin/services";
+    if (path.startsWith("/documents")) return "documents";
+    if (path.startsWith("/golden-monday")) return "golden-monday";
+    if (path.startsWith("/employees")) return "employees";
+    if (path.startsWith("/digital-attendance")) return "digital-attendance";
+    if (path.startsWith("/admin/attendance")) return "admin-attendance";
+    if (path.startsWith("/admin/digital-attendance"))
+      return "admin-digital-attendance";
+    if (path.startsWith("/admin/alerts")) return "admin-alerts";
+    if (path.startsWith("/admin/evaluations")) return "admin-evaluations";
+    if (path.startsWith("/admin/daily-reports")) return "admin-daily-reports";
+    if (path.startsWith("/admin/forum-reports")) return "admin-forum-reports";
+    if (path.startsWith("/admin/requests")) return "admin-requests";
+    return "dashboard";
   }, [location.pathname]);
 
+  // ── Click Outside Handler ──
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -102,17 +130,12 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
       ) {
         setIsLangDropdownOpen(false);
       }
-      if (
-        mobileMenuRef.current &&
-        !mobileMenuRef.current.contains(event.target)
-      ) {
-        setIsMobileMenuOpen(false);
-      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // ─── Date ──
   const dateStr = useMemo(() => {
     const now = new Date();
     return now.toLocaleDateString("en-GB", {
@@ -123,6 +146,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     });
   }, []);
 
+  // ── Translations ──
   const safeT = t || {};
   const safeNav = safeT.nav || {};
   const safeAppName = safeT.appName || "A-MESOB";
@@ -130,10 +154,8 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
   const tabLabel =
     safeNav[currentTab] || displayNames[currentTab] || currentTab;
 
-  const getUserProfilePhoto = () => {
-    return user?.profilePhotoUrl || null;
-  };
-
+  // ── User Helpers ──
+  const getUserProfilePhoto = () => user?.profilePhotoUrl || null;
   const getUserInitials = () => {
     if (!user?.name) return "U";
     return user.name
@@ -166,114 +188,18 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     return "#10b981";
   };
 
-  const toggleDropdown = () => {
-    setIsDropdownOpen(!isDropdownOpen);
-  };
-
-  const toggleLangDropdown = () => {
-    setIsLangDropdownOpen(!isLangDropdownOpen);
-  };
-
-  const toggleMobileMenu = () => {
-    setIsMobileMenuOpen(!isMobileMenuOpen);
-  };
-
+  // ── Toggles ──
+  const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
+  const toggleLangDropdown = () => setIsLangDropdownOpen(!isLangDropdownOpen);
   const handleLangSelect = (code) => {
     setLang(code);
     setIsLangDropdownOpen(false);
   };
 
+  // ── Derived ──
   const userProfilePhoto = getUserProfilePhoto();
   const canAddUsers = isAdmin || isSuperAdmin;
-
   const currentLang = LANGUAGES.find((l) => l.code === lang) || LANGUAGES[0];
-
-  // Navigation items based on role
-  // Navigation items based on role
-  const navItems = useMemo(() => {
-    const items = [];
-
-    // Everyone can see Dashboard
-    items.push({
-      key: "dashboard",
-      label: "Dashboard",
-      path: "/dashboard",
-      icon: <FiHome size={16} />,
-    });
-
-    // All authenticated users
-    items.push({
-      key: "forum",
-      label: "Peer Forum",
-      path: "/forum",
-      icon: <FiMessageSquare size={16} />,
-    });
-    items.push({
-      key: "evaluation",
-      label: "Evaluation",
-      path: "/evaluations",
-      icon: <FiStar size={16} />,
-    });
-    items.push({
-      key: "report",
-      label: "Daily Report",
-      path: "/daily-reports",
-      icon: <FiFileText size={16} />,
-    });
-
-    // ✅ SERVICES - ALWAYS INCLUDED
-    items.push({
-      key: "services",
-      label: "Services",
-      path: "/services",
-      icon: <FiGrid size={16} />,
-    });
-
-    items.push({
-      key: "golden-monday",
-      label: "Golden Monday",
-      path: "/golden-monday",
-      icon: <FiCalendar size={16} />,
-    });
-
-    // Leaders and above
-    if (isLeader || isAdmin || isSuperAdmin) {
-      items.push({
-        key: "employees",
-        label: "Employees",
-        path: "/employees",
-        icon: <FiUsers size={16} />,
-      });
-      items.push({
-        key: "teams",
-        label: "Teams",
-        path: "/teams",
-        icon: <FiUsers size={16} />,
-      });
-    }
-
-    // Admins and SuperAdmins
-    if (isAdmin || isSuperAdmin) {
-      items.push({
-        key: "users",
-        label: "User Management",
-        path: "/users",
-        icon: <FiUser size={16} />,
-      });
-    }
-
-    // SuperAdmins only
-    if (isSuperAdmin) {
-      items.push({
-        key: "admin/services",
-        label: "Service Manager",
-        path: "/admin/services",
-        icon: <FiGrid size={16} />,
-      });
-    }
-
-    return items;
-  }, [isLeader, isAdmin, isSuperAdmin]);
 
   return (
     <>
@@ -297,7 +223,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
           overflow: "visible",
         }}
       >
-        {/* LEFT SECTION - Logo + Breadcrumb */}
+        {/* ── LEFT SECTION - Logo + Breadcrumb ── */}
         <div
           style={{
             display: "flex",
@@ -308,23 +234,6 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
             overflow: "hidden",
           }}
         >
-          {/* Mobile Menu Toggle */}
-          <button
-            onClick={toggleMobileMenu}
-            style={{
-              display: "none",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              padding: "4px",
-              color: C.dark,
-              flexShrink: 0,
-            }}
-            className="mobile-menu-toggle"
-          >
-            {isMobileMenuOpen ? <FiX size={20} /> : <FiMenu size={20} />}
-          </button>
-
           <span
             style={{
               fontSize: "clamp(14px, 2.5vw, 18px)",
@@ -389,64 +298,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
           </span>
         </div>
 
-        {/* DESKTOP NAVIGATION */}
-        <div
-          className="desktop-nav"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "clamp(4px, 1.2vw, 16px)",
-            flexShrink: 0,
-            overflow: "visible",
-          }}
-        >
-          {navItems.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => navigate(item.path)}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-                background: currentTab === item.key ? C.primary : "transparent",
-                color: currentTab === item.key ? "#fff" : C.muted,
-                border: "none",
-                borderRadius: 8,
-                padding: "clamp(4px, 1.2vh, 8px) clamp(6px, 1.5vw, 14px)",
-                fontSize: "clamp(10px, 1.8vw, 12px)",
-                fontWeight: currentTab === item.key ? 700 : 500,
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-                fontFamily: F.sans,
-                whiteSpace: "nowrap",
-                boxShadow:
-                  currentTab === item.key
-                    ? `0 4px 12px ${C.primary}44`
-                    : "none",
-                transform: currentTab === item.key ? "scale(1.02)" : "scale(1)",
-              }}
-              onMouseEnter={(e) => {
-                if (currentTab !== item.key) {
-                  e.currentTarget.style.background = C.bg;
-                  e.currentTarget.style.color = C.dark;
-                  e.currentTarget.style.transform = "scale(1.05)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (currentTab !== item.key) {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = C.muted;
-                  e.currentTarget.style.transform = "scale(1)";
-                }
-              }}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        {/* RIGHT SECTION - Language & User */}
+        {/* ── RIGHT SECTION - Date, Language & User ── */}
         <div
           style={{
             display: "flex",
@@ -456,7 +308,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
             flexWrap: "nowrap",
           }}
         >
-          {/* Date */}
+          {/* ── Date ── */}
           <span
             className="header-date"
             style={{
@@ -475,11 +327,12 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
             {dateStr}
           </span>
 
-          {/* Language Selector */}
+          {/* ── Language Selector ── */}
           <div
             ref={langDropdownRef}
             style={{ position: "relative", flexShrink: 0 }}
           >
+            {/* Desktop: All language buttons */}
             <div
               className="lang-desktop"
               style={{ display: "flex", gap: "clamp(1px, 0.8vw, 4px)" }}
@@ -519,6 +372,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
               ))}
             </div>
 
+            {/* Mobile: Language dropdown button */}
             <button
               className="lang-mobile"
               onClick={toggleLangDropdown}
@@ -571,6 +425,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
               )}
             </button>
 
+            {/* Language Dropdown Menu */}
             {isLangDropdownOpen && (
               <div
                 style={{
@@ -657,7 +512,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
             )}
           </div>
 
-          {/* User Avatar */}
+          {/* ── User Avatar with Dropdown ── */}
           <div
             ref={dropdownRef}
             style={{ position: "relative", flexShrink: 0 }}
@@ -727,6 +582,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
               />
             </div>
 
+            {/* User Dropdown Menu */}
             {isDropdownOpen && (
               <div
                 style={{
@@ -835,6 +691,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
                   </div>
                 </div>
 
+                {/* Menu Items */}
                 <div style={{ padding: "4px 0" }}>
                   <div
                     style={{
@@ -851,7 +708,8 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
-                      navigate("/profile");
+                      // Navigate to profile
+                      window.location.href = "/profile";
                     }}
                     style={{
                       display: "flex",
@@ -874,7 +732,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
-                      navigate("/settings");
+                      window.location.href = "/settings";
                     }}
                     style={{
                       display: "flex",
@@ -940,7 +798,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
                       <button
                         onClick={() => {
                           setIsDropdownOpen(false);
-                          navigate("/users");
+                          window.location.href = "/users";
                         }}
                         style={{
                           display: "flex",
@@ -972,6 +830,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
                   }}
                 />
 
+                {/* Logout */}
                 <div style={{ padding: "4px 14px 8px" }}>
                   <button
                     onClick={() => {
@@ -1005,77 +864,6 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
         </div>
       </header>
 
-      {/* MOBILE NAVIGATION MENU */}
-      {isMobileMenuOpen && (
-        <div
-          ref={mobileMenuRef}
-          style={{
-            position: "fixed",
-            top: "clamp(44px, 7vh, 52px)",
-            left: 0,
-            right: 0,
-            background: C.white,
-            borderBottom: `2px solid ${C.border}`,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
-            zIndex: 39,
-            padding: "8px 16px 16px",
-            animation: "slideDown 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-            maxHeight: "calc(100vh - 60px)",
-            overflowY: "auto",
-          }}
-        >
-          {navItems.map((item) => (
-            <button
-              key={item.key}
-              onClick={() => {
-                navigate(item.path);
-                setIsMobileMenuOpen(false);
-              }}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 12px",
-                width: "100%",
-                border: "none",
-                borderRadius: 8,
-                background:
-                  currentTab === item.key ? `${C.primary}11` : "transparent",
-                color: currentTab === item.key ? C.primary : C.dark,
-                cursor: "pointer",
-                fontSize: 13,
-                fontWeight: currentTab === item.key ? 600 : 400,
-                transition: "all 0.2s ease",
-                fontFamily: F.sans,
-                margin: "2px 0",
-              }}
-              onMouseEnter={(e) => {
-                if (currentTab !== item.key) {
-                  e.currentTarget.style.background = C.bg;
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (currentTab !== item.key) {
-                  e.currentTarget.style.background = "transparent";
-                }
-              }}
-            >
-              <span
-                style={{ color: currentTab === item.key ? C.primary : C.muted }}
-              >
-                {item.icon}
-              </span>
-              {item.label}
-              {currentTab === item.key && (
-                <span style={{ marginLeft: "auto", color: C.primary }}>
-                  <FiCheck size={14} />
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-
       <style>{`
         @keyframes slideDown {
           from {
@@ -1102,8 +890,6 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
         @media (min-width: 769px) {
           .lang-mobile { display: none !important; }
           .lang-desktop { display: flex !important; }
-          .desktop-nav { display: flex !important; }
-          .mobile-menu-toggle { display: none !important; }
           .header-date { display: inline-flex !important; }
           .header-appname { display: inline-flex !important; }
         }
@@ -1112,8 +898,6 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
         @media (min-width: 641px) and (max-width: 768px) {
           .lang-mobile { display: flex !important; }
           .lang-desktop { display: none !important; }
-          .desktop-nav { display: none !important; }
-          .mobile-menu-toggle { display: flex !important; }
           .header-date { display: none !important; }
           .header-appname { display: none !important; }
         }
@@ -1122,8 +906,6 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
         @media (max-width: 640px) {
           .lang-mobile { display: flex !important; }
           .lang-desktop { display: none !important; }
-          .desktop-nav { display: none !important; }
-          .mobile-menu-toggle { display: flex !important; }
           .header-date { display: none !important; }
           .header-appname { display: none !important; }
         }
