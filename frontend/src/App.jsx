@@ -211,17 +211,17 @@ function AuthenticatedApp() {
   }
 
   return (
-  <div
-    style={{
-      minHeight: "100vh",
-      width: "100%",
-      maxWidth: "100%",
-      overflowX: "hidden",
-      background: C.gray,
-      fontFamily: F.sans,
-      display: "flex",
-    }}
-  >
+    <div
+      style={{
+        minHeight: "100vh",
+        width: "100%",
+        maxWidth: "100%",
+        overflowX: "hidden",
+        background: C.gray,
+        fontFamily: F.sans,
+        display: "flex",
+      }}
+    >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700;800&family=Noto+Serif+Ethiopic:wght@700;900&display=swap');
         * { box-sizing: border-box; margin: 0; }
@@ -266,43 +266,14 @@ function AuthenticatedApp() {
           scrollbar-width: thin; margin: 0 -8px; padding: 0 8px;
         }
 
-        /* ✅ FIX: Better mobile responsiveness */
-@media (max-width: 768px) {
-  .services-search, .services-filter { min-height: 44px; }
-  .service-card:active { transform: scale(0.98); }
-  
-  /* ✅ Make sidebar more compact on mobile */
-  .sidebar-collapsed { width: 60px !important; }
-  .sidebar-expanded { width: 240px !important; }
-  
-  /* ✅ Ensure main content fills remaining space */
-  .main-content { 
-    width: calc(100% - 60px) !important;
-    max-width: calc(100vw - 60px) !important;
-    overflow-x: hidden !important;
-  }
-}
-
-@media (max-width: 480px) {
-  select { font-size: 16px !important; }
-  input[type="number"] { min-height: 32px; }
-  
-  /* ✅ Reduce sidebar width on very small screens */
-  .sidebar-collapsed { width: 50px !important; }
-  .sidebar-expanded { width: 200px !important; }
-  .main-content { 
-    width: calc(100% - 50px) !important;
-    max-width: calc(100vw - 50px) !important;
-    overflow-x: hidden !important;
-  }
-  
-  /* ✅ Prevent any horizontal scroll on main content */
-  .main-content > * {
-    max-width: 100% !important;
-    overflow-x: hidden !important;
-  }
-}
-        
+        @media (max-width: 768px) {
+          .services-search, .services-filter { min-height: 44px; }
+          .service-card:active { transform: scale(0.98); }
+        }
+        @media (max-width: 480px) {
+          select { font-size: 16px !important; }
+          input[type="number"] { min-height: 32px; }
+        }
         @media (max-width: 600px) { .header-date    { display: none !important; } }
         @media (max-width: 480px) { .header-appname { display: none !important; } }
         @media (max-width: 400px) {
@@ -333,7 +304,6 @@ function AuthenticatedApp() {
           animation: ${pdfReady ? "pulseGlow 2s ease-in-out infinite" : "none"};
         }
         
-        /* ✅ FIX: Chatbot and FAB equal sizes */
         .fab-button {
           width: 48px !important;
           height: 48px !important;
@@ -367,30 +337,6 @@ function AuthenticatedApp() {
             font-size: 14px !important;
           }
         }
-/* ✅ NEW: Fix for very small screens and horizontal scroll */
-@media (max-width: 400px) {
-  .main-content {
-    width: calc(100% - 50px) !important;
-    max-width: calc(100vw - 50px) !important;
-  }
-  
-  /* Prevent overflow on all child elements */
-  .main-content * {
-    max-width: 100% !important;
-    word-wrap: break-word !important;
-    overflow-wrap: break-word !important;
-  }
-  
-  /* Fix tables on very small screens */
-  .main-content table {
-    display: block !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch !important;
-    max-width: 100% !important;
-  }
-}
-
-        
       `}</style>
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
@@ -407,19 +353,19 @@ function AuthenticatedApp() {
       />
 
       <div
-  className="main-content"
-  style={{
-    flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    height: "100vh",
-    overflow: "hidden",
-    minWidth: 0,
-    width: collapsed ? "calc(100% - 60px)" : "calc(100% - 240px)",
-    maxWidth: "100%",
-    transition: "width 0.3s ease, max-width 0.3s ease",
-  }}
->
+        className="main-content"
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          overflow: "hidden",
+          minWidth: 0,
+          width: collapsed ? "calc(100% - 60px)" : "calc(100% - 240px)",
+          maxWidth: "100%",
+          transition: "width 0.3s ease, max-width 0.3s ease",
+        }}
+      >
         <Header
           tab={currentTab}
           t={t}
@@ -427,16 +373,17 @@ function AuthenticatedApp() {
           setLang={changeLanguage}
           onAddUserClick={() => setShowRegister(true)}
         />
-<main
-  style={{
-    flex: 1,
-    overflowY: "auto",
-    overflowX: "hidden",
-    padding: 0,
-    maxWidth: "100%",
-    width: "100%",
-  }}
->
+
+        <main
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            overflowX: "hidden",
+            padding: 0,
+            maxWidth: "100%",
+            width: "100%",
+          }}
+        >
           <div className="page-enter" style={{ maxWidth: "100%", overflowX: "hidden" }}>
             <Routes>
               {/* Redirect root to dashboard */}
