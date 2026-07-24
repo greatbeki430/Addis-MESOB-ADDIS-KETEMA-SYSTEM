@@ -68,28 +68,35 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
     setLoading(true);
     try {
       const [rotationRes, sessionsRes, recordingsRes] = await Promise.all([
-        goldenMondayAPI.previewRotation(),
-        goldenMondayAPI.getAll(),
-        goldenMondayAPI.getLiveRecordings(),
+        goldenMondayAPI
+          .previewRotation()
+          .catch(() => ({ data: { ranking: [] } })),
+        goldenMondayAPI.getAll().catch(() => ({ data: [] })),
+        goldenMondayAPI.getLiveRecordings().catch(() => ({ data: [] })),
       ]);
 
-      setRanking(rotationRes.data.ranking || []);
+      // Ensure ranking is always an array
+      const rankingData = rotationRes?.data?.ranking || [];
+      setRanking(rankingData);
 
-      // The most recent scheduled/ongoing session with a presenter is
-      // "this week's" session.
-      const sessions = sessionsRes.data || [];
+      // Ensure sessions is always an array
+      const sessions = sessionsRes?.data || [];
       const upcoming = sessions.find(
         (s) => s.presenter && s.status !== "cancelled",
       );
       setCurrentSession(upcoming || null);
       setTitleDraft(upcoming?.presentationTitle || "");
 
-      setRecordings(recordingsRes.data || []);
+      // Ensure recordings is always an array
+      setRecordings(recordingsRes?.data || []);
 
       // Call parent refresh if provided
       if (onRefresh) onRefresh();
     } catch (err) {
       console.error("Golden Monday rotation load failed:", err);
+      // Set default values to prevent crashes
+      setRanking([]);
+      setRecordings([]);
     } finally {
       setLoading(false);
     }

@@ -138,6 +138,33 @@ const computeRanking = async (weekOf = nextMondayFrom()) => {
 };
 
 // ============================================================
+// Get the next presenter (highest score) without assigning
+// ============================================================
+const getNextPresenter = async (weekOf = nextMondayFrom()) => {
+  try {
+    const roster = await getEligibleRoster();
+    if (roster.length === 0) {
+      return null;
+    }
+
+    const totalPresented = roster.reduce(
+      (sum, p) => sum + (p.timesPresented || 0),
+      0,
+    );
+    const rosterAvgPresented = totalPresented / roster.length;
+
+    const scored = roster
+      .map((p) => scoreCandidate(p, weekOf, rosterAvgPresented))
+      .sort((a, b) => b.score - a.score);
+
+    return scored[0] ? scored[0].presenter : null;
+  } catch (error) {
+    console.error("Error in getNextPresenter:", error);
+    return null;
+  }
+};
+
+// ============================================================
 // Assign the next presenter for a given week, creating (or updating)
 // that week's session. If `manualPresenterId` is given, it overrides
 // the algorithm's pick (an admin choice) but is still logged so the
@@ -308,6 +335,7 @@ module.exports = {
   nextMondayFrom,
   getEligibleRoster,
   computeRanking,
+  getNextPresenter,
   assignNextPresenter,
   confirmPresentationTitle,
   reassignPresenter,

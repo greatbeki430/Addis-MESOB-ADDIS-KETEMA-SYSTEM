@@ -284,7 +284,7 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
         </div>
       ))}
 
-      {nextPresenter && (
+      {nextPresenter && nextPresenter.name && (
         <div
           style={{
             textAlign: "center",

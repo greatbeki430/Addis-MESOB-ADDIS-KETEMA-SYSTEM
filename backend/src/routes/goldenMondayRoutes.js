@@ -93,8 +93,13 @@ router.get("/rotation/preview", protect, anyRole, previewRotation);
 router.get("/rotation/next", protect, anyRole, async (req, res) => {
   try {
     const next = await rotationService.getNextPresenter();
+    // Ensure we return an object, not null
+    if (!next) {
+      return res.json({ name: "No presenter assigned", department: "" });
+    }
     res.json(next);
   } catch (error) {
+    console.error("Error in /rotation/next:", error);
     res.status(500).json({ error: error.message });
   }
 });
