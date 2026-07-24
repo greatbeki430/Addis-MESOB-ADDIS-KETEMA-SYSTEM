@@ -53,22 +53,22 @@ const postPresenterAnnouncement = async (session) => {
 
     const imageUrl = await generateAnnouncementImage(presenter, session);
 
-    let message = `🎯 *Golden Monday - ${dateFormatted}*\n\n`;
-    message += `👤 *Presenter:* ${presenter.name || "TBD"}\n`;
+    let message = `🎯 Golden Monday - ${dateFormatted}*\n\n`;
+    message += `👤 Presenter: ${presenter.name || "TBD"}\n`;
     if (presenter.department) {
-      message += `🏛️ *Department:* ${presenter.department}\n`;
+      message += `🏛️ Department: ${presenter.department}\n`;
     }
     if (session.presentationTitle) {
-      message += `📖 *Topic:* "${session.presentationTitle}"\n`;
+      message += `📖 Topic: "${session.presentationTitle}"\n`;
     }
     if (session.presentationDescription) {
-      message += `📝 *Description:* ${session.presentationDescription}\n`;
+      message += `📝 Description: ${session.presentationDescription}\n`;
     }
-    message += `\n🕒 *Time:* 2:00 - 2:50 PM\n`;
-    message += `📍 *Location:* Addis MESOB Conference Hall\n\n`;
+    message += `\n🕒 Time:* 2:00 - 2:50 PM\n`;
+    message += `📍 Location: Addis MESOB Conference Hall\n\n`;
 
     if (session.suggestedTopics && session.suggestedTopics.length > 0) {
-      message += `💡 *AI Suggested Topics:*\n`;
+      message += `💡 AI Suggested Topics:\n`;
       session.suggestedTopics.forEach((topic, i) => {
         message += `   ${i + 1}. ${topic}\n`;
       });
@@ -323,7 +323,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.EMAIL;
       sendMessage(
         chatId,
-        "📧 What is your email address? (this will be your login)"
+        "📧 What is your email address? (this will be your login email, so you have to use your real email- not demo email:)"
       );
       break;
 
@@ -339,7 +339,7 @@ async function handleRegistrationMessage(msg) {
       }
       session.data.email = email;
       session.step = STEPS.PHONE;
-      sendMessage(chatId, '📱 What is your phone number? (or type "skip")');
+      sendMessage(chatId, '📱 What is your phone number?');
       break;
     }
 
@@ -466,7 +466,7 @@ async function handleRegistrationMessage(msg) {
       session.pendingId = pending._id.toString();
       sendMessage(
         chatId,
-        `✅ Thanks! Your verification code is: *${otpCode}*\n\n` +
+        `✅ Thanks! Your verification code is: ${otpCode}\n\n` +
         `Reply with this code to confirm (valid for 10 minutes).`
       );
       break;
@@ -559,16 +559,16 @@ async function notifyAdminsForApproval(pending) {
   }
 
   const text =
-    `📋 *New Employee Registration*\n\n` +
-    `👤 *Name:* ${pending.name}\n` +
-    `📧 *Email:* ${pending.email}\n` +
-    `📱 *Phone:* ${pending.phone || "Not provided"}\n` +
-    `🏛️ *Department:* ${pending.department || "Not provided"}\n` +
-    `💼 *Position:* ${pending.position || "Not provided"}\n` +
-    `🛠️ *Skills:* ${pending.skills?.length ? pending.skills.join(", ") : "Not provided"}\n` +
-    `📅 *Hire Date:* ${pending.hireDate ? new Date(pending.hireDate).toLocaleDateString() : "Not provided"}\n` +
-    `👤 *Telegram:* @${pending.telegramUsername || "n/a"}\n` +
-    `🖼️ *Photo:* ${pending.profilePhotoUrl ? "✅ Uploaded" : "❌ Not uploaded"}`;
+    `📋 New Employee Registration\n\n` +
+    `👤 Name: ${pending.name}\n` +
+    `📧 Email: ${pending.email}\n` +
+    `📱 Phone: ${pending.phone || "Not provided"}\n` +
+    `🏛️ Department: ${pending.department || "Not provided"}\n` +
+    `💼 Position: ${pending.position || "Not provided"}\n` +
+    `🛠️ Skills: ${pending.skills?.length ? pending.skills.join(", ") : "Not provided"}\n` +
+    `📅 Hire Date: ${pending.hireDate ? new Date(pending.hireDate).toLocaleDateString() : "Not provided"}\n` +
+    `👤 Telegram: @${pending.telegramUsername || "n/a"}\n` +
+    `🖼️ Photo: ${pending.profilePhotoUrl ? "✅ Uploaded" : "❌ Not uploaded"}`;
 
   await sendMessage(TELEGRAM_ADMIN_GROUP_ID, text, {
     reply_markup: {
@@ -596,10 +596,10 @@ async function sendLoginLink(chatId, email, tempPassword) {
   const loginUrl = FRONTEND_URL;
   
   const message = 
-    `✅ **Your account has been approved!**\n\n` +
-    `🔗 **Login Link:** ${loginUrl}/login\n\n` +
-    `📧 **Email:** ${email}\n` +
-    `🔑 **Temporary Password:** ${tempPassword}\n\n` +
+    `✅ Your account has been approved!\n\n` +
+    `🔗 Login Link: ${loginUrl}/login\n\n` +
+    `📧 Email: ${email}\n` +
+    `🔑 Temporary Password: ${tempPassword}\n\n` +
     `⚠️ Please log in and change your password immediately.\n\n` +
     `If you have any issues, please contact your administrator.`;
 
@@ -616,13 +616,13 @@ async function sendDeletionNotification(chatId, name, reason = "Your account has
   const loginUrl = FRONTEND_URL;
   
   const message = 
-    `⚠️ **Account Deletion Notification**\n\n` +
+    `⚠️ Account Deletion Notification\n\n` +
     `Dear ${name},\n\n` +
     `${reason}\n\n` +
     `If you believe this is a mistake, please contact your administrator.\n\n` +
     `To re-register, please send /start to this bot again.\n\n` +
-    `🔄 **Register Here:** https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'addis_mesob_gm_bot'}\n\n` +
-    `🔗 **Login URL:** ${loginUrl}`;
+    `🔄 Register Here: https://t.me/${process.env.TELEGRAM_BOT_USERNAME || 'addis_mesob_gm_bot'}\n\n` +
+    `🔗 Login URL: ${loginUrl}`;
 
   await sendMessage(chatId, message);
 }
