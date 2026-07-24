@@ -4,6 +4,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import { C, F } from "../../styles/theme";
+import { useLanguage } from "../../hooks/useLanguage";
+import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
 import { FiX, FiPenTool } from "react-icons/fi";
 
 export default function SignatureCanvas({
@@ -16,6 +18,9 @@ export default function SignatureCanvas({
   required = false,
   className = "",
 }) {
+  const { language } = useLanguage();
+  const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
+
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -228,7 +233,9 @@ export default function SignatureCanvas({
             }}
           >
             <FiPenTool size={16} style={{ marginRight: 8, opacity: 0.5 }} />
-            {isTouchDevice ? "Touch to sign" : "Click to sign"}
+            {isTouchDevice
+              ? t.touchToSign || "Touch to sign"
+              : t.clickToSign || "Click to sign"}
           </div>
         )}
 
@@ -250,7 +257,7 @@ export default function SignatureCanvas({
               gap: 4,
             }}
           >
-            <span>✓</span> Signed
+            <span>✓</span> {t.signed || "Signed"}
           </div>
         )}
 
@@ -281,8 +288,8 @@ export default function SignatureCanvas({
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "scale(1)";
             }}
-            title="Clear signature"
-            aria-label="Clear signature"
+            title={t.clearSignature || "Clear signature"}
+            aria-label={t.clearSignature || "Clear signature"}
           >
             <FiX size={14} />
           </button>
@@ -317,8 +324,8 @@ export default function SignatureCanvas({
                 : C.border;
               e.currentTarget.style.boxShadow = "none";
             }}
-            placeholder="Or type your name to sign"
-            aria-label="Type your signature"
+            placeholder={t.typeNameToSign || "Or type your name to sign"}
+            aria-label={t.typeSignature || "Type your signature"}
           />
           <div
             style={{
@@ -331,8 +338,8 @@ export default function SignatureCanvas({
           >
             <span>
               {hasSignature
-                ? "✓ Signature recorded"
-                : "Draw or type your signature"}
+                ? t.signatureRecorded || "✓ Signature recorded"
+                : t.drawOrTypeSignature || "Draw or type your signature"}
             </span>
             {hasSignature && (
               <button
@@ -345,9 +352,9 @@ export default function SignatureCanvas({
                   fontSize: 10,
                   textDecoration: "underline",
                 }}
-                aria-label="Download signature as PNG"
+                aria-label={t.downloadPNG || "Download signature as PNG"}
               >
-                Download PNG
+                {t.downloadPNG || "Download PNG"}
               </button>
             )}
           </div>
@@ -364,7 +371,7 @@ export default function SignatureCanvas({
             textAlign: "center",
           }}
         >
-          ✓ Signature verified
+          ✓ {t.signatureVerified || "Signature verified"}
         </div>
       )}
     </div>

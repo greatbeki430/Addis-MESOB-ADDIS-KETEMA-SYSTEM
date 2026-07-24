@@ -20,6 +20,7 @@ const {
   uploadSessionRecording,
   removeSessionRecording,
   getLiveRecordings,
+  analyzeAndCategorizePhoto, // ✅ ADD THIS - new function from controller
 } = require("../controllers/goldenMondayController");
 
 const rotationService = require("../services/goldenMondayRotationService");
@@ -93,7 +94,6 @@ router.get("/rotation/preview", protect, anyRole, previewRotation);
 router.get("/rotation/next", protect, anyRole, async (req, res) => {
   try {
     const next = await rotationService.getNextPresenter();
-    // Ensure we return an object, not null
     if (!next) {
       return res.json({ name: "No presenter assigned", department: "" });
     }
@@ -200,7 +200,7 @@ router.get("/pillars", protect, anyRole, async (req, res) => {
 // ATTENDANCE ROUTES
 // ──────────────────────────────────────────────────────────────
 
-// GET /api/golden-monday/:sessionId/attendance - Get attendance for a session
+// GET /api/golden-monday/:sessionId/attendance
 router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   try {
     const attendance = await GoldenMondayAttendance.find({
@@ -209,16 +209,10 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       .populate("user", "name email department")
       .sort({ checkedInAt: -1 });
 
-    // Get all eligible employees for this session
     const allEmployees = await GoldenMondayPresenter.find({
       isEligible: true,
     }).select("user name email department");
 
-    const attendedUserIds = new Set(
-      attendance.filter((a) => a.attended).map((a) => a.user._id.toString()),
-    );
-
-    // Build full attendance report with who hasn't attended
     const report = allEmployees.map((emp) => {
       const record = attendance.find(
         (a) => a.user._id.toString() === emp.user._id.toString(),
@@ -249,7 +243,7 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   }
 });
 
-// POST /api/golden-monday/:sessionId/attendance - Record attendance for a single user
+// POST /api/golden-monday/:sessionId/attendance
 router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   try {
     const {
@@ -275,14 +269,12 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Check if already attended
     let attendance = await GoldenMondayAttendance.findOne({
       session: req.params.sessionId,
       user: userId,
     });
 
     if (attendance) {
-      // Update existing record
       attendance.attended = true;
       attendance.checkedInAt = new Date();
       if (signature) attendance.signature = signature;
@@ -292,7 +284,6 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       if (rating) attendance.rating = rating;
       await attendance.save();
     } else {
-      // Create new record
       attendance = new GoldenMondayAttendance({
         session: req.params.sessionId,
         user: userId,
@@ -311,7 +302,6 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       await attendance.save();
     }
 
-    // Also update the session's attendees array for backward compatibility
     const existingAttendee = session.attendees.find(
       (a) => a.user.toString() === userId,
     );
@@ -339,7 +329,7 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   }
 });
 
-// POST /api/golden-monday/:sessionId/attendance/bulk - Bulk attendance
+// POST /api/golden-monday/:sessionId/attendance/bulk
 router.post(
   "/:sessionId/attendance/bulk",
   protect,
@@ -406,7 +396,7 @@ router.post(
 // GALLERY ROUTES
 // ──────────────────────────────────────────────────────────────
 
-// GET /api/golden-monday/gallery - Get all gallery photos
+// GET /api/golden-monday/gallery
 router.get("/gallery", protect, anyRole, async (req, res) => {
   try {
     const { category, session, limit = 50, page = 1 } = req.query;
@@ -439,7 +429,7 @@ router.get("/gallery", protect, anyRole, async (req, res) => {
   }
 });
 
-// POST /api/golden-monday/gallery - Upload gallery photo
+// POST /api/golden-monday/gallery
 router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
   try {
     const {
@@ -457,7 +447,6 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
       return res.status(400).json({ error: "Image data is required" });
     }
 
-    // Upload to Cloudinary
     const cloudinary = require("../config/cloudinary");
     const result = await cloudinary.uploader.upload(image, {
       folder: "golden-monday-gallery",
@@ -465,7 +454,6 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
       overwrite: false,
     });
 
-    // Create thumbnail
     const thumbnailResult = await cloudinary.uploader.upload(image, {
       folder: "golden-monday-gallery/thumbnails",
       public_id: `thumb-${Date.now()}`,
@@ -495,7 +483,6 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
 
     await galleryPhoto.save();
 
-    // If sessionId provided, also add to session photos
     if (sessionId) {
       const session = await GoldenMondaySession.findById(sessionId);
       if (session) {
@@ -519,7 +506,7 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
   }
 });
 
-// DELETE /api/golden-monday/gallery/:photoId - Delete gallery photo
+// DELETE /api/golden-monday/gallery/:photoId
 router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
   try {
     const photo = await GoldenMondayGallery.findById(req.params.photoId);
@@ -527,7 +514,6 @@ router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
       return res.status(404).json({ error: "Photo not found" });
     }
 
-    // Delete from Cloudinary
     const cloudinary = require("../config/cloudinary");
     await cloudinary.uploader.destroy(photo.publicId);
     if (photo.thumbnailPublicId) {
@@ -543,10 +529,23 @@ router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
+// 🤖 AI PHOTO ANALYSIS - ✅ NEW ROUTE (USES CONTROLLER FUNCTION)
+// ──────────────────────────────────────────────────────────────
+
+// POST /api/golden-monday/gallery/analyze - AI analyze and categorize a photo
+// Uses the enhanced analyzeAndCategorizePhoto function from the controller
+router.post(
+  "/gallery/analyze",
+  protect,
+  leaderOrAdmin,
+  analyzeAndCategorizePhoto,
+);
+
+// ──────────────────────────────────────────────────────────────
 // SESSION RECORDING & DOWNLOAD ROUTES
 // ──────────────────────────────────────────────────────────────
 
-// GET /api/golden-monday/:sessionId/download-slides - Download presentation slides
+// GET /api/golden-monday/:sessionId/download-slides
 router.get(
   "/:sessionId/download-slides",
   protect,
@@ -574,7 +573,7 @@ router.get(
   },
 );
 
-// POST /api/golden-monday/:sessionId/slides - Upload presentation slides
+// POST /api/golden-monday/:sessionId/slides
 router.post("/:sessionId/slides", protect, leaderOrAdmin, async (req, res) => {
   try {
     const { slides } = req.body;

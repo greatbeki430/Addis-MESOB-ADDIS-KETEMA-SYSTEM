@@ -840,7 +840,7 @@ export default function Evaluation({ t, lang }) {
         {te.subtitle || "Addis Ababa City Admin · Public Service Bureau"}
       </p>
 
-      {/* ─── Tab Navigation ─── */}
+      {/* ─── Tab Navigation - FIXED: All buttons stay on one line ─── */}
       <div
         style={{
           display: "flex",
@@ -848,66 +848,80 @@ export default function Evaluation({ t, lang }) {
           marginBottom: "clamp(16px, 4vw, 24px)",
           borderBottom: `2px solid ${C.border}`,
           paddingBottom: "8px",
-          flexWrap: "wrap",
+          flexWrap: "nowrap",
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
+          alignItems: "center",
         }}
       >
         <button
           onClick={() => setActiveTab("form")}
           style={{
-            padding: "8px 20px",
+            padding: "8px 16px",
             background: activeTab === "form" ? C.primary : "transparent",
             color: activeTab === "form" ? "#fff" : C.muted,
             border: "none",
             borderRadius: 8,
-            fontSize: "clamp(12px, 3vw, 14px)",
+            fontSize: "clamp(11px, 2.5vw, 14px)",
             fontWeight: 600,
             cursor: "pointer",
             transition: "all 0.2s ease",
             display: "flex",
             alignItems: "center",
             gap: "6px",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
         >
           <FiClipboard size={16} />
-          Evaluation Form
+          <span>Evaluation Form</span>
         </button>
         <button
           onClick={() => setActiveTab("history")}
           style={{
-            padding: "8px 20px",
+            padding: "8px 16px",
             background: activeTab === "history" ? C.primary : "transparent",
             color: activeTab === "history" ? "#fff" : C.muted,
             border: "none",
             borderRadius: 8,
-            fontSize: "clamp(12px, 3vw, 14px)",
+            fontSize: "clamp(11px, 2.5vw, 14px)",
             fontWeight: 600,
             cursor: "pointer",
             transition: "all 0.2s ease",
             display: "flex",
             alignItems: "center",
             gap: "6px",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
         >
           <FiList size={16} />
-          History ({savedEvaluations.length})
+          <span>History ({savedEvaluations.length})</span>
         </button>
+
+        {/* Spacer to push Pass to Super Admin to the right */}
+        <div style={{ flex: 1, minWidth: "8px" }} />
+
+        {/* ─── Pass to Super Admin Button - Icon only on mobile ─── */}
         {evaluationId && (
           <button
             onClick={passToSuperAdmin}
             style={{
-              padding: "8px 20px",
+              padding: "8px 16px",
               background: "#8b5cf6",
               color: "#fff",
               border: "none",
               borderRadius: 8,
-              fontSize: "clamp(12px, 3vw, 14px)",
+              fontSize: "clamp(11px, 2.5vw, 14px)",
               fontWeight: 600,
               cursor: "pointer",
               transition: "all 0.2s ease",
               display: "flex",
               alignItems: "center",
+              justifyContent: "center",
               gap: "6px",
-              marginLeft: "auto",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.background = "#7c3aed";
@@ -922,7 +936,14 @@ export default function Evaluation({ t, lang }) {
             }}
           >
             <FiSend size={16} />
-            Pass to Super Admin
+            <span className="pass-to-superadmin-text">Pass to Super Admin</span>
+            <style>{`
+              @media (max-width: 480px) {
+                .pass-to-superadmin-text {
+                  display: none !important;
+                }
+              }
+            `}</style>
           </button>
         )}
       </div>
@@ -1096,7 +1117,7 @@ export default function Evaluation({ t, lang }) {
         </div>
       )}
 
-      {/* ─── Rest of the form content (same as before) ─── */}
+      {/* ─── Rest of the form content ─── */}
       {activeTab === "form" && (
         <>
           {/* Team Name Input */}
@@ -1216,7 +1237,7 @@ export default function Evaluation({ t, lang }) {
             </div>
           </div>
 
-          {/* Criteria Sections - same as before */}
+          {/* Criteria Sections */}
           {CRITERIA.map((c) => (
             <div
               key={c.id}
@@ -2539,7 +2560,7 @@ export default function Evaluation({ t, lang }) {
             </div>
           )}
 
-          {/* Action Buttons - Inline on all devices */}
+          {/* ─── Action Buttons - Inline on all devices ─── */}
           <div
             style={{
               display: "flex",
@@ -2547,7 +2568,9 @@ export default function Evaluation({ t, lang }) {
               gap: "clamp(8px, 2vw, 12px)",
               justifyContent: "center",
               marginTop: "clamp(20px, 5vw, 28px)",
-              flexWrap: "wrap",
+              flexWrap: "nowrap",
+              overflowX: "auto",
+              WebkitOverflowScrolling: "touch",
             }}
           >
             <button
@@ -2566,6 +2589,8 @@ export default function Evaluation({ t, lang }) {
                 gap: 6,
                 flex: "1 1 auto",
                 justifyContent: "center",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
               }}
               onClick={saveEvaluation}
               disabled={saving}
@@ -2576,14 +2601,21 @@ export default function Evaluation({ t, lang }) {
                     size={16}
                     style={{ animation: "spin 1s linear infinite" }}
                   />
-                  Saving...
+                  <span className="save-text">Saving...</span>
                 </>
               ) : (
                 <>
                   <FiSave size={16} />
-                  Save Evaluation
+                  <span className="save-text">Save Evaluation</span>
                 </>
               )}
+              <style>{`
+                @media (max-width: 480px) {
+                  .save-text {
+                    display: none !important;
+                  }
+                }
+              `}</style>
             </button>
 
             {/* Export button - Icon only on mobile, text + icon on desktop */}
@@ -2602,6 +2634,8 @@ export default function Evaluation({ t, lang }) {
                 gap: 6,
                 flex: "1 1 auto",
                 justifyContent: "center",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
               }}
               onClick={() => {
                 const bestPerformerName =
@@ -2638,11 +2672,20 @@ export default function Evaluation({ t, lang }) {
                 gap: 6,
                 flex: "1 1 auto",
                 justifyContent: "center",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
               }}
               onClick={resetForm}
             >
               <FiRefreshCw size={16} />
-              {te.reset || "Reset"}
+              <span className="reset-text">{te.reset || "Reset"}</span>
+              <style>{`
+                @media (max-width: 480px) {
+                  .reset-text {
+                    display: none !important;
+                  }
+                }
+              `}</style>
             </button>
           </div>
 
