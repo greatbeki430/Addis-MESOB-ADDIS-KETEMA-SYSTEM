@@ -20,7 +20,7 @@ const {
   uploadSessionRecording,
   removeSessionRecording,
   getLiveRecordings,
-  analyzeAndCategorizePhoto, // ✅ ADD THIS - new function from controller
+  analyzeAndCategorizePhoto,
 } = require("../controllers/goldenMondayController");
 
 const rotationService = require("../services/goldenMondayRotationService");
@@ -197,28 +197,38 @@ router.get("/pillars", protect, anyRole, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
-// ATTENDANCE ROUTES
+// ATTENDANCE ROUTES - FIXED WITH BETTER ERROR HANDLING
 // ──────────────────────────────────────────────────────────────
 
 // GET /api/golden-monday/:sessionId/attendance
 router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   try {
+    console.log("📊 [GET ATTENDANCE] Session ID:", req.params.sessionId);
+    
     const attendance = await GoldenMondayAttendance.find({
       session: req.params.sessionId,
     })
       .populate("user", "name email department")
       .sort({ checkedInAt: -1 });
 
+    // Get all eligible employees from the roster
     const allEmployees = await GoldenMondayPresenter.find({
       isEligible: true,
     }).select("user name email department");
 
+    console.log("📊 [GET ATTENDANCE] Found", allEmployees.length, "employees in roster");
+    console.log("📊 [GET ATTENDANCE] Found", attendance.length, "attendance records");
+
+    // Build report with all employees
     const report = allEmployees.map((emp) => {
+      // Find if this employee has an attendance record
       const record = attendance.find(
-        (a) => a.user._id.toString() === emp.user._id.toString(),
+        (a) => a.user && emp.user && a.user._id.toString() === emp.user._id.toString(),
       );
+      
       return {
         user: emp.user,
+        userId: emp.user?._id || emp._id,
         name: emp.name,
         email: emp.email,
         department: emp.department || "",
@@ -239,11 +249,12 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       attendance: report,
     });
   } catch (error) {
+    console.error("❌ [GET ATTENDANCE] Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// POST /api/golden-monday/:sessionId/attendance
+// POST /api/golden-monday/:sessionId/attendance - FIXED
 router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   try {
     const {
@@ -255,26 +266,43 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       rating,
     } = req.body;
 
+    console.log("📝 [POST ATTENDANCE] Request received:");
+    console.log("  sessionId:", req.params.sessionId);
+    console.log("  userId:", userId);
+    console.log("  signatureType:", signatureType);
+    console.log("  hasSignature:", !!signature);
+    console.log("  signature length:", signature?.length || 0);
+
+    // 1. Validate userId
     if (!userId) {
+      console.log("❌ [ATTENDANCE] Missing userId");
       return res.status(400).json({ error: "User ID is required" });
     }
 
+    // 2. Find the session
     const session = await GoldenMondaySession.findById(req.params.sessionId);
     if (!session) {
+      console.log("❌ [ATTENDANCE] Session not found:", req.params.sessionId);
       return res.status(404).json({ error: "Session not found" });
     }
+    console.log("✅ [ATTENDANCE] Session found:", session._id);
 
+    // 3. Find the user
     const user = await User.findById(userId);
     if (!user) {
+      console.log("❌ [ATTENDANCE] User not found:", userId);
       return res.status(404).json({ error: "User not found" });
     }
+    console.log("✅ [ATTENDANCE] User found:", user.name, user.email);
 
+    // 4. Check if attendance record exists
     let attendance = await GoldenMondayAttendance.findOne({
       session: req.params.sessionId,
       user: userId,
     });
 
     if (attendance) {
+      console.log("📝 [ATTENDANCE] Updating existing record");
       attendance.attended = true;
       attendance.checkedInAt = new Date();
       if (signature) attendance.signature = signature;
@@ -283,7 +311,9 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       if (feedback) attendance.feedback = feedback;
       if (rating) attendance.rating = rating;
       await attendance.save();
+      console.log("✅ [ATTENDANCE] Attendance updated");
     } else {
+      console.log("📝 [ATTENDANCE] Creating new record");
       attendance = new GoldenMondayAttendance({
         session: req.params.sessionId,
         user: userId,
@@ -300,8 +330,10 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
         recordedByName: req.user.name,
       });
       await attendance.save();
+      console.log("✅ [ATTENDANCE] New attendance created:", attendance._id);
     }
 
+    // 5. Update session attendees
     const existingAttendee = session.attendees.find(
       (a) => a.user.toString() === userId,
     );
@@ -318,6 +350,7 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       });
     }
     await session.save();
+    console.log("✅ [ATTENDANCE] Session attendees updated");
 
     res.json({
       success: true,
@@ -325,7 +358,12 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       message: "Attendance recorded successfully",
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("❌ [POST ATTENDANCE] Error:", error);
+    console.error("❌ [POST ATTENDANCE] Stack:", error.stack);
+    res.status(500).json({ 
+      error: error.message,
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined
+    });
   }
 });
 
@@ -387,6 +425,7 @@ router.post(
         attendance: results,
       });
     } catch (error) {
+      console.error("❌ [BULK ATTENDANCE] Error:", error);
       res.status(500).json({ error: error.message });
     }
   },
@@ -425,6 +464,7 @@ router.get("/gallery", protect, anyRole, async (req, res) => {
       },
     });
   } catch (error) {
+    console.error("❌ [GET GALLERY] Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -502,6 +542,7 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
       photo: galleryPhoto,
     });
   } catch (error) {
+    console.error("❌ [POST GALLERY] Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -524,22 +565,101 @@ router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
 
     res.json({ success: true, message: "Photo deleted successfully" });
   } catch (error) {
+    console.error("❌ [DELETE GALLERY] Error:", error);
     res.status(500).json({ error: error.message });
   }
 });
 
 // ──────────────────────────────────────────────────────────────
-// 🤖 AI PHOTO ANALYSIS - ✅ NEW ROUTE (USES CONTROLLER FUNCTION)
+// 🤖 AI PHOTO ANALYSIS
 // ──────────────────────────────────────────────────────────────
 
-// POST /api/golden-monday/gallery/analyze - AI analyze and categorize a photo
-// Uses the enhanced analyzeAndCategorizePhoto function from the controller
 router.post(
   "/gallery/analyze",
   protect,
   leaderOrAdmin,
   analyzeAndCategorizePhoto,
 );
+
+// ──────────────────────────────────────────────────────────────
+// 🔍 DEBUG ROUTES - Remove these in production
+// ──────────────────────────────────────────────────────────────
+
+// DEBUG: Check roster data
+router.get("/debug/roster", protect, async (req, res) => {
+  try {
+    console.log("🔍 [DEBUG] Fetching roster...");
+    const roster = await GoldenMondayPresenter.find()
+      .populate("user", "name email _id")
+      .lean();
+    
+    console.log("🔍 [DEBUG] Roster count:", roster.length);
+    res.json({ 
+      count: roster.length, 
+      roster: roster.map(r => ({
+        id: r._id,
+        userId: r.user?._id,
+        userName: r.user?.name,
+        email: r.user?.email,
+        name: r.name,
+        department: r.department,
+        isEligible: r.isEligible
+      }))
+    });
+  } catch (error) {
+    console.error("❌ [DEBUG ROSTER] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DEBUG: Check attendance data for a session
+router.get("/debug/attendance/:sessionId", protect, async (req, res) => {
+  try {
+    console.log("🔍 [DEBUG] Fetching attendance for session:", req.params.sessionId);
+    const attendance = await GoldenMondayAttendance.find({
+      session: req.params.sessionId,
+    }).populate("user", "name email _id");
+    
+    console.log("🔍 [DEBUG] Attendance count:", attendance.length);
+    res.json({ 
+      count: attendance.length, 
+      attendance: attendance.map(a => ({
+        id: a._id,
+        userId: a.user?._id,
+        userName: a.user?.name,
+        name: a.name,
+        attended: a.attended,
+        signature: a.signature ? "✅ Has signature" : "❌ No signature",
+        signatureType: a.signatureType,
+        checkedInAt: a.checkedInAt
+      }))
+    });
+  } catch (error) {
+    console.error("❌ [DEBUG ATTENDANCE] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DEBUG: Check all users
+router.get("/debug/users", protect, async (req, res) => {
+  try {
+    console.log("🔍 [DEBUG] Fetching all users...");
+    const users = await User.find().select("name email role _id");
+    console.log("🔍 [DEBUG] Users count:", users.length);
+    res.json({ 
+      count: users.length, 
+      users: users.map(u => ({
+        id: u._id,
+        name: u.name,
+        email: u.email,
+        role: u.role
+      }))
+    });
+  } catch (error) {
+    console.error("❌ [DEBUG USERS] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // ──────────────────────────────────────────────────────────────
 // SESSION RECORDING & DOWNLOAD ROUTES
@@ -568,6 +688,7 @@ router.get(
         title: session.presentationTitle,
       });
     } catch (error) {
+      console.error("❌ [GET SLIDES] Error:", error);
       res.status(500).json({ error: error.message });
     }
   },
@@ -591,6 +712,7 @@ router.post("/:sessionId/slides", protect, leaderOrAdmin, async (req, res) => {
 
     res.json({ success: true, session });
   } catch (error) {
+    console.error("❌ [POST SLIDES] Error:", error);
     res.status(500).json({ error: error.message });
   }
 });

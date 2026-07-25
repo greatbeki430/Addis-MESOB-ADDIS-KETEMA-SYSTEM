@@ -840,114 +840,115 @@ export default function Evaluation({ t, lang }) {
         {te.subtitle || "Addis Ababa City Admin · Public Service Bureau"}
       </p>
 
-      {/* ─── Tab Navigation - FIXED: All buttons stay on one line ─── */}
-      <div
-        style={{
-          display: "flex",
-          gap: "4px",
-          marginBottom: "clamp(16px, 4vw, 24px)",
-          borderBottom: `2px solid ${C.border}`,
-          paddingBottom: "8px",
-          flexWrap: "nowrap",
-          overflowX: "auto",
-          WebkitOverflowScrolling: "touch",
-          alignItems: "center",
-        }}
-      >
-        <button
-          onClick={() => setActiveTab("form")}
-          style={{
-            padding: "8px 16px",
-            background: activeTab === "form" ? C.primary : "transparent",
-            color: activeTab === "form" ? "#fff" : C.muted,
-            border: "none",
-            borderRadius: 8,
-            fontSize: "clamp(11px, 2.5vw, 14px)",
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            whiteSpace: "nowrap",
-            flexShrink: 0,
-          }}
-        >
-          <FiClipboard size={16} />
-          <span>Evaluation Form</span>
-        </button>
-        <button
-          onClick={() => setActiveTab("history")}
-          style={{
-            padding: "8px 16px",
-            background: activeTab === "history" ? C.primary : "transparent",
-            color: activeTab === "history" ? "#fff" : C.muted,
-            border: "none",
-            borderRadius: 8,
-            fontSize: "clamp(11px, 2.5vw, 14px)",
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: "all 0.2s ease",
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            whiteSpace: "nowrap",
-            flexShrink: 0,
-          }}
-        >
-          <FiList size={16} />
-          <span>History ({savedEvaluations.length})</span>
-        </button>
+      
+   {/* ─── Tab Navigation - FIXED: All buttons stay on one line ───*/}
+<div
+  style={{
+    display: "flex",
+    gap: "4px",
+    marginBottom: "clamp(16px, 4vw, 24px)",
+    borderBottom: `2px solid ${C.border}`,
+    paddingBottom: "8px",
+    flexWrap: "nowrap",
+    overflowX: "auto",
+    WebkitOverflowScrolling: "touch",
+    alignItems: "center",
+    minHeight: "48px", // Ensure consistent height
+  }}
+>
+  <button
+    onClick={() => setActiveTab("form")}
+    style={{
+      padding: "8px 16px",
+      background: activeTab === "form" ? C.primary : "transparent",
+      color: activeTab === "form" ? "#fff" : C.muted,
+      border: "none",
+      borderRadius: 8,
+      fontSize: "clamp(11px, 2.5vw, 14px)",
+      fontWeight: 600,
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+      whiteSpace: "nowrap",
+      flexShrink: 0,
+    }}
+  >
+    <FiClipboard size={16} />
+    <span>Evaluation Form</span>
+  </button>
+  
+  <button
+    onClick={() => setActiveTab("history")}
+    style={{
+      padding: "8px 16px",
+      background: activeTab === "history" ? C.primary : "transparent",
+      color: activeTab === "history" ? "#fff" : C.muted,
+      border: "none",
+      borderRadius: 8,
+      fontSize: "clamp(11px, 2.5vw, 14px)",
+      fontWeight: 600,
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+      display: "flex",
+      alignItems: "center",
+      gap: "6px",
+      whiteSpace: "nowrap",
+      flexShrink: 0,
+    }}
+  >
+    <FiList size={16} />
+    <span>History ({savedEvaluations.length})</span>
+  </button>
 
-        {/* Spacer to push Pass to Super Admin to the right */}
-        <div style={{ flex: 1, minWidth: "8px" }} />
+  {/* Spacer - pushes Pass to Super Admin to the right */}
+  <div style={{ flex: 1, minWidth: "8px" }} />
 
-        {/* ─── Pass to Super Admin Button - Icon only on mobile ─── */}
-        {evaluationId && (
-          <button
-            onClick={passToSuperAdmin}
-            style={{
-              padding: "8px 16px",
-              background: "#8b5cf6",
-              color: "#fff",
-              border: "none",
-              borderRadius: 8,
-              fontSize: "clamp(11px, 2.5vw, 14px)",
-              fontWeight: 600,
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = "#7c3aed";
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow =
-                "0 4px 16px rgba(139,92,246,0.3)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = "#8b5cf6";
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            <FiSend size={16} />
-            <span className="pass-to-superadmin-text">Pass to Super Admin</span>
-            <style>{`
-              @media (max-width: 480px) {
-                .pass-to-superadmin-text {
-                  display: none !important;
-                }
-              }
-            `}</style>
-          </button>
-        )}
-      </div>
-
+  {/* ─── Pass to Super Admin Button - Icon only on mobile ─── */}
+  {evaluationId && (
+    <button
+      onClick={passToSuperAdmin}
+      style={{
+        padding: "8px 16px",
+        background: "#8b5cf6",
+        color: "#fff",
+        border: "none",
+        borderRadius: 8,
+        fontSize: "clamp(11px, 2.5vw, 14px)",
+        fontWeight: 600,
+        cursor: "pointer",
+        transition: "all 0.2s ease",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "6px",
+        whiteSpace: "nowrap",
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "#7c3aed";
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.boxShadow = "0 4px 16px rgba(139,92,246,0.3)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "#8b5cf6";
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.boxShadow = "none";
+      }}
+    >
+      <FiSend size={16} />
+      <span className="pass-to-superadmin-text">Pass to Super Admin</span>
+      <style>{`
+        @media (max-width: 480px) {
+          .pass-to-superadmin-text {
+            display: none !important;
+          }
+        }
+      `}</style>
+    </button>
+  )}
+</div>
       {/* ─── History Tab Content ─── */}
       {activeTab === "history" && (
         <div style={{ marginBottom: "clamp(20px, 4vw, 32px)" }}>

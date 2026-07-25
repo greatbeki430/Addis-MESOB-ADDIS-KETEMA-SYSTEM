@@ -1,5 +1,5 @@
 // frontend/src/components/golden-monday/AttendancePanel.jsx
-// Golden Monday Attendance Panel with signature capture
+// Golden Monday Attendance Panel with signature capture - FIXED
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { C, F } from "../../styles/theme";
@@ -20,12 +20,17 @@ import {
   FiLoader,
   FiSearch,
   FiPenTool,
+  FiChevronDown,
+  FiChevronRight,
+  FiBriefcase,
+  FiFolder,
 } from "react-icons/fi";
 
 export default function AttendancePanel({ sessionId, onRefresh }) {
   const { user } = useAuth();
   const { language } = useLanguage();
   const isInitialMount = useRef(true);
+  const hasAutoOpened = useRef(false);
 
   // Get translations based on language
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
@@ -39,6 +44,13 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
   const [mySignature, setMySignature] = useState(null);
   const [signingFor, setSigningFor] = useState(null);
 
+  // State for showing signed employees
+  const [showSigned, setShowSigned] = useState(false);
+  // State for expanding departments
+  const [expandedDepartments, setExpandedDepartments] = useState({});
+
+  const isAdmin = ["admin", "superadmin"].includes(user?.role);
+
   const loadAttendance = useCallback(async () => {
     if (!sessionId) return;
     try {
@@ -50,7 +62,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
         ...new Set(
           response.data.attendance.map((a) => a.department).filter(Boolean),
         ),
-      ];
+      ].sort();
       setDepartments(depts);
     } catch (error) {
       console.error("Failed to load attendance:", error);
@@ -114,18 +126,83 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
     }
   }, [sessionId, loadAttendance]);
 
-  const filteredAttendance = attendance.filter((a) => {
-    const matchesSearch =
-      a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDept =
-      filterDepartment === "all" || a.department === filterDepartment;
-    return matchesSearch && matchesDept;
-  });
+  // Check if current user can sign (is in the attendance list)
+  const currentUserAttendance = attendance.find(
+    (a) => a.user?._id === user?._id,
+  );
+  const isCurrentUserUnsigned =
+    currentUserAttendance && !currentUserAttendance.attended;
 
-  const total = filteredAttendance.length;
-  const attended = filteredAttendance.filter((a) => a.attended).length;
-  const absent = total - attended;
+  // Auto-start signing for current user if they haven't signed yet (only once)
+  useEffect(() => {
+    if (
+      isCurrentUserUnsigned &&
+      !signingFor &&
+      !mySignature &&
+      !hasAutoOpened.current
+    ) {
+      hasAutoOpened.current = true;
+      setSigningFor(currentUserAttendance.user?._id);
+    }
+  }, [isCurrentUserUnsigned, signingFor, mySignature, currentUserAttendance]);
+
+  // Group employees by department and position
+  const groupEmployees = (employees) => {
+    const grouped = {};
+    employees.forEach((emp) => {
+      const dept = emp.department || t.uncategorized || "Uncategorized";
+      const position = emp.position || t.staff || "Staff";
+      if (!grouped[dept]) {
+        grouped[dept] = {};
+      }
+      if (!grouped[dept][position]) {
+        grouped[dept][position] = [];
+      }
+      grouped[dept][position].push(emp);
+    });
+    return grouped;
+  };
+
+  // Sort employees within each position by name
+  const sortEmployees = (employees) => {
+    return [...employees].sort((a, b) => a.name?.localeCompare(b.name) || 0);
+  };
+
+  // Filter employees
+  const filterEmployees = (employees) => {
+    return employees.filter((a) => {
+      const matchesSearch =
+        a.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.position?.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesDept =
+        filterDepartment === "all" || a.department === filterDepartment;
+      return matchesSearch && matchesDept;
+    });
+  };
+
+  // Get filtered lists
+  const unsignedEmployees = attendance.filter((a) => !a.attended);
+  const signedEmployees = attendance.filter((a) => a.attended);
+
+  const filteredUnsigned = filterEmployees(unsignedEmployees);
+  const filteredSigned = filterEmployees(signedEmployees);
+
+  // Group filtered employees
+  const groupedUnsigned = groupEmployees(filteredUnsigned);
+  const groupedSigned = groupEmployees(filteredSigned);
+
+  const total = attendance.length;
+  const attended = signedEmployees.length;
+  const absent = unsignedEmployees.length;
+
+  // Toggle department expansion
+  const toggleDepartment = (dept) => {
+    setExpandedDepartments((prev) => ({
+      ...prev,
+      [dept]: !prev[dept],
+    }));
+  };
 
   return (
     <div style={{ fontFamily: F.sans }}>
@@ -203,6 +280,27 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
           </div>
         </div>
       </div>
+
+      {/* Current User Status Banner */}
+      {isCurrentUserUnsigned && (
+        <div
+          style={{
+            background: "#fef3c7",
+            border: `1px solid #f59e0b`,
+            borderRadius: 8,
+            padding: "10px 16px",
+            marginBottom: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <FiPenTool size={16} color="#f59e0b" />
+          <span style={{ fontSize: 13, color: "#92400e" }}>
+            {t.pleaseSignYourAttendance || "Please sign your attendance below"}
+          </span>
+        </div>
+      )}
 
       {/* Controls */}
       <div
@@ -299,185 +397,599 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
           />
           <p>{t.loadingAttendance || "Loading attendance..."}</p>
         </div>
-      ) : filteredAttendance.length === 0 ? (
+      ) : filteredUnsigned.length === 0 && filteredSigned.length === 0 ? (
         <div style={{ textAlign: "center", padding: "30px", color: C.muted }}>
           <FiUsers size={32} style={{ opacity: 0.3 }} />
           <p>{t.noEmployeesFound || "No employees found"}</p>
         </div>
       ) : (
-        <div style={{ display: "grid", gap: 8 }}>
-          {filteredAttendance.map((emp) => {
-            const isCurrentUser = user?._id === emp.user?._id;
-            const isSigned = emp.attended;
-            const isSigning = signingFor === emp.user?._id;
-
-            return (
+        <div style={{ display: "grid", gap: 12 }}>
+          {/* UNSIGNED EMPLOYEES SECTION */}
+          {filteredUnsigned.length > 0 && (
+            <>
               <div
-                key={emp.user?._id || emp.name}
                 style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#991b1b",
+                  padding: "8px 14px",
+                  background: "#fee2e2",
+                  borderRadius: 6,
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "10px 14px",
-                  borderRadius: 8,
-                  background: isSigned ? "#d1fae5" : C.white,
-                  border: `1px solid ${isSigned ? "#6ee7b7" : C.border}`,
-                  flexWrap: "wrap",
                   gap: 8,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
-                      color: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 12,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {emp.name?.charAt(0) || "?"}
-                  </div>
-                  <div>
-                    <div
-                      style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
-                    >
-                      {emp.name}
-                      {isCurrentUser && (
+                <FiUserX size={16} />
+                {t.unsignedEmployees || "Unsigned Employees"} (
+                {filteredUnsigned.length})
+              </div>
+
+              {/* Group by Department */}
+              {Object.keys(groupedUnsigned)
+                .sort()
+                .map((dept) => {
+                  const positions = groupedUnsigned[dept];
+                  const deptTotal = Object.values(positions).reduce(
+                    (sum, empList) => sum + empList.length,
+                    0,
+                  );
+                  const isExpanded = expandedDepartments[dept] !== false;
+
+                  return (
+                    <div key={dept} style={{ marginBottom: 4 }}>
+                      <div
+                        onClick={() => toggleDepartment(dept)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          padding: "6px 12px",
+                          background: C.bg,
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: C.dark,
+                        }}
+                      >
                         <span
                           style={{
-                            marginLeft: 6,
-                            fontSize: 9,
-                            background: C.primary + "15",
-                            color: C.primary,
-                            padding: "1px 8px",
-                            borderRadius: 10,
-                            fontWeight: 600,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
                           }}
                         >
-                          {t.you || "You"}
+                          <FiFolder size={14} />
+                          {dept} ({deptTotal})
                         </span>
+                        {isExpanded ? (
+                          <FiChevronDown size={14} />
+                        ) : (
+                          <FiChevronRight size={14} />
+                        )}
+                      </div>
+
+                      {isExpanded && (
+                        <div style={{ paddingLeft: 12, marginTop: 4 }}>
+                          {Object.keys(positions)
+                            .sort()
+                            .map((position) => {
+                              const employees = sortEmployees(
+                                positions[position],
+                              );
+                              return (
+                                <div key={position} style={{ marginBottom: 8 }}>
+                                  <div
+                                    style={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      gap: 4,
+                                      fontSize: 11,
+                                      color: C.muted,
+                                      padding: "4px 8px",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    <FiBriefcase size={12} />
+                                    {position} ({employees.length})
+                                  </div>
+                                  <div style={{ display: "grid", gap: 4 }}>
+                                    {employees.map((emp) => {
+                                      const userId =
+                                        emp.user?._id || emp.user || emp.userId;
+                                      const isCurrentUser =
+                                        user?._id === userId;
+                                      const isSigning = signingFor === userId;
+                                      const canSign = isCurrentUser || isAdmin;
+
+                                      return (
+                                        <div
+                                          key={userId || emp.name}
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            padding: "8px 12px",
+                                            borderRadius: 6,
+                                            background: isCurrentUser
+                                              ? "#fef3c7"
+                                              : C.white,
+                                            border: `1px solid ${
+                                              isCurrentUser
+                                                ? "#f59e0b"
+                                                : C.border
+                                            }`,
+                                            flexWrap: "wrap",
+                                            gap: 6,
+                                          }}
+                                        >
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: 8,
+                                            }}
+                                          >
+                                            <div
+                                              style={{
+                                                width: 28,
+                                                height: 28,
+                                                borderRadius: "50%",
+                                                background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+                                                color: "#fff",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                              }}
+                                            >
+                                              {emp.name?.charAt(0) || "?"}
+                                            </div>
+                                            <div>
+                                              <div
+                                                style={{
+                                                  fontWeight: 600,
+                                                  fontSize: 12,
+                                                  color: C.dark,
+                                                }}
+                                              >
+                                                {emp.name}
+                                                {isCurrentUser && (
+                                                  <span
+                                                    style={{
+                                                      marginLeft: 4,
+                                                      fontSize: 8,
+                                                      background:
+                                                        C.primary + "15",
+                                                      color: C.primary,
+                                                      padding: "1px 6px",
+                                                      borderRadius: 8,
+                                                      fontWeight: 600,
+                                                    }}
+                                                  >
+                                                    {t.you || "You"}
+                                                  </span>
+                                                )}
+                                                {isAdmin && !isCurrentUser && (
+                                                  <span
+                                                    style={{
+                                                      marginLeft: 4,
+                                                      fontSize: 8,
+                                                      background: "#fef3c7",
+                                                      color: "#92400e",
+                                                      padding: "1px 6px",
+                                                      borderRadius: 8,
+                                                      fontWeight: 600,
+                                                    }}
+                                                  >
+                                                    Admin
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <div
+                                                style={{
+                                                  fontSize: 10,
+                                                  color: C.muted,
+                                                }}
+                                              >
+                                                {emp.email ||
+                                                  t.noEmail ||
+                                                  "No email"}
+                                              </div>
+                                            </div>
+                                          </div>
+
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: 6,
+                                            }}
+                                          >
+                                            {isSigning ? (
+                                              <div
+                                                style={{
+                                                  display: "flex",
+                                                  flexDirection: "column",
+                                                  alignItems: "flex-end",
+                                                  gap: 4,
+                                                  maxWidth: "180px",
+                                                }}
+                                              >
+                                                <SignatureCanvas
+                                                  onSave={(data) => {
+                                                    console.log(
+                                                      "✍️ Signature saved:",
+                                                      data ? "✅ Yes" : "❌ No",
+                                                    );
+                                                    setMySignature(data);
+                                                  }}
+                                                  height={40}
+                                                  width={180}
+                                                  label=""
+                                                />
+                                                <div
+                                                  style={{
+                                                    display: "flex",
+                                                    gap: 4,
+                                                  }}
+                                                >
+                                                  <button
+                                                    onClick={() => {
+                                                      console.log(
+                                                        "🔄 Confirm clicked for user:",
+                                                        userId,
+                                                      );
+                                                      handleSignAttendance(
+                                                        userId,
+                                                      );
+                                                    }}
+                                                    style={{
+                                                      padding: "2px 10px",
+                                                      background: C.primary,
+                                                      color: "#fff",
+                                                      border: "none",
+                                                      borderRadius: 4,
+                                                      cursor: "pointer",
+                                                      fontSize: 10,
+                                                      fontWeight: 600,
+                                                      display: "flex",
+                                                      alignItems: "center",
+                                                      gap: 3,
+                                                    }}
+                                                    aria-label={
+                                                      t.confirmSignature ||
+                                                      "Confirm signature"
+                                                    }
+                                                  >
+                                                    <FiCheck size={10} />
+                                                    {t.confirm || "Confirm"}
+                                                  </button>
+                                                  <button
+                                                    onClick={() => {
+                                                      setSigningFor(null);
+                                                      setMySignature(null);
+                                                    }}
+                                                    style={{
+                                                      padding: "2px 6px",
+                                                      background: "none",
+                                                      border: "none",
+                                                      cursor: "pointer",
+                                                      color: "#999",
+                                                      display: "flex",
+                                                      alignItems: "center",
+                                                      gap: 3,
+                                                    }}
+                                                    aria-label={
+                                                      t.cancelSignature ||
+                                                      "Cancel signing"
+                                                    }
+                                                  >
+                                                    <FiX size={12} />
+                                                    {t.cancel || "Cancel"}
+                                                  </button>
+                                                </div>
+                                              </div>
+                                            ) : canSign ? (
+                                              <button
+                                                onClick={() => {
+                                                  console.log(
+                                                    "🖊️ Sign In clicked for:",
+                                                    emp.name,
+                                                    "userId:",
+                                                    userId,
+                                                  );
+                                                  setSigningFor(userId);
+                                                }}
+                                                style={{
+                                                  padding: "3px 12px",
+                                                  background: "#f59e0b",
+                                                  color: "#fff",
+                                                  border: "none",
+                                                  borderRadius: 4,
+                                                  cursor: "pointer",
+                                                  fontSize: 10,
+                                                  fontWeight: 600,
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  gap: 3,
+                                                  transition: "all 0.2s ease",
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.background =
+                                                    "#d97706";
+                                                  e.currentTarget.style.transform =
+                                                    "scale(1.05)";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.background =
+                                                    "#f59e0b";
+                                                  e.currentTarget.style.transform =
+                                                    "scale(1)";
+                                                }}
+                                                aria-label={
+                                                  t.signIn || "Sign in"
+                                                }
+                                              >
+                                                <FiPenTool size={10} />
+                                                {t.signIn || "Sign In"}
+                                              </button>
+                                            ) : (
+                                              <span
+                                                style={{
+                                                  fontSize: 10,
+                                                  color: C.muted,
+                                                }}
+                                              >
+                                                {t.notSigned || "Not signed"}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                        </div>
                       )}
                     </div>
-                    <div style={{ fontSize: 11, color: C.muted }}>
-                      {emp.department || t.noDepartment || "No department"} •{" "}
-                      {emp.email || t.noEmail || "No email"}
-                    </div>
-                  </div>
-                </div>
+                  );
+                })}
+            </>
+          )}
 
+          {/* SIGNED EMPLOYEES SECTION - Collapsible */}
+          {filteredSigned.length > 0 && (
+            <>
+              <div
+                onClick={() => setShowSigned(!showSigned)}
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#065f46",
+                  padding: "8px 14px",
+                  background: "#d1fae5",
+                  borderRadius: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  cursor: "pointer",
+                }}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {isSigned ? (
-                    <span
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                        color: "#065f46",
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}
-                    >
-                      <FiCheck size={14} /> {t.signed || "Signed"}
-                    </span>
-                  ) : isSigning ? (
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "flex-end",
-                        gap: 8,
-                        width: "100%",
-                        maxWidth: "220px",
-                      }}
-                    >
-                      {/* ✅ Show SignatureCanvas when signing */}
-                      <div style={{ width: "100%" }}>
-                        <SignatureCanvas
-                          onSave={(data) => setMySignature(data)}
-                          height={60}
-                          width={220}
-                          label=""
-                        />
-                      </div>
-                      <div style={{ display: "flex", gap: 8 }}>
-                        <button
-                          onClick={() => handleSignAttendance(emp.user?._id)}
-                          style={{
-                            padding: "4px 12px",
-                            background: C.primary,
-                            color: "#fff",
-                            border: "none",
-                            borderRadius: 4,
-                            cursor: "pointer",
-                            fontSize: 11,
-                            fontWeight: 600,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                          aria-label={t.confirmSignature || "Confirm signature"}
-                        >
-                          <FiCheck size={12} />
-                          {t.confirmSignature || "Confirm"}
-                        </button>
-                        <button
-                          onClick={() => {
-                            setSigningFor(null);
-                            setMySignature(null);
-                          }}
-                          style={{
-                            padding: "4px 8px",
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            color: "#999",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 4,
-                          }}
-                          aria-label={t.cancelSignature || "Cancel signing"}
-                        >
-                          <FiX size={14} />
-                          {t.cancelSignature || "Cancel"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : isCurrentUser ? (
-                    <button
-                      onClick={() => setSigningFor(emp.user?._id)}
-                      style={{
-                        padding: "4px 14px",
-                        background: "#f59e0b",
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 4,
-                        cursor: "pointer",
-                        fontSize: 11,
-                        fontWeight: 600,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
-                      aria-label={t.signIn || "Sign in"}
-                    >
-                      <FiPenTool size={12} />
-                      {t.signIn || "Sign In"}
-                    </button>
-                  ) : (
-                    <span style={{ fontSize: 11, color: C.muted }}>
-                      {t.notSigned || "Not signed"}
-                    </span>
-                  )}
+                  <FiUserCheck size={16} />
+                  {t.signedEmployees || "Signed Employees"} (
+                  {filteredSigned.length})
                 </div>
+                {showSigned ? (
+                  <FiChevronDown size={16} />
+                ) : (
+                  <FiChevronRight size={16} />
+                )}
               </div>
-            );
-          })}
+
+              {showSigned && (
+                <div style={{ display: "grid", gap: 8, marginTop: 4 }}>
+                  {/* Group signed employees by department */}
+                  {Object.keys(groupedSigned)
+                    .sort()
+                    .map((dept) => {
+                      const positions = groupedSigned[dept];
+                      const deptTotal = Object.values(positions).reduce(
+                        (sum, empList) => sum + empList.length,
+                        0,
+                      );
+                      const isExpanded =
+                        expandedDepartments[`signed-${dept}`] !== false;
+
+                      return (
+                        <div key={dept} style={{ marginBottom: 4 }}>
+                          <div
+                            onClick={() => toggleDepartment(`signed-${dept}`)}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "6px 12px",
+                              background: "#ecfdf5",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: "#065f46",
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 6,
+                              }}
+                            >
+                              <FiFolder size={14} />
+                              {dept} ({deptTotal})
+                            </span>
+                            {isExpanded ? (
+                              <FiChevronDown size={14} />
+                            ) : (
+                              <FiChevronRight size={14} />
+                            )}
+                          </div>
+
+                          {isExpanded && (
+                            <div style={{ paddingLeft: 12, marginTop: 4 }}>
+                              {Object.keys(positions)
+                                .sort()
+                                .map((position) => {
+                                  const employees = sortEmployees(
+                                    positions[position],
+                                  );
+                                  return (
+                                    <div
+                                      key={position}
+                                      style={{ marginBottom: 8 }}
+                                    >
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 4,
+                                          fontSize: 11,
+                                          color: "#065f46",
+                                          padding: "4px 8px",
+                                          fontWeight: 600,
+                                          opacity: 0.7,
+                                        }}
+                                      >
+                                        <FiBriefcase size={12} />
+                                        {position} ({employees.length})
+                                      </div>
+                                      <div style={{ display: "grid", gap: 4 }}>
+                                        {employees.map((emp) => (
+                                          <div
+                                            key={emp.user?._id || emp.name}
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              justifyContent: "space-between",
+                                              padding: "8px 12px",
+                                              borderRadius: 6,
+                                              background: "#f0fdf4",
+                                              border: `1px solid #6ee7b7`,
+                                              flexWrap: "wrap",
+                                              gap: 6,
+                                              opacity: 0.85,
+                                            }}
+                                          >
+                                            <div
+                                              style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 8,
+                                              }}
+                                            >
+                                              <div
+                                                style={{
+                                                  width: 28,
+                                                  height: 28,
+                                                  borderRadius: "50%",
+                                                  background: `linear-gradient(135deg, #10b981, #34d399)`,
+                                                  color: "#fff",
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  justifyContent: "center",
+                                                  fontSize: 11,
+                                                  fontWeight: 700,
+                                                }}
+                                              >
+                                                {emp.name?.charAt(0) || "?"}
+                                              </div>
+                                              <div>
+                                                <div
+                                                  style={{
+                                                    fontWeight: 600,
+                                                    fontSize: 12,
+                                                    color: C.dark,
+                                                  }}
+                                                >
+                                                  {emp.name}
+                                                  {emp.user?._id ===
+                                                    user?._id && (
+                                                    <span
+                                                      style={{
+                                                        marginLeft: 4,
+                                                        fontSize: 8,
+                                                        background:
+                                                          C.primary + "15",
+                                                        color: C.primary,
+                                                        padding: "1px 6px",
+                                                        borderRadius: 8,
+                                                        fontWeight: 600,
+                                                      }}
+                                                    >
+                                                      {t.you || "You"}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <div
+                                                  style={{
+                                                    fontSize: 10,
+                                                    color: C.muted,
+                                                  }}
+                                                >
+                                                  {emp.email ||
+                                                    t.noEmail ||
+                                                    "No email"}
+                                                </div>
+                                              </div>
+                                            </div>
+                                            <span
+                                              style={{
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 4,
+                                                color: "#065f46",
+                                                fontSize: 11,
+                                                fontWeight: 600,
+                                              }}
+                                            >
+                                              <FiCheck size={14} />{" "}
+                                              {t.signed || "Signed"}
+                                              {emp.checkedInAt && (
+                                                <span
+                                                  style={{
+                                                    fontSize: 9,
+                                                    color: C.muted,
+                                                    fontWeight: 400,
+                                                  }}
+                                                >
+                                                  at{" "}
+                                                  {new Date(
+                                                    emp.checkedInAt,
+                                                  ).toLocaleTimeString()}
+                                                </span>
+                                              )}
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

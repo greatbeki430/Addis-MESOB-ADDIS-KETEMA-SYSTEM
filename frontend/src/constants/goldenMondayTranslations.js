@@ -86,7 +86,7 @@ export const goldenMondayTranslations = {
     closingBody:
       "Golden Monday is a standing fixture — check back weekly for the next session's write-up.",
 
-    // Rotation Panel (with additional keys)
+    // Rotation Panel
     rotationTitle: "Presenter Rotation",
     thisWeekPresenter: "This week's presenter",
     titleNotChosen: "Title not chosen yet",
@@ -179,6 +179,16 @@ export const goldenMondayTranslations = {
     noEmail: "No email",
     confirmSignature: "Confirm",
     cancelSignature: "Cancel",
+    unsignedEmployees: "Unsigned Employees",
+    signedEmployees: "Signed Employees",
+    signNow: "Sign Now",
+    alreadySigned: "Already Signed",
+    // ✅ NEW KEYS for the modified AttendancePanel
+    confirm: "Confirm",
+    cancel: "Cancel",
+    pleaseSignYourAttendance: "Please sign your attendance below",
+    uncategorized: "Uncategorized",
+    staff: "Staff",
 
     // Gallery
     galleryTitle: "Gallery",
@@ -437,6 +447,16 @@ export const goldenMondayTranslations = {
     noEmail: "ኢሜል የለም",
     confirmSignature: "አረጋግጥ",
     cancelSignature: "ሰርዝ",
+    unsignedEmployees: "ያልፈረሙ ሰራተኞች",
+    signedEmployees: "የፈረሙ ሰራተኞች",
+    signNow: "አሁን ፈረም",
+    alreadySigned: "ተፈርመዋል",
+    // ✅ NEW KEYS for the modified AttendancePanel
+    confirm: "አረጋግጥ",
+    cancel: "ሰርዝ",
+    pleaseSignYourAttendance: "እባክዎ ክትትልዎን ከታች ይፈረሙ",
+    uncategorized: "ያልተመደበ",
+    staff: "ሰራተኛ",
 
     // Gallery
     galleryTitle: "ማሳያ",
@@ -699,6 +719,16 @@ export const goldenMondayTranslations = {
     noEmail: "Imeeliin hin jiru",
     confirmSignature: "Mirkaneeffadhu",
     cancelSignature: "Haqi",
+    unsignedEmployees: "Hojjattoota hin mallatteessine",
+    signedEmployees: "Hojjattoota mallatteessan",
+    signNow: "Amma Mallatteessi",
+    alreadySigned: "Mallatteeffameera",
+    // ✅ NEW KEYS for the modified AttendancePanel
+    confirm: "Mirkaneeffadhu",
+    cancel: "Haqi",
+    pleaseSignYourAttendance: "Mallattoo argama keessan gaditti kaa'aa",
+    uncategorized: "Kan hin ramadamne",
+    staff: "Hojjataa",
 
     // Gallery
     galleryTitle: "Galerii",

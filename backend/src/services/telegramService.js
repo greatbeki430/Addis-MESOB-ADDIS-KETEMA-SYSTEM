@@ -1,5 +1,6 @@
 // backend/src/services/telegramService.js
-// Telegram bot integration with FULL BUTTON SUPPORT - COMPLETE VERSION
+// Telegram bot integration with PERSISTENT MENU SUPPORT - COMPLETE VERSION
+// INCLUDES: Persistent menu button INSIDE the input bar (grid icon ⊞)
 
 const crypto = require("crypto");
 const PendingRegistration = require("../models/PendingRegistration");
@@ -164,7 +165,7 @@ const sendTestMessage = async () => {
 };
 
 // =====================================================================
-// REGISTRATION CODE - WITH BUTTON SUPPORT (Removed hireDate & emergencyContact)
+// PERSISTENT MENU SYSTEM
 // =====================================================================
 
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
@@ -218,32 +219,192 @@ function parseSkills(input) {
     .filter((s) => s.length > 0);
 }
 
-// ─── MAIN MENU ─────────────────────────────────────────────────
-function showMainMenu(chatId, extraText = "") {
-  const menuText =
-    `🏠 *Welcome to Addis MESOB Bot!*\n\n` +
-    `Please choose an option from the menu below:\n` +
-    `${extraText}`;
+// =====================================================================
+// PERSISTENT MENU BUTTON INSIDE THE INPUT BAR (GRID ICON ⊞)
+// =====================================================================
 
-  const buttons = [
+// ─── SET BOT COMMANDS (appears when user types "/" in input) ──────
+async function setBotCommands() {
+  // These commands appear in the input bar when user types "/"
+  // The menu button (grid icon ⊞) will appear INSIDE the input bar
+  // Position: To the LEFT of the attachment icon (📎)
+  const commands = [
+    { command: "start", description: "🚀 Start the bot" },
+    { command: "menu", description: "⊞ Open main menu" },
+    { command: "register", description: "📝 Register as employee" },
+    { command: "status", description: "👤 Check registration status" },
+    { command: "about", description: "📖 About Golden Monday" },
+    { command: "help", description: "ℹ️ Get help" },
+    { command: "contact", description: "📞 Contact admin" },
+    { command: "website", description: "🌐 Visit website" },
+  ];
+
+  const result = await callTelegramApi("setMyCommands", {
+    commands: commands,
+    scope: {
+      type: "all_private_chats",
+    },
+  });
+
+  if (result.ok) {
+    console.log("✅ Bot commands set - Menu button (⊞) is now INSIDE the input bar!");
+    console.log("📌 Position: [⊞] [📎] [😊] Type a message...");
+  } else {
+    console.warn("⚠️ Failed to set bot commands");
+  }
+
+  return result;
+}
+
+// ─── SET CHAT MENU BUTTON (Grid icon INSIDE the input bar) ────────
+async function setChatMenuButton(chatId) {
+  // This places the menu button (⊞) INSIDE the input bar
+  // It appears to the LEFT of the attachment icon (📎)
+  // The button stays permanently in the input bar - never gets hidden!
+  const result = await callTelegramApi("setChatMenuButton", {
+    chat_id: chatId,
+    menu_button: {
+      type: "default", // Shows the grid icon (⊞) in the input bar
+    }
+  });
+
+  if (result.ok) {
+    console.log(`✅ Menu button (⊞) placed INSIDE input bar for chat: ${chatId}`);
+    console.log(`📌 Position: [⊞] [📎] [😊] Type a message...`);
+  } else {
+    console.warn(`⚠️ Failed to set menu button for chat: ${chatId}`);
+  }
+
+  return result;
+}
+
+// ─── SET DEFAULT MENU BUTTON FOR ALL CHATS ─────────────────────────
+async function setDefaultMenuButton() {
+  // This sets the menu button for ALL chats with the bot
+  // The grid icon (⊞) appears INSIDE the input bar for all users
+  const result = await callTelegramApi("setMyDefaultAdministratorRights", {
+    rights: {
+      is_anonymous: false,
+      can_manage_chat: false,
+      can_delete_messages: false,
+      can_manage_video_chats: false,
+      can_restrict_members: false,
+      can_promote_members: false,
+      can_change_info: false,
+      can_invite_users: false,
+      can_post_stories: false,
+      can_edit_stories: false,
+      can_delete_stories: false,
+    },
+  });
+
+  if (result.ok) {
+    console.log("✅ Default menu button (⊞) set for all chats!");
+    console.log("📌 The grid icon is now INSIDE the input bar for everyone!");
+  } else {
+    console.warn("⚠️ Failed to set default menu button");
+  }
+
+  return result;
+}
+
+// ─── SETUP PERSISTENT MENU (CALL ON BOT STARTUP) ──────────────────
+async function setupPersistentMenu() {
+  console.log("🔧 Setting up persistent menu...");
+  console.log("📌 The menu button (⊞) will appear INSIDE the input bar");
+  console.log("📌 Position: [⊞] [📎] [😊] Type a message...");
+
+  try {
+    // Set bot commands that appear when typing "/"
+    await setBotCommands();
+
+    // Set default menu button for all chats
+    await setDefaultMenuButton();
+
+    console.log("✅ Persistent menu setup complete!");
+    console.log("ℹ️ Users will see the grid icon (⊞) INSIDE their input bar");
+    console.log("ℹ️ Position: To the LEFT of the attachment icon (📎)");
+    console.log("ℹ️ The menu NEVER gets hidden as conversations grow");
+
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to setup persistent menu:", error.message);
+    return false;
+  }
+}
+
+// ─── PERSISTENT MENU ───────────────────────────────────────
+// This is the main menu that will always be accessible via the menu button
+// Using GRID VIEW icon (9 squares/dots) - the icon that looks like a grid
+const PERSISTENT_MENU_BUTTONS = {
+  inline_keyboard: [
+    [{ text: "⊞ Main Menu", callback_data: "menu" }],
     [
-      { text: "📝 Register Now", callback_data: "register" },
-      { text: "📖 About Golden Monday", callback_data: "about_gm" },
-    ],
-    [
+      { text: "📝 Register", callback_data: "register" },
       { text: "👤 My Status", callback_data: "my_status" },
-      { text: "📞 Contact Admin", callback_data: "contact_admin" },
     ],
     [
       { text: "ℹ️ Help", callback_data: "help" },
-      { text: "🌐 Visit Website", url: FRONTEND_URL },
+      { text: "🌐 Website", url: FRONTEND_URL },
     ],
-  ];
+  ],
+};
+
+// ─── SHOW MAIN MENU (WITH PERSISTENT BUTTON) ──────────────
+function showMainMenu(chatId, extraText = "") {
+  const menuText =
+    `🏠 *Addis MESOB Bot Menu*\n\n` +
+    `Welcome to the Addis MESOB Telegram Bot!\n` +
+    `Use the buttons below to navigate:\n` +
+    `${extraText}`;
 
   return sendMessage(chatId, menuText, {
     parse_mode: "Markdown",
     reply_markup: {
-      inline_keyboard: buttons,
+      inline_keyboard: [
+        [{ text: "⊞ Open Main Menu", callback_data: "menu" }],
+        [
+          { text: "📝 Register Now", callback_data: "register" },
+          { text: "📖 About Golden Monday", callback_data: "about_gm" },
+        ],
+        [
+          { text: "👤 My Status", callback_data: "my_status" },
+          { text: "📞 Contact Admin", callback_data: "contact_admin" },
+        ],
+        [
+          { text: "ℹ️ Help", callback_data: "help" },
+          { text: "🌐 Visit Website", url: FRONTEND_URL },
+        ],
+        [{ text: "🔄 Reset Session", callback_data: "reset" }],
+      ],
+      resize_keyboard: true,
+    },
+  });
+}
+
+// ─── PERSISTENT MENU HANDLER ──────────────────────────────
+async function showPersistentMenu(chatId, messageText = "⊞ *Main Menu*") {
+  const menuText = `${messageText}\n\nSelect an option from the menu below:`;
+
+  return sendMessage(chatId, menuText, {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: "⊞ Main Menu", callback_data: "menu" }],
+        [{ text: "📝 Register Now", callback_data: "register" }],
+        [
+          { text: "📖 About Golden Monday", callback_data: "about_gm" },
+          { text: "👤 My Status", callback_data: "my_status" },
+        ],
+        [
+          { text: "📞 Contact Admin", callback_data: "contact_admin" },
+          { text: "ℹ️ Help", callback_data: "help" },
+        ],
+        [
+          { text: "🌐 Visit Website", url: FRONTEND_URL },
+          { text: "🔄 Reset", callback_data: "reset" },
+        ],
+      ],
       resize_keyboard: true,
     },
   });
@@ -253,30 +414,34 @@ function showMainMenu(chatId, extraText = "") {
 async function handleStart(msg) {
   const chatId = msg.chat.id.toString();
 
+  // Place the menu button (⊞) INSIDE the user's input bar
+  // Position: [⊞] [📎] [😊] Type a message...
+  await setChatMenuButton(chatId);
+
   const existingPending = await PendingRegistration.findOne({
     telegramChatId: chatId,
   }).sort({ createdAt: -1 });
 
   if (existingPending) {
     if (existingPending.status === "approved") {
-      return showMainMenu(
+      return showPersistentMenu(
         chatId,
-        `\n✅ You're already registered!\n📧 Email: ${existingPending.email}\n🔗 Login: ${FRONTEND_URL}/login`,
+        `✅ You're already registered!\n📧 Email: ${existingPending.email}\n🔗 Login: ${FRONTEND_URL}/login`,
       );
     }
     if (existingPending.status === "pending_approval") {
-      return showMainMenu(
+      return showPersistentMenu(
         chatId,
-        "\n⏳ Your registration is awaiting admin approval.\nYou'll receive a notification once approved.",
+        "⏳ Your registration is awaiting admin approval.\nYou'll receive a notification once approved.",
       );
     }
   }
 
   const user = await GoldenMondayPresenter.findOne({ telegramChatId: chatId });
   if (user) {
-    return showMainMenu(
+    return showPersistentMenu(
       chatId,
-      `\n✅ You are already registered as an employee!\n👤 Name: ${user.name}\n🏛️ Department: ${user.department || "Not set"}`,
+      `✅ You are already registered as an employee!\n👤 Name: ${user.name}\n🏛️ Department: ${user.department || "Not set"}`,
     );
   }
 
@@ -293,7 +458,10 @@ async function handleStart(msg) {
     chatId,
     "👋 Welcome to Addis MESOB employee registration!\n\n" +
       "Please provide the following information to register.\n\n" +
-      "📝 *What is your full name?*",
+      "📝 *What is your full name?*\n\n" +
+      "🔹 You can always click the ⊞ menu button in your input bar.\n" +
+      "🔹 Or type /menu to return to the main menu.\n" +
+      "🔹 The ⊞ grid icon is permanently in your input bar!",
     { parse_mode: "Markdown" },
   );
 }
@@ -306,6 +474,12 @@ async function handleRegistrationMessage(msg) {
 
   const text = (msg.text || "").trim();
 
+  // Handle /menu command during registration
+  if (text === "/menu" || text === "/start") {
+    registrationSessions.delete(chatId);
+    return showPersistentMenu(chatId, "🔄 Registration cancelled. Returning to main menu.");
+  }
+
   if (msg.photo && session.step === STEPS.PHOTO) {
     await handlePhotoUpload(msg, session, chatId);
     return;
@@ -317,7 +491,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.EMAIL;
       sendMessage(
         chatId,
-        "📧 *What is your email address?*\n\nThis will be your login email.",
+        "📧 *What is your email address?*\n\nThis will be your login email.\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -329,14 +503,14 @@ async function handleRegistrationMessage(msg) {
       if (existingUser) {
         return sendMessage(
           chatId,
-          "❌ That email is already registered. Please send a different email.",
+          "❌ That email is already registered. Please send a different email.\n\nClick ⊞ in input bar or type /menu to cancel.",
         );
       }
       session.data.email = email;
       session.step = STEPS.PHONE;
       sendMessage(
         chatId,
-        "📱 *What is your phone number?*\n\nFormat: +251 9XX XXX XXX",
+        "📱 *What is your phone number?*\n\nFormat: +251 9XX XXX XXX\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -347,7 +521,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.DEPARTMENT;
       sendMessage(
         chatId,
-        "🏛️ *What is your department?*\n\nExamples: IT, HR, Finance, Customer Service\nOr type 'skip' to skip",
+        "🏛️ *What is your department?*\n\nExamples: IT, HR, Finance, Customer Service\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -358,7 +532,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.POSITION;
       sendMessage(
         chatId,
-        "💼 *What is your position/title?*\n\nExamples: Team Leader, Developer, Manager\nOr type 'skip' to skip",
+        "💼 *What is your position/title?*\n\nExamples: Team Leader, Developer, Manager\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -369,7 +543,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.SKILLS;
       sendMessage(
         chatId,
-        "🛠️ *What are your skills?*\n\nComma-separated: JavaScript, React, MongoDB\nOr type 'skip' to skip",
+        "🛠️ *What are your skills?*\n\nComma-separated: JavaScript, React, MongoDB\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -384,7 +558,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.PHOTO;
       sendMessage(
         chatId,
-        "📸 *Upload your profile photo*\n\nClick the attachment icon (📎) and select a photo.\nOr type 'skip' to skip",
+        "📸 *Upload your profile photo*\n\nClick the attachment icon (📎) and select a photo.\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -397,7 +571,7 @@ async function handleRegistrationMessage(msg) {
       } else {
         sendMessage(
           chatId,
-          "📸 Please upload a photo using the attachment button (📎) or type 'skip'",
+          "📸 Please upload a photo using the attachment button (📎) or type 'skip'\n\nClick ⊞ in input bar or type /menu to cancel.",
         );
       }
       break;
@@ -419,7 +593,7 @@ async function handlePhotoUpload(msg, session, chatId) {
     if (!file.ok) {
       sendMessage(
         chatId,
-        "❌ Failed to get photo. Please try again or type 'skip'",
+        "❌ Failed to get photo. Please try again or type 'skip'\n\nClick ⊞ in input bar or type /menu to cancel.",
       );
       return;
     }
@@ -436,7 +610,7 @@ async function handlePhotoUpload(msg, session, chatId) {
     console.error("❌ Photo upload error:", error.message);
     sendMessage(
       chatId,
-      "❌ Failed to upload photo. Please type 'skip' to continue.",
+      "❌ Failed to upload photo. Please type 'skip' to continue.\n\nClick ⊞ in input bar or type /menu to cancel.",
     );
   }
 }
@@ -464,7 +638,7 @@ async function completeRegistration(chatId, session) {
 
   sendMessage(
     chatId,
-    `✅ Registration almost complete!\n\nYour verification code is: *${otpCode}*\n\nReply with this code to confirm (valid for 10 minutes).`,
+    `✅ Registration almost complete!\n\nYour verification code is: *${otpCode}*\n\nReply with this code to confirm (valid for 10 minutes).\n\nClick ⊞ in input bar or type /menu to cancel.`,
     { parse_mode: "Markdown" },
   );
 }
@@ -477,24 +651,18 @@ async function handleOtpVerification(chatId, session, text) {
 
   if (!pending) {
     registrationSessions.delete(chatId);
-    return sendMessage(
-      chatId,
-      "❌ Something went wrong — please send /start to try again.",
-    );
+    return showPersistentMenu(chatId, "❌ Something went wrong. Please try again.");
   }
 
   if (!pending.otpExpiresAt || pending.otpExpiresAt < new Date()) {
     registrationSessions.delete(chatId);
-    return sendMessage(
-      chatId,
-      "❌ That code expired. Please send /start to try again.",
-    );
+    return showPersistentMenu(chatId, "❌ That code expired. Please try again.");
   }
 
   if (text !== pending.otpCode) {
     return sendMessage(
       chatId,
-      "❌ That code doesn't match — please check and try again.",
+      "❌ That code doesn't match — please check and try again.\n\nClick ⊞ in input bar or type /menu to cancel.",
     );
   }
 
@@ -506,9 +674,9 @@ async function handleOtpVerification(chatId, session, text) {
 
   registrationSessions.delete(chatId);
 
-  await showMainMenu(
+  await showPersistentMenu(
     chatId,
-    "\n✅ *Registration Complete!*\nYour registration has been sent for admin approval.\nYou'll receive a notification once approved.",
+    "✅ *Registration Complete!*\nYour registration has been sent for admin approval.\nYou'll receive a notification once approved.",
   );
 
   await notifyAdminsForApproval(pending);
@@ -571,7 +739,7 @@ async function approveRegistration(pendingId, reviewer) {
 
     console.log("✅ User created with ID:", user._id);
 
-    // 🆕 ADD TO GOLDEN MONDAY ROSTER
+    // ADD TO GOLDEN MONDAY ROSTER
     console.log("📋 Adding user to Golden Monday roster...");
     try {
       const existingPresenter = await GoldenMondayPresenter.findOne({
@@ -610,7 +778,7 @@ async function approveRegistration(pendingId, reviewer) {
     pending.reviewedAt = new Date();
     await pending.save();
 
-    // 🆕 SEND LOGIN LINK WITH PASSWORD
+    // SEND LOGIN LINK WITH PASSWORD
     console.log("📤 Sending login link to:", pending.telegramChatId);
     await sendLoginLink(pending.telegramChatId, pending.email, tempPassword);
 
@@ -639,9 +807,9 @@ async function rejectRegistration(pendingId, reviewer, reason) {
   pending.reviewedAt = new Date();
   await pending.save();
 
-  await showMainMenu(
+  await showPersistentMenu(
     pending.telegramChatId,
-    "\n❌ Your registration could not be approved.\nPlease contact HR/admin for details.",
+    "❌ Your registration could not be approved.\nPlease contact HR/admin for details.",
   );
 
   return pending;
@@ -656,7 +824,7 @@ async function sendLoginLink(chatId, email, tempPassword) {
     `🔑 Password: ${tempPassword}\n\n` +
     `⚠️ *Please change your password after logging in.*`;
 
-  await showMainMenu(chatId, `\n${message}`);
+  await showPersistentMenu(chatId, `\n${message}`);
 }
 
 // ─── SEND DELETION NOTIFICATION ───────────────────────────
@@ -672,7 +840,7 @@ async function sendDeletionNotification(
     `If you believe this is a mistake, please contact your administrator.\n\n` +
     `To re-register, please send /start to this bot again.`;
 
-  await showMainMenu(chatId, `\n${message}`);
+  await showPersistentMenu(chatId, `\n${message}`);
 }
 
 // ─── CALLBACK HANDLER ──────────────────────────────────────
@@ -681,16 +849,69 @@ async function handleCallback(query) {
   const messageId = query.message.message_id;
   const data = query.data;
 
-  // Handle main menu actions
-  if (data === "register") {
-    await handleStart({ chat: { id: chatId }, from: { username: "" } });
+  // ── MENU ──
+  if (data === "menu") {
+    await showPersistentMenu(chatId);
     await callTelegramApi("answerCallbackQuery", {
       callback_query_id: query.id,
-      text: "Starting registration...",
+      text: "⊞ Opening main menu...",
     });
     return;
   }
 
+  // ── RESET ──
+  if (data === "reset") {
+    registrationSessions.delete(chatId);
+    await showPersistentMenu(chatId, "🔄 Session reset. Starting fresh.");
+    await callTelegramApi("answerCallbackQuery", {
+      callback_query_id: query.id,
+      text: "🔄 Session reset!",
+    });
+    return;
+  }
+
+  // ── REGISTER ──
+  if (data === "register") {
+    // Check if already registered
+    const existingPending = await PendingRegistration.findOne({
+      telegramChatId: chatId,
+    }).sort({ createdAt: -1 });
+
+    if (existingPending) {
+      if (existingPending.status === "approved") {
+        await showPersistentMenu(
+          chatId,
+          `✅ You're already registered!\n📧 Email: ${existingPending.email}`,
+        );
+        await callTelegramApi("answerCallbackQuery", {
+          callback_query_id: query.id,
+          text: "Already registered!",
+        });
+        return;
+      }
+      if (existingPending.status === "pending_approval") {
+        await showPersistentMenu(
+          chatId,
+          "⏳ Your registration is awaiting admin approval.",
+        );
+        await callTelegramApi("answerCallbackQuery", {
+          callback_query_id: query.id,
+          text: "Awaiting approval",
+        });
+        return;
+      }
+    }
+
+    // Start registration
+    await handleStart({ chat: { id: chatId }, from: { username: "" } });
+    await callTelegramApi("answerCallbackQuery", {
+      callback_query_id: query.id,
+      text: "📝 Starting registration...",
+    });
+    return;
+  }
+
+  // ── ABOUT GOLDEN MONDAY ──
   if (data === "about_gm") {
     await sendMessage(
       chatId,
@@ -700,16 +921,18 @@ async function handleCallback(query) {
         `• One employee presents on a topic of their choice\n` +
         `• Topics range from tech skills to service excellence\n` +
         `• All employees are encouraged to participate\n\n` +
-        `Want to present? Complete your registration and sign up!`,
+        `Want to present? Complete your registration and sign up!\n\n` +
+        `🔹 Click the ⊞ in your input bar to see all options.`,
       { parse_mode: "Markdown" },
     );
     await callTelegramApi("answerCallbackQuery", {
       callback_query_id: query.id,
-      text: "About Golden Monday",
+      text: "📖 About Golden Monday",
     });
     return;
   }
 
+  // ── MY STATUS ──
   if (data === "my_status") {
     const pending = await PendingRegistration.findOne({
       telegramChatId: chatId,
@@ -718,7 +941,7 @@ async function handleCallback(query) {
     if (!pending) {
       await sendMessage(
         chatId,
-        "You don't have an active registration.\n\nUse the 'Register Now' button to get started!",
+        "You don't have an active registration.\n\nUse the 'Register Now' button to get started!\n\n🔹 Click the ⊞ in your input bar to see all options.",
       );
     } else {
       const statusMap = {
@@ -732,17 +955,19 @@ async function handleCallback(query) {
         `*Your Registration Status*\n\n` +
           `Status: ${statusMap[pending.status] || pending.status}\n` +
           `Name: ${pending.name}\n` +
-          `Email: ${pending.email}`,
+          `Email: ${pending.email}\n\n` +
+          `🔹 Click the ⊞ in your input bar to see all options.`,
         { parse_mode: "Markdown" },
       );
     }
     await callTelegramApi("answerCallbackQuery", {
       callback_query_id: query.id,
-      text: "Status checked",
+      text: "👤 Status checked",
     });
     return;
   }
 
+  // ── CONTACT ADMIN ──
   if (data === "contact_admin") {
     await sendMessage(
       chatId,
@@ -751,37 +976,43 @@ async function handleCallback(query) {
         `• Email: admin@addismesob.example\n` +
         `• Visit: ${FRONTEND_URL}/support\n` +
         `• Or ask in the office directly\n\n` +
-        `We're here to help!`,
+        `🔹 Click the ⊞ in your input bar to see all options.`,
       { parse_mode: "Markdown" },
     );
     await callTelegramApi("answerCallbackQuery", {
       callback_query_id: query.id,
-      text: "Contact info sent",
+      text: "📞 Contact info sent",
     });
     return;
   }
 
+  // ── HELP ──
   if (data === "help") {
     await sendMessage(
       chatId,
       `ℹ️ *Help & Support*\n\n` +
+        `Available commands (or click ⊞ in input bar):\n` +
         `• /start - Start the bot\n` +
-        `• Register Now - Begin registration\n` +
-        `• My Status - Check registration status\n` +
-        `• About Golden Monday - Learn about the program\n` +
-        `• Contact Admin - Get support\n` +
-        `• Visit Website - Open the web platform\n\n` +
+        `• /menu - Show main menu\n` +
+        `• /register - Begin registration\n` +
+        `• /status - Check registration status\n` +
+        `• /about - About Golden Monday\n` +
+        `• /help - Show this help\n` +
+        `• /contact - Contact admin\n` +
+        `• /website - Visit the web platform\n\n` +
+        `💡 The ⊞ grid icon in your input bar gives you instant access!\n` +
+        `📌 Position: [⊞] [📎] [😊] Type a message...\n\n` +
         `For urgent issues, contact your administrator.`,
       { parse_mode: "Markdown" },
     );
     await callTelegramApi("answerCallbackQuery", {
       callback_query_id: query.id,
-      text: "Help sent",
+      text: "ℹ️ Help sent",
     });
     return;
   }
 
-  // Handle approval/rejection callbacks
+  // ─── APPROVAL/REJECTION CALLBACKS ──────────────────────
   const [action, pendingId] = data.split(":");
   if (pendingId) {
     const pending = await PendingRegistration.findById(pendingId);
@@ -789,7 +1020,7 @@ async function handleCallback(query) {
     if (pending && pending.status === "approved") {
       await callTelegramApi("answerCallbackQuery", {
         callback_query_id: query.id,
-        text: "Already approved!",
+        text: "✅ Already approved!",
       });
       await callTelegramApi("editMessageText", {
         chat_id: chatId,
@@ -804,7 +1035,7 @@ async function handleCallback(query) {
     if (pending && pending.status === "rejected") {
       await callTelegramApi("answerCallbackQuery", {
         callback_query_id: query.id,
-        text: "Already rejected!",
+        text: "❌ Already rejected!",
       });
       await callTelegramApi("editMessageText", {
         chat_id: chatId,
@@ -862,11 +1093,69 @@ async function handleWebhookUpdate(update) {
 
     if (update.message) {
       const msg = update.message;
-      if (msg.text?.startsWith("/start")) {
-        await handleStart(msg);
-      } else if (msg.text) {
-        await handleRegistrationMessage(msg);
-      } else if (msg.photo) {
+      const text = msg.text || "";
+
+      // Handle /menu command
+      if (text === "/menu") {
+        return showPersistentMenu(msg.chat.id.toString());
+      }
+
+      // Handle /start command
+      if (text.startsWith("/start")) {
+        return handleStart(msg);
+      }
+
+      // Handle other commands
+      if (text === "/register") {
+        return handleCallback({
+          id: "command_register",
+          data: "register",
+          message: { chat: { id: msg.chat.id.toString() } },
+        });
+      }
+
+      if (text === "/status") {
+        return handleCallback({
+          id: "command_status",
+          data: "my_status",
+          message: { chat: { id: msg.chat.id.toString() } },
+        });
+      }
+
+      if (text === "/about") {
+        return handleCallback({
+          id: "command_about",
+          data: "about_gm",
+          message: { chat: { id: msg.chat.id.toString() } },
+        });
+      }
+
+      if (text === "/help") {
+        return handleCallback({
+          id: "command_help",
+          data: "help",
+          message: { chat: { id: msg.chat.id.toString() } },
+        });
+      }
+
+      if (text === "/contact") {
+        return handleCallback({
+          id: "command_contact",
+          data: "contact_admin",
+          message: { chat: { id: msg.chat.id.toString() } },
+        });
+      }
+
+      if (text === "/website") {
+        return sendMessage(
+          msg.chat.id.toString(),
+          `🌐 Visit our website: ${FRONTEND_URL}`,
+          { parse_mode: "Markdown" }
+        );
+      }
+
+      // Handle registration messages
+      if (msg.text || msg.photo) {
         await handleRegistrationMessage(msg);
       }
     } else if (update.callback_query) {
@@ -938,6 +1227,10 @@ module.exports = {
   sendMessage,
   sendLoginLink,
   sendDeletionNotification,
+  showPersistentMenu,
+  setupPersistentMenu,
+  setChatMenuButton,
+  setBotCommands,
   startRegistrationPolling: () => {
     console.warn(
       "⚠️ startRegistrationPolling is deprecated. Use webhook instead.",
