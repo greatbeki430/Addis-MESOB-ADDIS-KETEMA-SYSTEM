@@ -68,7 +68,7 @@ api.interceptors.response.use(
 );
 
 // ============================================================
-// AUTH API
+// AUTH API - Add changePassword
 // ============================================================
 export const authAPI = {
   register: (userData) => api.post("/auth/register", userData),
@@ -78,6 +78,27 @@ export const authAPI = {
   getUser: (id) => api.get(`/auth/users/${id}`),
   updateUser: (id, data) => api.put(`/auth/users/${id}`, data),
   deleteUser: (id) => api.delete(`/auth/users/${id}`),
+  // ✅ Add this
+  changePassword: (data) => api.put("/auth/change-password", data),
+  // ✅ Add this for profile update
+  updateProfile: (data) => api.put("/auth/profile", data),
+};
+
+// In api.js - uploadAPI section
+export const uploadAPI = {
+  uploadEmployeePhoto: (formData) =>
+    api.post("/upload/employee-photo", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
+  // ✅ Add this
+  uploadProfilePhoto: (formData) =>
+    api.post("/upload/profile-photo", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
 };
 
 // ============================================================
@@ -226,18 +247,6 @@ export const documentAPI = {
   getDownloadUrl: (id) => api.get(`/documents/${id}/download`),
   flagDelete: (id, reason) =>
     api.delete(`/documents/${id}/flag`, { data: { reason } }),
-};
-
-// ============================================================
-// UPLOAD API - For file uploads (employee photos, etc.)
-// ============================================================
-export const uploadAPI = {
-  uploadEmployeePhoto: (formData) =>
-    api.post("/upload/employee-photo", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-    }),
 };
 
 // ============================================================

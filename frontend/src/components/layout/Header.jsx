@@ -26,6 +26,7 @@ import {
   FiFileText,
   FiSunrise,
   FiBarChart2,
+  FiLock,
 } from "react-icons/fi";
 
 export default function Header({ t, lang, setLang, onAddUserClick }) {
@@ -751,6 +752,30 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
                   >
                     <FiSettings size={12} style={{ color: C.muted }} />
                     Settings
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      window.location.href = "/change-password";
+                    }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "5px 14px",
+                      width: "100%",
+                      border: "none",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      color: C.dark,
+                      transition: "background 0.2s ease",
+                      fontFamily: F.sans,
+                    }}
+                  >
+                    <FiLock size={12} style={{ color: C.muted }} />
+                    Change Password
                   </button>
 
                   {canAddUsers && (

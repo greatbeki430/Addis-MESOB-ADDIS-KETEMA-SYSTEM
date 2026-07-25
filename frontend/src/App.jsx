@@ -44,6 +44,7 @@ import AlertsManagement from "./pages/admin/AlertsManagement";
 
 // Admin Data Management - Only import the main component, not wrappers
 import AdminDataManagement from "./pages/admin/AdminDataManagement";
+import ChangePassword from "./pages/ChangePassword";
 
 // ✅ ADD THIS IMPORT
 import { FiUserPlus } from "react-icons/fi";
@@ -384,7 +385,10 @@ function AuthenticatedApp() {
             width: "100%",
           }}
         >
-          <div className="page-enter" style={{ maxWidth: "100%", overflowX: "hidden" }}>
+          <div
+            className="page-enter"
+            style={{ maxWidth: "100%", overflowX: "hidden" }}
+          >
             <Routes>
               {/* Redirect root to dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -617,6 +621,8 @@ function AuthenticatedApp() {
 
               {/* Catch all - redirect to dashboard */}
               <Route path="*" element={<Navigate to="/dashboard" replace />} />
+
+              <Route path="/change-password" element={<ChangePassword />} />
             </Routes>
           </div>
         </main>
