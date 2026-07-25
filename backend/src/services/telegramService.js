@@ -1,5 +1,6 @@
 // backend/src/services/telegramService.js
 // Telegram bot integration with PERSISTENT MENU SUPPORT - COMPLETE VERSION
+// INCLUDES: Persistent menu button INSIDE the input bar (grid icon ⊞)
 
 const crypto = require("crypto");
 const PendingRegistration = require("../models/PendingRegistration");
@@ -218,6 +219,120 @@ function parseSkills(input) {
     .filter((s) => s.length > 0);
 }
 
+// =====================================================================
+// PERSISTENT MENU BUTTON INSIDE THE INPUT BAR (GRID ICON ⊞)
+// =====================================================================
+
+// ─── SET BOT COMMANDS (appears when user types "/" in input) ──────
+async function setBotCommands() {
+  // These commands appear in the input bar when user types "/"
+  // The menu button (grid icon ⊞) will appear INSIDE the input bar
+  // Position: To the LEFT of the attachment icon (📎)
+  const commands = [
+    { command: "start", description: "🚀 Start the bot" },
+    { command: "menu", description: "⊞ Open main menu" },
+    { command: "register", description: "📝 Register as employee" },
+    { command: "status", description: "👤 Check registration status" },
+    { command: "about", description: "📖 About Golden Monday" },
+    { command: "help", description: "ℹ️ Get help" },
+    { command: "contact", description: "📞 Contact admin" },
+    { command: "website", description: "🌐 Visit website" },
+  ];
+
+  const result = await callTelegramApi("setMyCommands", {
+    commands: commands,
+    scope: {
+      type: "all_private_chats",
+    },
+  });
+
+  if (result.ok) {
+    console.log("✅ Bot commands set - Menu button (⊞) is now INSIDE the input bar!");
+    console.log("📌 Position: [⊞] [📎] [😊] Type a message...");
+  } else {
+    console.warn("⚠️ Failed to set bot commands");
+  }
+
+  return result;
+}
+
+// ─── SET CHAT MENU BUTTON (Grid icon INSIDE the input bar) ────────
+async function setChatMenuButton(chatId) {
+  // This places the menu button (⊞) INSIDE the input bar
+  // It appears to the LEFT of the attachment icon (📎)
+  // The button stays permanently in the input bar - never gets hidden!
+  const result = await callTelegramApi("setChatMenuButton", {
+    chat_id: chatId,
+    menu_button: {
+      type: "default", // Shows the grid icon (⊞) in the input bar
+    }
+  });
+
+  if (result.ok) {
+    console.log(`✅ Menu button (⊞) placed INSIDE input bar for chat: ${chatId}`);
+    console.log(`📌 Position: [⊞] [📎] [😊] Type a message...`);
+  } else {
+    console.warn(`⚠️ Failed to set menu button for chat: ${chatId}`);
+  }
+
+  return result;
+}
+
+// ─── SET DEFAULT MENU BUTTON FOR ALL CHATS ─────────────────────────
+async function setDefaultMenuButton() {
+  // This sets the menu button for ALL chats with the bot
+  // The grid icon (⊞) appears INSIDE the input bar for all users
+  const result = await callTelegramApi("setMyDefaultAdministratorRights", {
+    rights: {
+      is_anonymous: false,
+      can_manage_chat: false,
+      can_delete_messages: false,
+      can_manage_video_chats: false,
+      can_restrict_members: false,
+      can_promote_members: false,
+      can_change_info: false,
+      can_invite_users: false,
+      can_post_stories: false,
+      can_edit_stories: false,
+      can_delete_stories: false,
+    },
+  });
+
+  if (result.ok) {
+    console.log("✅ Default menu button (⊞) set for all chats!");
+    console.log("📌 The grid icon is now INSIDE the input bar for everyone!");
+  } else {
+    console.warn("⚠️ Failed to set default menu button");
+  }
+
+  return result;
+}
+
+// ─── SETUP PERSISTENT MENU (CALL ON BOT STARTUP) ──────────────────
+async function setupPersistentMenu() {
+  console.log("🔧 Setting up persistent menu...");
+  console.log("📌 The menu button (⊞) will appear INSIDE the input bar");
+  console.log("📌 Position: [⊞] [📎] [😊] Type a message...");
+
+  try {
+    // Set bot commands that appear when typing "/"
+    await setBotCommands();
+
+    // Set default menu button for all chats
+    await setDefaultMenuButton();
+
+    console.log("✅ Persistent menu setup complete!");
+    console.log("ℹ️ Users will see the grid icon (⊞) INSIDE their input bar");
+    console.log("ℹ️ Position: To the LEFT of the attachment icon (📎)");
+    console.log("ℹ️ The menu NEVER gets hidden as conversations grow");
+
+    return true;
+  } catch (error) {
+    console.error("❌ Failed to setup persistent menu:", error.message);
+    return false;
+  }
+}
+
 // ─── PERSISTENT MENU ───────────────────────────────────────
 // This is the main menu that will always be accessible via the menu button
 // Using GRID VIEW icon (9 squares/dots) - the icon that looks like a grid
@@ -299,6 +414,10 @@ async function showPersistentMenu(chatId, messageText = "⊞ *Main Menu*") {
 async function handleStart(msg) {
   const chatId = msg.chat.id.toString();
 
+  // Place the menu button (⊞) INSIDE the user's input bar
+  // Position: [⊞] [📎] [😊] Type a message...
+  await setChatMenuButton(chatId);
+
   const existingPending = await PendingRegistration.findOne({
     telegramChatId: chatId,
   }).sort({ createdAt: -1 });
@@ -340,8 +459,9 @@ async function handleStart(msg) {
     "👋 Welcome to Addis MESOB employee registration!\n\n" +
       "Please provide the following information to register.\n\n" +
       "📝 *What is your full name?*\n\n" +
-      "🔹 You can always type /menu to return to the main menu.\n" +
-      "🔹 Use the ⊞ grid menu button for quick access.",
+      "🔹 You can always click the ⊞ menu button in your input bar.\n" +
+      "🔹 Or type /menu to return to the main menu.\n" +
+      "🔹 The ⊞ grid icon is permanently in your input bar!",
     { parse_mode: "Markdown" },
   );
 }
@@ -371,7 +491,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.EMAIL;
       sendMessage(
         chatId,
-        "📧 *What is your email address?*\n\nThis will be your login email.\n\nType /menu to cancel registration.",
+        "📧 *What is your email address?*\n\nThis will be your login email.\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -383,14 +503,14 @@ async function handleRegistrationMessage(msg) {
       if (existingUser) {
         return sendMessage(
           chatId,
-          "❌ That email is already registered. Please send a different email.\n\nType /menu to cancel.",
+          "❌ That email is already registered. Please send a different email.\n\nClick ⊞ in input bar or type /menu to cancel.",
         );
       }
       session.data.email = email;
       session.step = STEPS.PHONE;
       sendMessage(
         chatId,
-        "📱 *What is your phone number?*\n\nFormat: +251 9XX XXX XXX\n\nType /menu to cancel.",
+        "📱 *What is your phone number?*\n\nFormat: +251 9XX XXX XXX\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -401,7 +521,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.DEPARTMENT;
       sendMessage(
         chatId,
-        "🏛️ *What is your department?*\n\nExamples: IT, HR, Finance, Customer Service\nOr type 'skip' to skip\n\nType /menu to cancel.",
+        "🏛️ *What is your department?*\n\nExamples: IT, HR, Finance, Customer Service\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -412,7 +532,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.POSITION;
       sendMessage(
         chatId,
-        "💼 *What is your position/title?*\n\nExamples: Team Leader, Developer, Manager\nOr type 'skip' to skip\n\nType /menu to cancel.",
+        "💼 *What is your position/title?*\n\nExamples: Team Leader, Developer, Manager\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -423,7 +543,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.SKILLS;
       sendMessage(
         chatId,
-        "🛠️ *What are your skills?*\n\nComma-separated: JavaScript, React, MongoDB\nOr type 'skip' to skip\n\nType /menu to cancel.",
+        "🛠️ *What are your skills?*\n\nComma-separated: JavaScript, React, MongoDB\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -438,7 +558,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.PHOTO;
       sendMessage(
         chatId,
-        "📸 *Upload your profile photo*\n\nClick the attachment icon (📎) and select a photo.\nOr type 'skip' to skip\n\nType /menu to cancel.",
+        "📸 *Upload your profile photo*\n\nClick the attachment icon (📎) and select a photo.\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -451,7 +571,7 @@ async function handleRegistrationMessage(msg) {
       } else {
         sendMessage(
           chatId,
-          "📸 Please upload a photo using the attachment button (📎) or type 'skip'\n\nType /menu to cancel.",
+          "📸 Please upload a photo using the attachment button (📎) or type 'skip'\n\nClick ⊞ in input bar or type /menu to cancel.",
         );
       }
       break;
@@ -473,7 +593,7 @@ async function handlePhotoUpload(msg, session, chatId) {
     if (!file.ok) {
       sendMessage(
         chatId,
-        "❌ Failed to get photo. Please try again or type 'skip'\n\nType /menu to cancel.",
+        "❌ Failed to get photo. Please try again or type 'skip'\n\nClick ⊞ in input bar or type /menu to cancel.",
       );
       return;
     }
@@ -490,7 +610,7 @@ async function handlePhotoUpload(msg, session, chatId) {
     console.error("❌ Photo upload error:", error.message);
     sendMessage(
       chatId,
-      "❌ Failed to upload photo. Please type 'skip' to continue.\n\nType /menu to cancel.",
+      "❌ Failed to upload photo. Please type 'skip' to continue.\n\nClick ⊞ in input bar or type /menu to cancel.",
     );
   }
 }
@@ -518,7 +638,7 @@ async function completeRegistration(chatId, session) {
 
   sendMessage(
     chatId,
-    `✅ Registration almost complete!\n\nYour verification code is: *${otpCode}*\n\nReply with this code to confirm (valid for 10 minutes).\n\nType /menu to cancel.`,
+    `✅ Registration almost complete!\n\nYour verification code is: *${otpCode}*\n\nReply with this code to confirm (valid for 10 minutes).\n\nClick ⊞ in input bar or type /menu to cancel.`,
     { parse_mode: "Markdown" },
   );
 }
@@ -542,7 +662,7 @@ async function handleOtpVerification(chatId, session, text) {
   if (text !== pending.otpCode) {
     return sendMessage(
       chatId,
-      "❌ That code doesn't match — please check and try again.\n\nType /menu to cancel.",
+      "❌ That code doesn't match — please check and try again.\n\nClick ⊞ in input bar or type /menu to cancel.",
     );
   }
 
@@ -802,7 +922,7 @@ async function handleCallback(query) {
         `• Topics range from tech skills to service excellence\n` +
         `• All employees are encouraged to participate\n\n` +
         `Want to present? Complete your registration and sign up!\n\n` +
-        `🔹 Type /menu to see all options.`,
+        `🔹 Click the ⊞ in your input bar to see all options.`,
       { parse_mode: "Markdown" },
     );
     await callTelegramApi("answerCallbackQuery", {
@@ -821,7 +941,7 @@ async function handleCallback(query) {
     if (!pending) {
       await sendMessage(
         chatId,
-        "You don't have an active registration.\n\nUse the 'Register Now' button to get started!\n\n🔹 Type /menu to see all options.",
+        "You don't have an active registration.\n\nUse the 'Register Now' button to get started!\n\n🔹 Click the ⊞ in your input bar to see all options.",
       );
     } else {
       const statusMap = {
@@ -836,7 +956,7 @@ async function handleCallback(query) {
           `Status: ${statusMap[pending.status] || pending.status}\n` +
           `Name: ${pending.name}\n` +
           `Email: ${pending.email}\n\n` +
-          `🔹 Type /menu to see all options.`,
+          `🔹 Click the ⊞ in your input bar to see all options.`,
         { parse_mode: "Markdown" },
       );
     }
@@ -856,7 +976,7 @@ async function handleCallback(query) {
         `• Email: admin@addismesob.example\n` +
         `• Visit: ${FRONTEND_URL}/support\n` +
         `• Or ask in the office directly\n\n` +
-        `🔹 Type /menu to see all options.`,
+        `🔹 Click the ⊞ in your input bar to see all options.`,
       { parse_mode: "Markdown" },
     );
     await callTelegramApi("answerCallbackQuery", {
@@ -871,7 +991,7 @@ async function handleCallback(query) {
     await sendMessage(
       chatId,
       `ℹ️ *Help & Support*\n\n` +
-        `Available commands:\n` +
+        `Available commands (or click ⊞ in input bar):\n` +
         `• /start - Start the bot\n` +
         `• /menu - Show main menu\n` +
         `• /register - Begin registration\n` +
@@ -880,6 +1000,8 @@ async function handleCallback(query) {
         `• /help - Show this help\n` +
         `• /contact - Contact admin\n` +
         `• /website - Visit the web platform\n\n` +
+        `💡 The ⊞ grid icon in your input bar gives you instant access!\n` +
+        `📌 Position: [⊞] [📎] [😊] Type a message...\n\n` +
         `For urgent issues, contact your administrator.`,
       { parse_mode: "Markdown" },
     );
@@ -1106,6 +1228,9 @@ module.exports = {
   sendLoginLink,
   sendDeletionNotification,
   showPersistentMenu,
+  setupPersistentMenu,
+  setChatMenuButton,
+  setBotCommands,
   startRegistrationPolling: () => {
     console.warn(
       "⚠️ startRegistrationPolling is deprecated. Use webhook instead.",
