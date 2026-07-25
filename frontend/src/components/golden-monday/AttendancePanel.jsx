@@ -49,6 +49,8 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
   // State for expanding departments
   const [expandedDepartments, setExpandedDepartments] = useState({});
 
+  const isAdmin = ["admin", "superadmin"].includes(user?.role);
+
   const loadAttendance = useCallback(async () => {
     if (!sessionId) return;
     try {
@@ -148,8 +150,8 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
   const groupEmployees = (employees) => {
     const grouped = {};
     employees.forEach((emp) => {
-      const dept = emp.department || "Uncategorized";
-      const position = emp.position || "Staff";
+      const dept = emp.department || t.uncategorized || "Uncategorized";
+      const position = emp.position || t.staff || "Staff";
       if (!grouped[dept]) {
         grouped[dept] = {};
       }
@@ -494,14 +496,16 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                                   </div>
                                   <div style={{ display: "grid", gap: 4 }}>
                                     {employees.map((emp) => {
+                                      const userId =
+                                        emp.user?._id || emp.user || emp.userId;
                                       const isCurrentUser =
-                                        user?._id === emp.user?._id;
-                                      const isSigning =
-                                        signingFor === emp.user?._id;
+                                        user?._id === userId;
+                                      const isSigning = signingFor === userId;
+                                      const canSign = isCurrentUser || isAdmin;
 
                                       return (
                                         <div
-                                          key={emp.user?._id || emp.name}
+                                          key={userId || emp.name}
                                           style={{
                                             display: "flex",
                                             alignItems: "center",
@@ -568,6 +572,21 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                                                     {t.you || "You"}
                                                   </span>
                                                 )}
+                                                {isAdmin && !isCurrentUser && (
+                                                  <span
+                                                    style={{
+                                                      marginLeft: 4,
+                                                      fontSize: 8,
+                                                      background: "#fef3c7",
+                                                      color: "#92400e",
+                                                      padding: "1px 6px",
+                                                      borderRadius: 8,
+                                                      fontWeight: 600,
+                                                    }}
+                                                  >
+                                                    Admin
+                                                  </span>
+                                                )}
                                               </div>
                                               <div
                                                 style={{
@@ -600,9 +619,13 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                                                 }}
                                               >
                                                 <SignatureCanvas
-                                                  onSave={(data) =>
-                                                    setMySignature(data)
-                                                  }
+                                                  onSave={(data) => {
+                                                    console.log(
+                                                      "✍️ Signature saved:",
+                                                      data ? "✅ Yes" : "❌ No",
+                                                    );
+                                                    setMySignature(data);
+                                                  }}
                                                   height={40}
                                                   width={180}
                                                   label=""
@@ -614,11 +637,15 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                                                   }}
                                                 >
                                                   <button
-                                                    onClick={() =>
+                                                    onClick={() => {
+                                                      console.log(
+                                                        "🔄 Confirm clicked for user:",
+                                                        userId,
+                                                      );
                                                       handleSignAttendance(
-                                                        emp.user?._id,
-                                                      )
-                                                    }
+                                                        userId,
+                                                      );
+                                                    }}
                                                     style={{
                                                       padding: "2px 10px",
                                                       background: C.primary,
@@ -665,11 +692,17 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                                                   </button>
                                                 </div>
                                               </div>
-                                            ) : isCurrentUser ? (
+                                            ) : canSign ? (
                                               <button
-                                                onClick={() =>
-                                                  setSigningFor(emp.user?._id)
-                                                }
+                                                onClick={() => {
+                                                  console.log(
+                                                    "🖊️ Sign In clicked for:",
+                                                    emp.name,
+                                                    "userId:",
+                                                    userId,
+                                                  );
+                                                  setSigningFor(userId);
+                                                }}
                                                 style={{
                                                   padding: "3px 12px",
                                                   background: "#f59e0b",
@@ -682,6 +715,19 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                                                   display: "flex",
                                                   alignItems: "center",
                                                   gap: 3,
+                                                  transition: "all 0.2s ease",
+                                                }}
+                                                onMouseEnter={(e) => {
+                                                  e.currentTarget.style.background =
+                                                    "#d97706";
+                                                  e.currentTarget.style.transform =
+                                                    "scale(1.05)";
+                                                }}
+                                                onMouseLeave={(e) => {
+                                                  e.currentTarget.style.background =
+                                                    "#f59e0b";
+                                                  e.currentTarget.style.transform =
+                                                    "scale(1)";
                                                 }}
                                                 aria-label={
                                                   t.signIn || "Sign in"
