@@ -36,8 +36,10 @@ const adminRoutes = require("./routes/adminRoutes");
 const publicRoutes = require("./routes/publicRoutes");
 const registrationRoutes = require("./routes/registrationRoutes");
 
-// REMOVED: startRegistrationPolling import - no longer needed for webhook
-// const { startRegistrationPolling } = require("./services/telegramService");
+// =============================================
+// IMPORT TELEGRAM SERVICE FOR PERSISTENT MENU
+// =============================================
+const { setupPersistentMenu } = require("./services/telegramService");
 
 const app = express();
 
@@ -205,13 +207,31 @@ const startServer = async () => {
     await connectDB();
     console.log("✅ Database connected successfully");
 
+    // =============================================
+    // 🚀 SETUP PERSISTENT MENU (Grid icon in input bar)
+    // =============================================
+    console.log("🔧 Setting up Telegram persistent menu...");
+    console.log("📌 The menu button (⊞) will appear INSIDE the input bar");
+    console.log("📌 Position: [⊞] [📎] [😊] Type a message...");
+
+    try {
+      await setupPersistentMenu();
+      console.log("✅ Persistent menu setup complete!");
+      console.log("ℹ️ Users will see the grid icon (⊞) in their input bar");
+      console.log("ℹ️ The menu NEVER gets hidden as conversations grow");
+    } catch (menuError) {
+      console.error("❌ Failed to setup persistent menu:", menuError.message);
+      console.log("ℹ️ The bot will still work, but the menu button may not appear");
+    }
+
+    // =============================================
     // 🚀 WEBHOOK MODE - Polling disabled
-    // The Telegram bot now uses webhooks via POST /api/telegram/webhook
-    // To set the webhook, call POST /api/telegram/set-webhook after deployment
+    // =============================================
     console.log("🤖 Telegram bot configured for WEBHOOK mode");
     console.log(
       `🔗 Webhook endpoint: https://your-app.onrender.com/api/telegram/webhook`,
     );
+    console.log("ℹ️ To set the webhook, call POST /api/telegram/set-webhook");
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
@@ -221,6 +241,7 @@ const startServer = async () => {
         `🤖 AI routes: /api/ai, /api/chatbot, /api/documents, /api/golden-monday`,
       );
       console.log(`📨 Telegram webhook ready at /api/telegram/webhook`);
+      console.log(`📌 Bot menu button (⊞) is now INSIDE the input bar!`);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);
