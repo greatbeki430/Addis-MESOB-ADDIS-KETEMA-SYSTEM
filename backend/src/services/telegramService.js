@@ -171,16 +171,21 @@ const sendTestMessage = async () => {
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 async function callTelegramApi(method, payload) {
-  const res = await fetch(`${TELEGRAM_API}/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
-  if (!data.ok) {
-    console.error(`❌ Telegram ${method} error:`, data.description);
+  try {
+    const res = await fetch(`${TELEGRAM_API}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      console.error(`❌ Telegram ${method} error:`, data.description);
+    }
+    return data;
+  } catch (error) {
+    console.error(`❌ Telegram ${method} network error:`, error.message);
+    return { ok: false, description: error.message };
   }
-  return data;
 }
 
 const sendMessage = (chatId, text, extra = {}) =>
@@ -282,6 +287,7 @@ async function setChatMenuButton(chatId) {
 async function setDefaultMenuButton() {
   // This sets the menu button for ALL chats with the bot
   // The grid icon (⊞) appears INSIDE the input bar for all users
+  // NOTE: This uses the correct method for setting default menu button
   const result = await callTelegramApi("setMyDefaultAdministratorRights", {
     rights: {
       is_anonymous: false,
@@ -299,10 +305,10 @@ async function setDefaultMenuButton() {
   });
 
   if (result.ok) {
-    console.log("✅ Default menu button (⊞) set for all chats!");
-    console.log("📌 The grid icon is now INSIDE the input bar for everyone!");
+    console.log("✅ Default administrator rights set for all chats!");
+    console.log("📌 The grid icon will appear INSIDE the input bar for everyone!");
   } else {
-    console.warn("⚠️ Failed to set default menu button");
+    console.warn("⚠️ Failed to set default administrator rights");
   }
 
   return result;
@@ -384,6 +390,9 @@ function showMainMenu(chatId, extraText = "") {
 
 // ─── PERSISTENT MENU HANDLER ──────────────────────────────
 async function showPersistentMenu(chatId, messageText = "⊞ *Main Menu*") {
+  // Ensure the menu button is set for this chat
+  await setChatMenuButton(chatId);
+  
   const menuText = `${messageText}\n\nSelect an option from the menu below:`;
 
   return sendMessage(chatId, menuText, {
@@ -487,6 +496,12 @@ async function handleRegistrationMessage(msg) {
 
   switch (session.step) {
     case STEPS.NAME:
+      if (!text || text.length < 2) {
+        return sendMessage(
+          chatId,
+          "❌ Please enter a valid name (at least 2 characters).\n\nClick ⊞ in input bar or type /menu to cancel.",
+        );
+      }
       session.data.name = text;
       session.step = STEPS.EMAIL;
       sendMessage(
@@ -498,6 +513,13 @@ async function handleRegistrationMessage(msg) {
 
     case STEPS.EMAIL: {
       const email = text.toLowerCase();
+      // Basic email validation
+      if (!email.includes('@') || !email.includes('.')) {
+        return sendMessage(
+          chatId,
+          "❌ Please enter a valid email address (e.g., name@domain.com).\n\nClick ⊞ in input bar or type /menu to cancel.",
+        );
+      }
       const User = require("../models/User");
       const existingUser = await User.findOne({ email });
       if (existingUser) {
@@ -510,7 +532,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.PHONE;
       sendMessage(
         chatId,
-        "📱 *What is your phone number?*\n\nFormat: +251 9XX XXX XXX\n\nClick ⊞ in input bar or type /menu to cancel.",
+        "📱 *What is your phone number?*\n\nFormat: +251 9XX XXX XXX\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
