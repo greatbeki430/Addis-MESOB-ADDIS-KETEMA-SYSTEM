@@ -213,7 +213,7 @@ export default function EmployeeManagement({ t }) {
       };
       return translations[key] || fallback[key] || key;
     },
-    [safeT], // ✅ Now depends on safeT (stable)
+    [safeT],
   );
 
   // ── Load Data ──
@@ -269,7 +269,6 @@ export default function EmployeeManagement({ t }) {
       console.log("✅ Users loaded:", response.data);
       console.log("📊 Total users:", response.data?.length || 0);
 
-      // Ensure we have an array
       const usersArray = Array.isArray(response.data) ? response.data : [];
       setAllUsers(usersArray);
 
@@ -286,7 +285,6 @@ export default function EmployeeManagement({ t }) {
         message: error.message,
       });
 
-      // Handle specific error cases
       if (error.response?.status === 401) {
         showToast("Session expired. Please login again.", "error");
         setTimeout(() => (window.location.href = "/login"), 1500);
@@ -302,6 +300,7 @@ export default function EmployeeManagement({ t }) {
       setIsLoadingUsers(false);
     }
   }, [showToast, getTranslation]);
+
   const loadPendingRegistrations = useCallback(async () => {
     try {
       const response = await goldenMondayAPI.getPendingRegistrations();
@@ -365,7 +364,6 @@ export default function EmployeeManagement({ t }) {
     setAiNotes("");
 
     try {
-      // Call AI API to analyze user data and suggest employee fields
       const response = await aiAPI.suggestEmployeeFields({
         name: userData.name,
         email: userData.email,
@@ -376,7 +374,6 @@ export default function EmployeeManagement({ t }) {
 
       const analysis = response.data || {};
 
-      // Auto-fill form fields
       const filled = {};
       setFormData((prev) => {
         const next = { ...prev };
@@ -422,8 +419,6 @@ export default function EmployeeManagement({ t }) {
         analysis.notes || `AI filled ${Object.keys(filled).length} field(s)`,
       );
       setShowAIAnalysis(true);
-
-      // Store full AI suggestions for reference
       setAiSuggestions(analysis);
 
       showToast(
@@ -556,7 +551,6 @@ export default function EmployeeManagement({ t }) {
       position: u.position || f.position,
     }));
 
-    // Trigger AI analysis when a user is selected (for new employees only)
     if (!editingEmployee) {
       runAIAnalysis(u);
     }
@@ -564,7 +558,6 @@ export default function EmployeeManagement({ t }) {
 
   const handleFormChange = (field, value) => {
     setFormData((f) => ({ ...f, [field]: value }));
-    // Clear AI filled flag for this field if user manually changes it
     if (aiFilledFields[field]) {
       setAiFilledFields((prev) => ({ ...prev, [field]: false }));
     }
@@ -763,7 +756,6 @@ export default function EmployeeManagement({ t }) {
     }
   };
 
-  // Add this function after handleDelete
   const handleDeleteWithReason = async (reason) => {
     if (!deleteTarget) return;
 
@@ -824,7 +816,6 @@ export default function EmployeeManagement({ t }) {
   const openAddModal = async () => {
     resetModal();
     setShowAddModal(true);
-    // Load users when modal opens
     await loadUsers();
   };
 
@@ -934,7 +925,6 @@ export default function EmployeeManagement({ t }) {
     );
   });
 
-  // Debug logging for user loading
   console.log("🔍 User filtering debug:", {
     allUsersCount: allUsers.length,
     employeesCount: employees.length,
@@ -947,7 +937,7 @@ export default function EmployeeManagement({ t }) {
   // ── Render ──
   return (
     <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
-      {/* Header */}
+      {/* Header - Responsive with icon-only buttons on mobile */}
       <div
         style={{
           display: "flex",
@@ -986,7 +976,15 @@ export default function EmployeeManagement({ t }) {
             {getTranslation("totalEmployees")}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {/* ✅ FIXED: Responsive button group - icons only on mobile */}
+        <div
+          style={{
+            display: "flex",
+            gap: "8px",
+            flexWrap: "nowrap",
+            alignItems: "center",
+          }}
+        >
           <button
             onClick={() => generateAIInsights()}
             style={{
@@ -995,12 +993,16 @@ export default function EmployeeManagement({ t }) {
               color: "#fff",
               display: "flex",
               alignItems: "center",
-              gap: 6,
+              gap: "6px",
               border: "none",
+              padding: "8px 12px",
+              fontSize: "clamp(12px, 2vw, 14px)",
+              whiteSpace: "nowrap",
             }}
+            title={getTranslation("aiInsights")}
           >
             <FiCpu size={16} />
-            AI Insights
+            <span className="btn-label">{getTranslation("aiInsights")}</span>
           </button>
           <button
             onClick={refreshData}
@@ -1009,8 +1011,12 @@ export default function EmployeeManagement({ t }) {
               ...btn.secondary,
               display: "flex",
               alignItems: "center",
-              gap: 6,
+              gap: "6px",
+              padding: "8px 12px",
+              fontSize: "clamp(12px, 2vw, 14px)",
+              whiteSpace: "nowrap",
             }}
+            title="Refresh"
           >
             <FiRefreshCw
               size={16}
@@ -1018,11 +1024,25 @@ export default function EmployeeManagement({ t }) {
                 animation: refreshing ? "spin 1s linear infinite" : "none",
               }}
             />
-            {refreshing ? "Refreshing..." : "Refresh"}
+            <span className="btn-label">
+              {refreshing ? "..." : "Refresh"}
+            </span>
           </button>
-          <button onClick={openAddModal} style={btn.primary}>
-            <FiUserPlus size={16} style={{ marginRight: 6 }} />
-            {getTranslation("addEmployee")}
+          <button
+            onClick={openAddModal}
+            style={{
+              ...btn.primary,
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "8px 12px",
+              fontSize: "clamp(12px, 2vw, 14px)",
+              whiteSpace: "nowrap",
+            }}
+            title={getTranslation("addEmployee")}
+          >
+            <FiUserPlus size={16} />
+            <span className="btn-label">{getTranslation("addEmployee")}</span>
           </button>
         </div>
       </div>
@@ -1171,7 +1191,6 @@ export default function EmployeeManagement({ t }) {
           </div>
         </div>
 
-        {/* 🆕 PENDING APPROVALS CARD */}
         <div
           style={{
             background: C.white,
@@ -2216,7 +2235,7 @@ export default function EmployeeManagement({ t }) {
         </div>
       )}
 
-      {/* Add/Edit Modal with AI Auto-Fill */}
+      {/* ✅ FIXED: Add/Edit Modal - Mobile Optimized with Full Width */}
       {showAddModal && (
         <div
           style={{
@@ -2227,7 +2246,7 @@ export default function EmployeeManagement({ t }) {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
-            padding: 16,
+            padding: "8px",
             backdropFilter: "blur(4px)",
           }}
           onClick={() => {
@@ -2238,18 +2257,21 @@ export default function EmployeeManagement({ t }) {
             style={{
               background: C.white,
               borderRadius: 16,
-              padding: 28,
-              width: "90%",
+              padding: "clamp(16px, 4vw, 28px)",
+              width: "min(96%, 600px)", // ✅ FIXED: Full width on mobile
               maxWidth: 600,
               maxHeight: "90vh",
-              overflow: "auto",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              overflowY: "auto",
+              overflowX: "hidden", // ✅ Prevent horizontal scroll
+              boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+              margin: "0 auto",
+              position: "relative",
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <h2
               style={{
-                fontSize: "clamp(20px, 5vw, 24px)",
+                fontSize: "clamp(18px, 4vw, 24px)",
                 fontWeight: 800,
                 color: C.dark,
                 fontFamily: F.serif,
@@ -2273,9 +2295,9 @@ export default function EmployeeManagement({ t }) {
             </h2>
             <p
               style={{
-                fontSize: "clamp(12px, 3vw, 13px)",
+                fontSize: "clamp(12px, 2.5vw, 14px)",
                 color: C.muted,
-                marginBottom: 20,
+                marginBottom: 16,
                 fontFamily: F.sans,
               }}
             >
@@ -2284,7 +2306,7 @@ export default function EmployeeManagement({ t }) {
                 : getTranslation("selectUser")}
             </p>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} style={{ overflow: "hidden" }}>
               {!editingEmployee && (
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -2379,6 +2401,7 @@ export default function EmployeeManagement({ t }) {
                           fontSize: 14,
                           outline: "none",
                           transition: "border-color 0.2s",
+                          boxSizing: "border-box",
                         }}
                         onFocus={(e) =>
                           (e.currentTarget.style.borderColor = C.primary)
@@ -2616,6 +2639,7 @@ export default function EmployeeManagement({ t }) {
                       outline: "none",
                       transition: "border-color 0.2s",
                       background: aiFilledFields.name ? "#F0F9FF" : "white",
+                      boxSizing: "border-box",
                     }}
                     placeholder="Full name"
                   />
@@ -2660,6 +2684,7 @@ export default function EmployeeManagement({ t }) {
                       outline: "none",
                       transition: "border-color 0.2s",
                       background: aiFilledFields.email ? "#F0F9FF" : "white",
+                      boxSizing: "border-box",
                     }}
                     placeholder="email@example.com"
                   />
@@ -2719,6 +2744,7 @@ export default function EmployeeManagement({ t }) {
                         background: aiFilledFields.department
                           ? "#F0F9FF"
                           : "white",
+                        boxSizing: "border-box",
                       }}
                       placeholder="e.g., Revenue"
                     />
@@ -2747,7 +2773,9 @@ export default function EmployeeManagement({ t }) {
                       }}
                     >
                       <FiPlus size={14} />
-                      {getTranslation("addDepartment")}
+                      <span className="add-dept-label">
+                        {getTranslation("addDepartment")}
+                      </span>
                     </button>
                   </div>
                   {aiFilledFields.department && (
@@ -2791,7 +2819,10 @@ export default function EmployeeManagement({ t }) {
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
-                      background: aiFilledFields.position ? "#F0F9FF" : "white",
+                      background: aiFilledFields.position
+                        ? "#F0F9FF"
+                        : "white",
+                      boxSizing: "border-box",
                     }}
                     placeholder="e.g., Team Leader"
                   />
@@ -2844,6 +2875,7 @@ export default function EmployeeManagement({ t }) {
                       outline: "none",
                       transition: "border-color 0.2s",
                       background: aiFilledFields.phone ? "#F0F9FF" : "white",
+                      boxSizing: "border-box",
                     }}
                     placeholder="+251 9XX XXX XXX"
                   />
@@ -2889,6 +2921,7 @@ export default function EmployeeManagement({ t }) {
                       outline: "none",
                       transition: "border-color 0.2s",
                       background: aiFilledFields.hireDate ? "#F0F9FF" : "white",
+                      boxSizing: "border-box",
                     }}
                   />
                   {aiFilledFields.hireDate && (
@@ -2949,6 +2982,7 @@ export default function EmployeeManagement({ t }) {
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
+                      boxSizing: "border-box",
                     }}
                     placeholder="Add a skill..."
                   />
@@ -3155,6 +3189,7 @@ export default function EmployeeManagement({ t }) {
                         fontSize: 14,
                         background: C.white,
                         outline: "none",
+                        boxSizing: "border-box",
                       }}
                     >
                       <option value="active">
@@ -3214,6 +3249,7 @@ export default function EmployeeManagement({ t }) {
                       background: aiFilledFields.performanceRating
                         ? "#F0F9FF"
                         : "white",
+                      boxSizing: "border-box",
                     }}
                     placeholder="0-100"
                   />
@@ -3276,6 +3312,7 @@ export default function EmployeeManagement({ t }) {
                     minHeight: 60,
                     fontFamily: F.sans,
                     background: aiFilledFields.notes ? "#F0F9FF" : "white",
+                    boxSizing: "border-box",
                   }}
                   placeholder="Additional notes..."
                 />
@@ -3295,56 +3332,117 @@ export default function EmployeeManagement({ t }) {
                 )}
               </div>
 
-              {/* Modal Actions */}
+              {/* ✅ FIXED: Modal Actions - Mobile Optimized */}
               <div
                 style={{
                   display: "flex",
-                  gap: 12,
-                  justifyContent: "flex-end",
+                  flexDirection: "column",
+                  gap: "10px",
                   borderTop: `1px solid ${C.border}`,
                   paddingTop: 20,
                 }}
               >
-                <button
-                  type="button"
-                  onClick={resetModal}
-                  style={btn.secondary}
-                  disabled={saving}
-                >
-                  {getTranslation("cancel")}
-                </button>
-                <button
-                  type="submit"
+                <style>{`
+                  @media (min-width: 480px) {
+                    .modal-actions-row {
+                      flex-direction: row !important;
+                      justify-content: flex-end !important;
+                    }
+                    .modal-actions-row button {
+                      flex: 0 1 auto !important;
+                      min-width: 100px !important;
+                      width: auto !important;
+                    }
+                  }
+                  @media (max-width: 479px) {
+                    .modal-actions-row button {
+                      width: 100% !important;
+                      justify-content: center !important;
+                      padding: 14px 20px !important;
+                      font-size: 15px !important;
+                    }
+                    .add-dept-label {
+                      display: none !important;
+                    }
+                    .btn-label {
+                      display: none !important;
+                    }
+                    .modal-actions-row {
+                      flex-direction: column-reverse !important;
+                    }
+                  }
+                `}</style>
+
+                <div
+                  className="modal-actions-row"
                   style={{
-                    ...btn.primary,
-                    opacity: saving ? 0.7 : 1,
-                    cursor: saving ? "not-allowed" : "pointer",
                     display: "flex",
-                    alignItems: "center",
-                    gap: 6,
+                    flexDirection: "column",
+                    gap: "10px",
                   }}
-                  disabled={saving || uploadingPhoto}
                 >
-                  {saving || uploadingPhoto ? (
-                    <>
-                      <FiLoader
-                        size={16}
-                        style={{ animation: "spin 0.8s linear infinite" }}
-                      />
-                      {uploadingPhoto ? "Uploading Photo..." : "Saving..."}
-                    </>
-                  ) : editingEmployee ? (
-                    <>
-                      <FiSave size={16} />
-                      {getTranslation("update")}
-                    </>
-                  ) : (
-                    <>
-                      <FiUserPlus size={16} />
-                      {getTranslation("register")}
-                    </>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={resetModal}
+                    style={{
+                      ...btn.secondary,
+                      padding: "12px 24px",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 10,
+                      width: "100%",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      border: `1.5px solid ${C.border}`,
+                    }}
+                    disabled={saving}
+                  >
+                    <FiX size={18} />
+                    {getTranslation("cancel")}
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      ...btn.primary,
+                      padding: "12px 24px",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 10,
+                      width: "100%",
+                      justifyContent: "center",
+                      cursor: saving ? "not-allowed" : "pointer",
+                      transition: "all 0.2s ease",
+                      boxShadow: `0 4px 14px ${C.primary}44`,
+                      opacity: saving || uploadingPhoto ? 0.7 : 1,
+                    }}
+                    disabled={saving || uploadingPhoto}
+                  >
+                    {saving || uploadingPhoto ? (
+                      <>
+                        <FiLoader
+                          size={18}
+                          style={{ animation: "spin 0.8s linear infinite" }}
+                        />
+                        {uploadingPhoto ? "Uploading Photo..." : "Saving..."}
+                      </>
+                    ) : editingEmployee ? (
+                      <>
+                        <FiSave size={18} />
+                        {getTranslation("update")}
+                      </>
+                    ) : (
+                      <>
+                        <FiUserPlus size={18} />
+                        {getTranslation("register")}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -3461,6 +3559,7 @@ export default function EmployeeManagement({ t }) {
                   fontSize: 14,
                   outline: "none",
                   transition: "border-color 0.2s",
+                  boxSizing: "border-box",
                 }}
                 autoFocus
               />
@@ -3788,6 +3887,7 @@ export default function EmployeeManagement({ t }) {
                   borderRadius: 8,
                   fontSize: 14,
                   outline: "none",
+                  boxSizing: "border-box",
                 }}
               />
             </div>
