@@ -1609,24 +1609,22 @@ export default function EmployeeManagement({ t }) {
         </div>
       )}
 
-    {/* Search and Filter - FIXED: Keep dropdowns on one line */}
+    {/* Search and Filter - FIXED: Search bar full width, dropdowns inline, icons separate if needed */}
 <div
   style={{
     display: "flex",
-    flexDirection: "row",
-    flexWrap: "nowrap", // ✅ Changed from "wrap" to "nowrap"
-    gap: 8, // Reduced gap to fit better
+    flexDirection: "column",
+    gap: 10,
     marginBottom: 16,
-    alignItems: "center",
-    overflowX: "auto", // Allow horizontal scroll if needed
   }}
 >
-  <div style={{ flex: 1, minWidth: 120, position: "relative" }}>
+  {/* Search Bar - Full width on its own line */}
+  <div style={{ width: "100%", position: "relative" }}>
     <FiSearch
-      size={14}
+      size={16}
       style={{
         position: "absolute",
-        left: "10px",
+        left: "12px",
         top: "50%",
         transform: "translateY(-50%)",
         color: "#999",
@@ -1639,94 +1637,127 @@ export default function EmployeeManagement({ t }) {
       onChange={(e) => setSearchTerm(e.target.value)}
       style={{
         width: "100%",
-        padding: "8px 10px 8px 32px",
+        padding: "10px 14px 10px 38px",
         border: `1.5px solid ${C.border}`,
         borderRadius: 8,
-        fontSize: 13,
+        fontSize: 14,
         outline: "none",
         transition: "border-color 0.2s",
-        minWidth: "80px",
+        boxSizing: "border-box",
       }}
       onFocus={(e) => (e.currentTarget.style.borderColor = C.primary)}
       onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
     />
   </div>
-  <select
-    value={filterEligible}
-    onChange={(e) => setFilterEligible(e.target.value)}
+
+  {/* Dropdowns and Icons Row */}
+  <div
     style={{
-      padding: "8px 10px",
-      border: `1.5px solid ${C.border}`,
-      borderRadius: 8,
-      fontSize: 12,
-      background: C.white,
-      outline: "none",
-      minWidth: "90px",
-      flexShrink: 0, // Prevent shrinking
+      display: "flex",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      alignItems: "center",
     }}
   >
-    <option value="all">{getTranslation("allStatus")}</option>
-    <option value="active">{getTranslation("active")}</option>
-    <option value="inactive">{getTranslation("inactive")}</option>
-  </select>
-  <select
-    value={filterDepartment}
-    onChange={(e) => setFilterDepartment(e.target.value)}
-    style={{
-      padding: "8px 10px",
-      border: `1.5px solid ${C.border}`,
-      borderRadius: 8,
-      fontSize: 12,
-      background: C.white,
-      outline: "none",
-      minWidth: "100px",
-      flexShrink: 0, // Prevent shrinking
-    }}
-  >
-    <option value="all">{getTranslation("allDepartments")}</option>
-    {departments.map((dept) => (
-      <option key={dept} value={dept}>
-        {dept}
-      </option>
-    ))}
-  </select>
-  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-    <button
-      onClick={() => setViewMode("grid")}
+    {/* Dropdowns - Inline, will wrap together if needed */}
+    <div
       style={{
-        padding: "6px 8px",
-        borderRadius: 6,
-        border: `1px solid ${viewMode === "grid" ? C.primary : C.border}`,
-        background: viewMode === "grid" ? C.primary : "transparent",
-        color: viewMode === "grid" ? "#fff" : C.muted,
-        cursor: "pointer",
-        minWidth: "32px",
-        minHeight: "32px",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        flexDirection: "row",
+        flexWrap: "nowrap",
+        gap: 8,
+        flex: "1 1 auto",
+        minWidth: "180px",
       }}
     >
-      <FiGrid size={14} />
-    </button>
-    <button
-      onClick={() => setViewMode("list")}
+      <select
+        value={filterEligible}
+        onChange={(e) => setFilterEligible(e.target.value)}
+        style={{
+          padding: "8px 10px",
+          border: `1.5px solid ${C.border}`,
+          borderRadius: 8,
+          fontSize: 13,
+          background: C.white,
+          outline: "none",
+          flex: 1,
+          minWidth: "80px",
+        }}
+      >
+        <option value="all">{getTranslation("allStatus")}</option>
+        <option value="active">{getTranslation("active")}</option>
+        <option value="inactive">{getTranslation("inactive")}</option>
+      </select>
+
+      <select
+        value={filterDepartment}
+        onChange={(e) => setFilterDepartment(e.target.value)}
+        style={{
+          padding: "8px 10px",
+          border: `1.5px solid ${C.border}`,
+          borderRadius: 8,
+          fontSize: 13,
+          background: C.white,
+          outline: "none",
+          flex: 1,
+          minWidth: "90px",
+        }}
+      >
+        <option value="all">{getTranslation("allDepartments")}</option>
+        {departments.map((dept) => (
+          <option key={dept} value={dept}>
+            {dept}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    {/* Grid/List Icons - Will wrap to new line if needed */}
+    <div
       style={{
-        padding: "6px 8px",
-        borderRadius: 6,
-        border: `1px solid ${viewMode === "list" ? C.primary : C.border}`,
-        background: viewMode === "list" ? C.primary : "transparent",
-        color: viewMode === "list" ? "#fff" : C.muted,
-        cursor: "pointer",
-        minWidth: "32px",
-        minHeight: "32px",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        gap: 4,
+        flexShrink: 0,
       }}
     >
-      <FiList size={14} />
-    </button>
+      <button
+        onClick={() => setViewMode("grid")}
+        style={{
+          padding: "6px 8px",
+          borderRadius: 6,
+          border: `1px solid ${viewMode === "grid" ? C.primary : C.border}`,
+          background: viewMode === "grid" ? C.primary : "transparent",
+          color: viewMode === "grid" ? "#fff" : C.muted,
+          cursor: "pointer",
+          minWidth: "34px",
+          minHeight: "34px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <FiGrid size={16} />
+      </button>
+      <button
+        onClick={() => setViewMode("list")}
+        style={{
+          padding: "6px 8px",
+          borderRadius: 6,
+          border: `1px solid ${viewMode === "list" ? C.primary : C.border}`,
+          background: viewMode === "list" ? C.primary : "transparent",
+          color: viewMode === "list" ? "#fff" : C.muted,
+          cursor: "pointer",
+          minWidth: "34px",
+          minHeight: "34px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <FiList size={16} />
+      </button>
+    </div>
   </div>
 </div>
 
