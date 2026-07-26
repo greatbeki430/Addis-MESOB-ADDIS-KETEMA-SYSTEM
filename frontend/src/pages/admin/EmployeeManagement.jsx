@@ -976,11 +976,11 @@ export default function EmployeeManagement({ t }) {
             {getTranslation("totalEmployees")}
           </p>
         </div>
-        {/* ✅ FIXED: Responsive button group - icons only on mobile */}
+        {/* ✅ FIXED: Responsive button group - ICON ONLY on mobile */}
         <div
           style={{
             display: "flex",
-            gap: "8px",
+            gap: "6px",
             flexWrap: "nowrap",
             alignItems: "center",
           }}
@@ -993,16 +993,21 @@ export default function EmployeeManagement({ t }) {
               color: "#fff",
               display: "flex",
               alignItems: "center",
-              gap: "6px",
+              justifyContent: "center",
+              gap: "4px",
               border: "none",
-              padding: "8px 12px",
+              padding: "8px 10px",
               fontSize: "clamp(12px, 2vw, 14px)",
               whiteSpace: "nowrap",
+              minWidth: "36px",
+              minHeight: "36px",
             }}
             title={getTranslation("aiInsights")}
           >
             <FiCpu size={16} />
-            <span className="btn-label">{getTranslation("aiInsights")}</span>
+            <span className="btn-label" style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}>
+              {getTranslation("aiInsights")}
+            </span>
           </button>
           <button
             onClick={refreshData}
@@ -1011,10 +1016,13 @@ export default function EmployeeManagement({ t }) {
               ...btn.secondary,
               display: "flex",
               alignItems: "center",
-              gap: "6px",
-              padding: "8px 12px",
+              justifyContent: "center",
+              gap: "4px",
+              padding: "8px 10px",
               fontSize: "clamp(12px, 2vw, 14px)",
               whiteSpace: "nowrap",
+              minWidth: "36px",
+              minHeight: "36px",
             }}
             title="Refresh"
           >
@@ -1024,7 +1032,7 @@ export default function EmployeeManagement({ t }) {
                 animation: refreshing ? "spin 1s linear infinite" : "none",
               }}
             />
-            <span className="btn-label">
+            <span className="btn-label" style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}>
               {refreshing ? "..." : "Refresh"}
             </span>
           </button>
@@ -1035,16 +1043,17 @@ export default function EmployeeManagement({ t }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "6px",
-              padding: "8px 12px",
+              gap: "4px",
+              padding: "8px 10px",
               fontSize: "clamp(12px, 2vw, 14px)",
               whiteSpace: "nowrap",
-              minWidth: "40px",
+              minWidth: "36px",
+              minHeight: "36px",
             }}
             title={getTranslation("addEmployee")}
           >
             <FiUserPlus size={16} />
-            <span className="btn-label" style={{ marginLeft: "4px" }}>
+            <span className="btn-label" style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}>
               {getTranslation("addEmployee")}
             </span>
           </button>
@@ -2611,13 +2620,14 @@ export default function EmployeeManagement({ t }) {
                 </>
               )}
 
-              {/* Form Fields - Responsive grid */}
+              {/* ✅ FIXED: Form Fields - Single column on mobile */}
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   gap: 12,
                 }}
+                className="form-grid"
               >
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -2711,12 +2721,14 @@ export default function EmployeeManagement({ t }) {
                 </div>
               </div>
 
+              {/* ✅ FIXED: Department + Position - Wraps on mobile */}
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   gap: 12,
                 }}
+                className="form-grid"
               >
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -2857,6 +2869,7 @@ export default function EmployeeManagement({ t }) {
                   gridTemplateColumns: "1fr 1fr",
                   gap: 12,
                 }}
+                className="form-grid"
               >
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -3172,6 +3185,7 @@ export default function EmployeeManagement({ t }) {
                   gridTemplateColumns: "1fr 1fr",
                   gap: 12,
                 }}
+                className="form-grid"
               >
                 {editingEmployee && (
                   <div style={{ marginBottom: 14 }}>
@@ -3354,7 +3368,8 @@ export default function EmployeeManagement({ t }) {
                 }}
               >
                 <style>{`
-                  @media (min-width: 480px) {
+                  /* Desktop/Tablet: Side by side */
+                  @media (min-width: 481px) {
                     .modal-actions-row {
                       flex-direction: row !important;
                       justify-content: flex-end !important;
@@ -3370,8 +3385,12 @@ export default function EmployeeManagement({ t }) {
                     .add-dept-label {
                       display: inline !important;
                     }
+                    .form-grid {
+                      grid-template-columns: 1fr 1fr !important;
+                    }
                   }
-                  @media (max-width: 479px) {
+                  /* Mobile: Stack vertically, icon only */
+                  @media (max-width: 480px) {
                     .modal-actions-row {
                       flex-direction: column-reverse !important;
                       gap: 8px !important;
@@ -3379,9 +3398,9 @@ export default function EmployeeManagement({ t }) {
                     .modal-actions-row button {
                       width: 100% !important;
                       justify-content: center !important;
-                      padding: 14px 20px !important;
+                      padding: 14px 16px !important;
                       font-size: 15px !important;
-                      min-height: 50px !important;
+                      min-height: 48px !important;
                     }
                     .btn-label {
                       display: none !important;
@@ -3389,8 +3408,17 @@ export default function EmployeeManagement({ t }) {
                     .add-dept-label {
                       display: none !important;
                     }
-                    .modal-content-grid {
+                    .form-grid {
                       grid-template-columns: 1fr !important;
+                    }
+                    /* Header buttons - icon only */
+                    .header-btn .btn-label {
+                      display: none !important;
+                    }
+                    .header-btn {
+                      padding: 8px 10px !important;
+                      min-width: 36px !important;
+                      min-height: 36px !important;
                     }
                   }
                 `}</style>
