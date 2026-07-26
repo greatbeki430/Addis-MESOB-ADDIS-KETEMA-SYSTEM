@@ -16,9 +16,8 @@ const userSchema = new mongoose.Schema(
     phone: String,
     signature: String,
     telegramChatId: { type: String, default: null },
-    // ✅ ADD THIS: Profile photo URL
+    // ✅ ADD THESE TWO FIELDS
     profilePhotoUrl: { type: String, default: "" },
-    // ✅ ADD THIS: Profile photo public ID for Cloudinary
     profilePhotoPublicId: { type: String, default: "" },
   },
   { timestamps: true },
