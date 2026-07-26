@@ -736,6 +736,7 @@ async function notifyAdminsForApproval(pending) {
   });
 }
 
+
 // ─── APPROVE REGISTRATION ──────────────────────────────────
 async function approveRegistration(pendingId, reviewer) {
   console.log("📝 Approving registration:", pendingId);
@@ -750,6 +751,7 @@ async function approveRegistration(pendingId, reviewer) {
     console.log("👤 Creating user account for:", pending.email);
     const tempPassword = generateTempPassword();
 
+    // ✅ FIXED: Pass profilePhotoUrl to createUserAccount
     const user = await createUserAccount({
       name: pending.name,
       email: pending.email,
@@ -757,6 +759,8 @@ async function approveRegistration(pendingId, reviewer) {
       role: "employee",
       phone: pending.phone,
       telegramChatId: pending.telegramChatId,
+      profilePhotoUrl: pending.profilePhotoUrl || "", // ✅ ADD THIS
+      // profilePhotoPublicId: pending.profilePhotoPublicId || "", // Add if you have it
     });
 
     console.log("✅ User created with ID:", user._id);
@@ -816,7 +820,6 @@ async function approveRegistration(pendingId, reviewer) {
     throw error;
   }
 }
-
 // ─── REJECT REGISTRATION ──────────────────────────────────
 async function rejectRegistration(pendingId, reviewer, reason) {
   const pending = await PendingRegistration.findById(pendingId);
