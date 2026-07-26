@@ -1034,20 +1034,24 @@ export default function EmployeeManagement({ t }) {
               ...btn.primary,
               display: "flex",
               alignItems: "center",
+              justifyContent: "center",
               gap: "6px",
               padding: "8px 12px",
               fontSize: "clamp(12px, 2vw, 14px)",
               whiteSpace: "nowrap",
+              minWidth: "40px",
             }}
             title={getTranslation("addEmployee")}
           >
             <FiUserPlus size={16} />
-            <span className="btn-label">{getTranslation("addEmployee")}</span>
+            <span className="btn-label" style={{ marginLeft: "4px" }}>
+              {getTranslation("addEmployee")}
+            </span>
           </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Keep as is */}
       <div
         style={{
           display: "grid",
@@ -2235,7 +2239,7 @@ export default function EmployeeManagement({ t }) {
         </div>
       )}
 
-      {/* ✅ FIXED: Add/Edit Modal - Mobile Optimized with Full Width */}
+      {/* ✅ FIXED: Add/Edit Modal - Fully Mobile Optimized */}
       {showAddModal && (
         <div
           style={{
@@ -2258,14 +2262,15 @@ export default function EmployeeManagement({ t }) {
               background: C.white,
               borderRadius: 16,
               padding: "clamp(16px, 4vw, 28px)",
-              width: "min(96%, 600px)", // ✅ FIXED: Full width on mobile
+              width: "100%",
               maxWidth: 600,
-              maxHeight: "90vh",
+              maxHeight: "95vh",
               overflowY: "auto",
-              overflowX: "hidden", // ✅ Prevent horizontal scroll
+              overflowX: "hidden",
               boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
               margin: "0 auto",
               position: "relative",
+              WebkitOverflowScrolling: "touch",
             }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -2606,6 +2611,7 @@ export default function EmployeeManagement({ t }) {
                 </>
               )}
 
+              {/* Form Fields - Responsive grid */}
               <div
                 style={{
                   display: "grid",
@@ -2745,6 +2751,7 @@ export default function EmployeeManagement({ t }) {
                           ? "#F0F9FF"
                           : "white",
                         boxSizing: "border-box",
+                        minWidth: 0,
                       }}
                       placeholder="e.g., Revenue"
                     />
@@ -2770,6 +2777,7 @@ export default function EmployeeManagement({ t }) {
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       <FiPlus size={14} />
@@ -2983,6 +2991,7 @@ export default function EmployeeManagement({ t }) {
                       outline: "none",
                       transition: "border-color 0.2s",
                       boxSizing: "border-box",
+                      minWidth: 0,
                     }}
                     placeholder="Add a skill..."
                   />
@@ -2997,6 +3006,7 @@ export default function EmployeeManagement({ t }) {
                       borderRadius: 8,
                       cursor: "pointer",
                       fontWeight: 600,
+                      whiteSpace: "nowrap",
                     }}
                   >
                     Add
@@ -3332,7 +3342,7 @@ export default function EmployeeManagement({ t }) {
                 )}
               </div>
 
-              {/* ✅ FIXED: Modal Actions - Mobile Optimized */}
+              {/* ✅ FIXED: Modal Actions - Fully Mobile Optimized */}
               <div
                 style={{
                   display: "flex",
@@ -3340,6 +3350,7 @@ export default function EmployeeManagement({ t }) {
                   gap: "10px",
                   borderTop: `1px solid ${C.border}`,
                   paddingTop: 20,
+                  marginTop: 4,
                 }}
               >
                 <style>{`
@@ -3353,22 +3364,33 @@ export default function EmployeeManagement({ t }) {
                       min-width: 100px !important;
                       width: auto !important;
                     }
+                    .btn-label {
+                      display: inline !important;
+                    }
+                    .add-dept-label {
+                      display: inline !important;
+                    }
                   }
                   @media (max-width: 479px) {
+                    .modal-actions-row {
+                      flex-direction: column-reverse !important;
+                      gap: 8px !important;
+                    }
                     .modal-actions-row button {
                       width: 100% !important;
                       justify-content: center !important;
                       padding: 14px 20px !important;
                       font-size: 15px !important;
-                    }
-                    .add-dept-label {
-                      display: none !important;
+                      min-height: 50px !important;
                     }
                     .btn-label {
                       display: none !important;
                     }
-                    .modal-actions-row {
-                      flex-direction: column-reverse !important;
+                    .add-dept-label {
+                      display: none !important;
+                    }
+                    .modal-content-grid {
+                      grid-template-columns: 1fr !important;
                     }
                   }
                 `}</style>
@@ -3397,6 +3419,7 @@ export default function EmployeeManagement({ t }) {
                       cursor: "pointer",
                       transition: "all 0.2s ease",
                       border: `1.5px solid ${C.border}`,
+                      minHeight: "48px",
                     }}
                     disabled={saving}
                   >
@@ -3419,6 +3442,7 @@ export default function EmployeeManagement({ t }) {
                       transition: "all 0.2s ease",
                       boxShadow: `0 4px 14px ${C.primary}44`,
                       opacity: saving || uploadingPhoto ? 0.7 : 1,
+                      minHeight: "48px",
                     }}
                     disabled={saving || uploadingPhoto}
                   >
