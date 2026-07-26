@@ -9,19 +9,21 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     role: {
       type: String,
-      // enum: ["member", "leader", "admin"],
       enum: ["employee", "leader", "admin", "superadmin"],
-      default: "member",
+      default: "employee",
     },
     team: { type: mongoose.Schema.Types.ObjectId, ref: "Team" },
     phone: String,
     signature: String,
-    telegramChatId: { type: String, default: null }, // NEW — set if registered via Telegram bot
+    telegramChatId: { type: String, default: null },
+    // ✅ ADD THESE TWO FIELDS
+    profilePhotoUrl: { type: String, default: "" },
+    profilePhotoPublicId: { type: String, default: "" },
   },
   { timestamps: true },
 );
 
-// 🔥 ADD THIS: hash password before saving
+// hash password before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
 
@@ -31,7 +33,7 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// 🔥 ADD THIS: helper method for login
+// helper method for login
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };

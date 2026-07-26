@@ -213,7 +213,7 @@ export default function EmployeeManagement({ t }) {
       };
       return translations[key] || fallback[key] || key;
     },
-    [safeT], // ✅ Now depends on safeT (stable)
+    [safeT],
   );
 
   // ── Load Data ──
@@ -269,7 +269,6 @@ export default function EmployeeManagement({ t }) {
       console.log("✅ Users loaded:", response.data);
       console.log("📊 Total users:", response.data?.length || 0);
 
-      // Ensure we have an array
       const usersArray = Array.isArray(response.data) ? response.data : [];
       setAllUsers(usersArray);
 
@@ -286,7 +285,6 @@ export default function EmployeeManagement({ t }) {
         message: error.message,
       });
 
-      // Handle specific error cases
       if (error.response?.status === 401) {
         showToast("Session expired. Please login again.", "error");
         setTimeout(() => (window.location.href = "/login"), 1500);
@@ -302,6 +300,7 @@ export default function EmployeeManagement({ t }) {
       setIsLoadingUsers(false);
     }
   }, [showToast, getTranslation]);
+
   const loadPendingRegistrations = useCallback(async () => {
     try {
       const response = await goldenMondayAPI.getPendingRegistrations();
@@ -365,7 +364,6 @@ export default function EmployeeManagement({ t }) {
     setAiNotes("");
 
     try {
-      // Call AI API to analyze user data and suggest employee fields
       const response = await aiAPI.suggestEmployeeFields({
         name: userData.name,
         email: userData.email,
@@ -376,7 +374,6 @@ export default function EmployeeManagement({ t }) {
 
       const analysis = response.data || {};
 
-      // Auto-fill form fields
       const filled = {};
       setFormData((prev) => {
         const next = { ...prev };
@@ -422,8 +419,6 @@ export default function EmployeeManagement({ t }) {
         analysis.notes || `AI filled ${Object.keys(filled).length} field(s)`,
       );
       setShowAIAnalysis(true);
-
-      // Store full AI suggestions for reference
       setAiSuggestions(analysis);
 
       showToast(
@@ -556,7 +551,6 @@ export default function EmployeeManagement({ t }) {
       position: u.position || f.position,
     }));
 
-    // Trigger AI analysis when a user is selected (for new employees only)
     if (!editingEmployee) {
       runAIAnalysis(u);
     }
@@ -564,7 +558,6 @@ export default function EmployeeManagement({ t }) {
 
   const handleFormChange = (field, value) => {
     setFormData((f) => ({ ...f, [field]: value }));
-    // Clear AI filled flag for this field if user manually changes it
     if (aiFilledFields[field]) {
       setAiFilledFields((prev) => ({ ...prev, [field]: false }));
     }
@@ -763,7 +756,6 @@ export default function EmployeeManagement({ t }) {
     }
   };
 
-  // Add this function after handleDelete
   const handleDeleteWithReason = async (reason) => {
     if (!deleteTarget) return;
 
@@ -824,7 +816,6 @@ export default function EmployeeManagement({ t }) {
   const openAddModal = async () => {
     resetModal();
     setShowAddModal(true);
-    // Load users when modal opens
     await loadUsers();
   };
 
@@ -934,7 +925,6 @@ export default function EmployeeManagement({ t }) {
     );
   });
 
-  // Debug logging for user loading
   console.log("🔍 User filtering debug:", {
     allUsersCount: allUsers.length,
     employeesCount: employees.length,
@@ -947,7 +937,7 @@ export default function EmployeeManagement({ t }) {
   // ── Render ──
   return (
     <div style={{ padding: "20px", maxWidth: 1200, margin: "0 auto" }}>
-      {/* Header */}
+      {/* Header - Responsive with icon-only buttons on mobile */}
       <div
         style={{
           display: "flex",
@@ -986,7 +976,15 @@ export default function EmployeeManagement({ t }) {
             {getTranslation("totalEmployees")}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {/* ✅ FIXED: Responsive button group - ICON ONLY on mobile */}
+        <div
+          style={{
+            display: "flex",
+            gap: "6px",
+            flexWrap: "nowrap",
+            alignItems: "center",
+          }}
+        >
           <button
             onClick={() => generateAIInsights()}
             style={{
@@ -995,12 +993,21 @@ export default function EmployeeManagement({ t }) {
               color: "#fff",
               display: "flex",
               alignItems: "center",
-              gap: 6,
+              justifyContent: "center",
+              gap: "4px",
               border: "none",
+              padding: "8px 10px",
+              fontSize: "clamp(12px, 2vw, 14px)",
+              whiteSpace: "nowrap",
+              minWidth: "36px",
+              minHeight: "36px",
             }}
+            title={getTranslation("aiInsights")}
           >
             <FiCpu size={16} />
-            AI Insights
+            <span className="btn-label" style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}>
+              {getTranslation("aiInsights")}
+            </span>
           </button>
           <button
             onClick={refreshData}
@@ -1009,8 +1016,15 @@ export default function EmployeeManagement({ t }) {
               ...btn.secondary,
               display: "flex",
               alignItems: "center",
-              gap: 6,
+              justifyContent: "center",
+              gap: "4px",
+              padding: "8px 10px",
+              fontSize: "clamp(12px, 2vw, 14px)",
+              whiteSpace: "nowrap",
+              minWidth: "36px",
+              minHeight: "36px",
             }}
+            title="Refresh"
           >
             <FiRefreshCw
               size={16}
@@ -1018,16 +1032,35 @@ export default function EmployeeManagement({ t }) {
                 animation: refreshing ? "spin 1s linear infinite" : "none",
               }}
             />
-            {refreshing ? "Refreshing..." : "Refresh"}
+            <span className="btn-label" style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}>
+              {refreshing ? "..." : "Refresh"}
+            </span>
           </button>
-          <button onClick={openAddModal} style={btn.primary}>
-            <FiUserPlus size={16} style={{ marginRight: 6 }} />
-            {getTranslation("addEmployee")}
+          <button
+            onClick={openAddModal}
+            style={{
+              ...btn.primary,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "4px",
+              padding: "8px 10px",
+              fontSize: "clamp(12px, 2vw, 14px)",
+              whiteSpace: "nowrap",
+              minWidth: "36px",
+              minHeight: "36px",
+            }}
+            title={getTranslation("addEmployee")}
+          >
+            <FiUserPlus size={16} />
+            <span className="btn-label" style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}>
+              {getTranslation("addEmployee")}
+            </span>
           </button>
         </div>
       </div>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Keep as is */}
       <div
         style={{
           display: "grid",
@@ -1171,7 +1204,6 @@ export default function EmployeeManagement({ t }) {
           </div>
         </div>
 
-        {/* 🆕 PENDING APPROVALS CARD */}
         <div
           style={{
             background: C.white,
@@ -1577,111 +1609,157 @@ export default function EmployeeManagement({ t }) {
         </div>
       )}
 
-      {/* Search and Filter */}
-      <div
+    {/* Search and Filter - FIXED: Search bar full width, dropdowns inline, icons separate if needed */}
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    marginBottom: 16,
+  }}
+>
+  {/* Search Bar - Full width on its own line */}
+  <div style={{ width: "100%", position: "relative" }}>
+    <FiSearch
+      size={16}
+      style={{
+        position: "absolute",
+        left: "12px",
+        top: "50%",
+        transform: "translateY(-50%)",
+        color: "#999",
+      }}
+    />
+    <input
+      type="text"
+      placeholder={getTranslation("searchPlaceholder")}
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      style={{
+        width: "100%",
+        padding: "10px 14px 10px 38px",
+        border: `1.5px solid ${C.border}`,
+        borderRadius: 8,
+        fontSize: 14,
+        outline: "none",
+        transition: "border-color 0.2s",
+        boxSizing: "border-box",
+      }}
+      onFocus={(e) => (e.currentTarget.style.borderColor = C.primary)}
+      onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
+    />
+  </div>
+
+  {/* Dropdowns and Icons Row */}
+  <div
+    style={{
+      display: "flex",
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+      alignItems: "center",
+    }}
+  >
+    {/* Dropdowns - Inline, will wrap together if needed */}
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "row",
+        flexWrap: "nowrap",
+        gap: 8,
+        flex: "1 1 auto",
+        minWidth: "180px",
+      }}
+    >
+      <select
+        value={filterEligible}
+        onChange={(e) => setFilterEligible(e.target.value)}
         style={{
-          display: "flex",
-          flexDirection: "row",
-          flexWrap: "wrap",
-          gap: 12,
-          marginBottom: 16,
+          padding: "8px 10px",
+          border: `1.5px solid ${C.border}`,
+          borderRadius: 8,
+          fontSize: 13,
+          background: C.white,
+          outline: "none",
+          flex: 1,
+          minWidth: "80px",
         }}
       >
-        <div style={{ flex: 2, minWidth: 200, position: "relative" }}>
-          <FiSearch
-            size={16}
-            style={{
-              position: "absolute",
-              left: "12px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              color: "#999",
-            }}
-          />
-          <input
-            type="text"
-            placeholder={getTranslation("searchPlaceholder")}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px 14px 10px 38px",
-              border: `1.5px solid ${C.border}`,
-              borderRadius: 8,
-              fontSize: 14,
-              outline: "none",
-              transition: "border-color 0.2s",
-            }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = C.primary)}
-            onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
-          />
-        </div>
-        <select
-          value={filterEligible}
-          onChange={(e) => setFilterEligible(e.target.value)}
-          style={{
-            padding: "10px 14px",
-            border: `1.5px solid ${C.border}`,
-            borderRadius: 8,
-            fontSize: 14,
-            background: C.white,
-            outline: "none",
-            minWidth: 120,
-          }}
-        >
-          <option value="all">{getTranslation("allStatus")}</option>
-          <option value="active">{getTranslation("active")}</option>
-          <option value="inactive">{getTranslation("inactive")}</option>
-        </select>
-        <select
-          value={filterDepartment}
-          onChange={(e) => setFilterDepartment(e.target.value)}
-          style={{
-            padding: "10px 14px",
-            border: `1.5px solid ${C.border}`,
-            borderRadius: 8,
-            fontSize: 14,
-            background: C.white,
-            outline: "none",
-            minWidth: 140,
-          }}
-        >
-          <option value="all">{getTranslation("allDepartments")}</option>
-          {departments.map((dept) => (
-            <option key={dept} value={dept}>
-              {dept}
-            </option>
-          ))}
-        </select>
-        <div style={{ display: "flex", gap: 4, marginLeft: "auto" }}>
-          <button
-            onClick={() => setViewMode("grid")}
-            style={{
-              padding: "8px 10px",
-              borderRadius: 6,
-              border: `1px solid ${viewMode === "grid" ? C.primary : C.border}`,
-              background: viewMode === "grid" ? C.primary : "transparent",
-              color: viewMode === "grid" ? "#fff" : C.muted,
-              cursor: "pointer",
-            }}
-          >
-            <FiGrid size={16} />
-          </button>
-          <button
-            onClick={() => setViewMode("list")}
-            style={{
-              padding: "8px 10px",
-              borderRadius: 6,
-              border: `1px solid ${viewMode === "list" ? C.primary : C.border}`,
-              background: viewMode === "list" ? C.primary : "transparent",
-              color: viewMode === "list" ? "#fff" : C.muted,
-              cursor: "pointer",
-            }}
-          >
-            <FiList size={16} />
-          </button>
-        </div>
-      </div>
+        <option value="all">{getTranslation("allStatus")}</option>
+        <option value="active">{getTranslation("active")}</option>
+        <option value="inactive">{getTranslation("inactive")}</option>
+      </select>
+
+      <select
+        value={filterDepartment}
+        onChange={(e) => setFilterDepartment(e.target.value)}
+        style={{
+          padding: "8px 10px",
+          border: `1.5px solid ${C.border}`,
+          borderRadius: 8,
+          fontSize: 13,
+          background: C.white,
+          outline: "none",
+          flex: 1,
+          minWidth: "90px",
+        }}
+      >
+        <option value="all">{getTranslation("allDepartments")}</option>
+        {departments.map((dept) => (
+          <option key={dept} value={dept}>
+            {dept}
+          </option>
+        ))}
+      </select>
+    </div>
+
+    {/* Grid/List Icons - Will wrap to new line if needed */}
+    <div
+      style={{
+        display: "flex",
+        gap: 4,
+        flexShrink: 0,
+      }}
+    >
+      <button
+        onClick={() => setViewMode("grid")}
+        style={{
+          padding: "6px 8px",
+          borderRadius: 6,
+          border: `1px solid ${viewMode === "grid" ? C.primary : C.border}`,
+          background: viewMode === "grid" ? C.primary : "transparent",
+          color: viewMode === "grid" ? "#fff" : C.muted,
+          cursor: "pointer",
+          minWidth: "34px",
+          minHeight: "34px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <FiGrid size={16} />
+      </button>
+      <button
+        onClick={() => setViewMode("list")}
+        style={{
+          padding: "6px 8px",
+          borderRadius: 6,
+          border: `1px solid ${viewMode === "list" ? C.primary : C.border}`,
+          background: viewMode === "list" ? C.primary : "transparent",
+          color: viewMode === "list" ? "#fff" : C.muted,
+          cursor: "pointer",
+          minWidth: "34px",
+          minHeight: "34px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <FiList size={16} />
+      </button>
+    </div>
+  </div>
+</div>
 
       {/* Employees Display */}
       {loading ? (
@@ -2216,7 +2294,7 @@ export default function EmployeeManagement({ t }) {
         </div>
       )}
 
-      {/* Add/Edit Modal with AI Auto-Fill */}
+      {/* ✅ FIXED: Add/Edit Modal - Fully Mobile Optimized */}
       {showAddModal && (
         <div
           style={{
@@ -2227,7 +2305,7 @@ export default function EmployeeManagement({ t }) {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
-            padding: 16,
+            padding: "8px",
             backdropFilter: "blur(4px)",
           }}
           onClick={() => {
@@ -2238,18 +2316,22 @@ export default function EmployeeManagement({ t }) {
             style={{
               background: C.white,
               borderRadius: 16,
-              padding: 28,
-              width: "90%",
+              padding: "clamp(16px, 4vw, 28px)",
+              width: "100%",
               maxWidth: 600,
-              maxHeight: "90vh",
-              overflow: "auto",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              maxHeight: "95vh",
+              overflowY: "auto",
+              overflowX: "hidden",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+              margin: "0 auto",
+              position: "relative",
+              WebkitOverflowScrolling: "touch",
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <h2
               style={{
-                fontSize: "clamp(20px, 5vw, 24px)",
+                fontSize: "clamp(18px, 4vw, 24px)",
                 fontWeight: 800,
                 color: C.dark,
                 fontFamily: F.serif,
@@ -2273,9 +2355,9 @@ export default function EmployeeManagement({ t }) {
             </h2>
             <p
               style={{
-                fontSize: "clamp(12px, 3vw, 13px)",
+                fontSize: "clamp(12px, 2.5vw, 14px)",
                 color: C.muted,
-                marginBottom: 20,
+                marginBottom: 16,
                 fontFamily: F.sans,
               }}
             >
@@ -2284,7 +2366,7 @@ export default function EmployeeManagement({ t }) {
                 : getTranslation("selectUser")}
             </p>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} style={{ overflow: "hidden" }}>
               {!editingEmployee && (
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -2379,6 +2461,7 @@ export default function EmployeeManagement({ t }) {
                           fontSize: 14,
                           outline: "none",
                           transition: "border-color 0.2s",
+                          boxSizing: "border-box",
                         }}
                         onFocus={(e) =>
                           (e.currentTarget.style.borderColor = C.primary)
@@ -2583,12 +2666,14 @@ export default function EmployeeManagement({ t }) {
                 </>
               )}
 
+              {/* ✅ FIXED: Form Fields - Single column on mobile */}
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   gap: 12,
                 }}
+                className="form-grid"
               >
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -2616,6 +2701,7 @@ export default function EmployeeManagement({ t }) {
                       outline: "none",
                       transition: "border-color 0.2s",
                       background: aiFilledFields.name ? "#F0F9FF" : "white",
+                      boxSizing: "border-box",
                     }}
                     placeholder="Full name"
                   />
@@ -2660,6 +2746,7 @@ export default function EmployeeManagement({ t }) {
                       outline: "none",
                       transition: "border-color 0.2s",
                       background: aiFilledFields.email ? "#F0F9FF" : "white",
+                      boxSizing: "border-box",
                     }}
                     placeholder="email@example.com"
                   />
@@ -2680,12 +2767,14 @@ export default function EmployeeManagement({ t }) {
                 </div>
               </div>
 
+              {/* ✅ FIXED: Department + Position - Wraps on mobile */}
               <div
                 style={{
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   gap: 12,
                 }}
+                className="form-grid"
               >
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -2719,6 +2808,8 @@ export default function EmployeeManagement({ t }) {
                         background: aiFilledFields.department
                           ? "#F0F9FF"
                           : "white",
+                        boxSizing: "border-box",
+                        minWidth: 0,
                       }}
                       placeholder="e.g., Revenue"
                     />
@@ -2744,10 +2835,13 @@ export default function EmployeeManagement({ t }) {
                         display: "flex",
                         alignItems: "center",
                         gap: 6,
+                        whiteSpace: "nowrap",
                       }}
                     >
                       <FiPlus size={14} />
-                      {getTranslation("addDepartment")}
+                      <span className="add-dept-label">
+                        {getTranslation("addDepartment")}
+                      </span>
                     </button>
                   </div>
                   {aiFilledFields.department && (
@@ -2791,7 +2885,10 @@ export default function EmployeeManagement({ t }) {
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
-                      background: aiFilledFields.position ? "#F0F9FF" : "white",
+                      background: aiFilledFields.position
+                        ? "#F0F9FF"
+                        : "white",
+                      boxSizing: "border-box",
                     }}
                     placeholder="e.g., Team Leader"
                   />
@@ -2818,6 +2915,7 @@ export default function EmployeeManagement({ t }) {
                   gridTemplateColumns: "1fr 1fr",
                   gap: 12,
                 }}
+                className="form-grid"
               >
                 <div style={{ marginBottom: 14 }}>
                   <label
@@ -2844,6 +2942,7 @@ export default function EmployeeManagement({ t }) {
                       outline: "none",
                       transition: "border-color 0.2s",
                       background: aiFilledFields.phone ? "#F0F9FF" : "white",
+                      boxSizing: "border-box",
                     }}
                     placeholder="+251 9XX XXX XXX"
                   />
@@ -2889,6 +2988,7 @@ export default function EmployeeManagement({ t }) {
                       outline: "none",
                       transition: "border-color 0.2s",
                       background: aiFilledFields.hireDate ? "#F0F9FF" : "white",
+                      boxSizing: "border-box",
                     }}
                   />
                   {aiFilledFields.hireDate && (
@@ -2949,6 +3049,8 @@ export default function EmployeeManagement({ t }) {
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
+                      boxSizing: "border-box",
+                      minWidth: 0,
                     }}
                     placeholder="Add a skill..."
                   />
@@ -2963,6 +3065,7 @@ export default function EmployeeManagement({ t }) {
                       borderRadius: 8,
                       cursor: "pointer",
                       fontWeight: 600,
+                      whiteSpace: "nowrap",
                     }}
                   >
                     Add
@@ -3128,6 +3231,7 @@ export default function EmployeeManagement({ t }) {
                   gridTemplateColumns: "1fr 1fr",
                   gap: 12,
                 }}
+                className="form-grid"
               >
                 {editingEmployee && (
                   <div style={{ marginBottom: 14 }}>
@@ -3155,6 +3259,7 @@ export default function EmployeeManagement({ t }) {
                         fontSize: 14,
                         background: C.white,
                         outline: "none",
+                        boxSizing: "border-box",
                       }}
                     >
                       <option value="active">
@@ -3214,6 +3319,7 @@ export default function EmployeeManagement({ t }) {
                       background: aiFilledFields.performanceRating
                         ? "#F0F9FF"
                         : "white",
+                      boxSizing: "border-box",
                     }}
                     placeholder="0-100"
                   />
@@ -3276,6 +3382,7 @@ export default function EmployeeManagement({ t }) {
                     minHeight: 60,
                     fontFamily: F.sans,
                     background: aiFilledFields.notes ? "#F0F9FF" : "white",
+                    boxSizing: "border-box",
                   }}
                   placeholder="Additional notes..."
                 />
@@ -3295,56 +3402,145 @@ export default function EmployeeManagement({ t }) {
                 )}
               </div>
 
-              {/* Modal Actions */}
+              {/* ✅ FIXED: Modal Actions - Fully Mobile Optimized */}
               <div
                 style={{
                   display: "flex",
-                  gap: 12,
-                  justifyContent: "flex-end",
+                  flexDirection: "column",
+                  gap: "10px",
                   borderTop: `1px solid ${C.border}`,
                   paddingTop: 20,
+                  marginTop: 4,
                 }}
               >
-                <button
-                  type="button"
-                  onClick={resetModal}
-                  style={btn.secondary}
-                  disabled={saving}
-                >
-                  {getTranslation("cancel")}
-                </button>
-                <button
-                  type="submit"
+                <style>{`
+                  /* Desktop/Tablet: Side by side */
+                  @media (min-width: 481px) {
+                    .modal-actions-row {
+                      flex-direction: row !important;
+                      justify-content: flex-end !important;
+                    }
+                    .modal-actions-row button {
+                      flex: 0 1 auto !important;
+                      min-width: 100px !important;
+                      width: auto !important;
+                    }
+                    .btn-label {
+                      display: inline !important;
+                    }
+                    .add-dept-label {
+                      display: inline !important;
+                    }
+                    .form-grid {
+                      grid-template-columns: 1fr 1fr !important;
+                    }
+                  }
+                  /* Mobile: Stack vertically, icon only */
+                  @media (max-width: 480px) {
+                    .modal-actions-row {
+                      flex-direction: column-reverse !important;
+                      gap: 8px !important;
+                    }
+                    .modal-actions-row button {
+                      width: 100% !important;
+                      justify-content: center !important;
+                      padding: 14px 16px !important;
+                      font-size: 15px !important;
+                      min-height: 48px !important;
+                    }
+                    .btn-label {
+                      display: none !important;
+                    }
+                    .add-dept-label {
+                      display: none !important;
+                    }
+                    .form-grid {
+                      grid-template-columns: 1fr !important;
+                    }
+                    /* Header buttons - icon only */
+                    .header-btn .btn-label {
+                      display: none !important;
+                    }
+                    .header-btn {
+                      padding: 8px 10px !important;
+                      min-width: 36px !important;
+                      min-height: 36px !important;
+                    }
+                  }
+                `}</style>
+
+                <div
+                  className="modal-actions-row"
                   style={{
-                    ...btn.primary,
-                    opacity: saving ? 0.7 : 1,
-                    cursor: saving ? "not-allowed" : "pointer",
                     display: "flex",
-                    alignItems: "center",
-                    gap: 6,
+                    flexDirection: "column",
+                    gap: "10px",
                   }}
-                  disabled={saving || uploadingPhoto}
                 >
-                  {saving || uploadingPhoto ? (
-                    <>
-                      <FiLoader
-                        size={16}
-                        style={{ animation: "spin 0.8s linear infinite" }}
-                      />
-                      {uploadingPhoto ? "Uploading Photo..." : "Saving..."}
-                    </>
-                  ) : editingEmployee ? (
-                    <>
-                      <FiSave size={16} />
-                      {getTranslation("update")}
-                    </>
-                  ) : (
-                    <>
-                      <FiUserPlus size={16} />
-                      {getTranslation("register")}
-                    </>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={resetModal}
+                    style={{
+                      ...btn.secondary,
+                      padding: "12px 24px",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 10,
+                      width: "100%",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      border: `1.5px solid ${C.border}`,
+                      minHeight: "48px",
+                    }}
+                    disabled={saving}
+                  >
+                    <FiX size={18} />
+                    {getTranslation("cancel")}
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      ...btn.primary,
+                      padding: "12px 24px",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 10,
+                      width: "100%",
+                      justifyContent: "center",
+                      cursor: saving ? "not-allowed" : "pointer",
+                      transition: "all 0.2s ease",
+                      boxShadow: `0 4px 14px ${C.primary}44`,
+                      opacity: saving || uploadingPhoto ? 0.7 : 1,
+                      minHeight: "48px",
+                    }}
+                    disabled={saving || uploadingPhoto}
+                  >
+                    {saving || uploadingPhoto ? (
+                      <>
+                        <FiLoader
+                          size={18}
+                          style={{ animation: "spin 0.8s linear infinite" }}
+                        />
+                        {uploadingPhoto ? "Uploading Photo..." : "Saving..."}
+                      </>
+                    ) : editingEmployee ? (
+                      <>
+                        <FiSave size={18} />
+                        {getTranslation("update")}
+                      </>
+                    ) : (
+                      <>
+                        <FiUserPlus size={18} />
+                        {getTranslation("register")}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -3461,6 +3657,7 @@ export default function EmployeeManagement({ t }) {
                   fontSize: 14,
                   outline: "none",
                   transition: "border-color 0.2s",
+                  boxSizing: "border-box",
                 }}
                 autoFocus
               />
@@ -3788,6 +3985,7 @@ export default function EmployeeManagement({ t }) {
                   borderRadius: 8,
                   fontSize: 14,
                   outline: "none",
+                  boxSizing: "border-box",
                 }}
               />
             </div>
