@@ -18,6 +18,7 @@ const createUserAccount = async ({
   phone,
   telegramChatId,
   profilePhotoUrl, // ✅ ADD THIS
+  profilePhotoPublicId, // ✅ ADD THIS
 }) => {
   const userExists = await User.findOne({ email });
   if (userExists) {
@@ -33,7 +34,8 @@ const createUserAccount = async ({
     role: role || "employee",
     phone,
     ...(telegramChatId ? { telegramChatId } : {}),
-    ...(profilePhotoUrl ? { profilePhotoUrl } : {}), // ✅ ADD THIS
+    ...(profilePhotoUrl ? { profilePhotoUrl } : {}),
+    ...(profilePhotoPublicId ? { profilePhotoPublicId } : {}),
   });
 
   return user;
@@ -57,7 +59,7 @@ const registerUser = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      profilePhotoUrl: user.profilePhotoUrl || "", // ✅ ADD THIS
+      profilePhotoUrl: user.profilePhotoUrl || "",
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -81,8 +83,8 @@ const loginUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        profilePhotoUrl: user.profilePhotoUrl || "", // ✅ ADD THIS
-        phone: user.phone || "", // ✅ ADD THIS
+        profilePhotoUrl: user.profilePhotoUrl || "",
+        phone: user.phone || "",
         token: generateToken(user._id),
       });
     } else {
@@ -96,7 +98,6 @@ const loginUser = async (req, res) => {
 // @desc    Get current user
 // @route   GET /api/auth/me
 const getMe = async (req, res) => {
-  // ✅ Ensure profilePhotoUrl is included
   const user = req.user;
   res.json({
     _id: user._id,
