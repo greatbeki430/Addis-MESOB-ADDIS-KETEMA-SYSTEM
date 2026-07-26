@@ -391,7 +391,7 @@ export default function UserManagement({ t }) {
       return fallback[key] || key;
     },
     [safeT],
-  ); // ✅ Now depends on memoized safeT
+  );
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -564,8 +564,6 @@ export default function UserManagement({ t }) {
     }
     return [];
   };
-
-  // FIXED: Removed unused canDeleteUser function (logic moved to ActionButtons component)
 
   const getRoleStats = () => {
     const stats = {
@@ -1264,7 +1262,7 @@ export default function UserManagement({ t }) {
         </div>
       )}
 
-      {/* User Modal */}
+      {/* ✅ FIXED: User Modal - Mobile Optimized */}
       {showModal && (
         <div
           style={{
@@ -1278,7 +1276,7 @@ export default function UserManagement({ t }) {
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
-            padding: 16,
+            padding: "12px",
             backdropFilter: "blur(4px)",
           }}
           onClick={() => setShowModal(false)}
@@ -1287,18 +1285,20 @@ export default function UserManagement({ t }) {
             style={{
               background: C.white,
               borderRadius: 16,
-              padding: 28,
-              width: "90%",
-              maxWidth: 450,
+              padding: "clamp(20px, 4vw, 32px)",
+              width: "min(92%, 500px)", // ✅ Increased max width on mobile
+              maxWidth: 500,
               maxHeight: "90vh",
               overflow: "auto",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+              margin: "0 auto",
+              position: "relative",
             }}
             onClick={(e) => e.stopPropagation()}
           >
             <h2
               style={{
-                fontSize: "clamp(20px, 4vw, 24px)",
+                fontSize: "clamp(18px, 4vw, 24px)",
                 fontWeight: 800,
                 color: C.dark,
                 fontFamily: F.serif,
@@ -1322,7 +1322,7 @@ export default function UserManagement({ t }) {
             </h2>
             <p
               style={{
-                fontSize: "clamp(12px, 2.5vw, 13px)",
+                fontSize: "clamp(12px, 2.5vw, 14px)",
                 color: C.muted,
                 marginBottom: 20,
                 fontFamily: F.sans,
@@ -1363,6 +1363,7 @@ export default function UserManagement({ t }) {
                     fontSize: 13,
                     transition: "border-color 0.2s, box-shadow 0.2s",
                     outline: "none",
+                    boxSizing: "border-box",
                   }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = C.primary;
@@ -1404,6 +1405,7 @@ export default function UserManagement({ t }) {
                     fontSize: 13,
                     transition: "border-color 0.2s, box-shadow 0.2s",
                     outline: "none",
+                    boxSizing: "border-box",
                   }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = C.primary;
@@ -1446,6 +1448,7 @@ export default function UserManagement({ t }) {
                       fontSize: 13,
                       transition: "border-color 0.2s, box-shadow 0.2s",
                       outline: "none",
+                      boxSizing: "border-box",
                     }}
                     onFocus={(e) => {
                       e.currentTarget.style.borderColor = C.primary;
@@ -1485,6 +1488,7 @@ export default function UserManagement({ t }) {
                     fontSize: 13,
                     background: C.white,
                     outline: "none",
+                    boxSizing: "border-box",
                   }}
                 >
                   {getAvailableRoles().map((role) => (
@@ -1523,6 +1527,7 @@ export default function UserManagement({ t }) {
                     fontSize: 13,
                     transition: "border-color 0.2s, box-shadow 0.2s",
                     outline: "none",
+                    boxSizing: "border-box",
                   }}
                   onFocus={(e) => {
                     e.currentTarget.style.borderColor = C.primary;
@@ -1535,55 +1540,99 @@ export default function UserManagement({ t }) {
                 />
               </div>
 
+              {/* ✅ FIXED: Mobile-optimized buttons */}
               <div
                 style={{
                   display: "flex",
-                  gap: 12,
-                  justifyContent: "flex-end",
+                  flexDirection: "column",
+                  gap: "10px",
                   borderTop: `1px solid ${C.border}`,
                   paddingTop: 20,
+                  marginTop: 4,
                 }}
               >
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
+                {/* Desktop/Tablet: Side by side, Mobile: Stacked */}
+                <style>{`
+                  @media (min-width: 480px) {
+                    .modal-button-row {
+                      flex-direction: row !important;
+                      justify-content: flex-end !important;
+                    }
+                    .modal-button-row button {
+                      flex: 0 1 auto !important;
+                      min-width: 100px !important;
+                      width: auto !important;
+                    }
+                  }
+                  @media (max-width: 479px) {
+                    .modal-button-row button {
+                      width: 100% !important;
+                      justify-content: center !important;
+                      padding: 14px 20px !important;
+                      font-size: 15px !important;
+                    }
+                  }
+                `}</style>
+
+                <div
+                  className="modal-button-row"
                   style={{
-                    ...btn.secondary,
-                    padding: "10px 22px",
-                    fontSize: 13,
                     display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    borderRadius: 8,
+                    flexDirection: "column",
+                    gap: "10px",
                   }}
                 >
-                  <FiX size={16} />
-                  {getTranslation("cancel")}
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    ...btn.primary,
-                    padding: "10px 22px",
-                    fontSize: 13,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    borderRadius: 8,
-                  }}
-                >
-                  {editingUser ? (
-                    <>
-                      <FiCheck size={16} />
-                      {getTranslation("updateUser")}
-                    </>
-                  ) : (
-                    <>
-                      <FiUserPlus size={16} />
-                      {getTranslation("createUser")}
-                    </>
-                  )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    style={{
+                      ...btn.secondary,
+                      padding: "12px 24px",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 10,
+                      width: "100%",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      border: `1.5px solid ${C.border}`,
+                    }}
+                  >
+                    <FiX size={18} />
+                    {getTranslation("cancel")}
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      ...btn.primary,
+                      padding: "12px 24px",
+                      fontSize: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      borderRadius: 10,
+                      width: "100%",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                      boxShadow: `0 4px 14px ${C.primary}44`,
+                    }}
+                  >
+                    {editingUser ? (
+                      <>
+                        <FiCheck size={18} />
+                        {getTranslation("updateUser")}
+                      </>
+                    ) : (
+                      <>
+                        <FiUserPlus size={18} />
+                        {getTranslation("createUser")}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
