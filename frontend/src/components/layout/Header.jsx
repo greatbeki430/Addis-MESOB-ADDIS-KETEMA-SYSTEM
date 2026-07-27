@@ -27,6 +27,11 @@ import {
   FiSunrise,
   FiBarChart2,
   FiLock,
+  FiSmartphone,
+  FiClock,
+  FiBell,
+  FiClipboard,
+  FiMail,
 } from "react-icons/fi";
 
 export default function Header({ t, lang, setLang, onAddUserClick }) {
@@ -45,15 +50,18 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     "golden-monday": <FiSunrise size={18} />,
     employees: <FiUsers size={18} />,
     "admin/services": <FiGrid size={18} />,
-    "digital-attendance": <FiGrid size={18} />,
-    "admin-attendance": <FiGrid size={18} />,
-    "admin-digital-attendance": <FiGrid size={18} />,
-    "admin-alerts": <FiGrid size={18} />,
+    "digital-attendance": <FiSmartphone size={18} />,
+    "admin-attendance": <FiClock size={18} />,
+    "admin-digital-attendance": <FiSmartphone size={18} />,
+    "admin-alerts": <FiBell size={18} />,
     "admin-evaluations": <FiStar size={18} />,
-    "admin-daily-reports": <FiFileText size={18} />,
+    "admin-daily-reports": <FiClipboard size={18} />,
     "admin-forum-reports": <FiMessageSquare size={18} />,
-    "admin-requests": <FiGrid size={18} />,
+    "admin-requests": <FiMail size={18} />,
     documents: <FiFileText size={18} />,
+    profile: <FiUser size={18} />,
+    settings: <FiSettings size={18} />,
+    "change-password": <FiLock size={18} />,
   };
 
   // ── Display Names for Breadcrumb ──
@@ -111,8 +119,8 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     const path = location.pathname;
     if (path === "/" || path === "/dashboard") return "dashboard";
     if (path.startsWith("/forum")) return "forum";
-    if (path.startsWith("/evaluations")) return "evaluation";
-    if (path.startsWith("/daily-reports")) return "report";
+    if (path.startsWith("/evaluation")) return "evaluation";
+    if (path.startsWith("/report")) return "report";
     if (path.startsWith("/services")) return "services";
     if (path.startsWith("/analytics")) return "analytics";
     if (path.startsWith("/users")) return "users";
@@ -122,14 +130,17 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     if (path.startsWith("/golden-monday")) return "golden-monday";
     if (path.startsWith("/employees")) return "employees";
     if (path.startsWith("/digital-attendance")) return "digital-attendance";
-    if (path.startsWith("/admin/attendance")) return "admin-attendance";
-    if (path.startsWith("/admin/digital-attendance"))
+    if (path.startsWith("/admin-attendance")) return "admin-attendance";
+    if (path.startsWith("/admin-digital-attendance"))
       return "admin-digital-attendance";
-    if (path.startsWith("/admin/alerts")) return "admin-alerts";
-    if (path.startsWith("/admin/evaluations")) return "admin-evaluations";
-    if (path.startsWith("/admin/daily-reports")) return "admin-daily-reports";
-    if (path.startsWith("/admin/forum-reports")) return "admin-forum-reports";
-    if (path.startsWith("/admin/requests")) return "admin-requests";
+    if (path.startsWith("/admin-alerts")) return "admin-alerts";
+    if (path.startsWith("/admin-evaluations")) return "admin-evaluations";
+    if (path.startsWith("/admin-daily-reports")) return "admin-daily-reports";
+    if (path.startsWith("/admin-forum-reports")) return "admin-forum-reports";
+    if (path.startsWith("/admin-requests")) return "admin-requests";
+    if (path.startsWith("/profile")) return "profile";
+    if (path.startsWith("/settings")) return "settings";
+    if (path.startsWith("/change-password")) return "change-password";
     return "dashboard";
   }, [location.pathname]);
 
@@ -723,7 +734,6 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
                   <button
                     onClick={() => {
                       setIsDropdownOpen(false);
-                      // Navigate to profile
                       window.location.href = "/profile";
                     }}
                     style={{
