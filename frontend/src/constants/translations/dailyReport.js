@@ -14,7 +14,7 @@ export const dailyReportTranslations = {
       colFemale: "F",
       colTotal: "Total",
       grandTotal: "Grand Total",
-      addRow: "+ Add Row",
+      addRow: "Add Row",
       save: "Save Report",
       selectDept: "Select Dept",
       selectService: "Select Service",
