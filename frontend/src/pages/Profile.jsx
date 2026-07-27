@@ -248,13 +248,16 @@ export default function Profile() {
                     border: `4px solid ${C.primary}`,
                     boxShadow: shadows.md,
                     transition: "transform 0.3s ease",
+                    cursor: "pointer",
                   }}
                   onMouseEnter={(e) =>
-                    (e.currentTarget.style.transform = "scale(1.02)")
+                    (e.currentTarget.style.transform = "scale(1.05)")
                   }
                   onMouseLeave={(e) =>
                     (e.currentTarget.style.transform = "scale(1)")
                   }
+                  onClick={() => window.open(photoPreview, "_blank")}
+                  title="Click to view full size"
                 />
               ) : (
                 <div
@@ -274,16 +277,12 @@ export default function Profile() {
                     boxShadow: shadows.md,
                     transition: "transform 0.3s ease",
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.transform = "scale(1.02)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.transform = "scale(1)")
-                  }
                 >
                   {getUserInitials()}
                 </div>
               )}
+
+              {/* ✅ Keep this for upload functionality */}
               {isEditing && (
                 <>
                   <label
