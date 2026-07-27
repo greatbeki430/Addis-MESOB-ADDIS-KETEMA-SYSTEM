@@ -1,12 +1,30 @@
 // frontend/src/utils/pdf/reports/dailyReport.js
 import { createPDF } from "../pdfEngine";
-import { encodeText } from "../language";
+import { encodeText, isAmharic } from "../language";
+import { loadFonts, FONT_NAMES } from "../fontLoader";
+
+// ✅ Amharic labels - forced for all exports
+const AMHARIC_LABELS = {
+  title: "ዕለታዊ ሪፖርት",
+  subtitle: "የአዲስ መሶብ የአንድ ማዕከል አገልግሎት",
+  reportDate: "የሪፖርቱ ቀን",
+  colNo: "#",
+  colDept: "ዘርፍ",
+  colService: "አገልግሎት",
+  colMale: "ወንድ",
+  colFemale: "ሴት",
+  colTotal: "ድምር",
+  grandTotal: "ጠቅላላ ድምር",
+  footer: "በአዲስ መሶብ የአንድ ማዕከል አገልግሎት ማእከል የተዘጋጀ",
+  generatedBy: "ገጽ",
+  of: "ከ",
+};
 
 /**
  * Generate Daily Report PDF with full Amharic support
  * @param {Array} rows - Array of report rows with dept, service, male, female, total
  * @param {string} date - Report date string
- * @param {Object} t - Translation function object
+ * @param {Object} t - Translation function object (kept for compatibility)
  * @param {Object} options - Additional options for PDF generation
  * @param {string} options.filename - Custom filename (optional)
  * @param {string} options.footerText - Custom footer text (optional)
@@ -33,17 +51,36 @@ export const generateDailyReportPDF = (rows, date, t, options = {}) => {
       theme: "daily",
     });
 
-    // Get the document instance for additional manipulation if needed
+    // Get the document instance
     const doc = engine.getDoc();
 
-    // Use the doc for any additional customization
-    // For example, set document metadata
+    // ✅ IMPORTANT: Load fonts into this document
+    loadFonts(doc);
+
+    // Use Amharic labels (forced)
+    const labels = AMHARIC_LABELS;
+
+    // ─── Helper: Set font based on text content ───
+    const setSmartFont = (text, bold = false) => {
+      try {
+        if (isAmharic(text)) {
+          doc.setFont(bold ? FONT_NAMES.ethiopicBold : FONT_NAMES.ethiopic, "normal");
+        } else {
+          doc.setFont(bold ? FONT_NAMES.latinBold : FONT_NAMES.latin, "normal");
+        }
+      } catch (error) {
+        console.warn("Font fallback:", error.message);
+        doc.setFont("helvetica", bold ? "bold" : "normal");
+      }
+    };
+
+    // ─── Set document metadata ────────────────────────────────────────────────
     try {
       doc.setProperties({
-        title: options?.title || t?.dailyReport?.title || "Daily Report",
+        title: labels.title,
         author: options?.author || "A-MESOB One-Stop Service Center",
-        subject: options?.subject || "Daily Report",
-        keywords: options?.keywords || "daily, report, service",
+        subject: options?.subject || labels.title,
+        keywords: options?.keywords || "daily, report, service, Amharic",
         creator: "A-MESOB PDF Generator",
       });
     } catch (metadataError) {
@@ -51,22 +88,27 @@ export const generateDailyReportPDF = (rows, date, t, options = {}) => {
     }
 
     // ─── Title ────────────────────────────────────────────────────────────────
-    engine.addHeader({
-      title: t?.dailyReport?.title || "Daily Report",
-      subtitle: t?.dailyReport?.subtitle || "",
-      titleSize: options?.titleSize || 18,
-      subtitleSize: options?.subtitleSize || 10,
-    });
+    setSmartFont(labels.title, true);
+    doc.setFontSize(18);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let yPos = 20;
+    doc.text(encodeText(labels.title), pageWidth / 2, yPos, { align: "center" });
+    yPos += 10;
+
+    // ─── Subtitle ──────────────────────────────────────────────────────────────
+    setSmartFont(labels.subtitle, false);
+    doc.setFontSize(10);
+    doc.text(encodeText(labels.subtitle), pageWidth / 2, yPos, { align: "center" });
+    yPos += 10;
 
     // ─── Date ──────────────────────────────────────────────────────────────────
     const reportDate = date || new Date().toISOString().split("T")[0];
-    engine.addTextBlock({
-      text: `Report Date: ${reportDate}`,
-      fontSize: 10,
-      bold: false,
+    setSmartFont(`${labels.reportDate}: ${reportDate}`, false);
+    doc.setFontSize(10);
+    doc.text(encodeText(`${labels.reportDate}: ${reportDate}`), pageWidth / 2, yPos, {
       align: "center",
-      marginBottom: 12,
     });
+    yPos += 12;
 
     // ─── Calculate Totals ─────────────────────────────────────────────────────
     const grandTotal = validRows.reduce(
@@ -82,17 +124,17 @@ export const generateDailyReportPDF = (rows, date, t, options = {}) => {
     // ─── Table ─────────────────────────────────────────────────────────────────
     const head = [
       [
-        t?.dailyReport?.colNo || "#",
-        t?.dailyReport?.colDept || "Department",
-        t?.dailyReport?.colService || "Service",
-        t?.dailyReport?.colMale || "Male",
-        t?.dailyReport?.colFemale || "Female",
-        t?.dailyReport?.colTotal || "Total",
+        labels.colNo,
+        labels.colDept,
+        labels.colService,
+        labels.colMale,
+        labels.colFemale,
+        labels.colTotal,
       ],
     ];
 
     const body = validRows.map((row, idx) => [
-      idx + 1,
+      `${idx + 1}`,
       encodeText(row.dept || "—"),
       encodeText(row.service || "—"),
       row.male || 0,
@@ -104,35 +146,46 @@ export const generateDailyReportPDF = (rows, date, t, options = {}) => {
       [
         "",
         "",
-        t?.dailyReport?.grandTotal || "Grand Total",
+        labels.grandTotal,
         grandMale,
         grandFemale,
         grandTotal,
       ],
     ];
 
-    engine.addTable({
-      head,
-      body,
-      foot,
-      theme: options?.tableTheme || "grid",
+    // ─── Import autoTable dynamically ────────────────────────────────────────
+    const autoTable = (await import("jspdf-autotable")).default;
+
+    autoTable(doc, {
+      startY: yPos,
+      head: head,
+      body: body,
+      foot: foot,
+      margin: { left: 15, right: 15 },
+      theme: options?.tableTheme || "striped",
       headStyles: {
-        fillColor: options?.headerColor || [194, 90, 0],
+        fillColor: options?.headerColor || [26, 107, 74],
         textColor: [255, 255, 255],
-        fontSize: options?.headerFontSize || 11,
+        fontSize: options?.headerFontSize || 10,
         fontStyle: "bold",
+        halign: "center",
+        valign: "middle",
       },
       bodyStyles: {
-        fontSize: options?.bodyFontSize || 10,
+        fontSize: options?.bodyFontSize || 9,
         cellPadding: options?.cellPadding || 4,
+        halign: "center",
+        valign: "middle",
       },
       footStyles: {
         fillColor: options?.footerColor || [240, 247, 244],
-        textColor: options?.footerTextColor || [194, 90, 0],
+        textColor: options?.footerTextColor || [26, 107, 74],
         fontStyle: "bold",
-        fontSize: options?.footerFontSize || 11,
+        fontSize: options?.footerFontSize || 10,
+        halign: "center",
+        valign: "middle",
       },
-      columnsStyles: {
+      columnStyles: {
         0: { cellWidth: 15, halign: "center" },
         1: { cellWidth: "auto" },
         2: { cellWidth: "auto" },
@@ -140,21 +193,33 @@ export const generateDailyReportPDF = (rows, date, t, options = {}) => {
         4: { cellWidth: 25, halign: "center" },
         5: { cellWidth: 30, halign: "center" },
       },
+      // ✅ IMPORTANT: Handle mixed language content
+      didParseCell: (data) => {
+        const cellText = String(data.cell.raw || "");
+        if (isAmharic(cellText)) {
+          data.cell.styles.font = FONT_NAMES.ethiopic;
+        } else {
+          data.cell.styles.font = FONT_NAMES.latin;
+        }
+      },
+      styles: {
+        font: FONT_NAMES.latin,
+      },
     });
 
     // ─── Add Watermark if requested ──────────────────────────────────────────
     if (options?.showWatermark) {
       try {
-        const watermarkText = options?.watermarkText || "CONFIDENTIAL";
+        const watermarkText = options?.watermarkText || "ሚስጥራዊ";
         const pageCount = doc.internal.getNumberOfPages();
 
         for (let i = 1; i <= pageCount; i++) {
           doc.setPage(i);
+          setSmartFont(watermarkText, true);
           doc.setFontSize(options?.watermarkSize || 60);
           doc.setTextColor(200, 200, 200);
-          doc.setFont("helvetica", "bold");
           doc.text(
-            watermarkText,
+            encodeText(watermarkText),
             doc.internal.pageSize.getWidth() / 2,
             doc.internal.pageSize.getHeight() / 2,
             {
@@ -169,29 +234,34 @@ export const generateDailyReportPDF = (rows, date, t, options = {}) => {
     }
 
     // ─── Footer ────────────────────────────────────────────────────────────────
-    const footerText =
-      options?.footerText || "Generated by A-MESOB One-Stop Service Center";
-    engine.addFooter({
-      text: footerText,
-      showPageNumbers: options?.showPageNumbers !== false,
-      showDate: options?.showDate !== false,
-    });
+    const footerText = options?.footerText || labels.footer;
+    const pageCount = doc.internal.getNumberOfPages();
+    const footerY = doc.internal.pageSize.getHeight() - 10;
+
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      setSmartFont(footerText, false);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(encodeText(footerText), pageWidth / 2, footerY, { align: "center" });
+      doc.text(
+        `${labels.generatedBy} ${i} ${labels.of} ${pageCount}`,
+        pageWidth - 15,
+        footerY,
+        { align: "right" }
+      );
+    }
 
     // ─── Save ──────────────────────────────────────────────────────────────────
     const safeDate = reportDate.replace(/\//g, "-");
     const filename = options?.filename || `daily_report_${safeDate}.pdf`;
     engine.save(filename);
 
-    console.log("✅ Daily Report PDF generated successfully!");
+    console.log("✅ Daily Report PDF generated successfully in Amharic!");
     console.log(`📄 Saved as: ${filename}`);
     console.log(
       `📊 Total rows: ${validRows.length}, Grand total: ${grandTotal}`,
     );
-
-    // Log options used (for debugging)
-    if (options) {
-      console.debug("PDF Options used:", JSON.stringify(options, null, 2));
-    }
 
     return true;
   } catch (error) {
