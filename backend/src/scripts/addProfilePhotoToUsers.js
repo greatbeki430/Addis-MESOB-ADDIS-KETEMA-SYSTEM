@@ -1,4 +1,3 @@
-
 // backend/scripts/addProfilePhotoToUsers.js
 // Run with: node backend/scripts/addProfilePhotoToUsers.js
 
@@ -9,7 +8,7 @@ require("dotenv").config();
 
 async function migrateProfilePhotos() {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(process.env.MONGO_URI);
     console.log("Connected to MongoDB");
 
     // Find all presenters with profile photos
@@ -29,9 +28,11 @@ async function migrateProfilePhotos() {
         skipped++;
         continue;
       }
-      
+
       if (user.profilePhotoUrl) {
-        console.log(`⏭️ User ${user.email} already has a profile photo, skipping`);
+        console.log(
+          `⏭️ User ${user.email} already has a profile photo, skipping`,
+        );
         skipped++;
         continue;
       }
