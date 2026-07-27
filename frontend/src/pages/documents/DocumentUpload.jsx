@@ -1,10 +1,11 @@
 // frontend/src/pages/documents/DocumentUpload.jsx
 // Upload form for CRRSA Document Vault with advanced AI metadata extraction
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { documentAPI } from "../../services/api";
 import { C } from "../../styles/theme";
+import { useLanguage } from "../../hooks/useLanguage";
 import {
   FiUpload,
   FiX,
@@ -34,72 +35,49 @@ import {
 const uploadDocument = (data) => documentAPI.upload(data);
 const analyzeDocument = (file, mimeType) => documentAPI.analyze(file, mimeType);
 
-const DOCUMENT_TYPES = [
-  { value: "birth_certificate", label: "Birth Certificate / የልደት ምስክር ወረቀት" },
-  { value: "death_certificate", label: "Death Certificate / የሞት ምስክር ወረቀት" },
-  {
-    value: "marriage_certificate",
-    label: "Marriage Certificate / የጋብቻ ምስክር ወረቀት",
-  },
-  {
-    value: "divorce_certificate",
-    label: "Divorce Certificate / የፍቺ ምስክር ወረቀት",
-  },
-  { value: "residence_id", label: "Residence ID / የኑሮ መታወቂያ" },
-  { value: "name_change", label: "Name Change / የስም ለውጥ" },
-  { value: "registration_book", label: "Registration Book / የምዝገባ መዝገብ" },
-  { value: "circular", label: "Circular / ክብ ደብዳቤ" },
-  { value: "directive", label: "Directive / መመሪያ" },
-  { value: "correspondence", label: "Correspondence / ደብዳቤ" },
-  { value: "application_form", label: "Application Form / ማመልከቻ ቅጽ" },
-  { value: "other", label: "Other / ሌሎች" },
-];
-
-const inputStyle = {
-  width: "100%",
-  border: "1px solid #CBD5E1",
-  borderRadius: "8px",
-  padding: "9px 12px",
-  fontSize: "13px",
-  outline: "none",
-  boxSizing: "border-box",
-  fontFamily: "inherit",
-};
-
-const inputStyleFilled = {
-  ...inputStyle,
-  border: "1px solid #93C5FD",
-  background: "#F0F9FF",
-};
-
-const labelStyle = {
-  display: "block",
-  fontSize: "12px",
-  fontWeight: 600,
-  color: "#374151",
-  marginBottom: "4px",
-};
-
-const aiBadge = (
-  <span
-    style={{
-      fontSize: "10px",
-      fontWeight: 600,
-      color: "#1D4ED8",
-      background: "#DBEAFE",
-      padding: "1px 7px",
-      borderRadius: "99px",
-      marginLeft: "6px",
-      display: "inline-flex",
-      alignItems: "center",
-      gap: "3px",
-    }}
-  >
-    <FiBook size={10} /> AI
-  </span>
-);
-
 export default function DocumentUpload({ onSuccess, onClose }) {
+  const { t } = useLanguage();
+
+  // Translation helpers
+  const td = (key, fallback) => t?.(`documentVault.${key}`) || fallback;
+  const tc = (key, fallback) => t?.(`common.${key}`) || fallback;
+
+  const DOCUMENT_TYPES = [
+    {
+      value: "birth_certificate",
+      label: td("typeBirthCertificate", "Birth Certificate"),
+    },
+    {
+      value: "death_certificate",
+      label: td("typeDeathCertificate", "Death Certificate"),
+    },
+    {
+      value: "marriage_certificate",
+      label: td("typeMarriageCertificate", "Marriage Certificate"),
+    },
+    {
+      value: "divorce_certificate",
+      label: td("typeDivorceCertificate", "Divorce Certificate"),
+    },
+    { value: "residence_id", label: td("typeResidenceId", "Residence ID") },
+    { value: "name_change", label: td("typeNameChange", "Name Change") },
+    {
+      value: "registration_book",
+      label: td("typeRegistrationBook", "Registration Book"),
+    },
+    { value: "circular", label: td("typeCircular", "Circular") },
+    { value: "directive", label: td("typeDirective", "Directive") },
+    {
+      value: "correspondence",
+      label: td("typeCorrespondence", "Correspondence"),
+    },
+    {
+      value: "application_form",
+      label: td("typeApplicationForm", "Application Form"),
+    },
+    { value: "other", label: td("typeOther", "Other") },
+  ];
+
   const [form, setForm] = useState({
     documentType: "",
     title: "",
@@ -119,6 +97,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 480);
 
   // AI auto-fill state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -135,8 +114,14 @@ export default function DocumentUpload({ onSuccess, onClose }) {
   const [aiDocumentQuality, setAiDocumentQuality] = useState(null);
   const [showExtractedDetails, setShowExtractedDetails] = useState(false);
 
+  // Handle resize
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 480);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   // Calls the backend AI vision analyzer and auto-fills the form with enhanced details
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const runAiAnalysis = async (base64File, mimeType) => {
     const startTime = Date.now();
     setIsAnalyzing(true);
@@ -154,10 +139,8 @@ export default function DocumentUpload({ onSuccess, onClose }) {
       const res = await analyzeDocument(base64File, mimeType);
       const a = res.data?.analysis || {};
 
-      // Store processing time
       setAiProcessingTime(Date.now() - startTime);
 
-      // Store AI notes and detected type
       if (a.notes) {
         setAiNotes(a.notes);
         if (a.documentType === "other" || a.confidence === "low") {
@@ -166,12 +149,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
       }
       if (a.documentType) setDetectedDocumentType(a.documentType);
 
-      // ✅ Enhanced extraction details - now properly used and displayed
       if (a.extractedDetails) {
         setAiExtractedDetails(a.extractedDetails);
         setShowExtractedDetails(true);
       } else {
-        // Create extracted details from the available data
         const details = {
           documentNumber: a.nationalId || a.referenceNumber || null,
           issuedBy: a.issuingOfficer || a.issuingDepartment || null,
@@ -186,26 +167,29 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         setShowExtractedDetails(true);
       }
 
-      // Document quality assessment
       if (a.documentQuality) {
         setAiDocumentQuality(a.documentQuality);
       } else {
-        // Generate quality assessment based on confidence
-        let quality = "Good quality document";
+        let quality = td("goodQuality", "Good quality document");
         if (a.confidence === "high") {
-          quality =
-            "Excellent quality document - All fields clearly visible and legible";
+          quality = td(
+            "excellentQuality",
+            "Excellent quality document - All fields clearly visible and legible",
+          );
         } else if (a.confidence === "medium") {
-          quality =
-            "Acceptable quality - Some fields may require manual verification";
+          quality = td(
+            "acceptableQuality",
+            "Acceptable quality - Some fields may require manual verification",
+          );
         } else {
-          quality =
-            "Low quality - Document may be blurry or incomplete. Please verify all fields";
+          quality = td(
+            "lowQuality",
+            "Low quality - Document may be blurry or incomplete. Please verify all fields",
+          );
         }
         setAiDocumentQuality(quality);
       }
 
-      // Check if AI detected this is NOT a CRRSA document
       const isNotCRRSA =
         a.documentType === "other" ||
         a.notes?.toLowerCase().includes("not a government document") ||
@@ -226,7 +210,6 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         const filled = {};
         setForm((prev) => {
           const next = { ...prev };
-
           if (a.citizenName) {
             next.citizenName = a.citizenName;
             filled.citizenName = true;
@@ -245,24 +228,17 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           }
           next.documentType = "other";
           filled.documentType = true;
-
           return next;
         });
         setAiFilledFields(filled);
         setAiConfidence(a.confidence || "low");
-
-        // Show detailed warning
-        if (a.notes) {
-          setAiNotes(`⚠️ ${a.notes}`);
-        }
+        if (a.notes) setAiNotes(`⚠️ ${a.notes}`);
         return;
       }
 
-      // Normal CRRSA document processing with enhanced extraction
       const filled = {};
       setForm((prev) => {
         const next = { ...prev };
-
         if (a.documentType && a.documentType !== "other") {
           next.documentType = a.documentType;
           filled.documentType = true;
@@ -303,14 +279,12 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           next.notes = a.notes;
           filled.notes = true;
         }
-
         return next;
       });
 
       setAiFilledFields(filled);
       setAiConfidence(a.confidence || null);
 
-      // Show success with detailed extraction info
       if (a.confidence === "high" && a.documentType) {
         const typeLabel =
           DOCUMENT_TYPES.find((t) => t.value === a.documentType)?.label ||
@@ -322,7 +296,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
     } catch (err) {
       const errorMsg =
         err.response?.data?.message ||
-        "AI analysis failed. Please fill in the fields manually.";
+        td(
+          "aiAnalysisFailed",
+          "AI analysis failed. Please fill in the fields manually.",
+        );
       setAnalyzeError(errorMsg);
       console.error("AI Analysis error:", err);
       setAiProcessingTime(Date.now() - startTime);
@@ -368,9 +345,12 @@ export default function DocumentUpload({ onSuccess, onClose }) {
   };
 
   const handleSubmit = async () => {
-    if (!fileBase64) return setError("Please select a file to upload.");
-    if (!form.documentType) return setError("Please select a document type.");
-    if (!form.title.trim()) return setError("Please enter a document title.");
+    if (!fileBase64)
+      return setError(td("selectFile", "Please select a file to upload."));
+    if (!form.documentType)
+      return setError(td("selectType", "Please select a document type."));
+    if (!form.title.trim())
+      return setError(td("enterTitle", "Please enter a document title."));
 
     setIsUploading(true);
     setError("");
@@ -381,12 +361,57 @@ export default function DocumentUpload({ onSuccess, onClose }) {
       setTimeout(() => onSuccess?.(), 2000);
     } catch (err) {
       setError(
-        err.response?.data?.message || "Upload failed. Please try again.",
+        err.response?.data?.message ||
+          td("uploadError", "Upload failed. Please try again."),
       );
     } finally {
       setIsUploading(false);
     }
   };
+
+  const inputStyle = {
+    width: "100%",
+    border: "1px solid #CBD5E1",
+    borderRadius: "8px",
+    padding: isMobile ? "8px 10px" : "9px 12px",
+    fontSize: isMobile ? "14px" : "13px",
+    outline: "none",
+    boxSizing: "border-box",
+    fontFamily: "inherit",
+  };
+
+  const inputStyleFilled = {
+    ...inputStyle,
+    border: "1px solid #93C5FD",
+    background: "#F0F9FF",
+  };
+
+  const labelStyle = {
+    display: "block",
+    fontSize: isMobile ? "13px" : "12px",
+    fontWeight: 600,
+    color: "#374151",
+    marginBottom: "4px",
+  };
+
+  const aiBadge = (
+    <span
+      style={{
+        fontSize: "10px",
+        fontWeight: 600,
+        color: "#1D4ED8",
+        background: "#DBEAFE",
+        padding: "1px 7px",
+        borderRadius: "99px",
+        marginLeft: "6px",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: "3px",
+      }}
+    >
+      <FiBook size={10} /> AI
+    </span>
+  );
 
   if (success) {
     return (
@@ -394,32 +419,42 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         style={{
           background: "#fff",
           borderRadius: "16px",
-          padding: "40px",
+          padding: isMobile ? "24px 16px" : "40px",
           textAlign: "center",
-          width: "440px",
+          width: isMobile ? "100%" : "440px",
+          maxWidth: "100%",
         }}
       >
-        <div style={{ fontSize: "48px", marginBottom: "16px" }}>
+        <div
+          style={{ fontSize: isMobile ? "36px" : "48px", marginBottom: "16px" }}
+        >
           <FiCheck
-            size={48}
+            size={isMobile ? 36 : 48}
             color="#22C55E"
             style={{ display: "block", margin: "0 auto" }}
           />
         </div>
-        <h3 style={{ fontWeight: 700, color: "#0F172A" }}>
-          Document Uploaded!
+        <h3
+          style={{
+            fontWeight: 700,
+            color: "#0F172A",
+            fontSize: isMobile ? "16px" : "18px",
+          }}
+        >
+          {td("uploadSuccess", "Document Uploaded!")}
         </h3>
-        <p style={{ color: "#64748B", fontSize: "13px" }}>
-          Reference: <strong>{success.document?.referenceNumber}</strong>
+        <p style={{ color: "#64748B", fontSize: isMobile ? "12px" : "13px" }}>
+          {tc("reference", "Reference")}:{" "}
+          <strong>{success.document?.referenceNumber}</strong>
         </p>
         {success.document?.aiExtractedData?.summary && (
           <div
             style={{
               background: "#EFF6FF",
               borderRadius: "8px",
-              padding: "12px",
+              padding: isMobile ? "10px" : "12px",
               marginTop: "12px",
-              fontSize: "13px",
+              fontSize: isMobile ? "12px" : "13px",
               color: "#1D4ED8",
               textAlign: "left",
               display: "flex",
@@ -429,17 +464,17 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           >
             <FiInfo size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
             <div>
-              <strong>AI Extracted:</strong>
+              <strong>{td("aiExtracted", "AI Extracted")}:</strong>
               <br />
               {success.document.aiExtractedData.summary}
               {success.document.aiExtractedData.confidence && (
                 <div style={{ marginTop: "4px", fontSize: "11px" }}>
-                  Confidence:{" "}
+                  {td("confidence", "Confidence")}:{" "}
                   <strong>{success.document.aiExtractedData.confidence}</strong>
                   {success.document.aiExtractedData.processingTime && (
                     <>
                       {" "}
-                      · Processed in{" "}
+                      · {td("processedIn", "Processed in")}{" "}
                       {(
                         success.document.aiExtractedData.processingTime / 1000
                       ).toFixed(1)}
@@ -459,9 +494,9 @@ export default function DocumentUpload({ onSuccess, onClose }) {
     <div
       style={{
         background: "#fff",
-        borderRadius: "16px",
-        padding: "28px",
-        width: "620px",
+        borderRadius: isMobile ? "12px" : "16px",
+        padding: isMobile ? "16px" : "28px",
+        width: isMobile ? "100%" : "620px",
         maxWidth: "95vw",
         maxHeight: "90vh",
         overflowY: "auto",
@@ -472,12 +507,14 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: "20px",
+          marginBottom: isMobile ? "12px" : "20px",
+          flexWrap: "wrap",
+          gap: "8px",
         }}
       >
         <h2
           style={{
-            fontSize: "18px",
+            fontSize: isMobile ? "16px" : "18px",
             fontWeight: 700,
             margin: 0,
             display: "flex",
@@ -485,15 +522,15 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             gap: "8px",
           }}
         >
-          <FiUpload size={20} color="#2563EB" />
-          Upload CRRSA Document
+          <FiUpload size={isMobile ? 16 : 20} color="#2563EB" />
+          {td("uploadDocument", "Upload CRRSA Document")}
         </h2>
         <button
           onClick={onClose}
           style={{
             background: "none",
             border: "none",
-            fontSize: "20px",
+            fontSize: isMobile ? "16px" : "20px",
             cursor: "pointer",
             color: "#64748B",
             display: "flex",
@@ -502,7 +539,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             padding: "4px",
           }}
         >
-          <FiX size={20} />
+          <FiX size={isMobile ? 16 : 20} />
         </button>
       </div>
 
@@ -511,8 +548,8 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         {...getRootProps()}
         style={{
           border: `2px dashed ${isDragActive ? "#2563EB" : file ? "#22C55E" : "#CBD5E1"}`,
-          borderRadius: "12px",
-          padding: "24px",
+          borderRadius: isMobile ? "10px" : "12px",
+          padding: isMobile ? "16px" : "24px",
           textAlign: "center",
           cursor: "pointer",
           background: isDragActive ? "#EFF6FF" : file ? "#F0FDF4" : "#F8FAFC",
@@ -523,39 +560,49 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         <input {...getInputProps()} />
         <div
           style={{
-            fontSize: "32px",
+            fontSize: isMobile ? "28px" : "32px",
             marginBottom: "8px",
             color: file ? "#22C55E" : "#64748B",
           }}
         >
           {file ? (
-            <FiCheck size={32} />
+            <FiCheck size={isMobile ? 28 : 32} />
           ) : isDragActive ? (
-            <FiUpload size={32} />
+            <FiUpload size={isMobile ? 28 : 32} />
           ) : (
-            <FiFile size={32} />
+            <FiFile size={isMobile ? 28 : 32} />
           )}
         </div>
-        <p style={{ fontSize: "13px", color: "#475569", margin: 0 }}>
+        <p
+          style={{
+            fontSize: isMobile ? "12px" : "13px",
+            color: "#475569",
+            margin: 0,
+          }}
+        >
           {file
             ? `${file.name} (${(file.size / 1024).toFixed(0)}KB)`
             : isDragActive
-              ? "Drop the file here..."
-              : "Drag and drop PDF, JPG, PNG, or TIFF — or click to browse"}
+              ? td("dropHere", "Drop the file here...")
+              : td(
+                  "dragDrop",
+                  "Drag and drop PDF, JPG, PNG, or TIFF — or click to browse",
+                )}
         </p>
         <p
           style={{
-            fontSize: "11px",
+            fontSize: isMobile ? "10px" : "11px",
             color: "#94A3B8",
             margin: "4px 0 0",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: "4px",
+            flexWrap: "wrap",
           }}
         >
           <FiInfo size={12} />
-          Max 20MB · AI will auto-detect document details
+          {td("maxFileSize", "Max 20MB · AI will auto-detect document details")}
         </p>
       </div>
 
@@ -569,22 +616,28 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             background: "#EFF6FF",
             border: "1px solid #BFDBFE",
             borderRadius: "8px",
-            padding: "10px 14px",
+            padding: isMobile ? "8px 12px" : "10px 14px",
             marginBottom: "16px",
-            fontSize: "13px",
+            fontSize: isMobile ? "12px" : "13px",
             color: "#1D4ED8",
+            flexWrap: "wrap",
           }}
         >
           <span style={{ animation: "spin 1s linear infinite" }}>
             <FiLoader size={16} />
           </span>
           <div>
-            <div>Reading document with AI — extracting metadata...</div>
+            <div>
+              {td(
+                "analyzing",
+                "Reading document with AI — extracting metadata...",
+              )}
+            </div>
             {aiProcessingTime && (
               <div
                 style={{ fontSize: "11px", color: "#64748B", marginTop: "2px" }}
               >
-                Analyzing document contents...
+                {td("analyzingContent", "Analyzing document contents...")}
               </div>
             )}
           </div>
@@ -612,8 +665,9 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                   : "#FECACA"
             }`,
             borderRadius: "8px",
-            padding: "12px 14px",
+            padding: isMobile ? "10px 12px" : "12px 14px",
             marginBottom: "16px",
+            flexWrap: "wrap",
           }}
         >
           {aiConfidence === "high" ? (
@@ -645,17 +699,18 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                     : aiConfidence === "medium"
                       ? "#B45309"
                       : "#B91C1C",
+                fontSize: isMobile ? "12px" : "13px",
               }}
             >
               {aiConfidence === "high"
-                ? "High Confidence Extraction"
+                ? td("highConfidence", "High Confidence Extraction")
                 : aiConfidence === "medium"
-                  ? "Medium Confidence Extraction"
-                  : "Low Confidence Extraction"}
+                  ? td("mediumConfidence", "Medium Confidence Extraction")
+                  : td("lowConfidence", "Low Confidence Extraction")}
             </div>
             <div
               style={{
-                fontSize: "13px",
+                fontSize: isMobile ? "12px" : "13px",
                 color:
                   aiConfidence === "high"
                     ? "#15803D"
@@ -666,27 +721,28 @@ export default function DocumentUpload({ onSuccess, onClose }) {
               }}
             >
               {aiNotes ||
-                `AI filled ${Object.keys(aiFilledFields).length} field(s) — please review before submitting.`}
+                `${td("aiFilled", "AI filled")} ${Object.keys(aiFilledFields).length} ${td("fields", "field(s)")} — ${td("reviewBeforeSubmit", "please review before submitting.")}`}
             </div>
             {aiProcessingTime && (
               <div
                 style={{ fontSize: "11px", color: "#64748B", marginTop: "4px" }}
               >
-                Processed in {(aiProcessingTime / 1000).toFixed(1)}s
+                {td("processedIn", "Processed in")}{" "}
+                {(aiProcessingTime / 1000).toFixed(1)}s
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* ✅ AI Extracted Details Section - Now properly using aiExtractedDetails */}
+      {/* AI Extracted Details Section */}
       {!isAnalyzing && showExtractedDetails && aiExtractedDetails && (
         <div
           style={{
             background: "#F8FAFC",
             border: "1px solid #E2E8F0",
             borderRadius: "8px",
-            padding: "12px 14px",
+            padding: isMobile ? "10px 12px" : "12px 14px",
             marginBottom: "16px",
           }}
         >
@@ -704,13 +760,13 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                fontSize: "12px",
+                fontSize: isMobile ? "11px" : "12px",
                 fontWeight: 600,
                 color: "#1E293B",
               }}
             >
               <FiList size={14} color={C?.primary || "#2563EB"} />
-              AI Extracted Details
+              {td("aiExtractedDetails", "AI Extracted Details")}
               <span
                 style={{
                   fontSize: "9px",
@@ -725,7 +781,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                     (k) => aiExtractedDetails[k],
                   ).length
                 }{" "}
-                fields
+                {td("fields", "fields")}
               </span>
             </div>
             <span style={{ color: "#64748B" }}>
@@ -741,18 +797,18 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "6px 12px",
+                gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+                gap: isMobile ? "4px 8px" : "6px 12px",
                 marginTop: "10px",
                 paddingTop: "10px",
                 borderTop: "1px solid #E2E8F0",
               }}
             >
               {aiExtractedDetails.documentNumber && (
-                <div style={{ fontSize: "11px" }}>
+                <div style={{ fontSize: isMobile ? "10px" : "11px" }}>
                   <span style={{ color: "#64748B" }}>
                     <FiHash size={10} style={{ marginRight: "4px" }} />
-                    Document No:
+                    {td("documentNumber", "Document No")}:
                   </span>
                   <span
                     style={{
@@ -766,10 +822,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                 </div>
               )}
               {aiExtractedDetails.issuedBy && (
-                <div style={{ fontSize: "11px" }}>
+                <div style={{ fontSize: isMobile ? "10px" : "11px" }}>
                   <span style={{ color: "#64748B" }}>
                     <FiUser size={10} style={{ marginRight: "4px" }} />
-                    Issued By:
+                    {td("issuedBy", "Issued By")}:
                   </span>
                   <span
                     style={{
@@ -783,10 +839,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                 </div>
               )}
               {aiExtractedDetails.issueLocation && (
-                <div style={{ fontSize: "11px" }}>
+                <div style={{ fontSize: isMobile ? "10px" : "11px" }}>
                   <span style={{ color: "#64748B" }}>
                     <FiMapPin size={10} style={{ marginRight: "4px" }} />
-                    Location:
+                    {td("location", "Location")}:
                   </span>
                   <span
                     style={{
@@ -800,10 +856,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                 </div>
               )}
               {aiExtractedDetails.documentLanguage && (
-                <div style={{ fontSize: "11px" }}>
+                <div style={{ fontSize: isMobile ? "10px" : "11px" }}>
                   <span style={{ color: "#64748B" }}>
                     <FiBook size={10} style={{ marginRight: "4px" }} />
-                    Language:
+                    {td("language", "Language")}:
                   </span>
                   <span
                     style={{
@@ -817,10 +873,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                 </div>
               )}
               {aiExtractedDetails.pageCount && (
-                <div style={{ fontSize: "11px" }}>
+                <div style={{ fontSize: isMobile ? "10px" : "11px" }}>
                   <span style={{ color: "#64748B" }}>
                     <FiFileText size={10} style={{ marginRight: "4px" }} />
-                    Pages:
+                    {td("pages", "Pages")}:
                   </span>
                   <span
                     style={{
@@ -834,10 +890,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                 </div>
               )}
               {aiExtractedDetails.fileSize && (
-                <div style={{ fontSize: "11px" }}>
+                <div style={{ fontSize: isMobile ? "10px" : "11px" }}>
                   <span style={{ color: "#64748B" }}>
                     <FiFile size={10} style={{ marginRight: "4px" }} />
-                    File Size:
+                    {td("fileSize", "File Size")}:
                   </span>
                   <span
                     style={{
@@ -851,10 +907,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                 </div>
               )}
               {aiExtractedDetails.fileType && (
-                <div style={{ fontSize: "11px" }}>
+                <div style={{ fontSize: isMobile ? "10px" : "11px" }}>
                   <span style={{ color: "#64748B" }}>
                     <FiFileText size={10} style={{ marginRight: "4px" }} />
-                    File Type:
+                    {td("fileType", "File Type")}:
                   </span>
                   <span
                     style={{
@@ -869,10 +925,10 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                 </div>
               )}
               {aiExtractedDetails.documentVersion && (
-                <div style={{ fontSize: "11px" }}>
+                <div style={{ fontSize: isMobile ? "10px" : "11px" }}>
                   <span style={{ color: "#64748B" }}>
                     <FiInfo size={10} style={{ marginRight: "4px" }} />
-                    Version:
+                    {td("version", "Version")}:
                   </span>
                   <span
                     style={{
@@ -913,9 +969,9 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                   : "#FECACA"
             }`,
             borderRadius: "8px",
-            padding: "10px 14px",
+            padding: isMobile ? "8px 12px" : "10px 14px",
             marginBottom: "16px",
-            fontSize: "13px",
+            fontSize: isMobile ? "12px" : "13px",
             color:
               aiDocumentQuality.includes("Excellent") ||
               aiDocumentQuality.includes("Good")
@@ -923,11 +979,12 @@ export default function DocumentUpload({ onSuccess, onClose }) {
                 : aiDocumentQuality.includes("Acceptable")
                   ? "#B45309"
                   : "#B91C1C",
+            flexWrap: "wrap",
           }}
         >
           <FiActivity size={16} style={{ flexShrink: 0, marginTop: "1px" }} />
           <div>
-            <strong>Document Quality:</strong>
+            <strong>{td("documentQuality", "Document Quality")}:</strong>
             <br />
             {aiDocumentQuality}
           </div>
@@ -944,10 +1001,11 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             background: "#FFFBEB",
             border: "1px solid #FDE68A",
             borderRadius: "8px",
-            padding: "10px 14px",
+            padding: isMobile ? "8px 12px" : "10px 14px",
             marginBottom: "16px",
-            fontSize: "13px",
+            fontSize: isMobile ? "12px" : "13px",
             color: "#92400E",
+            flexWrap: "wrap",
           }}
         >
           <FiAlertTriangle
@@ -955,11 +1013,21 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             style={{ flexShrink: 0, marginTop: "1px" }}
           />
           <div>
-            <strong>Document type not recognized as a CRRSA document.</strong>
+            <strong>
+              {td(
+                "notRecognized",
+                "Document type not recognized as a CRRSA document.",
+              )}
+            </strong>
             <br />
-            <span style={{ fontSize: "13px", color: "#78350F" }}>
+            <span
+              style={{ fontSize: isMobile ? "12px" : "13px", color: "#78350F" }}
+            >
               {aiNotes ||
-                "This document does not appear to be a government CRRSA document. You can still upload it using the 'Other' document type."}
+                td(
+                  "notCRRSA",
+                  "This document does not appear to be a government CRRSA document. You can still upload it using the 'Other' document type.",
+                )}
             </span>
           </div>
         </div>
@@ -974,10 +1042,11 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             background: "#FEF2F2",
             border: "1px solid #FECACA",
             borderRadius: "8px",
-            padding: "10px 14px",
+            padding: isMobile ? "8px 12px" : "10px 14px",
             marginBottom: "16px",
-            fontSize: "13px",
+            fontSize: isMobile ? "12px" : "13px",
             color: "#B91C1C",
+            flexWrap: "wrap",
           }}
         >
           <FiAlertCircle
@@ -989,18 +1058,25 @@ export default function DocumentUpload({ onSuccess, onClose }) {
       )}
 
       {/* Form fields */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: isMobile ? "10px" : "14px",
+        }}
+      >
         <div>
           <label style={labelStyle}>
             <FiBook size={12} style={{ marginRight: "4px" }} />
-            Document Type *{aiFilledFields.documentType && aiBadge}
+            {td("documentType", "Document Type")} *
+            {aiFilledFields.documentType && aiBadge}
           </label>
           <select
             value={form.documentType}
             onChange={handleChange("documentType")}
             style={aiFilledFields.documentType ? inputStyleFilled : inputStyle}
           >
-            <option value="">Select type...</option>
+            <option value="">{td("selectType", "Select type...")}</option>
             {DOCUMENT_TYPES.map((t) => (
               <option key={t.value} value={t.value}>
                 {t.label}
@@ -1009,10 +1085,15 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           </select>
           {detectedDocumentType && !form.documentType && (
             <div
-              style={{ fontSize: "11px", color: "#64748B", marginTop: "4px" }}
+              style={{
+                fontSize: isMobile ? "10px" : "11px",
+                color: "#64748B",
+                marginTop: "4px",
+              }}
             >
               <FiInfo size={12} style={{ marginRight: "4px" }} />
-              AI detected: {detectedDocumentType.replace(/_/g, " ")}
+              {td("aiDetected", "AI detected")}:{" "}
+              {detectedDocumentType.replace(/_/g, " ")}
             </div>
           )}
         </div>
@@ -1020,12 +1101,15 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         <div>
           <label style={labelStyle}>
             <FiFileText size={12} style={{ marginRight: "4px" }} />
-            Title *{aiFilledFields.title && aiBadge}
+            {td("title", "Title")} *{aiFilledFields.title && aiBadge}
           </label>
           <input
             value={form.title}
             onChange={handleChange("title")}
-            placeholder="e.g. Birth Certificate – Abebe Kebede"
+            placeholder={td(
+              "titlePlaceholder",
+              "e.g. Birth Certificate – Abebe Kebede",
+            )}
             style={aiFilledFields.title ? inputStyleFilled : inputStyle}
           />
         </div>
@@ -1033,30 +1117,32 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "12px",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            gap: isMobile ? "8px" : "12px",
           }}
         >
           <div>
             <label style={labelStyle}>
               <FiUser size={12} style={{ marginRight: "4px" }} />
-              Citizen Name (English){aiFilledFields.citizenName && aiBadge}
+              {td("citizenName", "Citizen Name (English)")}
+              {aiFilledFields.citizenName && aiBadge}
             </label>
             <input
               value={form.citizenName}
               onChange={handleChange("citizenName")}
-              placeholder="Full name"
+              placeholder={td("fullName", "Full name")}
               style={aiFilledFields.citizenName ? inputStyleFilled : inputStyle}
             />
           </div>
           <div>
             <label style={labelStyle}>
-              ስም (አማርኛ){aiFilledFields.citizenNameAmharic && aiBadge}
+              {td("citizenNameAmharic", "ስም (አማርኛ)")}
+              {aiFilledFields.citizenNameAmharic && aiBadge}
             </label>
             <input
               value={form.citizenNameAmharic}
               onChange={handleChange("citizenNameAmharic")}
-              placeholder="ሙሉ ስም"
+              placeholder={td("fullNameAmharic", "ሙሉ ስም")}
               style={
                 aiFilledFields.citizenNameAmharic
                   ? inputStyleFilled
@@ -1069,14 +1155,15 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "12px",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            gap: isMobile ? "8px" : "12px",
           }}
         >
           <div>
             <label style={labelStyle}>
               <FiCalendar size={12} style={{ marginRight: "4px" }} />
-              Issue Date{aiFilledFields.issueDate && aiBadge}
+              {td("issueDate", "Issue Date")}
+              {aiFilledFields.issueDate && aiBadge}
             </label>
             <input
               type="date"
@@ -1087,12 +1174,13 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           </div>
           <div>
             <label style={labelStyle}>
-              Issuing Officer{aiFilledFields.issuingOfficer && aiBadge}
+              {td("issuingOfficer", "Issuing Officer")}
+              {aiFilledFields.issuingOfficer && aiBadge}
             </label>
             <input
               value={form.issuingOfficer}
               onChange={handleChange("issuingOfficer")}
-              placeholder="Officer name"
+              placeholder={td("officerName", "Officer name")}
               style={
                 aiFilledFields.issuingOfficer ? inputStyleFilled : inputStyle
               }
@@ -1102,12 +1190,13 @@ export default function DocumentUpload({ onSuccess, onClose }) {
 
         <div>
           <label style={labelStyle}>
-            National ID (optional){aiFilledFields.nationalId && aiBadge}
+            {td("nationalId", "National ID (optional)")}
+            {aiFilledFields.nationalId && aiBadge}
           </label>
           <input
             value={form.nationalId}
             onChange={handleChange("nationalId")}
-            placeholder="Citizen ID number"
+            placeholder={td("citizenId", "Citizen ID number")}
             style={aiFilledFields.nationalId ? inputStyleFilled : inputStyle}
           />
         </div>
@@ -1115,12 +1204,13 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         <div>
           <label style={labelStyle}>
             <FiTag size={12} style={{ marginRight: "4px" }} />
-            Tags (comma-separated){aiFilledFields.tags && aiBadge}
+            {td("tags", "Tags (comma-separated)")}
+            {aiFilledFields.tags && aiBadge}
           </label>
           <input
             value={form.tags}
             onChange={handleChange("tags")}
-            placeholder="e.g. 2016, Arada, urgent"
+            placeholder={td("tagsPlaceholder", "e.g. 2016, Arada, urgent")}
             style={aiFilledFields.tags ? inputStyleFilled : inputStyle}
           />
         </div>
@@ -1128,16 +1218,18 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         <div>
           <label style={labelStyle}>
             <FiFileText size={12} style={{ marginRight: "4px" }} />
-            Notes{aiFilledFields.notes && aiBadge}
+            {td("notes", "Notes")}
+            {aiFilledFields.notes && aiBadge}
           </label>
           <textarea
             value={form.notes}
             onChange={handleChange("notes")}
-            placeholder="Internal notes..."
-            rows={2}
+            placeholder={td("notesPlaceholder", "Internal notes...")}
+            rows={isMobile ? 2 : 2}
             style={{
               ...(aiFilledFields.notes ? inputStyleFilled : inputStyle),
               resize: "vertical",
+              fontSize: isMobile ? "14px" : "13px",
             }}
           />
         </div>
@@ -1145,38 +1237,40 @@ export default function DocumentUpload({ onSuccess, onClose }) {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "12px",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            gap: isMobile ? "8px" : "12px",
           }}
         >
           <div>
             <label style={labelStyle}>
               <FiLock size={12} style={{ marginRight: "4px" }} />
-              Access Level
+              {td("accessLevel", "Access Level")}
             </label>
             <select
               value={form.accessLevel}
               onChange={handleChange("accessLevel")}
               style={inputStyle}
             >
-              <option value="employee">Employee</option>
-              <option value="leader">Leader & above</option>
-              <option value="admin">Admin only</option>
+              <option value="employee">{td("employee", "Employee")}</option>
+              <option value="leader">
+                {td("leaderAndAbove", "Leader & above")}
+              </option>
+              <option value="admin">{td("adminOnly", "Admin only")}</option>
             </select>
           </div>
           <div>
             <label style={labelStyle}>
               <FiClock size={12} style={{ marginRight: "4px" }} />
-              Retention Policy
+              {td("retentionPolicy", "Retention Policy")}
             </label>
             <select
               value={form.retentionPolicy}
               onChange={handleChange("retentionPolicy")}
               style={inputStyle}
             >
-              <option value="lifetime">Lifetime ♾</option>
-              <option value="10_years">10 Years</option>
-              <option value="5_years">5 Years</option>
+              <option value="lifetime">{td("lifetime", "Lifetime ♾")}</option>
+              <option value="10_years">{td("tenYears", "10 Years")}</option>
+              <option value="5_years">{td("fiveYears", "5 Years")}</option>
             </select>
           </div>
         </div>
@@ -1185,7 +1279,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
           <p
             style={{
               color: "#DC2626",
-              fontSize: "13px",
+              fontSize: isMobile ? "12px" : "13px",
               margin: 0,
               display: "flex",
               alignItems: "center",
@@ -1205,8 +1299,8 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             color: "#fff",
             border: "none",
             borderRadius: "10px",
-            padding: "12px",
-            fontSize: "14px",
+            padding: isMobile ? "10px" : "12px",
+            fontSize: isMobile ? "13px" : "14px",
             fontWeight: 600,
             cursor: isUploading || isAnalyzing ? "default" : "pointer",
             marginTop: "4px",
@@ -1214,6 +1308,7 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             alignItems: "center",
             justifyContent: "center",
             gap: "8px",
+            width: "100%",
           }}
         >
           {isUploading ? (
@@ -1221,19 +1316,19 @@ export default function DocumentUpload({ onSuccess, onClose }) {
               <span style={{ animation: "spin 1s linear infinite" }}>
                 <FiLoader size={16} />
               </span>
-              Uploading… Please wait
+              {td("uploading", "Uploading… Please wait")}
             </>
           ) : isAnalyzing ? (
             <>
               <span style={{ animation: "spin 1s linear infinite" }}>
                 <FiLoader size={16} />
               </span>
-              Analyzing document with AI…
+              {td("analyzingDocument", "Analyzing document with AI…")}
             </>
           ) : (
             <>
               <FiUpload size={16} />
-              Upload Document
+              {td("uploadDocument", "Upload Document")}
             </>
           )}
         </button>

@@ -7,6 +7,7 @@ import { documentAPI } from "../../services/api";
 import DocumentUpload from "./DocumentUpload";
 import { useAuth } from "../../hooks/useAuth";
 import { AISmartSearch } from "../../components/ai";
+import { useLanguage } from "../../hooks/useLanguage";
 
 // ✅ Import react-icons
 import {
@@ -31,126 +32,127 @@ import {
 const fetchDocuments = (params) => documentAPI.getAll(params);
 const getDocumentDownloadUrl = (id) => documentAPI.getDownloadUrl(id);
 
-const DOCUMENT_TYPE_LABELS = {
-  birth_certificate: "Birth Certificate / የልደት ምስክር ወረቀት",
-  death_certificate: "Death Certificate / የሞት ምስክር ወረቀት",
-  marriage_certificate: "Marriage Certificate / የጋብቻ ምስክር ወረቀት",
-  divorce_certificate: "Divorce Certificate / የፍቺ ምስክር ወረቀት",
-  residence_id: "Residence ID / የኑሮ መታወቂያ",
-  name_change: "Name Change / የስም ለውጥ",
-  registration_book: "Registration Book / የምዝገባ መዝገብ",
-  circular: "Circular / ክብ ደብዳቤ",
-  directive: "Directive / መመሪያ",
-  correspondence: "Correspondence / ደብዳቤ",
-  application_form: "Application Form / ማመልከቻ ቅጽ",
-  other: "Other / ሌሎች",
-};
-
-// ✅ File type icons using react-icons
-const FILE_TYPE_ICON = {
-  pdf: <FiFile size={24} />,
-  jpg: <FiImage size={24} />,
-  png: <FiImage size={24} />,
-  tiff: <FiImage size={24} />,
-  other: <FiFileText size={24} />,
-};
-
 // ─── Document Card ────────────────────────────────────────────
-const DocumentCard = ({ doc, onDownload }) => (
-  <div
-    style={{
-      background: "#fff",
-      border: "1px solid #E2E8F0",
-      borderRadius: "12px",
-      padding: "16px",
-      display: "flex",
-      gap: "14px",
-      alignItems: "flex-start",
-      transition: "box-shadow 0.2s",
-    }}
-    onMouseEnter={(e) =>
-      (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")
-    }
-    onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
-  >
-    {/* Thumbnail or icon */}
+const DocumentCard = ({ doc, onDownload, t }) => {
+  const getFileIcon = (fileType) => {
+    const icons = {
+      pdf: <FiFile size={24} />,
+      jpg: <FiImage size={24} />,
+      png: <FiImage size={24} />,
+      tiff: <FiImage size={24} />,
+    };
+    return icons[fileType] || <FiFileText size={24} />;
+  };
+
+  const getTypeLabel = (type) => {
+    const labels = {
+      birth_certificate:
+        t?.("documentVault.typeBirthCertificate") || "Birth Certificate",
+      death_certificate:
+        t?.("documentVault.typeDeathCertificate") || "Death Certificate",
+      marriage_certificate:
+        t?.("documentVault.typeMarriageCertificate") || "Marriage Certificate",
+      divorce_certificate:
+        t?.("documentVault.typeDivorceCertificate") || "Divorce Certificate",
+      residence_id: t?.("documentVault.typeResidenceId") || "Residence ID",
+      name_change: t?.("documentVault.typeNameChange") || "Name Change",
+      registration_book:
+        t?.("documentVault.typeRegistrationBook") || "Registration Book",
+      circular: t?.("documentVault.typeCircular") || "Circular",
+      directive: t?.("documentVault.typeDirective") || "Directive",
+      correspondence:
+        t?.("documentVault.typeCorrespondence") || "Correspondence",
+      application_form:
+        t?.("documentVault.typeApplicationForm") || "Application Form",
+      other: t?.("documentVault.typeOther") || "Other",
+    };
+    return labels[type] || type;
+  };
+
+  return (
     <div
       style={{
-        width: "52px",
-        height: "52px",
-        borderRadius: "8px",
-        background: "#F1F5F9",
+        background: "#fff",
+        border: "1px solid #E2E8F0",
+        borderRadius: "12px",
+        padding: "clamp(12px, 2vw, 16px)",
         display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "26px",
-        flexShrink: 0,
-        overflow: "hidden",
-        color: "#64748B",
+        gap: "clamp(10px, 1.5vw, 14px)",
+        alignItems: "flex-start",
+        transition: "box-shadow 0.2s",
+        flexDirection: window.innerWidth < 480 ? "column" : "row",
       }}
+      onMouseEnter={(e) =>
+        (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")
+      }
+      onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
     >
-      {doc.thumbnailUrl ? (
-        <img
-          src={doc.thumbnailUrl}
-          alt="preview"
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      ) : (
-        FILE_TYPE_ICON[doc.fileType] || <FiFileText size={24} />
-      )}
-    </div>
-
-    {/* Info */}
-    <div style={{ flex: 1, minWidth: 0 }}>
+      {/* Thumbnail or icon */}
       <div
         style={{
-          fontWeight: 600,
-          fontSize: "14px",
-          color: "#1E293B",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
+          width: "clamp(40px, 8vw, 52px)",
+          height: "clamp(40px, 8vw, 52px)",
+          borderRadius: "8px",
+          background: "#F1F5F9",
           display: "flex",
           alignItems: "center",
-          gap: "6px",
+          justifyContent: "center",
+          fontSize: "clamp(20px, 4vw, 26px)",
+          flexShrink: 0,
+          overflow: "hidden",
+          color: "#64748B",
         }}
       >
-        <FiFileText size={14} color="#64748B" />
-        {doc.title}
+        {doc.thumbnailUrl ? (
+          <img
+            src={doc.thumbnailUrl}
+            alt="preview"
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          getFileIcon(doc.fileType)
+        )}
       </div>
-      <div style={{ fontSize: "12px", color: "#64748B", marginTop: "2px" }}>
-        <FiInfo size={12} style={{ marginRight: "4px" }} />
-        {doc.referenceNumber}
-      </div>
-      <div
-        style={{
-          display: "flex",
-          gap: "6px",
-          marginTop: "6px",
-          flexWrap: "wrap",
-        }}
-      >
-        <span
+
+      {/* Info */}
+      <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
+        <div
           style={{
-            background: "#EFF6FF",
-            color: "#1D4ED8",
-            fontSize: "11px",
-            padding: "2px 8px",
-            borderRadius: "99px",
-            display: "inline-flex",
+            fontWeight: 600,
+            fontSize: "clamp(13px, 2.5vw, 14px)",
+            color: "#1E293B",
+            display: "flex",
             alignItems: "center",
-            gap: "4px",
+            gap: "6px",
+            flexWrap: "wrap",
           }}
         >
-          <FiBook size={10} />
-          {DOCUMENT_TYPE_LABELS[doc.documentType] || doc.documentType}
-        </span>
-        {doc.retentionPolicy === "lifetime" && (
+          <FiFileText size={14} color="#64748B" />
+          <span style={{ wordBreak: "break-word" }}>{doc.title}</span>
+        </div>
+        <div
+          style={{
+            fontSize: "clamp(11px, 2vw, 12px)",
+            color: "#64748B",
+            marginTop: "2px",
+          }}
+        >
+          <FiInfo size={12} style={{ marginRight: "4px" }} />
+          {doc.referenceNumber}
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: "6px",
+            marginTop: "6px",
+            flexWrap: "wrap",
+          }}
+        >
           <span
             style={{
-              background: "#F0FDF4",
-              color: "#15803D",
-              fontSize: "11px",
+              background: "#EFF6FF",
+              color: "#1D4ED8",
+              fontSize: "clamp(10px, 1.8vw, 11px)",
               padding: "2px 8px",
               borderRadius: "99px",
               display: "inline-flex",
@@ -158,60 +160,95 @@ const DocumentCard = ({ doc, onDownload }) => (
               gap: "4px",
             }}
           >
-            <FiArchive size={10} />♾ Lifetime
+            <FiBook size={10} />
+            {getTypeLabel(doc.documentType)}
           </span>
+          {doc.retentionPolicy === "lifetime" && (
+            <span
+              style={{
+                background: "#F0FDF4",
+                color: "#15803D",
+                fontSize: "clamp(10px, 1.8vw, 11px)",
+                padding: "2px 8px",
+                borderRadius: "99px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <FiArchive size={10} />♾{" "}
+              {t?.("documentVault.lifetime") || "Lifetime"}
+            </span>
+          )}
+        </div>
+        {doc.citizenName && (
+          <div
+            style={{
+              fontSize: "clamp(11px, 2vw, 12px)",
+              color: "#475569",
+              marginTop: "4px",
+            }}
+          >
+            <FiUser size={12} style={{ marginRight: "4px" }} />
+            {doc.citizenName}
+          </div>
         )}
       </div>
-      {doc.citizenName && (
-        <div style={{ fontSize: "12px", color: "#475569", marginTop: "4px" }}>
-          <FiUser size={12} style={{ marginRight: "4px" }} />
-          {doc.citizenName}
-        </div>
-      )}
-    </div>
 
-    {/* Actions */}
-    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-      <button
-        onClick={() => onDownload(doc._id)}
-        style={{
-          background: "#2563EB",
-          color: "#fff",
-          border: "none",
-          borderRadius: "7px",
-          padding: "6px 12px",
-          fontSize: "12px",
-          cursor: "pointer",
-          whiteSpace: "nowrap",
-          display: "flex",
-          alignItems: "center",
-          gap: "4px",
-        }}
-      >
-        <FiDownload size={14} />
-        Download
-      </button>
+      {/* Actions */}
       <div
         style={{
-          fontSize: "11px",
-          color: "#94A3B8",
-          textAlign: "center",
           display: "flex",
-          alignItems: "center",
-          gap: "4px",
-          justifyContent: "center",
+          flexDirection: window.innerWidth < 480 ? "row" : "column",
+          gap: "6px",
+          flexShrink: 0,
+          width: window.innerWidth < 480 ? "100%" : "auto",
         }}
       >
-        <FiHardDrive size={12} />
-        {doc.fileType?.toUpperCase()}
-        {doc.fileSize ? ` · ${(doc.fileSize / 1024).toFixed(0)}KB` : ""}
+        <button
+          onClick={() => onDownload(doc._id)}
+          style={{
+            background: "#2563EB",
+            color: "#fff",
+            border: "none",
+            borderRadius: "7px",
+            padding: "clamp(6px, 1.5vw, 8px) clamp(12px, 2vw, 16px)",
+            fontSize: "clamp(11px, 2vw, 12px)",
+            cursor: "pointer",
+            whiteSpace: "nowrap",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "4px",
+            width: window.innerWidth < 480 ? "100%" : "auto",
+          }}
+        >
+          <FiDownload size={14} />
+          {t?.("common.download") || "Download"}
+        </button>
+        <div
+          style={{
+            fontSize: "clamp(10px, 1.8vw, 11px)",
+            color: "#94A3B8",
+            textAlign: "center",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            justifyContent: "center",
+          }}
+        >
+          <FiHardDrive size={12} />
+          {doc.fileType?.toUpperCase()}
+          {doc.fileSize ? ` · ${(doc.fileSize / 1024).toFixed(0)}KB` : ""}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ─── Main Page ────────────────────────────────────────────────
 export default function DocumentVault() {
+  const { t } = useLanguage();
   const [documents, setDocuments] = useState([]);
   const [pagination, setPagination] = useState({});
   const [typeFilter, setTypeFilter] = useState("");
@@ -219,6 +256,10 @@ export default function DocumentVault() {
   const [isLoading, setIsLoading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const { user } = useAuth();
+
+  // Translation helpers
+  const td = (key, fallback) => t?.(`documentVault.${key}`) || fallback;
+  const tc = (key, fallback) => t?.(`common.${key}`) || fallback;
 
   // ✅ Use ref to track if component is mounted
   const isMounted = useRef(true);
@@ -300,7 +341,7 @@ export default function DocumentVault() {
       const res = await getDocumentDownloadUrl(id);
       window.open(res.data.fileUrl, "_blank");
     } catch {
-      alert("Download failed. Please try again.");
+      alert(td("downloadError", "Download failed. Please try again."));
     }
   };
 
@@ -315,44 +356,59 @@ export default function DocumentVault() {
   };
 
   return (
-    <div style={{ padding: "24px", maxWidth: "1000px", margin: "0 auto" }}>
+    <div
+      style={{
+        padding: "clamp(12px, 3vw, 24px)",
+        maxWidth: "1000px",
+        margin: "0 auto",
+      }}
+    >
       {/* Header */}
       <div
         style={{
           display: "flex",
+          flexDirection: window.innerWidth < 480 ? "column" : "row",
           justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: "24px",
+          alignItems: window.innerWidth < 480 ? "stretch" : "flex-start",
+          gap: "12px",
+          marginBottom: "clamp(16px, 3vw, 24px)",
         }}
       >
         <div>
           <h1
             style={{
-              fontSize: "22px",
+              fontSize: "clamp(18px, 4vw, 22px)",
               fontWeight: 700,
               margin: 0,
               color: "#0F172A",
               display: "flex",
               alignItems: "center",
-              gap: "10px",
+              gap: "8px",
+              flexWrap: "wrap",
             }}
           >
-            <FiFolder size={28} color="#2563EB" />
-            CRRSA Document Vault
+            <FiFolder
+              size={window.innerWidth < 480 ? 20 : 28}
+              color="#2563EB"
+            />
+            {td("title", "CRRSA Document Vault")}
           </h1>
           <p
             style={{
               color: "#64748B",
-              fontSize: "13px",
+              fontSize: "clamp(11px, 2.5vw, 13px)",
               marginTop: "4px",
               display: "flex",
               alignItems: "center",
               gap: "6px",
+              flexWrap: "wrap",
             }}
           >
             <FiDatabase size={14} />
-            Lifetime document storage for Civil Registration and Residency
-            Service Agency
+            {td(
+              "subtitle",
+              "Lifetime document storage for Civil Registration and Residency Service Agency",
+            )}
           </p>
         </div>
         {["leader", "admin", "superadmin"].includes(user?.role) && (
@@ -363,17 +419,19 @@ export default function DocumentVault() {
               color: "#fff",
               border: "none",
               borderRadius: "10px",
-              padding: "10px 20px",
+              padding: "clamp(8px, 2vw, 10px) clamp(16px, 3vw, 20px)",
               cursor: "pointer",
               fontWeight: 600,
-              fontSize: "14px",
+              fontSize: "clamp(12px, 2.5vw, 14px)",
               display: "flex",
               alignItems: "center",
+              justifyContent: "center",
               gap: "6px",
+              width: window.innerWidth < 480 ? "100%" : "auto",
             }}
           >
             <FiUpload size={16} />
-            Upload Document
+            {td("uploadDocument", "Upload Document")}
           </button>
         )}
       </div>
@@ -390,10 +448,14 @@ export default function DocumentVault() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              padding: "16px",
             }}
             onClick={() => setShowUpload(false)}
           >
-            <div onClick={(e) => e.stopPropagation()}>
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{ width: "100%", maxWidth: "620px" }}
+            >
               <DocumentUpload
                 onSuccess={handleUploadComplete}
                 onClose={() => setShowUpload(false)}
@@ -403,11 +465,14 @@ export default function DocumentVault() {
           document.body,
         )}
 
-      {/* ✅ AI Smart Search - Primary search (only one!) */}
+      {/* ✅ AI Smart Search - Primary search */}
       <div style={{ marginBottom: "16px" }}>
         <AISmartSearch
           onSelect={handleSmartSelect}
-          placeholder="AI-powered search by name, reference, content..."
+          placeholder={td(
+            "aiSearchPlaceholder",
+            "AI-powered search by name, reference, content...",
+          )}
         />
       </div>
 
@@ -418,10 +483,15 @@ export default function DocumentVault() {
           gap: "12px",
           marginBottom: "20px",
           flexWrap: "wrap",
-          justifyContent: "flex-end",
+          justifyContent: window.innerWidth < 480 ? "flex-start" : "flex-end",
         }}
       >
-        <div style={{ position: "relative" }}>
+        <div
+          style={{
+            position: "relative",
+            width: window.innerWidth < 480 ? "100%" : "auto",
+          }}
+        >
           <FiFilter
             size={16}
             style={{
@@ -440,13 +510,14 @@ export default function DocumentVault() {
               border: "1px solid #CBD5E1",
               borderRadius: "10px",
               padding: "10px 14px 10px 36px",
-              fontSize: "13px",
+              fontSize: "clamp(12px, 2.5vw, 13px)",
               background: "#fff",
               outline: "none",
               appearance: "none",
-              minWidth: "200px",
+              minWidth: window.innerWidth < 480 ? "100%" : "200px",
               cursor: "pointer",
               transition: "border-color 0.2s",
+              width: window.innerWidth < 480 ? "100%" : "auto",
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = "#2563EB";
@@ -457,12 +528,41 @@ export default function DocumentVault() {
               e.currentTarget.style.boxShadow = "none";
             }}
           >
-            <option value="">All Document Types</option>
-            {Object.entries(DOCUMENT_TYPE_LABELS).map(([val, label]) => (
-              <option key={val} value={val}>
-                {label}
-              </option>
-            ))}
+            <option value="">
+              {td("allDocumentTypes", "All Document Types")}
+            </option>
+            <option value="birth_certificate">
+              {td("typeBirthCertificate", "Birth Certificate")}
+            </option>
+            <option value="death_certificate">
+              {td("typeDeathCertificate", "Death Certificate")}
+            </option>
+            <option value="marriage_certificate">
+              {td("typeMarriageCertificate", "Marriage Certificate")}
+            </option>
+            <option value="divorce_certificate">
+              {td("typeDivorceCertificate", "Divorce Certificate")}
+            </option>
+            <option value="residence_id">
+              {td("typeResidenceId", "Residence ID")}
+            </option>
+            <option value="name_change">
+              {td("typeNameChange", "Name Change")}
+            </option>
+            <option value="registration_book">
+              {td("typeRegistrationBook", "Registration Book")}
+            </option>
+            <option value="circular">{td("typeCircular", "Circular")}</option>
+            <option value="directive">
+              {td("typeDirective", "Directive")}
+            </option>
+            <option value="correspondence">
+              {td("typeCorrespondence", "Correspondence")}
+            </option>
+            <option value="application_form">
+              {td("typeApplicationForm", "Application Form")}
+            </option>
+            <option value="other">{td("typeOther", "Other")}</option>
           </select>
         </div>
       </div>
@@ -471,16 +571,21 @@ export default function DocumentVault() {
       {pagination.total !== undefined && (
         <p
           style={{
-            fontSize: "13px",
+            fontSize: "clamp(12px, 2.5vw, 13px)",
             color: "#64748B",
             marginBottom: "12px",
             display: "flex",
             alignItems: "center",
             gap: "6px",
+            flexWrap: "wrap",
           }}
         >
           <FiDatabase size={14} />
-          {pagination.total} document{pagination.total !== 1 ? "s" : ""} found
+          {pagination.total}{" "}
+          {pagination.total !== 1
+            ? td("documents", "documents")
+            : td("document", "document")}{" "}
+          {tc("found", "found")}
         </p>
       )}
 
@@ -501,13 +606,13 @@ export default function DocumentVault() {
             size={32}
             style={{ animation: "pulse 1.5s ease-in-out infinite" }}
           />
-          Loading documents…
+          {tc("loading", "Loading...")}
         </div>
       ) : documents.length === 0 ? (
         <div
           style={{
             textAlign: "center",
-            padding: "60px 20px",
+            padding: "clamp(40px, 8vw, 60px) clamp(16px, 3vw, 20px)",
             color: "#94A3B8",
             background: "#F8FAFC",
             borderRadius: "12px",
@@ -517,20 +622,34 @@ export default function DocumentVault() {
             gap: "12px",
           }}
         >
-          <div style={{ fontSize: "40px", marginBottom: "12px" }}>
+          <div style={{ fontSize: "clamp(32px, 8vw, 40px)" }}>
             <FiFolder size={48} color="#94A3B8" />
           </div>
-          <p style={{ fontWeight: 600, fontSize: "16px", color: "#64748B" }}>
-            No documents found
+          <p
+            style={{
+              fontWeight: 600,
+              fontSize: "clamp(14px, 3vw, 16px)",
+              color: "#64748B",
+            }}
+          >
+            {td("noDocuments", "No documents found")}
           </p>
-          <p style={{ fontSize: "13px" }}>
-            Upload the first CRRSA document to get started
+          <p style={{ fontSize: "clamp(12px, 2.5vw, 13px)" }}>
+            {td(
+              "uploadFirst",
+              "Upload the first CRRSA document to get started",
+            )}
           </p>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           {documents.map((doc) => (
-            <DocumentCard key={doc._id} doc={doc} onDownload={handleDownload} />
+            <DocumentCard
+              key={doc._id}
+              doc={doc}
+              onDownload={handleDownload}
+              t={t}
+            />
           ))}
         </div>
       )}
@@ -544,13 +663,14 @@ export default function DocumentVault() {
             gap: "8px",
             marginTop: "24px",
             alignItems: "center",
+            flexWrap: "wrap",
           }}
         >
           <button
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
             style={{
-              padding: "8px 16px",
+              padding: "clamp(6px, 1.5vw, 8px) clamp(12px, 2vw, 16px)",
               border: "1px solid #CBD5E1",
               borderRadius: "8px",
               background: "#fff",
@@ -559,6 +679,7 @@ export default function DocumentVault() {
               display: "flex",
               alignItems: "center",
               gap: "6px",
+              fontSize: "clamp(12px, 2.5vw, 13px)",
               transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
@@ -571,12 +692,12 @@ export default function DocumentVault() {
             }}
           >
             <FiChevronLeft size={16} />
-            Prev
+            {tc("previous", "Prev")}
           </button>
           <span
             style={{
-              padding: "8px 16px",
-              fontSize: "13px",
+              padding: "clamp(6px, 1.5vw, 8px) clamp(12px, 2vw, 16px)",
+              fontSize: "clamp(12px, 2.5vw, 13px)",
               color: "#64748B",
               display: "flex",
               alignItems: "center",
@@ -584,13 +705,13 @@ export default function DocumentVault() {
             }}
           >
             <FiLayers size={14} />
-            Page {page} of {pagination.pages}
+            {tc("page", "Page")} {page} {tc("of", "of")} {pagination.pages}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(pagination.pages, p + 1))}
             disabled={page === pagination.pages}
             style={{
-              padding: "8px 16px",
+              padding: "clamp(6px, 1.5vw, 8px) clamp(12px, 2vw, 16px)",
               border: "1px solid #CBD5E1",
               borderRadius: "8px",
               background: "#fff",
@@ -599,6 +720,7 @@ export default function DocumentVault() {
               display: "flex",
               alignItems: "center",
               gap: "6px",
+              fontSize: "clamp(12px, 2.5vw, 13px)",
               transition: "all 0.2s",
             }}
             onMouseEnter={(e) => {
@@ -610,7 +732,7 @@ export default function DocumentVault() {
               e.currentTarget.style.background = "#fff";
             }}
           >
-            Next
+            {tc("next", "Next")}
             <FiChevronRight size={16} />
           </button>
         </div>
