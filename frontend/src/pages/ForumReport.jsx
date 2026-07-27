@@ -2,7 +2,7 @@
 // frontend/src/pages/ForumReport.jsx
 // Enhanced Professional Forum Report Page with AI Integration - FIXED
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
   btn,
   C,
@@ -64,8 +64,11 @@ const FONT_SIZES = {
 const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Translation helper
-  const tf = (key, fallback) => t?.(`forum.${key}`) || fallback;
+  // Translation helper - memoized via useCallback
+  const tf = useCallback(
+    (key, fallback) => t?.(`forum.${key}`) || fallback,
+    [t],
+  );
 
   const filteredTeams = teams.filter((team) =>
     team.name.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -418,9 +421,12 @@ const STANDING_AGENDAS_AM = [
 ];
 
 const StandingAgendasPanel = ({ t }) => {
-  const safeT = t || {};
+  const safeT = useMemo(() => t || {}, [t]);
   const agendas = safeT.agendas || STANDING_AGENDAS_AM;
-  const tf = (key, fallback) => safeT?.forum?.[key] || fallback;
+  const tf = useCallback(
+    (key, fallback) => safeT?.forum?.[key] || fallback,
+    [safeT], // safeT is now stable
+  );
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -655,12 +661,19 @@ export default function ForumReport({
   const { t: tHook } = useLanguage();
   const t = tProp || tHook;
 
-  const safeT = t || {};
+  // ✅ FIX: Wrap safeT in useMemo to prevent recreation on every render
+  const safeT = useMemo(() => t || {}, [t]);
   const safeYear = safeT.year || "2018 E.C.";
 
-  // Translation helpers
-  const tf = (key, fallback) => safeT?.forum?.[key] || fallback;
-  const tc = (key, fallback) => safeT?.common?.[key] || fallback;
+  // Translation helpers - memoized with useCallback
+  const tf = useCallback(
+    (key, fallback) => safeT?.forum?.[key] || fallback,
+    [safeT], // safeT is now stable
+  );
+  const tc = useCallback(
+    (key, fallback) => safeT?.common?.[key] || fallback,
+    [safeT], // safeT is now stable
+  );
 
   const { showToast } = useToast();
   const formRef = useRef(null);

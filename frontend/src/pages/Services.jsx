@@ -1,5 +1,5 @@
 // frontend/src/pages/Services.jsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { card, C, F, inp } from "../styles/theme";
 import { SERVICES } from "../constants/services";
 import { serviceAPI } from "../services/api";
@@ -28,7 +28,8 @@ import {
 } from "react-icons/fi";
 
 export default function Services({ t, lang }) {
-  const safeT = t || {};
+  // ✅ Wrap safeT in useMemo
+  const safeT = useMemo(() => t || {}, [t]);
 
   const [search, setSearch] = useState("");
   const [services, setServices] = useState([]);
@@ -41,9 +42,15 @@ export default function Services({ t, lang }) {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(12);
 
-  // Translation helpers
-  const tsKey = (key, fallback) => safeT?.services?.[key] || fallback;
-  const tcKey = (key, fallback) => safeT?.common?.[key] || fallback;
+  // ✅ Wrap translation helpers in useCallback to stabilize them
+  const tsKey = useCallback(
+    (key, fallback) => safeT?.services?.[key] || fallback,
+    [safeT],
+  );
+  const tcKey = useCallback(
+    (key, fallback) => safeT?.common?.[key] || fallback,
+    [safeT],
+  );
 
   useEffect(() => {
     const loadServices = async () => {
@@ -103,7 +110,7 @@ export default function Services({ t, lang }) {
       }
     };
     loadServices();
-  }, [tsKey]);
+  }, [tsKey]); // ✅ tsKey is now stable
 
   const localizedServices = services.map((s) => ({
     ...s,
