@@ -123,6 +123,7 @@ export default function DailyReport({ t, lang }) {
       }
     };
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
   const calculateTotals = (rowsData) => {
