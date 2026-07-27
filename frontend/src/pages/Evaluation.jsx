@@ -42,7 +42,7 @@ import {
 } from "react-icons/fi";
 
 // ─── Signature Canvas Component ──────────────────────────────
-const SignatureCanvas = ({ onSave, value }) => {
+const SignatureCanvas = ({ onSave, value, t }) => {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
@@ -170,8 +170,10 @@ const SignatureCanvas = ({ onSave, value }) => {
           type="text"
           placeholder={
             isTouchDevice
-              ? "Or type your name as signature..."
-              : "Type your name as signature..."
+              ? t?.("evaluation.typeNameToSign") ||
+                "Or type your name as signature..."
+              : t?.("evaluation.typeNameToSign") ||
+                "Type your name as signature..."
           }
           value={textSignature}
           onChange={handleTextSignature}
@@ -226,10 +228,12 @@ const SignatureCanvas = ({ onSave, value }) => {
         }}
       >
         {hasSignature
-          ? "✓ Signature saved"
+          ? t?.("evaluation.signatureSaved") || "✓ Signature saved"
           : isTouchDevice
-            ? "✍️ Sign with your finger (touch) or type name below"
-            : "✍️ Sign with mouse or type name below"}
+            ? t?.("evaluation.signWithFinger") ||
+              "✍️ Sign with your finger (touch) or type name below"
+            : t?.("evaluation.signWithMouse") ||
+              "✍️ Sign with mouse or type name below"}
       </div>
     </div>
   );
@@ -332,7 +336,10 @@ export default function Evaluation({ t, lang }) {
         } catch (error) {
           if (isActive) {
             console.error("Failed to load evaluations:", error);
-            showToast("Failed to load evaluation history", "error");
+            showToast(
+              te.loadError || "Failed to load evaluation history",
+              "error",
+            );
           }
         } finally {
           if (isActive) {
@@ -347,7 +354,7 @@ export default function Evaluation({ t, lang }) {
     return () => {
       isActive = false;
     };
-  }, [activeTab, showToast]);
+  }, [activeTab, showToast, te.loadError]);
 
   // ─── Load an evaluation from history ──────────────────────
   const loadEvaluation = (evalData) => {
@@ -358,14 +365,19 @@ export default function Evaluation({ t, lang }) {
     setSignatures(evalData.signatures || {});
     setEvaluationId(evalData._id);
     setActiveTab("form");
-    showToast("Evaluation loaded successfully!", "success");
+    showToast(te.loadSuccess || "Evaluation loaded successfully!", "success");
   };
 
   // ─── Delete an evaluation ──────────────────────────────────────
   const deleteEvaluation = async (evalId, evalName) => {
+    const confirmMsg =
+      te.deleteConfirm || 'Are you sure you want to delete "{name}"?';
     if (
       !window.confirm(
-        `Are you sure you want to delete "${evalName || "Untitled Team"}"? This action cannot be undone.`,
+        confirmMsg.replace(
+          "{name}",
+          evalName || te.untitledTeam || "Untitled Team",
+        ),
       )
     ) {
       return;
@@ -374,20 +386,31 @@ export default function Evaluation({ t, lang }) {
     try {
       await evaluationAPI.delete(evalId);
       setSavedEvaluations((prev) => prev.filter((e) => e._id !== evalId));
+      const successMsg =
+        te.deleteSuccess || '✅ "{name}" deleted successfully!';
       showToast(
-        `✅ "${evalName || "Untitled Team"}" deleted successfully!`,
+        successMsg.replace(
+          "{name}",
+          evalName || te.untitledTeam || "Untitled Team",
+        ),
         "success",
       );
     } catch (error) {
       console.error("Failed to delete evaluation:", error);
-      showToast("Failed to delete evaluation. Please try again.", "error");
+      showToast(
+        te.deleteError || "Failed to delete evaluation. Please try again.",
+        "error",
+      );
     }
   };
 
   // ─── Pass to Super Admin ────────────────────────────────────
   const passToSuperAdmin = async () => {
     if (!evaluationId) {
-      showToast("Please save the evaluation first", "warning");
+      showToast(
+        te.saveFirstWarning || "Please save the evaluation first",
+        "warning",
+      );
       return;
     }
 
@@ -397,10 +420,16 @@ export default function Evaluation({ t, lang }) {
         submittedTo: "superadmin",
         submittedAt: new Date().toISOString(),
       });
-      showToast("✅ Evaluation passed to Super Admin for review!", "success");
+      showToast(
+        te.passedSuccess || "✅ Evaluation passed to Super Admin for review!",
+        "success",
+      );
     } catch (error) {
       console.error("Failed to pass evaluation:", error);
-      showToast("Failed to pass evaluation to Super Admin", "error");
+      showToast(
+        te.passedError || "Failed to pass evaluation to Super Admin",
+        "error",
+      );
     }
   };
 
@@ -614,7 +643,10 @@ export default function Evaluation({ t, lang }) {
   const saveEvaluation = async () => {
     const validMembers = members.filter((m) => m.trim() !== "");
     if (validMembers.length === 0) {
-      showToast("Please add at least one team member", "warning");
+      showToast(
+        te.noMembers || "Please add at least one team member",
+        "warning",
+      );
       return;
     }
 
@@ -632,7 +664,7 @@ export default function Evaluation({ t, lang }) {
           : null;
 
       const evaluationData = {
-        teamName: teamName || "Untitled Team",
+        teamName: teamName || te.untitledTeam || "Untitled Team",
         members: validMembers,
         scores: scores,
         comments: comments,
@@ -652,16 +684,23 @@ export default function Evaluation({ t, lang }) {
       let response;
       if (evaluationId) {
         response = await evaluationAPI.update(evaluationId, evaluationData);
-        showToast("✅ Evaluation updated successfully!", "success");
+        showToast(
+          te.saveSuccess || "✅ Evaluation updated successfully!",
+          "success",
+        );
       } else {
         response = await evaluationAPI.create(evaluationData);
         setEvaluationId(response.data._id);
-        showToast("✅ Evaluation saved successfully!", "success");
+        showToast(
+          te.saveSuccess || "✅ Evaluation saved successfully!",
+          "success",
+        );
       }
     } catch (error) {
       console.error("Failed to save evaluation:", error);
       showToast(
         error.response?.data?.message ||
+          te.saveError ||
           "Failed to save evaluation. Please try again.",
         "error",
       );
@@ -679,7 +718,7 @@ export default function Evaluation({ t, lang }) {
     setEvaluationId(null);
     setSignatures({});
     localStorage.removeItem("currentEvaluation");
-    showToast("Form reset successfully", "info");
+    showToast(te.resetSuccess || "Form reset successfully", "info");
   };
 
   // ─── Helper functions ──────────────────────────────────────
@@ -694,44 +733,56 @@ export default function Evaluation({ t, lang }) {
   const getPerformanceLevel = (score) => {
     if (score >= 90)
       return {
-        label: "Outstanding",
+        label: te.performanceLevelOutstanding || "Outstanding",
         color: "#10b981",
         icon: <FiStar size={14} />,
-        description: "Exceptional performance exceeding all expectations",
+        description:
+          te.performanceOutstandingDesc ||
+          "Exceptional performance exceeding all expectations",
       };
     if (score >= 80)
       return {
-        label: "Excellent",
+        label: te.performanceLevelExcellent || "Excellent",
         color: "#3b82f6",
         icon: <FiAward size={14} />,
-        description: "Strong performance meeting all standards",
+        description:
+          te.performanceExcellentDesc ||
+          "Strong performance meeting all standards",
       };
     if (score >= 70)
       return {
-        label: "Good",
+        label: te.performanceLevelGood || "Good",
         color: "#8b5cf6",
         icon: <FiThumbsUp size={14} />,
-        description: "Satisfactory performance with room for growth",
+        description:
+          te.performanceGoodDesc ||
+          "Satisfactory performance with room for growth",
       };
     if (score >= 60)
       return {
-        label: "Average",
+        label: te.performanceLevelAverage || "Average",
         color: "#f59e0b",
         icon: <FiBarChart2 size={14} />,
-        description: "Meets minimum requirements, improvement needed",
+        description:
+          te.performanceAverageDesc ||
+          "Meets minimum requirements, improvement needed",
       };
     if (score >= 50)
       return {
-        label: "Needs Improvement",
+        label: te.performanceLevelNeedsImprovement || "Needs Improvement",
         color: "#f97316",
         icon: <FiTrendingUp size={14} />,
-        description: "Significant improvement needed in key areas",
+        description:
+          te.performanceImprovementDesc ||
+          "Significant improvement needed in key areas",
       };
     return {
-      label: "Needs Attention",
+      label: te.performanceLevelNeedsAttention || "Needs Attention",
       color: "#ef4444",
       icon: <FiAlertCircle size={14} />,
-      description: "Immediate action required to improve performance",
+      description:
+        te.performanceAttentionDesc ||
+        "Immediate action required to improve performance",
     };
   };
 
@@ -754,6 +805,10 @@ export default function Evaluation({ t, lang }) {
     fontFamily: F.sans,
     fontSize: "clamp(10px, 3vw, 12px)",
   };
+
+  // ─── Translation helpers ──────────────────────────────────
+  const teKey = (key, fallback) => t?.(`evaluation.${key}`) || fallback;
+  const tcKey = (key, fallback) => t?.(`common.${key}`) || fallback;
 
   return (
     <div
@@ -788,7 +843,7 @@ export default function Evaluation({ t, lang }) {
           }}
         >
           <FiClipboard size={24} color={C.primary} />
-          {te.title || "Peer Forum Evaluation"}
+          {teKey("title", "Peer Forum Evaluation")}
         </h1>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <span
@@ -806,7 +861,7 @@ export default function Evaluation({ t, lang }) {
             }}
           >
             <FiTarget size={12} />
-            {te.outOf || "Out of 100 pts"}
+            {teKey("outOf", "Out of 100 pts")}
           </span>
           {evaluationId && (
             <span
@@ -823,7 +878,7 @@ export default function Evaluation({ t, lang }) {
               }}
             >
               <FiCheck size={12} />
-              Saved
+              {tcKey("saved", "Saved")}
             </span>
           )}
         </div>
@@ -837,118 +892,121 @@ export default function Evaluation({ t, lang }) {
           fontFamily: F.sans,
         }}
       >
-        {te.subtitle || "Addis Ababa City Admin · Public Service Bureau"}
+        {teKey("subtitle", "Addis Ababa City Admin · Public Service Bureau")}
       </p>
 
-      
-   {/* ─── Tab Navigation - FIXED: All buttons stay on one line ───*/}
-<div
-  style={{
-    display: "flex",
-    gap: "4px",
-    marginBottom: "clamp(16px, 4vw, 24px)",
-    borderBottom: `2px solid ${C.border}`,
-    paddingBottom: "8px",
-    flexWrap: "nowrap",
-    overflowX: "auto",
-    WebkitOverflowScrolling: "touch",
-    alignItems: "center",
-    minHeight: "48px", // Ensure consistent height
-  }}
->
-  <button
-    onClick={() => setActiveTab("form")}
-    style={{
-      padding: "8px 16px",
-      background: activeTab === "form" ? C.primary : "transparent",
-      color: activeTab === "form" ? "#fff" : C.muted,
-      border: "none",
-      borderRadius: 8,
-      fontSize: "clamp(11px, 2.5vw, 14px)",
-      fontWeight: 600,
-      cursor: "pointer",
-      transition: "all 0.2s ease",
-      display: "flex",
-      alignItems: "center",
-      gap: "6px",
-      whiteSpace: "nowrap",
-      flexShrink: 0,
-    }}
-  >
-    <FiClipboard size={16} />
-    <span>Evaluation Form</span>
-  </button>
-  
-  <button
-    onClick={() => setActiveTab("history")}
-    style={{
-      padding: "8px 16px",
-      background: activeTab === "history" ? C.primary : "transparent",
-      color: activeTab === "history" ? "#fff" : C.muted,
-      border: "none",
-      borderRadius: 8,
-      fontSize: "clamp(11px, 2.5vw, 14px)",
-      fontWeight: 600,
-      cursor: "pointer",
-      transition: "all 0.2s ease",
-      display: "flex",
-      alignItems: "center",
-      gap: "6px",
-      whiteSpace: "nowrap",
-      flexShrink: 0,
-    }}
-  >
-    <FiList size={16} />
-    <span>History ({savedEvaluations.length})</span>
-  </button>
+      {/* ─── Tab Navigation ───*/}
+      <div
+        style={{
+          display: "flex",
+          gap: "4px",
+          marginBottom: "clamp(16px, 4vw, 24px)",
+          borderBottom: `2px solid ${C.border}`,
+          paddingBottom: "8px",
+          flexWrap: "nowrap",
+          overflowX: "auto",
+          WebkitOverflowScrolling: "touch",
+          alignItems: "center",
+          minHeight: "48px",
+        }}
+      >
+        <button
+          onClick={() => setActiveTab("form")}
+          style={{
+            padding: "8px 16px",
+            background: activeTab === "form" ? C.primary : "transparent",
+            color: activeTab === "form" ? "#fff" : C.muted,
+            border: "none",
+            borderRadius: 8,
+            fontSize: "clamp(11px, 2.5vw, 14px)",
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          <FiClipboard size={16} />
+          <span>{teKey("evalForm", "Evaluation Form")}</span>
+        </button>
 
-  {/* Spacer - pushes Pass to Super Admin to the right */}
-  <div style={{ flex: 1, minWidth: "8px" }} />
+        <button
+          onClick={() => setActiveTab("history")}
+          style={{
+            padding: "8px 16px",
+            background: activeTab === "history" ? C.primary : "transparent",
+            color: activeTab === "history" ? "#fff" : C.muted,
+            border: "none",
+            borderRadius: 8,
+            fontSize: "clamp(11px, 2.5vw, 14px)",
+            fontWeight: 600,
+            cursor: "pointer",
+            transition: "all 0.2s ease",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          <FiList size={16} />
+          <span>
+            {teKey("evalHistory", "History")} ({savedEvaluations.length})
+          </span>
+        </button>
 
-  {/* ─── Pass to Super Admin Button - Icon only on mobile ─── */}
-  {evaluationId && (
-    <button
-      onClick={passToSuperAdmin}
-      style={{
-        padding: "8px 16px",
-        background: "#8b5cf6",
-        color: "#fff",
-        border: "none",
-        borderRadius: 8,
-        fontSize: "clamp(11px, 2.5vw, 14px)",
-        fontWeight: 600,
-        cursor: "pointer",
-        transition: "all 0.2s ease",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: "6px",
-        whiteSpace: "nowrap",
-        flexShrink: 0,
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.background = "#7c3aed";
-        e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.boxShadow = "0 4px 16px rgba(139,92,246,0.3)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.background = "#8b5cf6";
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.boxShadow = "none";
-      }}
-    >
-      <FiSend size={16} />
-      <span className="pass-to-superadmin-text">Pass to Super Admin</span>
-      <style>{`
-        @media (max-width: 480px) {
-          .pass-to-superadmin-text {
-            display: none !important;
-          }
-        }
-      `}</style>
-    </button>
-  )}
-</div>
+        <div style={{ flex: 1, minWidth: "8px" }} />
+
+        {evaluationId && (
+          <button
+            onClick={passToSuperAdmin}
+            style={{
+              padding: "8px 16px",
+              background: "#8b5cf6",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              fontSize: "clamp(11px, 2.5vw, 14px)",
+              fontWeight: 600,
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "6px",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#7c3aed";
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow =
+                "0 4px 16px rgba(139,92,246,0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#8b5cf6";
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            <FiSend size={16} />
+            <span className="pass-to-superadmin-text">
+              {teKey("passToSuperAdmin", "Pass to Super Admin")}
+            </span>
+            <style>{`
+              @media (max-width: 480px) {
+                .pass-to-superadmin-text {
+                  display: none !important;
+                }
+              }
+            `}</style>
+          </button>
+        )}
+      </div>
+
       {/* ─── History Tab Content ─── */}
       {activeTab === "history" && (
         <div style={{ marginBottom: "clamp(20px, 4vw, 32px)" }}>
@@ -960,7 +1018,7 @@ export default function Evaluation({ t, lang }) {
                 size={24}
                 style={{ animation: "spin 1s linear infinite" }}
               />
-              <p>Loading evaluations...</p>
+              <p>{teKey("loading", "Loading evaluations...")}</p>
             </div>
           ) : savedEvaluations.length === 0 ? (
             <div
@@ -972,10 +1030,10 @@ export default function Evaluation({ t, lang }) {
             >
               <div style={{ fontSize: 48, marginBottom: 16 }}>📋</div>
               <p style={{ fontSize: 16, marginBottom: 8 }}>
-                No saved evaluations found
+                {teKey("noSavedEvaluations", "No saved evaluations found")}
               </p>
               <p style={{ fontSize: 13, color: "#999" }}>
-                Save an evaluation to see it here
+                {teKey("saveFirst", "Save an evaluation to see it here")}
               </p>
             </div>
           ) : (
@@ -1013,7 +1071,8 @@ export default function Evaluation({ t, lang }) {
                         color: C.dark,
                       }}
                     >
-                      {evalItem.teamName || "Untitled Team"}
+                      {evalItem.teamName ||
+                        teKey("untitledTeam", "Untitled Team")}
                     </div>
                     <div
                       style={{
@@ -1024,9 +1083,15 @@ export default function Evaluation({ t, lang }) {
                         flexWrap: "wrap",
                       }}
                     >
-                      <span>{evalItem.members?.length || 0} members</span>
+                      <span>
+                        {evalItem.members?.length || 0}{" "}
+                        {tcKey("members", "members")}
+                      </span>
                       <span>•</span>
-                      <span>Avg: {evalItem.averageScore || 0} pts</span>
+                      <span>
+                        {tcKey("avg", "Avg")}: {evalItem.averageScore || 0}{" "}
+                        {teKey("points", "pts")}
+                      </span>
                       <span>•</span>
                       <span>
                         {new Date(evalItem.createdAt).toLocaleDateString()}
@@ -1079,7 +1144,7 @@ export default function Evaluation({ t, lang }) {
                       }}
                     >
                       <FiEye size={14} />
-                      Load
+                      {teKey("loadEval", "Load")}
                     </button>
                     <button
                       onClick={() =>
@@ -1108,7 +1173,7 @@ export default function Evaluation({ t, lang }) {
                       }}
                     >
                       <FiTrash2 size={14} />
-                      Delete
+                      {teKey("deleteEval", "Delete")}
                     </button>
                   </div>
                 </div>
@@ -1133,12 +1198,15 @@ export default function Evaluation({ t, lang }) {
               }}
             >
               <FiUsers size={14} style={{ marginRight: 6 }} />
-              Team Name / Department
+              {teKey("teamName", "Team Name / Department")}
             </label>
             <input
               type="text"
               style={inp}
-              placeholder="e.g., Addis Ketema Service Team"
+              placeholder={teKey(
+                "teamNamePlaceholder",
+                "e.g., Addis Ketema Service Team",
+              )}
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
             />
@@ -1168,7 +1236,8 @@ export default function Evaluation({ t, lang }) {
                 }}
               >
                 <FiUsers size={18} color={C.primary} />
-                {te.teamMembers || "Team Members"} (Max 7)
+                {teKey("teamMembers", "Team Members")}{" "}
+                {teKey("maxMembers", "(Max 7)")}
               </h3>
               {members.length < 7 && (
                 <button
@@ -1188,7 +1257,7 @@ export default function Evaluation({ t, lang }) {
                   }}
                 >
                   <FiPlus size={14} />
-                  Add Member
+                  {teKey("addMember", "Add Member")}
                 </button>
               )}
             </div>
@@ -1209,7 +1278,10 @@ export default function Evaluation({ t, lang }) {
                   <input
                     ref={(el) => (memberInputRefs.current[idx] = el)}
                     style={{ ...inp, flex: 1 }}
-                    placeholder={`Member ${idx + 1}`}
+                    placeholder={teKey(
+                      "memberPlaceholder",
+                      "Member {number}",
+                    ).replace("{number}", idx + 1)}
                     value={member}
                     onChange={(e) => updateMemberName(idx, e.target.value)}
                   />
@@ -1290,7 +1362,7 @@ export default function Evaluation({ t, lang }) {
                     <tr>
                       <th style={thS}>መስፈርት / Criterion</th>
                       <th style={{ ...thS, textAlign: "center" }}>
-                        {te.maxPts || "Max Pts"}
+                        {teKey("maxPts", "Max Pts")}
                       </th>
                       {members
                         .filter((m) => m.trim() !== "")
@@ -1406,7 +1478,10 @@ export default function Evaluation({ t, lang }) {
                   }}
                 >
                   <FiBarChart2 size={18} color={C.primary} />
-                  Performance Rankings & Feedback
+                  {teKey(
+                    "performanceRankings",
+                    "Performance Rankings & Feedback",
+                  )}
                 </h3>
                 {!showRankings && sortedMembers.length > 0 && (
                   <span
@@ -1419,7 +1494,7 @@ export default function Evaluation({ t, lang }) {
                       fontWeight: 600,
                     }}
                   >
-                    {sortedMembers.length} Members
+                    {sortedMembers.length} {tcKey("members", "Members")}
                   </span>
                 )}
               </div>
@@ -1442,7 +1517,7 @@ export default function Evaluation({ t, lang }) {
                     }}
                   >
                     <FiAward size={14} color={C.gold} />
-                    Best: {bestPerformer}
+                    {teKey("best", "Best")}: {bestPerformer}
                   </span>
                   <span
                     style={{
@@ -1454,7 +1529,7 @@ export default function Evaluation({ t, lang }) {
                     }}
                   >
                     <FiTrendingUp size={14} color={C.primary} />
-                    Avg: {averageScore}
+                    {tcKey("avg", "Avg")}: {averageScore}
                   </span>
                 </div>
               )}
@@ -1499,7 +1574,7 @@ export default function Evaluation({ t, lang }) {
                       }}
                     >
                       <FiUsers size={12} />
-                      Total Members
+                      {tcKey("totalMembers", "Total Members")}
                     </div>
                   </div>
                   <div
@@ -1530,7 +1605,7 @@ export default function Evaluation({ t, lang }) {
                       }}
                     >
                       <FiTrendingUp size={12} />
-                      Average Score
+                      {teKey("averageScore", "Average Score")}
                     </div>
                   </div>
                   <div
@@ -1561,7 +1636,7 @@ export default function Evaluation({ t, lang }) {
                       }}
                     >
                       <FiAward size={12} />
-                      Highest Score
+                      {teKey("highestScore", "Highest Score")}
                     </div>
                   </div>
                   <div
@@ -1592,7 +1667,7 @@ export default function Evaluation({ t, lang }) {
                       }}
                     >
                       <FiTrendingDown size={12} />
-                      Lowest Score
+                      {teKey("lowestScore", "Lowest Score")}
                     </div>
                   </div>
                 </div>
@@ -1659,17 +1734,17 @@ export default function Evaluation({ t, lang }) {
                               {idx === 0 ? (
                                 <>
                                   <FiAward size={10} />
-                                  TOP
+                                  {teKey("top", "TOP")}
                                 </>
                               ) : idx === 1 ? (
                                 <>
                                   <FiAward size={10} />
-                                  2ND
+                                  {teKey("rank2nd", "2ND")}
                                 </>
                               ) : (
                                 <>
                                   <FiStar size={10} />
-                                  3RD
+                                  {teKey("rank3rd", "3RD")}
                                 </>
                               )}
                             </div>
@@ -1786,14 +1861,17 @@ export default function Evaluation({ t, lang }) {
                                 size={10}
                                 style={{ marginRight: 4 }}
                               />
-                              Feedback / Comments
+                              {teKey("feedbackComments", "Feedback / Comments")}
                             </label>
                             <textarea
                               value={comment || ""}
                               onChange={(e) =>
                                 updateComment(index, e.target.value)
                               }
-                              placeholder="Add your feedback, strengths, or areas for improvement..."
+                              placeholder={teKey(
+                                "addFeedbackPlaceholder",
+                                "Add your feedback, strengths, or areas for improvement...",
+                              )}
                               style={{
                                 width: "100%",
                                 border: `1px solid ${C.border}`,
@@ -1825,7 +1903,8 @@ export default function Evaluation({ t, lang }) {
                                   textAlign: "right",
                                 }}
                               >
-                                {comment.length} characters
+                                {comment.length}{" "}
+                                {tcKey("characters", "characters")}
                               </div>
                             )}
                           </div>
@@ -1848,7 +1927,12 @@ export default function Evaluation({ t, lang }) {
                 <div style={{ fontSize: 32, marginBottom: 8 }}>
                   <FiClipboard size={32} color={C.muted} />
                 </div>
-                <p>Add team members and scores to see rankings</p>
+                <p>
+                  {teKey(
+                    "noRankings",
+                    "Add team members and scores to see rankings",
+                  )}
+                </p>
               </div>
             )}
           </div>
@@ -1891,8 +1975,7 @@ export default function Evaluation({ t, lang }) {
                     marginBottom: 8,
                   }}
                 >
-                  {te.bestPerformerLabel ||
-                    "የወሩ ምርጥ ፈፃሚ / Best Performer of the Month"}
+                  {teKey("bestPerformerLabel", "Best Performer of the Month")}
                 </div>
                 <div
                   style={{
@@ -1916,8 +1999,8 @@ export default function Evaluation({ t, lang }) {
                     fontFamily: F.sans,
                   }}
                 >
-                  {te.bestPerformerSub || "ሆኖ ተመርጧል"} ·{" "}
-                  {sortedMembers[0]?.total || 0} {te.points || "pts"}
+                  {teKey("bestPerformerSub", "has been selected")} ·{" "}
+                  {sortedMembers[0]?.total || 0} {teKey("points", "pts")}
                 </div>
               </div>
 
@@ -1936,7 +2019,7 @@ export default function Evaluation({ t, lang }) {
                   }}
                 >
                   <FiPenTool size={14} />
-                  {te.signaturesTitle || "ፊርማዎች / Digital Signatures"}
+                  {teKey("signaturesTitle", "Digital Signatures")}
                 </div>
                 <div
                   style={{
@@ -1972,11 +2055,11 @@ export default function Evaluation({ t, lang }) {
                       }}
                     >
                       <FiStar size={12} />
-                      {te.teamLeaderLabel || "ቡድን መሪ / Team Leader"}
+                      {teKey("teamLeaderLabel", "Team Leader")}
                     </div>
                     <input
                       type="text"
-                      placeholder={te.namePlaceholder || "ስም / Name"}
+                      placeholder={teKey("namePlaceholder", "Name")}
                       style={{
                         width: "100%",
                         border: `1px solid ${C.border}`,
@@ -1995,6 +2078,7 @@ export default function Evaluation({ t, lang }) {
                     <SignatureCanvas
                       onSave={(data) => handleSignatureSave("teamLeader", data)}
                       value={signatures.teamLeader}
+                      t={t}
                     />
                   </div>
 
@@ -2021,7 +2105,7 @@ export default function Evaluation({ t, lang }) {
                           letterSpacing: 0.5,
                         }}
                       >
-                        {te.memberLabel || "ተመዛኝ ፈፃሚ"} {idx + 1}
+                        {teKey("memberLabel", "Team Member")} {idx + 1}
                       </div>
                       <div
                         style={{
@@ -2043,6 +2127,7 @@ export default function Evaluation({ t, lang }) {
                       <SignatureCanvas
                         onSave={(data) => handleSignatureSave(name, data)}
                         value={signatures[name]}
+                        t={t}
                       />
                     </div>
                   ))}
@@ -2070,7 +2155,7 @@ export default function Evaluation({ t, lang }) {
                     }}
                   >
                     <FiCalendar size={12} />
-                    {te.dateLabel || "ቀን / Date:"}
+                    {teKey("dateLabel", "Date:")}
                   </span>
                   <span
                     style={{
@@ -2144,7 +2229,7 @@ export default function Evaluation({ t, lang }) {
                           fontFamily: F.sans,
                         }}
                       >
-                        AI Evaluation Insights
+                        {teKey("aiInsights", "AI Evaluation Insights")}
                       </h4>
                       <p
                         style={{
@@ -2153,8 +2238,10 @@ export default function Evaluation({ t, lang }) {
                           color: C.muted,
                         }}
                       >
-                        Advanced AI analysis of team performance with
-                        recommendations
+                        {teKey(
+                          "aiInsightsDesc",
+                          "Advanced AI analysis of team performance with recommendations",
+                        )}
                       </p>
                     </div>
                   </div>
@@ -2179,7 +2266,7 @@ export default function Evaluation({ t, lang }) {
                       }}
                     >
                       <FiAward size={12} />
-                      AI Powered
+                      {teKey("aiPowered", "AI Powered")}
                     </span>
                     {evaluationId && (
                       <span
@@ -2196,7 +2283,7 @@ export default function Evaluation({ t, lang }) {
                         }}
                       >
                         <FiCheck size={12} />
-                        {totalMembers} Members
+                        {totalMembers} {tcKey("members", "Members")}
                       </span>
                     )}
                   </div>
@@ -2205,7 +2292,8 @@ export default function Evaluation({ t, lang }) {
                 {/* AI Evaluation Helper Component */}
                 <AIEvaluationHelper
                   evaluationData={{
-                    teamName: teamName || "Untitled Team",
+                    teamName:
+                      teamName || teKey("untitledTeam", "Untitled Team"),
                     members: members.filter((m) => m.trim() !== ""),
                     totalScores: sortedMembers.map((m) => ({
                       member: m.name,
@@ -2233,7 +2321,13 @@ export default function Evaluation({ t, lang }) {
                     }),
                   }}
                   onApplyFeedback={(feedback) => {
-                    showToast("AI feedback generated successfully!", "success");
+                    showToast(
+                      teKey(
+                        "aiFeedbackGenerated",
+                        "AI feedback generated successfully!",
+                      ),
+                      "success",
+                    );
                     console.log("AI Feedback:", feedback);
 
                     if (feedback && feedback.individualFeedback) {
@@ -2251,7 +2345,15 @@ export default function Evaluation({ t, lang }) {
                         }
                       });
                       showToast(
-                        `✅ Applied AI feedback for ${feedback.individualFeedback.length} member(s)`,
+                        (
+                          teKey(
+                            "aiFeedbackApplied",
+                            "✅ Applied AI feedback for {count} member(s)",
+                          ) || "✅ Applied AI feedback for {count} member(s)"
+                        ).replace(
+                          "{count}",
+                          feedback.individualFeedback.length,
+                        ),
                         "success",
                       );
                     }
@@ -2295,7 +2397,10 @@ export default function Evaluation({ t, lang }) {
                               color: C.dark,
                             }}
                           >
-                            Performance Distribution
+                            {teKey(
+                              "performanceDistribution",
+                              "Performance Distribution",
+                            )}
                           </span>
                         </div>
                         <div
@@ -2393,10 +2498,16 @@ export default function Evaluation({ t, lang }) {
                           }}
                         >
                           <span>
-                            Range: {lowestScore} - {highestScore}
+                            {teKey("range", "Range")}: {lowestScore} -{" "}
+                            {highestScore}
                           </span>
-                          <span>Gap: {highestScore - lowestScore} pts</span>
-                          <span>Avg: {averageScore}</span>
+                          <span>
+                            {teKey("gap", "Gap")}: {highestScore - lowestScore}{" "}
+                            {teKey("points", "pts")}
+                          </span>
+                          <span>
+                            {tcKey("avg", "Avg")}: {averageScore}
+                          </span>
                         </div>
                       </div>
 
@@ -2426,7 +2537,7 @@ export default function Evaluation({ t, lang }) {
                               color: C.dark,
                             }}
                           >
-                            AI Recommendations
+                            {teKey("aiRecommendations", "AI Recommendations")}
                           </span>
                         </div>
                         <div
@@ -2439,33 +2550,65 @@ export default function Evaluation({ t, lang }) {
                           <ul style={{ margin: 0, paddingLeft: "16px" }}>
                             {averageScore < 70 && (
                               <li>
-                                <strong>Training needed:</strong> Average score
-                                below 70. Consider additional training sessions.
+                                <strong>
+                                  {teKey("trainingNeeded", "Training needed")}:
+                                </strong>{" "}
+                                {teKey(
+                                  "trainingNeededDesc",
+                                  "Average score below 70. Consider additional training sessions.",
+                                )}
                               </li>
                             )}
                             {highestScore - lowestScore > 30 && (
                               <li>
-                                <strong>Performance gap:</strong>{" "}
-                                {highestScore - lowestScore}pt gap detected.
-                                Consider mentorship program.
+                                <strong>
+                                  {teKey("performanceGap", "Performance gap")}:
+                                </strong>{" "}
+                                {highestScore - lowestScore}
+                                {teKey(
+                                  "pointGap",
+                                  "pt gap detected. Consider mentorship program.",
+                                )}
                               </li>
                             )}
                             {sortedMembers.length > 5 && (
                               <li>
-                                <strong>Team optimization:</strong> Large team (
-                                {sortedMembers.length}). Consider sub-teams.
+                                <strong>
+                                  {teKey(
+                                    "teamOptimization",
+                                    "Team optimization",
+                                  )}
+                                  :
+                                </strong>{" "}
+                                {teKey(
+                                  "teamOptimizationDesc",
+                                  "Large team ({count}). Consider sub-teams.",
+                                ).replace("{count}", sortedMembers.length)}
                               </li>
                             )}
                             {averageScore >= 80 && (
                               <li>
-                                <strong>Excellent performance:</strong> Avg (
-                                {averageScore}) high. Consider recognition
-                                program.
+                                <strong>
+                                  {teKey(
+                                    "excellentPerformance",
+                                    "Excellent performance",
+                                  )}
+                                  :
+                                </strong>{" "}
+                                {teKey(
+                                  "excellentPerformanceDesc",
+                                  "Avg ({avg}) high. Consider recognition program.",
+                                ).replace("{avg}", averageScore)}
                               </li>
                             )}
                             <li>
-                              <strong>Review criteria:</strong> Ensure
-                              consistent application across all members.
+                              <strong>
+                                {teKey("reviewCriteria", "Review criteria")}:
+                              </strong>{" "}
+                              {teKey(
+                                "reviewCriteriaDesc",
+                                "Ensure consistent application across all members.",
+                              )}
                             </li>
                           </ul>
                         </div>
@@ -2497,7 +2640,7 @@ export default function Evaluation({ t, lang }) {
                               color: C.dark,
                             }}
                           >
-                            Key Insights
+                            {teKey("keyInsights", "Key Insights")}
                           </span>
                         </div>
                         <div
@@ -2514,9 +2657,10 @@ export default function Evaluation({ t, lang }) {
                             }}
                           >
                             <span style={{ fontWeight: 600 }}>
-                              Top Performer:
+                              {teKey("topPerformer", "Top Performer")}:
                             </span>{" "}
-                            {bestPerformer} ({highestScore} pts)
+                            {bestPerformer} ({highestScore}{" "}
+                            {teKey("points", "pts")})
                           </div>
                           <div
                             style={{
@@ -2525,11 +2669,17 @@ export default function Evaluation({ t, lang }) {
                             }}
                           >
                             <span style={{ fontWeight: 600 }}>
-                              Area for Growth:
+                              {teKey("areaForGrowth", "Area for Growth")}:
                             </span>{" "}
                             {lowestScore > 60
-                              ? "Maintain current performance levels"
-                              : "Significant improvement needed"}
+                              ? teKey(
+                                  "maintainPerformance",
+                                  "Maintain current performance levels",
+                                )
+                              : teKey(
+                                  "significantImprovement",
+                                  "Significant improvement needed",
+                                )}
                           </div>
                           <div
                             style={{
@@ -2538,19 +2688,31 @@ export default function Evaluation({ t, lang }) {
                             }}
                           >
                             <span style={{ fontWeight: 600 }}>
-                              Team Strength:
+                              {teKey("teamStrength", "Team Strength")}:
                             </span>{" "}
                             {averageScore >= 75
-                              ? "Strong collective performance"
-                              : "Opportunity for team building"}
+                              ? teKey(
+                                  "strongCollective",
+                                  "Strong collective performance",
+                                )
+                              : teKey(
+                                  "opportunityTeamBuilding",
+                                  "Opportunity for team building",
+                                )}
                           </div>
                           <div style={{ wordBreak: "break-word" }}>
                             <span style={{ fontWeight: 600 }}>
-                              Recommendation:
+                              {teKey("recommendation", "Recommendation")}:
                             </span>{" "}
                             {averageScore >= 80
-                              ? "Focus on sustaining excellence and innovation"
-                              : "Implement targeted development programs"}
+                              ? teKey(
+                                  "sustainExcellence",
+                                  "Focus on sustaining excellence and innovation",
+                                )
+                              : teKey(
+                                  "implementDevelopment",
+                                  "Implement targeted development programs",
+                                )}
                           </div>
                         </div>
                       </div>
@@ -2561,7 +2723,7 @@ export default function Evaluation({ t, lang }) {
             </div>
           )}
 
-          {/* ─── Action Buttons - Inline on all devices ─── */}
+          {/* ─── Action Buttons ─── */}
           <div
             style={{
               display: "flex",
@@ -2602,12 +2764,16 @@ export default function Evaluation({ t, lang }) {
                     size={16}
                     style={{ animation: "spin 1s linear infinite" }}
                   />
-                  <span className="save-text">Saving...</span>
+                  <span className="save-text">
+                    {tcKey("saving", "Saving...")}
+                  </span>
                 </>
               ) : (
                 <>
                   <FiSave size={16} />
-                  <span className="save-text">Save Evaluation</span>
+                  <span className="save-text">
+                    {teKey("save", "Save Evaluation")}
+                  </span>
                 </>
               )}
               <style>{`
@@ -2619,7 +2785,7 @@ export default function Evaluation({ t, lang }) {
               `}</style>
             </button>
 
-            {/* Export button - Icon only on mobile, text + icon on desktop */}
+            {/* Export button */}
             <button
               style={{
                 background: "#dc2626",
@@ -2655,7 +2821,9 @@ export default function Evaluation({ t, lang }) {
               }}
             >
               <FiDownload size={16} />
-              <span className="export-text">Export PDF</span>
+              <span className="export-text">
+                {teKey("export", "Export PDF")}
+              </span>
               <style>{`
                 @media (max-width: 480px) {
                   .export-text {
@@ -2679,7 +2847,7 @@ export default function Evaluation({ t, lang }) {
               onClick={resetForm}
             >
               <FiRefreshCw size={16} />
-              <span className="reset-text">{te.reset || "Reset"}</span>
+              <span className="reset-text">{teKey("reset", "Reset")}</span>
               <style>{`
                 @media (max-width: 480px) {
                   .reset-text {
@@ -2714,7 +2882,7 @@ export default function Evaluation({ t, lang }) {
                       color: C.dark,
                     }}
                   >
-                    AI Evaluation Narrative
+                    {teKey("aiNarrative", "AI Evaluation Narrative")}
                   </span>
                 </div>
                 <label
@@ -2733,7 +2901,7 @@ export default function Evaluation({ t, lang }) {
                     onChange={(e) => setIncludeAINarrative(e.target.checked)}
                     style={{ cursor: "pointer" }}
                   />
-                  Include in report
+                  {teKey("includeInReport", "Include in report")}
                 </label>
               </div>
 
@@ -2741,7 +2909,7 @@ export default function Evaluation({ t, lang }) {
                 <AISummary
                   fetchFn={(id) => aiAPI.getEvaluationSummary(id, null)}
                   args={[evaluationId]}
-                  label="AI Evaluation Narrative"
+                  label={teKey("aiNarrative", "AI Evaluation Narrative")}
                   formatResult={formatAINarrative}
                   onContentGenerated={(content) =>
                     setAiNarrativeContent(content)

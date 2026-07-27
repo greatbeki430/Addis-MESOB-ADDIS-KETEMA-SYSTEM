@@ -6,7 +6,6 @@ import { C, F } from "../../styles/theme";
 import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
-import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
 import {
   FiDownload,
   FiFileText,
@@ -21,13 +20,22 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
 export default function ReportExport({ sessionId }) {
-  const { language } = useLanguage();
+  const { t } = useLanguage();
   const [exporting, setExporting] = useState(false);
   const [reportType, setReportType] = useState("attendance");
   const [exportFormat, setExportFormat] = useState("pdf");
 
-  // Get translations based on language
-  const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
+  // Translation helper for Golden Monday keys
+  const gt = (key, fallback = key) => {
+    const value = t(`goldenMonday.${key}`);
+    return value === `goldenMonday.${key}` ? fallback : value;
+  };
+
+  // Translation helper for common keys
+  const ct = (key, fallback = key) => {
+    const value = t(`common.${key}`);
+    return value === `common.${key}` ? fallback : value;
+  };
 
   const [dateRange, setDateRange] = useState(() => {
     const now = new Date();
@@ -43,17 +51,17 @@ export default function ReportExport({ sessionId }) {
   const reportTypes = [
     {
       value: "attendance",
-      label: t.attendanceReport || "Attendance Report",
+      label: gt("attendanceReport", "Attendance Report"),
       icon: <FiUsers size={14} />,
     },
     {
       value: "sessions",
-      label: t.sessionsReport || "Sessions Report",
+      label: gt("sessionsReport", "Sessions Report"),
       icon: <FiFileText size={14} />,
     },
     {
       value: "gallery",
-      label: t.galleryReport || "Gallery Report",
+      label: gt("galleryReport", "Gallery Report"),
       icon: <FiCamera size={14} />,
     },
   ];
@@ -70,7 +78,7 @@ export default function ReportExport({ sessionId }) {
       case "attendance": {
         const attendanceRes = await goldenMondayAPI.getAttendance(sessionId);
         return {
-          title: "Golden Monday Attendance Report",
+          title: gt("attendanceReport", "Attendance Report"),
           date: new Date().toISOString(),
           sessionId: sessionId,
           attendance: attendanceRes.data.attendance || [],
@@ -80,7 +88,7 @@ export default function ReportExport({ sessionId }) {
       case "sessions": {
         const sessionsRes = await goldenMondayAPI.getSessions();
         return {
-          title: "Golden Monday Sessions Report",
+          title: gt("sessionsReport", "Sessions Report"),
           date: new Date().toISOString(),
           total: sessionsRes.data.length,
           sessions: sessionsRes.data,
@@ -89,7 +97,7 @@ export default function ReportExport({ sessionId }) {
       case "gallery": {
         const galleryRes = await goldenMondayAPI.getGallery({ limit: 1000 });
         return {
-          title: "Golden Monday Gallery Report",
+          title: gt("galleryReport", "Gallery Report"),
           date: new Date().toISOString(),
           total: galleryRes.data.photos.length,
           photos: galleryRes.data.photos,
@@ -119,7 +127,7 @@ export default function ReportExport({ sessionId }) {
       // Title
       doc.setFontSize(18);
       doc.setTextColor(26, 58, 173);
-      doc.text(data.title || "Golden Monday Report", pageWidth / 2, 20, {
+      doc.text(data.title || gt("reportTitle", "Report"), pageWidth / 2, 20, {
         align: "center",
       });
 
@@ -127,7 +135,7 @@ export default function ReportExport({ sessionId }) {
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
       doc.text(
-        `Generated: ${new Date(data.date).toLocaleString()}`,
+        `${ct("generated", "Generated")}: ${new Date(data.date).toLocaleString()}`,
         pageWidth / 2,
         28,
         { align: "center" },
@@ -139,23 +147,23 @@ export default function ReportExport({ sessionId }) {
       if (data.attendance) {
         doc.setFontSize(12);
         doc.setTextColor(0, 0, 0);
-        doc.text("Attendance Summary", 14, yPos);
+        doc.text(gt("attendanceReport", "Attendance Report"), 14, yPos);
         yPos += 6;
 
         const summaryData = [
-          ["Metric", "Value"],
+          [ct("metric", "Metric"), ct("value", "Value")],
           [
-            "Total Employees",
+            ct("total", "Total"),
             data.stats?.totalEmployees || data.attendance.length,
           ],
-          ["Present", data.stats?.attendedCount || 0],
+          [gt("present", "Present"), data.stats?.attendedCount || 0],
           [
-            "Absent",
+            gt("absent", "Absent"),
             (data.stats?.totalEmployees || data.attendance.length) -
               (data.stats?.attendedCount || 0),
           ],
           [
-            "Attendance Rate",
+            gt("attendanceRate", "Attendance Rate"),
             data.stats?.totalEmployees > 0
               ? `${Math.round((data.stats?.attendedCount / data.stats?.totalEmployees) * 100)}%`
               : "0%",
@@ -174,20 +182,32 @@ export default function ReportExport({ sessionId }) {
 
         // Detailed Attendance Table
         doc.setFontSize(12);
-        doc.text("Detailed Attendance", 14, yPos);
+        doc.text(gt("detailedAttendance", "Detailed Attendance"), 14, yPos);
         yPos += 6;
 
         const tableData = data.attendance.map((a) => [
-          a.name || "Unknown",
-          a.department || "N/A",
-          a.email || "N/A",
-          a.attended ? "✅ Present" : "❌ Absent",
-          a.signature ? "✓ Signed" : "✗ Not Signed",
+          a.name || ct("unknown", "Unknown"),
+          a.department || ct("na", "N/A"),
+          a.email || ct("na", "N/A"),
+          a.attended
+            ? `✅ ${gt("present", "Present")}`
+            : `❌ ${gt("absent", "Absent")}`,
+          a.signature
+            ? `✓ ${gt("signed", "Signed")}`
+            : `✗ ${gt("notSigned", "Not Signed")}`,
         ]);
 
         autoTable(doc, {
           startY: yPos,
-          head: [["Name", "Department", "Email", "Status", "Signature"]],
+          head: [
+            [
+              ct("name", "Name"),
+              ct("department", "Department"),
+              ct("email", "Email"),
+              ct("status", "Status"),
+              gt("signature", "Signature"),
+            ],
+          ],
           body: tableData,
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
@@ -206,20 +226,28 @@ export default function ReportExport({ sessionId }) {
       if (data.sessions) {
         yPos = doc.lastAutoTable?.finalY + 8 || 35;
         doc.setFontSize(12);
-        doc.text("Sessions Summary", 14, yPos);
+        doc.text(gt("sessionsReport", "Sessions Report"), 14, yPos);
         yPos += 6;
 
         const sessionData = data.sessions.map((s) => [
-          s.presentationTitle || s.title || "Untitled",
+          s.presentationTitle || s.title || gt("untitled", "Untitled"),
           new Date(s.date).toLocaleDateString(),
-          s.presenterName || "N/A",
-          s.averageRating ? `${s.averageRating.toFixed(1)} ★` : "N/A",
-          s.status || "Unknown",
+          s.presenterName || ct("na", "N/A"),
+          s.averageRating ? `${s.averageRating.toFixed(1)} ★` : ct("na", "N/A"),
+          s.status || ct("unknown", "Unknown"),
         ]);
 
         autoTable(doc, {
           startY: yPos,
-          head: [["Title", "Date", "Presenter", "Rating", "Status"]],
+          head: [
+            [
+              ct("title", "Title"),
+              ct("date", "Date"),
+              gt("presenter", "Presenter"),
+              ct("rating", "Rating"),
+              ct("status", "Status"),
+            ],
+          ],
           body: sessionData,
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
@@ -231,19 +259,26 @@ export default function ReportExport({ sessionId }) {
       if (data.photos) {
         yPos = doc.lastAutoTable?.finalY + 8 || 35;
         doc.setFontSize(12);
-        doc.text("Gallery Summary", 14, yPos);
+        doc.text(gt("galleryReport", "Gallery Report"), 14, yPos);
         yPos += 6;
 
         const galleryData = data.photos.map((p) => [
-          p.title || "Untitled",
-          p.category || "Other",
+          p.title || gt("untitled", "Untitled"),
+          p.category || gt("other", "Other"),
           new Date(p.createdAt).toLocaleDateString(),
-          p.uploadedByName || "Unknown",
+          p.uploadedByName || ct("unknown", "Unknown"),
         ]);
 
         autoTable(doc, {
           startY: yPos,
-          head: [["Title", "Category", "Date", "Uploaded By"]],
+          head: [
+            [
+              ct("title", "Title"),
+              gt("category", "Category"),
+              ct("date", "Date"),
+              gt("uploadedBy", "Uploaded By"),
+            ],
+          ],
           body: galleryData,
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
@@ -258,7 +293,7 @@ export default function ReportExport({ sessionId }) {
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
         doc.text(
-          `Page ${i} of ${pageCount}`,
+          `${ct("page", "Page")} ${i} ${ct("of", "of")} ${pageCount}`,
           pageWidth / 2,
           doc.internal.pageSize.getHeight() - 10,
           { align: "center" },
@@ -278,51 +313,57 @@ export default function ReportExport({ sessionId }) {
     try {
       const wb = XLSX.utils.book_new();
 
-      // Main sheet with report info
-
       // Attendance data
       if (data.attendance) {
         const attendanceRows = [
           [
-            "Name",
-            "Department",
-            "Email",
-            "Attended",
-            "Signature",
-            "Checked In At",
-            "Feedback",
-            "Rating",
+            ct("name", "Name"),
+            ct("department", "Department"),
+            ct("email", "Email"),
+            gt("attended", "Attended"),
+            gt("signature", "Signature"),
+            gt("checkedInAt", "Checked In At"),
+            ct("feedback", "Feedback"),
+            ct("rating", "Rating"),
           ],
         ];
         data.attendance.forEach((a) => {
           attendanceRows.push([
-            a.name || "Unknown",
-            a.department || "N/A",
-            a.email || "N/A",
-            a.attended ? "Present" : "Absent",
-            a.signature ? "Signed" : "Not Signed",
-            a.checkedInAt ? new Date(a.checkedInAt).toLocaleString() : "N/A",
+            a.name || ct("unknown", "Unknown"),
+            a.department || ct("na", "N/A"),
+            a.email || ct("na", "N/A"),
+            a.attended ? gt("present", "Present") : gt("absent", "Absent"),
+            a.signature
+              ? gt("signed", "Signed")
+              : gt("notSigned", "Not Signed"),
+            a.checkedInAt
+              ? new Date(a.checkedInAt).toLocaleString()
+              : ct("na", "N/A"),
             a.feedback || "",
-            a.rating || "N/A",
+            a.rating || ct("na", "N/A"),
           ]);
         });
 
         const ws = XLSX.utils.aoa_to_sheet(attendanceRows);
-        XLSX.utils.book_append_sheet(wb, ws, "Attendance");
+        XLSX.utils.book_append_sheet(
+          wb,
+          ws,
+          gt("attendanceReport", "Attendance"),
+        );
 
         // Stats sheet
         if (data.stats) {
           const statsRows = [
-            ["Metric", "Value"],
-            ["Total Employees", data.stats.totalEmployees || 0],
-            ["Present", data.stats.attendedCount || 0],
+            [ct("metric", "Metric"), ct("value", "Value")],
+            [ct("total", "Total"), data.stats.totalEmployees || 0],
+            [gt("present", "Present"), data.stats.attendedCount || 0],
             [
-              "Absent",
+              gt("absent", "Absent"),
               (data.stats.totalEmployees || 0) -
                 (data.stats.attendedCount || 0),
             ],
             [
-              "Attendance Rate",
+              gt("attendanceRate", "Attendance Rate"),
               data.stats.totalEmployees > 0
                 ? `${Math.round((data.stats.attendedCount / data.stats.totalEmployees) * 100)}%`
                 : "0%",
@@ -336,40 +377,55 @@ export default function ReportExport({ sessionId }) {
       // Sessions data
       if (data.sessions) {
         const sessionRows = [
-          ["Title", "Date", "Presenter", "Rating", "Status", "Attendees"],
+          [
+            ct("title", "Title"),
+            ct("date", "Date"),
+            gt("presenter", "Presenter"),
+            ct("rating", "Rating"),
+            ct("status", "Status"),
+            gt("attendees", "Attendees"),
+          ],
         ];
         data.sessions.forEach((s) => {
           sessionRows.push([
-            s.presentationTitle || s.title || "Untitled",
+            s.presentationTitle || s.title || gt("untitled", "Untitled"),
             new Date(s.date).toLocaleDateString(),
-            s.presenterName || "N/A",
-            s.averageRating ? `${s.averageRating.toFixed(1)} ★` : "N/A",
-            s.status || "Unknown",
+            s.presenterName || ct("na", "N/A"),
+            s.averageRating
+              ? `${s.averageRating.toFixed(1)} ★`
+              : ct("na", "N/A"),
+            s.status || ct("unknown", "Unknown"),
             s.attendees?.length || 0,
           ]);
         });
 
         const ws = XLSX.utils.aoa_to_sheet(sessionRows);
-        XLSX.utils.book_append_sheet(wb, ws, "Sessions");
+        XLSX.utils.book_append_sheet(wb, ws, gt("sessionsReport", "Sessions"));
       }
 
       // Gallery data
       if (data.photos) {
         const galleryRows = [
-          ["Title", "Category", "Date", "Uploaded By", "URL"],
+          [
+            ct("title", "Title"),
+            gt("category", "Category"),
+            ct("date", "Date"),
+            gt("uploadedBy", "Uploaded By"),
+            gt("url", "URL"),
+          ],
         ];
         data.photos.forEach((p) => {
           galleryRows.push([
-            p.title || "Untitled",
-            p.category || "Other",
+            p.title || gt("untitled", "Untitled"),
+            p.category || gt("other", "Other"),
             new Date(p.createdAt).toLocaleDateString(),
-            p.uploadedByName || "Unknown",
+            p.uploadedByName || ct("unknown", "Unknown"),
             p.url || "",
           ]);
         });
 
         const ws = XLSX.utils.aoa_to_sheet(galleryRows);
-        XLSX.utils.book_append_sheet(wb, ws, "Gallery");
+        XLSX.utils.book_append_sheet(wb, ws, gt("galleryReport", "Gallery"));
       }
 
       // Write file
@@ -393,7 +449,7 @@ export default function ReportExport({ sessionId }) {
               xmlns='http://www.w3.org/TR/REC-html40'>
         <head>
           <meta charset="utf-8">
-          <title>${data.title || "Golden Monday Report"}</title>
+          <title>${data.title || gt("reportTitle", "Report")}</title>
           <!--[if gte mso 9]>
           <xml>
             <w:WordDocument>
@@ -419,9 +475,9 @@ export default function ReportExport({ sessionId }) {
         </head>
         <body>
           <div class="header">
-            <h1>${data.title || "Golden Monday Report"}</h1>
-            <p><strong>Generated:</strong> ${new Date(data.date).toLocaleString()}</p>
-            <p><strong>Report Type:</strong> ${reportType}</p>
+            <h1>${data.title || gt("reportTitle", "Report")}</h1>
+            <p><strong>${ct("generated", "Generated")}:</strong> ${new Date(data.date).toLocaleString()}</p>
+            <p><strong>${gt("reportType", "Report Type")}:</strong> ${reportType}</p>
           </div>
       `;
 
@@ -433,37 +489,37 @@ export default function ReportExport({ sessionId }) {
         const rate = total > 0 ? Math.round((present / total) * 100) : 0;
 
         htmlContent += `
-          <h2>📊 Attendance Summary</h2>
+          <h2>📊 ${gt("attendanceReport", "Attendance Report")}</h2>
           <div class="summary-box">
             <table>
-              <tr><td><strong>Total Employees:</strong></td><td>${total}</td></tr>
-              <tr><td><strong>Present:</strong></td><td>${present}</td></tr>
-              <tr><td><strong>Absent:</strong></td><td>${absent}</td></tr>
-              <tr><td><strong>Attendance Rate:</strong></td><td>${rate}%</td></tr>
+              <tr><td><strong>${ct("total", "Total")}:</strong></td><td>${total}</td></tr>
+              <tr><td><strong>${gt("present", "Present")}:</strong></td><td>${present}</td></tr>
+              <tr><td><strong>${gt("absent", "Absent")}:</strong></td><td>${absent}</td></tr>
+              <tr><td><strong>${gt("attendanceRate", "Attendance Rate")}:</strong></td><td>${rate}%</td></tr>
             </table>
           </div>
 
-          <h2>📋 Detailed Attendance</h2>
+          <h2>📋 ${gt("detailedAttendance", "Detailed Attendance")}</h2>
           <table>
             <tr>
-              <th>Name</th>
-              <th>Department</th>
-              <th>Email</th>
-              <th>Status</th>
-              <th>Signature</th>
-              <th>Checked In</th>
+              <th>${ct("name", "Name")}</th>
+              <th>${ct("department", "Department")}</th>
+              <th>${ct("email", "Email")}</th>
+              <th>${ct("status", "Status")}</th>
+              <th>${gt("signature", "Signature")}</th>
+              <th>${gt("checkedIn", "Checked In")}</th>
             </tr>
         `;
 
         data.attendance.forEach((a) => {
           htmlContent += `
             <tr>
-              <td>${a.name || "Unknown"}</td>
-              <td>${a.department || "N/A"}</td>
-              <td>${a.email || "N/A"}</td>
-              <td class="${a.attended ? "badge-present" : "badge-absent"}">${a.attended ? "✅ Present" : "❌ Absent"}</td>
-              <td>${a.signature ? "✓ Signed" : "✗ Not Signed"}</td>
-              <td>${a.checkedInAt ? new Date(a.checkedInAt).toLocaleString() : "N/A"}</td>
+              <td>${a.name || ct("unknown", "Unknown")}</td>
+              <td>${a.department || ct("na", "N/A")}</td>
+              <td>${a.email || ct("na", "N/A")}</td>
+              <td class="${a.attended ? "badge-present" : "badge-absent"}">${a.attended ? `✅ ${gt("present", "Present")}` : `❌ ${gt("absent", "Absent")}`}</td>
+              <td>${a.signature ? `✓ ${gt("signed", "Signed")}` : `✗ ${gt("notSigned", "Not Signed")}`}</td>
+              <td>${a.checkedInAt ? new Date(a.checkedInAt).toLocaleString() : ct("na", "N/A")}</td>
             </tr>
           `;
         });
@@ -474,25 +530,25 @@ export default function ReportExport({ sessionId }) {
       // Sessions section
       if (data.sessions) {
         htmlContent += `
-          <h2>📅 Sessions Report</h2>
+          <h2>📅 ${gt("sessionsReport", "Sessions Report")}</h2>
           <table>
             <tr>
-              <th>Title</th>
-              <th>Date</th>
-              <th>Presenter</th>
-              <th>Rating</th>
-              <th>Status</th>
+              <th>${ct("title", "Title")}</th>
+              <th>${ct("date", "Date")}</th>
+              <th>${gt("presenter", "Presenter")}</th>
+              <th>${ct("rating", "Rating")}</th>
+              <th>${ct("status", "Status")}</th>
             </tr>
         `;
 
         data.sessions.forEach((s) => {
           htmlContent += `
             <tr>
-              <td>${s.presentationTitle || s.title || "Untitled"}</td>
+              <td>${s.presentationTitle || s.title || gt("untitled", "Untitled")}</td>
               <td>${new Date(s.date).toLocaleDateString()}</td>
-              <td>${s.presenterName || "N/A"}</td>
-              <td>${s.averageRating ? `${s.averageRating.toFixed(1)} ★` : "N/A"}</td>
-              <td>${s.status || "Unknown"}</td>
+              <td>${s.presenterName || ct("na", "N/A")}</td>
+              <td>${s.averageRating ? `${s.averageRating.toFixed(1)} ★` : ct("na", "N/A")}</td>
+              <td>${s.status || ct("unknown", "Unknown")}</td>
             </tr>
           `;
         });
@@ -503,23 +559,23 @@ export default function ReportExport({ sessionId }) {
       // Gallery section
       if (data.photos) {
         htmlContent += `
-          <h2>🖼️ Gallery Report</h2>
+          <h2>🖼️ ${gt("galleryReport", "Gallery Report")}</h2>
           <table>
             <tr>
-              <th>Title</th>
-              <th>Category</th>
-              <th>Date</th>
-              <th>Uploaded By</th>
+              <th>${ct("title", "Title")}</th>
+              <th>${gt("category", "Category")}</th>
+              <th>${ct("date", "Date")}</th>
+              <th>${gt("uploadedBy", "Uploaded By")}</th>
             </tr>
         `;
 
         data.photos.forEach((p) => {
           htmlContent += `
             <tr>
-              <td>${p.title || "Untitled"}</td>
-              <td>${p.category || "Other"}</td>
+              <td>${p.title || gt("untitled", "Untitled")}</td>
+              <td>${p.category || gt("other", "Other")}</td>
               <td>${new Date(p.createdAt).toLocaleDateString()}</td>
-              <td>${p.uploadedByName || "Unknown"}</td>
+              <td>${p.uploadedByName || ct("unknown", "Unknown")}</td>
             </tr>
           `;
         });
@@ -529,7 +585,7 @@ export default function ReportExport({ sessionId }) {
 
       htmlContent += `
           <div class="footer">
-            <p>Generated by Addis MESOB Golden Monday System • ${new Date().toLocaleString()}</p>
+            <p>${gt("footerText", "Generated by Addis MESOB Golden Monday System")} • ${new Date().toLocaleString()}</p>
           </div>
         </body>
         </html>
@@ -570,14 +626,14 @@ export default function ReportExport({ sessionId }) {
 
       if (success) {
         showToast(
-          `${t.exportSuccess || "Report exported successfully!"} (${exportFormat.toUpperCase()})`,
+          `${gt("exportSuccess", "Report exported successfully!")} (${exportFormat.toUpperCase()})`,
           "success",
         );
       }
     } catch (error) {
       console.error("Export failed:", error);
       showToast(
-        `${t.exportError || "Failed to export report"} (${exportFormat.toUpperCase()})`,
+        `${gt("exportError", "Failed to export report")} (${exportFormat.toUpperCase()})`,
         "error",
       );
     } finally {
@@ -657,9 +713,9 @@ export default function ReportExport({ sessionId }) {
               outline: "none",
               fontFamily: F.sans,
             }}
-            aria-label={t.startDate || "Start date"}
+            aria-label={gt("startDate", "Start date")}
           />
-          <span style={{ color: C.muted }}>{t.to || "to"}</span>
+          <span style={{ color: C.muted }}>{ct("to", "to")}</span>
           <input
             type="date"
             value={dateRange.end}
@@ -674,7 +730,7 @@ export default function ReportExport({ sessionId }) {
               outline: "none",
               fontFamily: F.sans,
             }}
-            aria-label={t.endDate || "End date"}
+            aria-label={gt("endDate", "End date")}
           />
         </div>
 
@@ -725,7 +781,7 @@ export default function ReportExport({ sessionId }) {
             opacity: exporting ? 0.6 : 1,
             transition: "all 0.2s ease",
           }}
-          aria-label={t.exportReport || "Export Report"}
+          aria-label={gt("exportReport", "Export Report")}
         >
           {exporting ? (
             <>
@@ -733,12 +789,12 @@ export default function ReportExport({ sessionId }) {
                 size={16}
                 style={{ animation: "spin 1s linear infinite" }}
               />
-              {t.exporting || "Exporting..."}
+              {gt("exporting", "Exporting...")}
             </>
           ) : (
             <>
               <FiDownload size={16} />
-              {t.exportReport || `Export (${exportFormat.toUpperCase()})`}
+              {gt("exportReport", "Export Report")}
             </>
           )}
         </button>

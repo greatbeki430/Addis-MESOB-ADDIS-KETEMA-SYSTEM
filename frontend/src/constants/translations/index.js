@@ -15,6 +15,7 @@ import { servicesTranslations } from "./services";
 import { userManagementTranslations } from "./userManagement";
 import { employeeManagementTranslations } from "./employeeManagement";
 import { documentVaultTranslations } from "./documentVault";
+import { landingTranslations } from "./landing";
 
 // ✅ CORRECTED: Import existing Golden Monday translations from the original location
 // NOT from "./goldenMonday" - that file should be deleted
@@ -36,7 +37,7 @@ export const modularTranslations = {
     ...userManagementTranslations.en,
     ...employeeManagementTranslations.en,
     ...documentVaultTranslations.en,
-    // Golden Monday comes from existing file - NO DUPLICATION
+    ...landingTranslations.en,
     goldenMonday: goldenMondayTranslations.en,
   },
   am: {
@@ -53,6 +54,7 @@ export const modularTranslations = {
     ...userManagementTranslations.am,
     ...employeeManagementTranslations.am,
     ...documentVaultTranslations.am,
+    ...landingTranslations.am,
     goldenMonday: goldenMondayTranslations.am,
   },
   om: {
@@ -69,6 +71,7 @@ export const modularTranslations = {
     ...userManagementTranslations.om,
     ...employeeManagementTranslations.om,
     ...documentVaultTranslations.om,
+    ...landingTranslations.om,
     goldenMonday: goldenMondayTranslations.om,
   },
 };

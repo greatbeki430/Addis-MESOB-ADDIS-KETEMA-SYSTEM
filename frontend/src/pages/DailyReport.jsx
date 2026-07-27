@@ -6,7 +6,7 @@ import { dailyReportAPI, serviceAPI } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { generateDailyReportPDF } from "../utils/pdf/reports/dailyReport";
-import { AISummary, AIReportAssistant } from "../components/ai"; // ✅ Updated imports
+import { AISummary, AIReportAssistant } from "../components/ai";
 import { aiAPI } from "../services/api";
 import {
   FiCalendar,
@@ -115,7 +115,7 @@ export default function DailyReport({ t, lang }) {
           setSavedReportId(null);
         } else {
           console.error("Failed to load daily report:", error);
-          showToast("Failed to load daily report", "error");
+          showToast(td("saveError", "Failed to load daily report"), "error");
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
         }
       } finally {
@@ -185,13 +185,19 @@ export default function DailyReport({ t, lang }) {
       setSaving(true);
       const entries = rows.filter((r) => r.dept || r.service);
       if (entries.length === 0) {
-        showToast("Please add at least one service entry", "warning");
+        showToast(
+          td("addServiceEntry", "Please add at least one service entry"),
+          "warning",
+        );
         return;
       }
       const invalidRows = entries.filter((r) => !r.dept || !r.service);
       if (invalidRows.length > 0) {
         showToast(
-          "Please fill in both Department and Service for all rows",
+          td(
+            "fillDeptService",
+            "Please fill in both Department and Service for all rows",
+          ),
           "warning",
         );
         return;
@@ -204,11 +210,12 @@ export default function DailyReport({ t, lang }) {
         team: user?.team || null,
       });
       setSavedReportId(response?.data?._id || null);
-      showToast("✅ Report saved successfully!", "success");
+      showToast(td("savedSuccess", "✅ Report saved successfully!"), "success");
     } catch (error) {
       console.error("Failed to save report:", error);
       showToast(
-        error.response?.data?.message || "Failed to save report",
+        error.response?.data?.message ||
+          td("saveError", "Failed to save report"),
         "error",
       );
     } finally {
@@ -223,15 +230,21 @@ export default function DailyReport({ t, lang }) {
       const exportData = rows.filter((r) => r.dept || r.service);
 
       if (exportData.length === 0) {
-        showToast("No data to export", "warning");
+        showToast(td("noDataToExport", "No data to export"), "warning");
         return;
       }
 
       await generateDailyReportPDF(exportData, date, t);
-      showToast("✅ PDF exported successfully!", "success");
+      showToast(
+        td("exportSuccess", "✅ PDF exported successfully!"),
+        "success",
+      );
     } catch (error) {
       console.error("Failed to export PDF:", error);
-      showToast("Failed to export PDF: " + error.message, "error");
+      showToast(
+        td("exportError", "Failed to export PDF: ") + error.message,
+        "error",
+      );
     } finally {
       setExporting(false);
     }
@@ -463,7 +476,9 @@ export default function DailyReport({ t, lang }) {
                     <th style={{ ...th, textAlign: "center" }}>
                       {td("colTotal", "Total")}
                     </th>
-                    <th style={{ ...th, textAlign: "center", width: 40 }}>✕</th>
+                    <th style={{ ...th, textAlign: "center", width: 40 }}>
+                      <FiX size={14} color={C.light} />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -549,11 +564,14 @@ export default function DailyReport({ t, lang }) {
                               ))
                             ) : r.dept ? (
                               <option value="" disabled>
-                                No services for this dept
+                                {td("noServices", "No services for this dept")}
                               </option>
                             ) : (
                               <option value="" disabled>
-                                Select a department first
+                                {td(
+                                  "selectDeptFirst",
+                                  "Select a department first",
+                                )}
                               </option>
                             )}
                           </select>
@@ -713,10 +731,13 @@ export default function DailyReport({ t, lang }) {
                       (sum, e) => sum + (e.total || 0),
                       0,
                     ),
-                    teamName: user?.team || "My Team",
+                    teamName: user?.team || tcm("myTeam", "My Team"),
                   }}
                   onApply={(text) => {
-                    showToast("AI suggestion applied to report!", "success");
+                    showToast(
+                      td("aiInsight", "AI suggestion applied to report!"),
+                      "success",
+                    );
                     console.log("Applied suggestion:", text);
                   }}
                 />
@@ -769,11 +790,11 @@ export default function DailyReport({ t, lang }) {
                       size={16}
                       style={{ animation: "spin 1s linear infinite" }}
                     />{" "}
-                    Exporting...
+                    {td("exporting", "Exporting...")}
                   </>
                 ) : (
                   <>
-                    <FiDownload size={16} /> Export PDF
+                    <FiDownload size={16} /> {td("exportPdf", "Export PDF")}
                   </>
                 )}
               </button>
@@ -798,7 +819,7 @@ export default function DailyReport({ t, lang }) {
                       size={16}
                       style={{ animation: "spin 1s linear infinite" }}
                     />{" "}
-                    Saving...
+                    {tcm("saving", "Saving...")}
                   </>
                 ) : (
                   <>
@@ -813,7 +834,7 @@ export default function DailyReport({ t, lang }) {
               <AISummary
                 fetchFn={(id) => aiAPI.getDailyInsight(id, null)}
                 args={[savedReportId]}
-                label="AI Daily Insight"
+                label={td("aiInsight", "AI Daily Insight")}
               />
             )}
           </>

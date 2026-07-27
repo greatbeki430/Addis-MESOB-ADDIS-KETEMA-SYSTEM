@@ -3,6 +3,7 @@ import { useState, useRef } from "react";
 import { C, F, btn, card, flex, shadows, radius, inp } from "../styles/theme";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
+import { useLanguage } from "../hooks/useLanguage";
 import { authAPI, uploadAPI } from "../services/api";
 import {
   FiUser,
@@ -23,6 +24,7 @@ import "./Profile.css";
 export default function Profile() {
   const { user, isAdmin, isSuperAdmin, isLeader, refreshUser } = useAuth();
   const { showToast } = useToast();
+  const { t } = useLanguage();
   const fileInputRef = useRef(null);
 
   const [saving, setSaving] = useState(false);
@@ -60,12 +62,12 @@ export default function Profile() {
 
   const photoPreview = photoPreviewState;
 
-  // Role helpers
+  // Role helpers with translations
   const getUserRole = () => {
-    if (isSuperAdmin) return "Super Admin";
-    if (isAdmin) return "Admin";
-    if (isLeader) return "Team Leader";
-    return "Employee";
+    if (isSuperAdmin) return t("profile.roleSuperAdmin");
+    if (isAdmin) return t("profile.roleAdmin");
+    if (isLeader) return t("profile.roleTeamLeader");
+    return t("profile.roleEmployee");
   };
 
   const getRoleIcon = () => {
@@ -97,7 +99,7 @@ export default function Profile() {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        showToast("Photo must be less than 5MB", "error");
+        showToast(t("profile.photoTooLarge"), "error");
         e.target.value = "";
         return;
       }
@@ -146,7 +148,7 @@ export default function Profile() {
       };
 
       await authAPI.updateProfile(updateData);
-      showToast("Profile updated successfully!", "success");
+      showToast(t("profile.updateSuccess"), "success");
       setIsEditing(false);
       setPhotoFile(null);
 
@@ -156,7 +158,7 @@ export default function Profile() {
     } catch (error) {
       console.error("Failed to update profile:", error);
       showToast(
-        error.response?.data?.message || "Failed to update profile",
+        error.response?.data?.message || t("profile.updateError"),
         "error",
       );
     } finally {
@@ -171,6 +173,16 @@ export default function Profile() {
     setPhotoFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  // Format date for member since
+  const formatMemberSince = () => {
+    if (!user?.joinDate) return t("profile.noData");
+    try {
+      return new Date(user.joinDate).toLocaleDateString();
+    } catch {
+      return t("profile.noData");
     }
   };
 
@@ -202,7 +214,7 @@ export default function Profile() {
             }}
           >
             <FiUser size={24} color={C.primary} />
-            My Profile
+            {t("profile.title")}
           </h1>
           <p
             style={{
@@ -212,13 +224,13 @@ export default function Profile() {
               fontFamily: F.sans,
             }}
           >
-            Manage your personal information and preferences
+            {t("profile.subtitle")}
           </p>
         </div>
         {!isEditing && (
           <button onClick={() => setIsEditing(true)} style={btn.primary}>
             <FiEdit2 size={16} style={{ marginRight: 6 }} />
-            Edit Profile
+            {t("profile.editProfileBtn")}
           </button>
         )}
       </div>
@@ -239,7 +251,7 @@ export default function Profile() {
               {photoPreview ? (
                 <img
                   src={photoPreview}
-                  alt="Profile"
+                  alt={t("profile.title")}
                   style={{
                     width: 120,
                     height: 120,
@@ -257,7 +269,7 @@ export default function Profile() {
                     (e.currentTarget.style.transform = "scale(1)")
                   }
                   onClick={() => window.open(photoPreview, "_blank")}
-                  title="Click to view full size"
+                  title={t("common.view")}
                 />
               ) : (
                 <div
@@ -308,6 +320,7 @@ export default function Profile() {
                     onMouseLeave={(e) => {
                       e.currentTarget.style.transform = "scale(1)";
                     }}
+                    title={t("profile.uploadPhoto")}
                   >
                     <FiUpload size={16} />
                     <input
@@ -360,8 +373,20 @@ export default function Profile() {
                 onMouseEnter={(e) => (e.currentTarget.style.color = "#b91c1c")}
                 onMouseLeave={(e) => (e.currentTarget.style.color = C.red)}
               >
-                <FiX size={14} /> Remove Photo
+                <FiX size={14} /> {t("profile.removePhoto")}
               </button>
+            )}
+            {isEditing && !photoPreview && (
+              <div
+                style={{
+                  marginTop: 8,
+                  fontSize: 11,
+                  color: C.muted,
+                  textAlign: "center",
+                }}
+              >
+                {t("profile.photoUploadHint")}
+              </div>
             )}
           </div>
 
@@ -428,7 +453,7 @@ export default function Profile() {
                   {user?.totalTasks || 0}
                 </div>
                 <div style={{ fontSize: 12, color: C.muted }}>
-                  Tasks Completed
+                  {t("profile.tasksCompleted")}
                 </div>
               </div>
             </div>
@@ -460,7 +485,7 @@ export default function Profile() {
                   ${user?.totalEarnings || "0.00"}
                 </div>
                 <div style={{ fontSize: 12, color: C.muted }}>
-                  Total Earnings
+                  {t("profile.totalEarnings")}
                 </div>
               </div>
             </div>
@@ -489,11 +514,11 @@ export default function Profile() {
               <FiClock size={20} color={C.muted} />
               <div>
                 <div style={{ fontSize: 20, fontWeight: 700, color: C.dark }}>
-                  {user?.joinDate
-                    ? new Date(user.joinDate).toLocaleDateString()
-                    : "N/A"}
+                  {formatMemberSince()}
                 </div>
-                <div style={{ fontSize: 12, color: C.muted }}>Member Since</div>
+                <div style={{ fontSize: 12, color: C.muted }}>
+                  {t("profile.memberSince")}
+                </div>
               </div>
             </div>
           </div>
@@ -516,7 +541,7 @@ export default function Profile() {
                   color: C.dark,
                 }}
               >
-                Full Name *
+                {t("profile.fullName")} *
               </label>
               {isEditing ? (
                 <input
@@ -551,7 +576,7 @@ export default function Profile() {
                   }}
                 >
                   <FiUser size={16} color={C.muted} />
-                  {formData.name || "Not set"}
+                  {formData.name || t("profile.noData")}
                 </div>
               )}
             </div>
@@ -566,7 +591,7 @@ export default function Profile() {
                   color: C.dark,
                 }}
               >
-                Email *
+                {t("profile.email")} *
               </label>
               {isEditing ? (
                 <input
@@ -601,7 +626,7 @@ export default function Profile() {
                   }}
                 >
                   <FiMail size={16} color={C.muted} />
-                  {formData.email || "Not set"}
+                  {formData.email || t("profile.noData")}
                 </div>
               )}
             </div>
@@ -616,7 +641,7 @@ export default function Profile() {
                   color: C.dark,
                 }}
               >
-                Phone
+                {t("profile.phone")}
               </label>
               {isEditing ? (
                 <input
@@ -651,7 +676,7 @@ export default function Profile() {
                   }}
                 >
                   <FiPhone size={16} color={C.muted} />
-                  {formData.phone || "Not set"}
+                  {formData.phone || t("profile.noData")}
                 </div>
               )}
             </div>
@@ -666,7 +691,7 @@ export default function Profile() {
                   color: C.dark,
                 }}
               >
-                Role
+                {t("profile.role")}
               </label>
               <div
                 style={{
@@ -704,7 +729,7 @@ export default function Profile() {
                 style={btn.secondary}
                 disabled={saving}
               >
-                Cancel
+                {t("profile.cancelBtn")}
               </button>
               <button
                 type="submit"
@@ -724,12 +749,14 @@ export default function Profile() {
                       size={16}
                       style={{ animation: "spin 0.8s linear infinite" }}
                     />
-                    {uploadingPhoto ? "Uploading Photo..." : "Saving..."}
+                    {uploadingPhoto
+                      ? t("profile.uploadingPhoto")
+                      : t("profile.saving")}
                   </>
                 ) : (
                   <>
                     <FiSave size={16} />
-                    Save Changes
+                    {t("profile.saveChanges")}
                   </>
                 )}
               </button>

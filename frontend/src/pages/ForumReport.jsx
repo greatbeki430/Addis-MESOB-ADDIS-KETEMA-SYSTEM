@@ -22,6 +22,7 @@ import { aiAPI } from "../services/api";
 import { teamAPI } from "../services/api";
 import { AISummary } from "../components/ai";
 import { useToast } from "../hooks/useToast";
+import { useLanguage } from "../hooks/useLanguage";
 
 // ✅ React Icons
 import {
@@ -61,8 +62,10 @@ const FONT_SIZES = {
 
 // ─── Team Selector Component ─────────────────────────────────
 const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
-  const tf = t?.forum || {};
   const [searchTerm, setSearchTerm] = useState("");
+
+  // Translation helper
+  const tf = (key, fallback) => t?.(`forum.${key}`) || fallback;
 
   const filteredTeams = teams.filter((team) =>
     team.name.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -106,7 +109,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
             marginBottom: 8,
           }}
         >
-          {tf.selectTeamPrompt || "Select a Team"}
+          {tf("selectTeamPrompt", "Select a Team")}
         </h2>
         <p
           style={{
@@ -115,8 +118,10 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
             fontFamily: F.sans,
           }}
         >
-          {tf.selectTeamHelper ||
-            "Choose a team from the list below to start or view their forum report"}
+          {tf(
+            "selectTeamHelper",
+            "Choose a team from the list below to start or view their forum report",
+          )}
         </p>
       </div>
 
@@ -124,7 +129,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
       <div style={{ position: "relative", marginBottom: 16 }}>
         <input
           type="text"
-          placeholder={tf.searchTeams || "Search teams..."}
+          placeholder={tf("searchTeams", "Search teams...")}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
@@ -155,7 +160,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
             size={24}
             style={{ animation: "spin 1s linear infinite" }}
           />
-          <p>{tf.loadingTeams || "Loading teams..."}</p>
+          <p>{tf("loadingTeams", "Loading teams...")}</p>
         </div>
       ) : filteredTeams.length === 0 ? (
         <div
@@ -168,7 +173,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
           }}
         >
           <FiUsers size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
-          <p>{tf.noTeamsFound || "No teams found"}</p>
+          <p>{tf("noTeamsFound", "No teams found")}</p>
         </div>
       ) : (
         <div
@@ -257,7 +262,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
                       textOverflow: "ellipsis",
                     }}
                   >
-                    {team.department || tf.noDepartment || "No department"}
+                    {team.department || tf("noDepartment", "No department")}
                   </div>
                 </div>
                 {selectedTeam?.id === team.id && (
@@ -415,7 +420,7 @@ const STANDING_AGENDAS_AM = [
 const StandingAgendasPanel = ({ t }) => {
   const safeT = t || {};
   const agendas = safeT.agendas || STANDING_AGENDAS_AM;
-  const tf = safeT.forum || {};
+  const tf = (key, fallback) => safeT?.forum?.[key] || fallback;
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -458,7 +463,7 @@ const StandingAgendasPanel = ({ t }) => {
               fontFamily: F.sans,
             }}
           >
-            {tf.standingAgendas || "ቋሚ የአቻ ፎረም አጀንዳዎች"}
+            {tf("standingAgendas", "ቋሚ የአቻ ፎረም አጀንዳዎች")}
           </span>
           <span
             style={{
@@ -641,16 +646,21 @@ const formatAIResponse = (text) => {
 
 // ─── Main Component ──────────────────────────────────────────
 export default function ForumReport({
-  t,
+  t: tProp,
   lang,
   selectedTeam,
   setSelectedTeam,
   onReportSaved,
 }) {
+  const { t: tHook } = useLanguage();
+  const t = tProp || tHook;
+
   const safeT = t || {};
-  const tf = safeT.forum || {};
-  const common = safeT.common || {};
   const safeYear = safeT.year || "2018 E.C.";
+
+  // Translation helpers
+  const tf = (key, fallback) => safeT?.forum?.[key] || fallback;
+  const tc = (key, fallback) => safeT?.common?.[key] || fallback;
 
   const { showToast } = useToast();
   const formRef = useRef(null);
@@ -690,7 +700,7 @@ export default function ForumReport({
               id: team._id,
               name: team.name,
               description: team.department || "",
-              leader: team.leader?.name || "Not assigned",
+              leader: team.leader?.name || tf("notAssigned", "Not assigned"),
               members: team.members || [],
               department: team.department,
             }));
@@ -704,7 +714,7 @@ export default function ForumReport({
       };
       loadTeams();
     }
-  }, [selectedTeam]);
+  }, [selectedTeam, tf]);
 
   // ─── Calculate form progress ───────────────────────────────
   useEffect(() => {
@@ -760,7 +770,7 @@ export default function ForumReport({
   // ─── Enhanced AI Apply Handler ─────────────────────────────
   const handleApplySuggestion = (text) => {
     if (!text || text.trim() === "") {
-      showToast("⚠️ No content to apply", "warning");
+      showToast(tf("noContent", "⚠️ No content to apply"), "warning");
       return;
     }
 
@@ -775,14 +785,17 @@ export default function ForumReport({
     }));
 
     setAiGeneratedContent(formattedText);
-    showToast("✅ AI suggestion applied to explanation!", "success");
+    showToast(
+      tf("aiApplied", "✅ AI suggestion applied to explanation!"),
+      "success",
+    );
   };
 
   // ─── Handle AI Summary Generation ──────────────────────────
   const handleGenerateSummary = async () => {
     try {
       const context = {
-        title: `${tf.title || "Peer Forum Report"} - ${selectedTeam?.name || ""}`,
+        title: `${tf("title", "Peer Forum Report")} - ${selectedTeam?.name || ""}`,
         date: form.date,
         attendees: form.present.filter((p) => p.trim() !== ""),
         topics: form.topics.filter((t) => t.trim()),
@@ -807,13 +820,25 @@ export default function ForumReport({
       const content = response.data?.minutes || response.data?.insight || "";
       if (content) {
         handleApplySuggestion(content);
-        showToast("✅ AI summary generated and applied!", "success");
+        showToast(
+          tf("summaryGenerated", "✅ AI summary generated and applied!"),
+          "success",
+        );
       } else {
-        showToast("⚠️ No content generated. Please try again.", "warning");
+        showToast(
+          tf(
+            "noContentGenerated",
+            "⚠️ No content generated. Please try again.",
+          ),
+          "warning",
+        );
       }
     } catch (error) {
       console.error("Failed to generate summary:", error);
-      showToast("❌ Failed to generate AI summary", "error");
+      showToast(
+        tf("summaryError", "❌ Failed to generate AI summary"),
+        "error",
+      );
     }
   };
 
@@ -821,7 +846,7 @@ export default function ForumReport({
   const handleGenerateFullReport = async () => {
     try {
       const context = {
-        title: `${tf.title || "Peer Forum Report"} - ${selectedTeam?.name || ""}`,
+        title: `${tf("title", "Peer Forum Report")} - ${selectedTeam?.name || ""}`,
         date: form.date,
         attendees: form.present.filter((p) => p.trim() !== ""),
         topics: form.topics.filter((t) => t.trim()),
@@ -870,10 +895,16 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
       `;
 
       handleApplySuggestion(fullReport);
-      showToast("✅ Full report generated and applied!", "success");
+      showToast(
+        tf("fullReportGenerated", "✅ Full report generated and applied!"),
+        "success",
+      );
     } catch (error) {
       console.error("Failed to generate full report:", error);
-      showToast("❌ Failed to generate full report", "error");
+      showToast(
+        tf("fullReportError", "❌ Failed to generate full report"),
+        "error",
+      );
     }
   };
 
@@ -881,10 +912,13 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
   const handleExport = () => {
     try {
       exportForumReportToPDF(form, t, lang, selectedTeam?.name);
-      showToast("✅ Report exported successfully!", "success");
+      showToast(
+        tf("exportSuccess", "✅ Report exported successfully!"),
+        "success",
+      );
     } catch (error) {
       console.error("Failed to export report:", error);
-      showToast("❌ Failed to export report", "error");
+      showToast(tf("exportError", "❌ Failed to export report"), "error");
     }
   };
 
@@ -893,7 +927,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
       setSaving(true);
 
       if (!form.date) {
-        showToast(common.selectDate || "Please select a date", "warning");
+        showToast(tf("selectDate", "Please select a date"), "warning");
         setSaving(false);
         return;
       }
@@ -921,13 +955,12 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         onReportSaved(selectedTeam.id, form);
       }
       setSubmitted(true);
-      showToast("✅ Report saved successfully!", "success");
+      showToast(tf("saveSuccess", "✅ Report saved successfully!"), "success");
     } catch (error) {
       console.error("Failed to save report:", error);
       showToast(
         error.response?.data?.message ||
-          common.failedSave ||
-          "Failed to save report. Please try again.",
+          tf("saveError", "Failed to save report. Please try again."),
         "error",
       );
     } finally {
@@ -984,7 +1017,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               marginBottom: 8,
             }}
           >
-            {tf.saved || "Report Saved!"}
+            {tf("saved", "Report Saved!")}
           </h2>
           <p
             style={{
@@ -994,7 +1027,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               fontSize: FONT_SIZES.body,
             }}
           >
-            {tf.savedSub || "Peer Forum report completed successfully."}
+            {tf("savedSub", "Peer Forum report completed successfully.")}
           </p>
 
           {aiGeneratedContent && (
@@ -1024,7 +1057,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                     color: "#1D4ED8",
                   }}
                 >
-                  AI Generated Content Applied
+                  {tf("aiContentApplied", "AI Generated Content Applied")}
                 </span>
               </div>
               <p
@@ -1052,7 +1085,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           >
             <button style={btn.primary} onClick={() => setSubmitted(false)}>
               <FiPlus size={16} />
-              {tf.newReport || "New Report"}
+              {tf("newReport", "New Report")}
             </button>
           </div>
 
@@ -1060,7 +1093,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             <AISummary
               fetchFn={() =>
                 aiAPI.getMeetingMinutes({
-                  title: `${tf.title || "Peer Forum Report"} - ${selectedTeam?.name || ""}`,
+                  title: `${tf("title", "Peer Forum Report")} - ${selectedTeam?.name || ""}`,
                   date: form.date,
                   attendees: form.present.filter((p) => p.trim() !== ""),
                   agenda: STANDING_AGENDAS_AM.join("; "),
@@ -1073,7 +1106,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 })
               }
               args={[]}
-              label="AI Meeting Minutes"
+              label={tf("aiSummaryLabel", "AI Meeting Minutes")}
             />
           </div>
         </div>
@@ -1162,7 +1195,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 lineHeight: 1.2,
               }}
             >
-              {tf.title || "Peer Forum Report"}
+              {tf("title", "Peer Forum Report")}
             </h1>
             {/* ✅ Team name on new line with dash */}
             <h2
@@ -1188,8 +1221,10 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               }}
             >
               <FiCalendar size={12} />
-              {tf.subtitle ||
-                "Addis Ababa City Admin · Addis MESOB · Addis Ketema Center"}
+              {tf(
+                "subtitle",
+                "Addis Ababa City Admin · Addis MESOB · Addis Ketema Center",
+              )}
             </p>
           </div>
         </div>
@@ -1210,7 +1245,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             }}
           >
             <FiChevronLeft size={12} />
-            {tf.changeTeam || "Change Team"}
+            {tf("changeTeam", "Change Team")}
           </button>
 
           <div
@@ -1267,13 +1302,18 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
       </div>
 
       <AIInsightBadge type="info">
-        <strong>Progress: {formProgress}% complete</strong>
+        <strong>
+          {tf("progressLabel", "Progress")}: {formProgress}%{" "}
+          {tf("complete", "complete")}
+        </strong>
         <span style={{ marginLeft: "6px", fontSize: "11px" }}>
-          {formProgress < 30 && "Start filling in the report details below"}
+          {formProgress < 30 &&
+            tf("progressStart", "Start filling in the report details below")}
           {formProgress >= 30 &&
             formProgress < 70 &&
-            "You're making good progress! Keep going."}
-          {formProgress >= 70 && "Almost there! Review and save your report."}
+            tf("progressMiddle", "You're making good progress! Keep going.")}
+          {formProgress >= 70 &&
+            tf("progressEnd", "Almost there! Review and save your report.")}
         </span>
       </AIInsightBadge>
 
@@ -1292,24 +1332,24 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
       >
         {/* Meeting Time */}
         <Section
-          title={tf.meetingTime || "Meeting Time"}
+          title={tf("meetingTime", "Meeting Time")}
           icon={<FiCalendar size={16} />}
         >
           <div style={g3Responsive}>
             <Field
-              label={tf.date || "Date"}
+              label={tf("date", "Date")}
               value={form.date}
               onChange={(v) => upd("date", v)}
               type="date"
             />
             <Field
-              label={tf.startTime || "Start Time"}
+              label={tf("startTime", "Start Time")}
               value={form.timeStart}
               onChange={(v) => upd("timeStart", v)}
               type="time"
             />
             <Field
-              label={tf.endTime || "End Time"}
+              label={tf("endTime", "End Time")}
               value={form.timeEnd}
               onChange={(v) => upd("timeEnd", v)}
               type="time"
@@ -1319,7 +1359,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
 
         {/* Present Members */}
         <DynamicFieldGroup
-          title={tf.presentMembers || "Present Members"}
+          title={tf("presentMembers", "Present Members")}
           icon={<FiUserCheckIcon size={16} />}
           values={form.present}
           onAdd={() => addItem("present", "")}
@@ -1331,25 +1371,25 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           }}
           renderField={(value, idx) => (
             <Field
-              label={`${idx + 1}${tf.memberN || " Member"}`}
+              label={`${idx + 1}${tf("memberN", " Member")}`}
               value={value}
               onChange={(v) => {
                 const updated = [...form.present];
                 updated[idx] = v;
                 setForm((prev) => ({ ...prev, present: updated }));
               }}
-              placeholder={`${tf.memberPlaceholder || "Member"} ${idx + 1}`}
+              placeholder={`${tf("memberPlaceholder", "Member")} ${idx + 1}`}
             />
           )}
-          helperText={
-            tf.presentHelper ||
-            "Add all team members who attended the forum meeting"
-          }
+          helperText={tf(
+            "presentHelper",
+            "Add all team members who attended the forum meeting",
+          )}
         />
 
         {/* Absent Members */}
         <Section
-          title={tf.absentMembers || "Absent Members & Reasons"}
+          title={tf("absentMembers", "Absent Members & Reasons")}
           icon={<FiUserX size={16} />}
         >
           <div
@@ -1387,7 +1427,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                   }}
                 >
                   <FiUserX size={12} />
-                  {tf.absentMemberLabel || "Absent Member"} #{idx + 1}
+                  {tf("absentMemberLabel", "Absent Member")} #{idx + 1}
                 </div>
                 <div
                   style={{
@@ -1397,16 +1437,16 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                   }}
                 >
                   <Field
-                    label={tf.name || "Name"}
+                    label={tf("name", "Name")}
                     value={item.name}
                     onChange={(v) => updateAbsent(idx, "name", v)}
-                    placeholder={tf.namePlaceholder || "Member name"}
+                    placeholder={tf("namePlaceholder", "Member name")}
                   />
                   <Field
-                    label={tf.reason || "Reason"}
+                    label={tf("reason", "Reason")}
                     value={item.reason}
                     onChange={(v) => updateAbsent(idx, "reason", v)}
-                    placeholder={tf.reasonPlaceholder || "Reason for absence"}
+                    placeholder={tf("reasonPlaceholder", "Reason for absence")}
                   />
                 </div>
                 {form.absent.length > 1 && (
@@ -1429,7 +1469,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                     }}
                   >
                     <FiX size={12} />
-                    {common.remove || "Remove"}
+                    {tc("remove", "Remove")}
                   </button>
                 )}
               </div>
@@ -1448,13 +1488,13 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             }}
           >
             <FiPlus size={14} />
-            {tf.addAbsent || "Add Absent Member"}
+            {tf("addAbsent", "Add Absent Member")}
           </button>
         </Section>
 
         {/* Previous Results */}
         <DynamicFieldGroup
-          title={tf.prevResults || "Results from Previous Meeting"}
+          title={tf("prevResults", "Results from Previous Meeting")}
           icon={<FiFileText size={16} />}
           values={form.prevResults}
           onAdd={() => addItem("prevResults", "")}
@@ -1464,17 +1504,17 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             updated[idx] = val;
             setForm((prev) => ({ ...prev, prevResults: updated }));
           }}
-          labelPrefix={tf.resultLabel || "Result"}
-          placeholderPrefix={tf.prevResultPlaceholder || "Previous result"}
-          helperText={
-            tf.prevResultHelper ||
-            "List outcomes and action items from the previous meeting"
-          }
+          labelPrefix={tf("resultLabel", "Result")}
+          placeholderPrefix={tf("prevResultPlaceholder", "Previous result")}
+          helperText={tf(
+            "prevResultHelper",
+            "List outcomes and action items from the previous meeting",
+          )}
         />
 
         {/* Today's Topics */}
         <DynamicFieldGroup
-          title={tf.todayTopics || "Today's Discussion Topics"}
+          title={tf("todayTopics", "Today's Discussion Topics")}
           icon={<FiMessageSquare size={16} />}
           values={form.topics}
           onAdd={() => addItem("topics", "")}
@@ -1484,16 +1524,17 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             updated[idx] = val;
             setForm((prev) => ({ ...prev, topics: updated }));
           }}
-          labelPrefix={tf.topic || "Topic"}
-          placeholderPrefix={tf.topicPlaceholder || "Discussion topic"}
-          helperText={
-            tf.topicHelper || "Enter each discussion topic separately"
-          }
+          labelPrefix={tf("topic", "Topic")}
+          placeholderPrefix={tf("topicPlaceholder", "Discussion topic")}
+          helperText={tf(
+            "topicHelper",
+            "Enter each discussion topic separately",
+          )}
         />
 
         {/* Explanation - Enhanced with AI Actions */}
         <Section
-          title={tf.explanation || "Explanation Given (Brief)"}
+          title={tf("explanation", "Explanation Given (Brief)")}
           icon={<FiEdit3 size={16} />}
         >
           <textarea
@@ -1519,7 +1560,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             onChange={(e) => upd("explanation", e.target.value)}
             onFocus={() => setFocusedField("explanation")}
             onBlur={() => setFocusedField(null)}
-            placeholder={tf.explanationPlaceholder || "Write explanation..."}
+            placeholder={tf("explanationPlaceholder", "Write explanation...")}
           />
 
           {/* ✅ AI Actions Toolbar - Full width buttons, no duplicate */}
@@ -1549,7 +1590,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               }}
             >
               <FiZap size={12} color={C.primary} />
-              AI Actions:
+              {tf("aiActions", "AI Actions:")}
             </span>
 
             <div
@@ -1577,7 +1618,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 }}
               >
                 <FiZap size={11} />
-                {tf.aiWritingAssistant || "AI Writing Assistant"}
+                {tf("generateSummary", "AI Writing Assistant")}
               </button>
 
               <button
@@ -1596,7 +1637,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 }}
               >
                 <FiTrendingUp size={11} />
-                {tf.summarize || "Summarize"}
+                {tf("summarize", "Summarize")}
               </button>
 
               <button
@@ -1615,7 +1656,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 }}
               >
                 <FiBookOpen size={11} />
-                {tf.fullReport || "Full Report"}
+                {tf("fullReport", "Full Report")}
               </button>
 
               {/* ✅ Export button - Icon only */}
@@ -1633,7 +1674,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                   justifyContent: "center",
                   whiteSpace: "nowrap",
                 }}
-                title={common.export || "Export"}
+                title={tc("export", "Export")}
               >
                 <FiDownload size={14} />
               </button>
@@ -1643,7 +1684,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
 
         {/* Gaps */}
         <DynamicFieldGroup
-          title={tf.gaps || "Identified Gaps"}
+          title={tf("gaps", "Identified Gaps")}
           icon={<FiAlertCircle size={16} />}
           values={form.gaps}
           onAdd={() => addItem("gaps", "")}
@@ -1653,16 +1694,17 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             updated[idx] = val;
             setForm((prev) => ({ ...prev, gaps: updated }));
           }}
-          labelPrefix={tf.gapLabel || "Gap"}
-          placeholderPrefix={tf.gapPlaceholder || "Identified gap"}
-          helperText={
-            tf.gapHelper || "Identify gaps or challenges discussed in the forum"
-          }
+          labelPrefix={tf("gapLabel", "Gap")}
+          placeholderPrefix={tf("gapPlaceholder", "Identified gap")}
+          helperText={tf(
+            "gapHelper",
+            "Identify gaps or challenges discussed in the forum",
+          )}
         />
 
         {/* Agreements */}
         <DynamicFieldGroup
-          title={tf.agreements || "Agreed Points"}
+          title={tf("agreements", "Agreed Points")}
           icon={<FiCheckCircle size={16} />}
           values={form.agreements}
           onAdd={() => addItem("agreements", "")}
@@ -1672,16 +1714,17 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             updated[idx] = val;
             setForm((prev) => ({ ...prev, agreements: updated }));
           }}
-          labelPrefix={tf.agreementLabel || "Agreement"}
-          placeholderPrefix={tf.agreementPlaceholder || "Agreed point"}
-          helperText={
-            tf.agreementHelper || "Document all points of agreement reached"
-          }
+          labelPrefix={tf("agreementLabel", "Agreement")}
+          placeholderPrefix={tf("agreementPlaceholder", "Agreed point")}
+          helperText={tf(
+            "agreementHelper",
+            "Document all points of agreement reached",
+          )}
         />
 
         {/* Signatures */}
         <Section
-          title={tf.signatures || "Signatures"}
+          title={tf("signatures", "Signatures")}
           icon={<FiPenTool size={16} />}
         >
           <div
@@ -1710,14 +1753,14 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               >
                 <div style={{ flex: 1 }}>
                   <Field
-                    label={`${idx + 1}${tf.signatureN || " Signature"}`}
+                    label={`${idx + 1}${tf("signatureN", " Signature")}`}
                     value={sig}
                     onChange={(v) => {
                       const updated = [...form.signatures];
                       updated[idx] = v;
                       setForm((prev) => ({ ...prev, signatures: updated }));
                     }}
-                    placeholder={tf.signaturePlaceholder || "Signature line"}
+                    placeholder={tf("signaturePlaceholder", "Signature line")}
                   />
                 </div>
                 {form.signatures.length > 1 && (
@@ -1759,7 +1802,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             }}
           >
             <FiPlus size={14} />
-            {tf.addSignature || "Add Signature"}
+            {tf("addSignature", "Add Signature")}
           </button>
         </Section>
 
@@ -1795,7 +1838,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               e.currentTarget.style.transform = "translateY(0)";
               e.currentTarget.style.boxShadow = "none";
             }}
-            title="Export PDF"
+            title={tc("export", "Export")}
           >
             <FiDownload size={18} />
           </button>
@@ -1819,12 +1862,12 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                   size={16}
                   style={{ animation: "spin 1s linear infinite" }}
                 />
-                {common.saving || "Saving..."}
+                {tc("saving", "Saving...")}
               </>
             ) : (
               <>
                 <FiSave size={16} />
-                {tf.save || "Save Report"}
+                {tf("save", "Save Report")}
               </>
             )}
           </button>

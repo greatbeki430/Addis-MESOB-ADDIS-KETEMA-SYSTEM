@@ -4,10 +4,15 @@ import { C, F, card } from "../styles/theme";
 import StatCard from "../components/ui/StatCard";
 import { CRITERIA } from "../constants/criteria";
 import { useAuth } from "../hooks/useAuth";
+import { useLanguage } from "../hooks/useLanguage";
 import { dailyReportAPI } from "../services/api";
 import { AIDashboardWidget } from "../components/ai";
 
-export default function Dashboard({ t }) {
+export default function Dashboard({ t: tProp }) {
+  // Use the passed t prop if available, otherwise use the hook
+  const languageContext = useLanguage();
+  const t = tProp || languageContext.t;
+
   const td = (key, fb = "") => t?.(`dashboard.${key}`) || fb;
   const tc = (key, fb = "") => t?.(`criteria.${key}`) || fb;
   const tcm = (key, fb = "") => t?.(`common.${key}`) || fb;
@@ -83,28 +88,57 @@ export default function Dashboard({ t }) {
     loadDashboardData();
   }, []);
 
-  const getGreeting = () => {
+  // Get translated greeting based on time of day
+  const getGreetingKey = () => {
     const h = new Date().getHours();
-    if (h < 12) return "🌅 Good morning";
-    if (h < 18) return "☀️ Good afternoon";
-    return "🌙 Good evening";
+    if (h < 12) return "greetingMorning";
+    if (h < 18) return "greetingAfternoon";
+    return "greetingEvening";
   };
 
+  const getGreeting = () => {
+    const key = getGreetingKey();
+    return td(
+      key,
+      key === "greetingMorning"
+        ? "🌅 Good morning"
+        : key === "greetingAfternoon"
+          ? "☀️ Good afternoon"
+          : "🌙 Good evening",
+    );
+  };
+
+  // Get translated role badge
   const getRoleBadge = (role) => {
     switch (role) {
       case "superadmin":
-        return { bg: C.dark, color: C.gold, label: "Super Admin", icon: "👑" };
+        return {
+          bg: C.dark,
+          color: C.gold,
+          label: td("roleSuperAdmin", "Super Admin"),
+          icon: "👑",
+        };
       case "admin":
-        return { bg: C.primary, color: "#fff", label: "Admin", icon: "⚙️" };
+        return {
+          bg: C.primary,
+          color: "#fff",
+          label: td("roleAdmin", "Admin"),
+          icon: "⚙️",
+        };
       case "leader":
         return {
           bg: C.orange,
           color: "#fff",
-          label: "Team Leader",
+          label: td("roleTeamLeader", "Team Leader"),
           icon: "⭐",
         };
       default:
-        return { bg: C.border, color: C.dark, label: "Employee", icon: "👤" };
+        return {
+          bg: C.border,
+          color: C.dark,
+          label: td("roleEmployee", "Employee"),
+          icon: "👤",
+        };
     }
   };
 
@@ -137,6 +171,15 @@ export default function Dashboard({ t }) {
     evaluationsCompleted: 0,
     topDepartment: stats.departments[0]?.name || "N/A",
     period: "this week",
+  };
+
+  // Get formatted last login
+  const getLastLogin = () => {
+    try {
+      return new Date().toLocaleDateString();
+    } catch {
+      return "";
+    }
   };
 
   return (
@@ -205,7 +248,9 @@ export default function Dashboard({ t }) {
                     margin: 0,
                   }}
                 >
-                  {greeting}, {userName}!
+                  {td("welcomeMessage", "{greeting}, {userName}!")
+                    .replace("{greeting}", greeting)
+                    .replace("{userName}", userName)}
                 </h2>
                 <span
                   style={{
@@ -232,7 +277,11 @@ export default function Dashboard({ t }) {
                   fontFamily: F.sans,
                 }}
               >
-                {user?.email} • Last login: {new Date().toLocaleDateString()}
+                {user?.email} •{" "}
+                {td("lastLogin", "Last login: {date}").replace(
+                  "{date}",
+                  getLastLogin(),
+                )}
               </p>
             </div>
           </div>
@@ -403,7 +452,7 @@ export default function Dashboard({ t }) {
           >
             {td("forumAgendas", "Standing Forum Agendas")}
           </h3>
-          {Array.isArray(agendas) &&
+          {Array.isArray(agendas) && agendas.length > 0 ? (
             agendas.map((a, i) => (
               <div
                 key={i}
@@ -445,7 +494,19 @@ export default function Dashboard({ t }) {
                   {a}
                 </span>
               </div>
-            ))}
+            ))
+          ) : (
+            <p
+              style={{
+                color: C.muted,
+                fontSize: 13,
+                textAlign: "center",
+                padding: 20,
+              }}
+            >
+              {tcm("noData", "No data available")}
+            </p>
+          )}
         </div>
       </div>
 
