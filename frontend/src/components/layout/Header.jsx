@@ -58,26 +58,40 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
 
   // ── Display Names for Breadcrumb ──
   const displayNames = {
+    // Core Pages
     dashboard: "Dashboard",
     forum: "Peer Forum",
     evaluation: "Evaluation",
     report: "Daily Report",
     services: "Services",
     analytics: "Analytics",
-    users: "User Management",
-    teams: "Team Management",
-    "admin/services": "Service Manager",
     documents: "Document Vault",
     "golden-monday": "Golden Monday",
+
+    // Admin Management Pages
+    users: "User Management",
+    teams: "Team Management",
     employees: "Employee Management",
+    "admin/services": "Service Manager",
+
+    // Attendance & Digital Attendance
     "digital-attendance": "Digital Attendance",
-    "admin-attendance": "Attendance",
-    "admin-digital-attendance": "Digital Attendance",
-    "admin-alerts": "Alerts",
-    "admin-evaluations": "Evaluations",
-    "admin-daily-reports": "Daily Reports",
-    "admin-forum-reports": "Forum Reports",
-    "admin-requests": "Requests",
+    "admin-attendance": "Attendance Management",
+    "admin-digital-attendance": "Digital Attendance Logs",
+
+    // Alerts
+    "admin-alerts": "Alerts & Notifications",
+
+    // Admin Data Management
+    "admin-evaluations": "Manage Evaluations",
+    "admin-daily-reports": "Manage Daily Reports",
+    "admin-forum-reports": "Manage Forum Reports",
+    "admin-requests": "Manage Requests",
+
+    // Profile & Settings
+    profile: "Profile",
+    settings: "Settings",
+    "change-password": "Change Password",
   };
 
   // ── Auth ──
