@@ -28,12 +28,14 @@ import {
   FiArchive,
   FiCalendar,
   FiHash,
+  FiList,
+  FiGrid,
 } from "react-icons/fi";
 
 const fetchDocuments = (params) => documentAPI.getAll(params);
 const getDocumentDownloadUrl = (id) => documentAPI.getDownloadUrl(id);
 
-// ─── Document Card ────────────────────────────────────────────
+// ─── Document List Card ────────────────────────────────────────────
 const DocumentCard = ({ doc, onDownload, t }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 480);
 
@@ -295,26 +297,28 @@ const DocumentCard = ({ doc, onDownload, t }) => {
           justifyContent: isMobile ? "space-between" : "flex-start",
         }}
       >
-        {/* File Size */}
+        {/* File Size - Updated with minimized border radius and mobile fixes */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: "6px",
             background: "#F8FAFC",
-            padding: isMobile ? "4px 12px" : "6px 14px",
-            borderRadius: "20px",
+            padding: isMobile ? "4px 10px" : "6px 14px",
+            borderRadius: "8px",
             border: "1px solid #E2E8F0",
             width: isMobile ? "auto" : "100%",
             justifyContent: isMobile ? "flex-start" : "center",
+            whiteSpace: "nowrap",
           }}
         >
           <FiHardDrive size={14} color="#64748B" />
           <span
             style={{
-              fontSize: isMobile ? "11px" : "12px",
+              fontSize: isMobile ? "10px" : "12px",
               fontWeight: 600,
               color: "#1E293B",
+              whiteSpace: "nowrap",
             }}
           >
             {formatFileSize(doc.fileSize)}
@@ -372,6 +376,316 @@ const DocumentCard = ({ doc, onDownload, t }) => {
   );
 };
 
+// ─── Document Grid Card ────────────────────────────────────────────
+const DocumentGridCard = ({ doc, onDownload, t }) => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 480);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 480);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const getFileIcon = (fileType) => {
+    const icons = {
+      pdf: <FiFile size={isMobile ? 32 : 40} />,
+      jpg: <FiImage size={isMobile ? 32 : 40} />,
+      png: <FiImage size={isMobile ? 32 : 40} />,
+      tiff: <FiImage size={isMobile ? 32 : 40} />,
+    };
+    return icons[fileType] || <FiFileText size={isMobile ? 32 : 40} />;
+  };
+
+  const getTypeLabel = (type) => {
+    const labels = {
+      birth_certificate:
+        t?.("documentVault.typeBirthCertificate") || "Birth Certificate",
+      death_certificate:
+        t?.("documentVault.typeDeathCertificate") || "Death Certificate",
+      marriage_certificate:
+        t?.("documentVault.typeMarriageCertificate") || "Marriage Certificate",
+      divorce_certificate:
+        t?.("documentVault.typeDivorceCertificate") || "Divorce Certificate",
+      residence_id: t?.("documentVault.typeResidenceId") || "Residence ID",
+      name_change: t?.("documentVault.typeNameChange") || "Name Change",
+      registration_book:
+        t?.("documentVault.typeRegistrationBook") || "Registration Book",
+      circular: t?.("documentVault.typeCircular") || "Circular",
+      directive: t?.("documentVault.typeDirective") || "Directive",
+      correspondence:
+        t?.("documentVault.typeCorrespondence") || "Correspondence",
+      application_form:
+        t?.("documentVault.typeApplicationForm") || "Application Form",
+      other: t?.("documentVault.typeOther") || "Other",
+    };
+    return labels[type] || type;
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return "0 KB";
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${Math.round(kb)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
+  };
+
+  return (
+    <div
+      style={{
+        background: "#fff",
+        border: "1px solid #E2E8F0",
+        borderRadius: "12px",
+        padding: isMobile ? "16px" : "20px",
+        transition: "box-shadow 0.2s, transform 0.2s",
+        display: "flex",
+        flexDirection: "column",
+        gap: "12px",
+        cursor: "pointer",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)";
+        e.currentTarget.style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.transform = "translateY(0)";
+      }}
+    >
+      {/* Document Image/Icon */}
+      <div
+        style={{
+          width: "100%",
+          height: isMobile ? "140px" : "160px",
+          borderRadius: "8px",
+          background: `linear-gradient(135deg, #EFF6FF, #DBEAFE)`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: isMobile ? "40px" : "48px",
+          overflow: "hidden",
+          color: "#2563EB",
+          border: "1px solid #BFDBFE",
+          position: "relative",
+        }}
+      >
+        {doc.thumbnailUrl ? (
+          <img
+            src={doc.thumbnailUrl}
+            alt="preview"
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : (
+          getFileIcon(doc.fileType)
+        )}
+        <span
+          style={{
+            position: "absolute",
+            bottom: "6px",
+            right: "6px",
+            background: "rgba(0,0,0,0.7)",
+            color: "#fff",
+            fontSize: "9px",
+            padding: "2px 8px",
+            borderRadius: "4px",
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}
+        >
+          {doc.fileType?.toUpperCase() || "FILE"}
+        </span>
+      </div>
+
+      {/* Title */}
+      <div
+        style={{
+          fontWeight: 600,
+          fontSize: isMobile ? "14px" : "15px",
+          color: "#0F172A",
+          display: "flex",
+          alignItems: "center",
+          gap: "6px",
+        }}
+      >
+        <span style={{ wordBreak: "break-word" }}>{doc.title}</span>
+      </div>
+
+      {/* Reference Number */}
+      <div
+        style={{
+          fontSize: isMobile ? "10px" : "11px",
+          color: "#64748B",
+          display: "flex",
+          alignItems: "center",
+          gap: "4px",
+        }}
+      >
+        <FiHash size={12} color="#94A3B8" />
+        <span style={{ fontFamily: "monospace", fontSize: "10px" }}>
+          {doc.referenceNumber}
+        </span>
+      </div>
+
+      {/* Tags and Badges */}
+      <div
+        style={{
+          display: "flex",
+          gap: "6px",
+          flexWrap: "wrap",
+        }}
+      >
+        <span
+          style={{
+            background: "#EFF6FF",
+            color: "#1D4ED8",
+            fontSize: isMobile ? "9px" : "10px",
+            padding: "2px 8px",
+            borderRadius: "99px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <FiBook size={9} />
+          {getTypeLabel(doc.documentType)}
+        </span>
+        {doc.retentionPolicy === "lifetime" && (
+          <span
+            style={{
+              background: "#F0FDF4",
+              color: "#15803D",
+              fontSize: isMobile ? "9px" : "10px",
+              padding: "2px 8px",
+              borderRadius: "99px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <FiArchive size={9} />♾{" "}
+            {t?.("documentVault.lifetime") || "Lifetime"}
+          </span>
+        )}
+        {doc.retentionPolicy === "10_years" && (
+          <span
+            style={{
+              background: "#FEF3C7",
+              color: "#92400E",
+              fontSize: isMobile ? "9px" : "10px",
+              padding: "2px 8px",
+              borderRadius: "99px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <FiCalendar size={9} />
+            {t?.("documentVault.tenYears") || "10 Years"}
+          </span>
+        )}
+        {doc.retentionPolicy === "5_years" && (
+          <span
+            style={{
+              background: "#FEF3C7",
+              color: "#92400E",
+              fontSize: isMobile ? "9px" : "10px",
+              padding: "2px 8px",
+              borderRadius: "99px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+            }}
+          >
+            <FiCalendar size={9} />
+            {t?.("documentVault.fiveYears") || "5 Years"}
+          </span>
+        )}
+      </div>
+
+      {/* Citizen Name */}
+      {doc.citizenName && (
+        <div
+          style={{
+            fontSize: isMobile ? "11px" : "12px",
+            color: "#475569",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <FiUser size={12} color="#94A3B8" />
+          {doc.citizenName}
+        </div>
+      )}
+
+      {/* Bottom: File Size & Download */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginTop: "auto",
+          paddingTop: "12px",
+          borderTop: "1px solid #F1F5F9",
+        }}
+      >
+        {/* File Size - Updated with minimized border radius and mobile fixes */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            background: "#F8FAFC",
+            padding: isMobile ? "4px 10px" : "6px 14px",
+            borderRadius: "6px",
+            border: "1px solid #E2E8F0",
+            whiteSpace: "nowrap",
+          }}
+        >
+          <FiHardDrive size={14} color="#64748B" />
+          <span
+            style={{
+              fontSize: isMobile ? "10px" : "12px",
+              fontWeight: 600,
+              color: "#1E293B",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {formatFileSize(doc.fileSize)}
+          </span>
+        </div>
+
+        {/* Download Button */}
+        <button
+          onClick={() => onDownload(doc._id)}
+          style={{
+            background: "#2563EB",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            padding: isMobile ? "6px 14px" : "8px 18px",
+            fontSize: isMobile ? "11px" : "12px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            fontWeight: 600,
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#1D4ED8";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "#2563EB";
+          }}
+        >
+          <FiDownload size={14} />
+          {t?.("common.download") || "Download"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main Page ────────────────────────────────────────────────
 export default function DocumentVault() {
   const { t } = useLanguage();
@@ -382,6 +696,7 @@ export default function DocumentVault() {
   const [isLoading, setIsLoading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 480);
+  const [viewMode, setViewMode] = useState("list"); // "list" or "grid"
   const { user } = useAuth();
 
   // Translation helpers
@@ -607,20 +922,23 @@ export default function DocumentVault() {
         />
       </div>
 
-      {/* ✅ Type Filter Only */}
+      {/* ✅ Type Filter and View Toggle */}
       <div
         style={{
           display: "flex",
           gap: "12px",
           marginBottom: "20px",
           flexWrap: "wrap",
-          justifyContent: isMobile ? "flex-start" : "flex-end",
+          justifyContent: isMobile ? "flex-start" : "space-between",
+          alignItems: "center",
         }}
       >
+        {/* Type Filter */}
         <div
           style={{
             position: "relative",
             width: isMobile ? "100%" : "auto",
+            flex: isMobile ? 1 : "0 1 auto",
           }}
         >
           <FiFilter
@@ -696,6 +1014,63 @@ export default function DocumentVault() {
             <option value="other">{td("typeOther", "Other")}</option>
           </select>
         </div>
+
+        {/* View Toggle */}
+        <div
+          style={{
+            display: "flex",
+            gap: "4px",
+            background: "#F1F5F9",
+            borderRadius: "8px",
+            padding: "4px",
+            flexShrink: 0,
+          }}
+        >
+          <button
+            onClick={() => setViewMode("list")}
+            style={{
+              padding: isMobile ? "6px 12px" : "8px 16px",
+              borderRadius: "6px",
+              border: "none",
+              background: viewMode === "list" ? "#fff" : "transparent",
+              color: viewMode === "list" ? "#0F172A" : "#64748B",
+              fontWeight: 600,
+              fontSize: isMobile ? "11px" : "12px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              boxShadow:
+                viewMode === "list" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              transition: "all 0.2s",
+            }}
+          >
+            <FiList size={isMobile ? 14 : 16} />
+            {tc("list", "List")}
+          </button>
+          <button
+            onClick={() => setViewMode("grid")}
+            style={{
+              padding: isMobile ? "6px 12px" : "8px 16px",
+              borderRadius: "6px",
+              border: "none",
+              background: viewMode === "grid" ? "#fff" : "transparent",
+              color: viewMode === "grid" ? "#0F172A" : "#64748B",
+              fontWeight: 600,
+              fontSize: isMobile ? "11px" : "12px",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              boxShadow:
+                viewMode === "grid" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              transition: "all 0.2s",
+            }}
+          >
+            <FiGrid size={isMobile ? 14 : 16} />
+            {tc("grid", "Grid")}
+          </button>
+        </div>
       </div>
 
       {/* Results count */}
@@ -720,7 +1095,7 @@ export default function DocumentVault() {
         </p>
       )}
 
-      {/* Documents grid */}
+      {/* Documents grid - Conditional rendering based on view mode */}
       {isLoading ? (
         <div
           style={{
@@ -773,15 +1148,36 @@ export default function DocumentVault() {
           </p>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {documents.map((doc) => (
-            <DocumentCard
-              key={doc._id}
-              doc={doc}
-              onDownload={handleDownload}
-              t={t}
-            />
-          ))}
+        <div
+          style={{
+            display: viewMode === "grid" ? "grid" : "flex",
+            gridTemplateColumns:
+              viewMode === "grid"
+                ? isMobile
+                  ? "1fr"
+                  : "repeat(auto-fill, minmax(280px, 1fr))"
+                : "1fr",
+            gap: viewMode === "grid" ? "16px" : "10px",
+            flexDirection: viewMode === "list" ? "column" : undefined,
+          }}
+        >
+          {documents.map((doc) =>
+            viewMode === "list" ? (
+              <DocumentCard
+                key={doc._id}
+                doc={doc}
+                onDownload={handleDownload}
+                t={t}
+              />
+            ) : (
+              <DocumentGridCard
+                key={doc._id}
+                doc={doc}
+                onDownload={handleDownload}
+                t={t}
+              />
+            ),
+          )}
         </div>
       )}
 
