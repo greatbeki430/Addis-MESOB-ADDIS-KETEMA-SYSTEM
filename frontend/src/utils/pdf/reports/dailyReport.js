@@ -248,22 +248,20 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     const reportDate = date || new Date().toISOString().split("T")[0];
     const displayDate = reportDate.split("-").reverse().join("/");
 
-    setSmartFont(`${labels.reportDate}: ${displayDate}`, false);
+    // ✅ FIX: Encode the full string properly
+    const reportDateText = `${labels.reportDate}: ${displayDate}`;
+    setSmartFont(reportDateText, false);
     doc.setFontSize(11);
-    doc.text(
-      encodeText(`${labels.reportDate}: ${displayDate}`),
-      pageWidth / 2,
-      yPos,
-      {
-        align: "center",
-      },
-    );
+    doc.text(encodeText(reportDateText), pageWidth / 2, yPos, {
+      align: "center",
+    });
     yPos += 8;
 
     // ─── ✅ Generated On (Ethiopian calendar) ────────────────────────────────
     const ethiopianDate = formatEthiopianDate(new Date());
     const generatedOnText = `${labels.generatedOn}: ${ethiopianDate}`;
 
+    // ✅ FIX: Encode the full string properly and ensure font is set
     setSmartFont(generatedOnText, false);
     doc.setFontSize(9);
     doc.setTextColor(120, 120, 120);
