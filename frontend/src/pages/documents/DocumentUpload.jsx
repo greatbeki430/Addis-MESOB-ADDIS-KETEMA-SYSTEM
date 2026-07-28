@@ -1,7 +1,7 @@
 // frontend/src/pages/documents/DocumentUpload.jsx
 // Upload form for CRRSA Document Vault with advanced AI metadata extraction
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useDropzone } from "react-dropzone";
 import { documentAPI } from "../../services/api";
 import { C } from "../../styles/theme";
@@ -38,45 +38,57 @@ const analyzeDocument = (file, mimeType) => documentAPI.analyze(file, mimeType);
 export default function DocumentUpload({ onSuccess, onClose }) {
   const { t } = useLanguage();
 
-  // Translation helpers
-  const td = (key, fallback) => t?.(`documentVault.${key}`) || fallback;
-  const tc = (key, fallback) => t?.(`common.${key}`) || fallback;
+  // ✅ FIX: Wrap td in useCallback to prevent it from changing on every render
+  const td = useCallback(
+    (key, fallback) => t?.(`documentVault.${key}`) || fallback,
+    [t],
+  );
 
-  const DOCUMENT_TYPES = [
-    {
-      value: "birth_certificate",
-      label: td("typeBirthCertificate", "Birth Certificate"),
-    },
-    {
-      value: "death_certificate",
-      label: td("typeDeathCertificate", "Death Certificate"),
-    },
-    {
-      value: "marriage_certificate",
-      label: td("typeMarriageCertificate", "Marriage Certificate"),
-    },
-    {
-      value: "divorce_certificate",
-      label: td("typeDivorceCertificate", "Divorce Certificate"),
-    },
-    { value: "residence_id", label: td("typeResidenceId", "Residence ID") },
-    { value: "name_change", label: td("typeNameChange", "Name Change") },
-    {
-      value: "registration_book",
-      label: td("typeRegistrationBook", "Registration Book"),
-    },
-    { value: "circular", label: td("typeCircular", "Circular") },
-    { value: "directive", label: td("typeDirective", "Directive") },
-    {
-      value: "correspondence",
-      label: td("typeCorrespondence", "Correspondence"),
-    },
-    {
-      value: "application_form",
-      label: td("typeApplicationForm", "Application Form"),
-    },
-    { value: "other", label: td("typeOther", "Other") },
-  ];
+  // ✅ FIX: Wrap tc in useCallback to prevent it from changing on every render
+  const tc = useCallback(
+    (key, fallback) => t?.(`common.${key}`) || fallback,
+    [t],
+  );
+
+  // ✅ FIX: Wrap DOCUMENT_TYPES in useMemo to prevent it from being recreated on every render
+  const DOCUMENT_TYPES = useMemo(
+    () => [
+      {
+        value: "birth_certificate",
+        label: td("typeBirthCertificate", "Birth Certificate"),
+      },
+      {
+        value: "death_certificate",
+        label: td("typeDeathCertificate", "Death Certificate"),
+      },
+      {
+        value: "marriage_certificate",
+        label: td("typeMarriageCertificate", "Marriage Certificate"),
+      },
+      {
+        value: "divorce_certificate",
+        label: td("typeDivorceCertificate", "Divorce Certificate"),
+      },
+      { value: "residence_id", label: td("typeResidenceId", "Residence ID") },
+      { value: "name_change", label: td("typeNameChange", "Name Change") },
+      {
+        value: "registration_book",
+        label: td("typeRegistrationBook", "Registration Book"),
+      },
+      { value: "circular", label: td("typeCircular", "Circular") },
+      { value: "directive", label: td("typeDirective", "Directive") },
+      {
+        value: "correspondence",
+        label: td("typeCorrespondence", "Correspondence"),
+      },
+      {
+        value: "application_form",
+        label: td("typeApplicationForm", "Application Form"),
+      },
+      { value: "other", label: td("typeOther", "Other") },
+    ],
+    [td],
+  );
 
   const [form, setForm] = useState({
     documentType: "",
@@ -121,104 +133,158 @@ export default function DocumentUpload({ onSuccess, onClose }) {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Calls the backend AI vision analyzer and auto-fills the form with enhanced details
-  const runAiAnalysis = async (base64File, mimeType) => {
-    const startTime = Date.now();
-    setIsAnalyzing(true);
-    setAnalyzeError("");
-    setAiFilledFields({});
-    setAiConfidence(null);
-    setAiNotes("");
-    setIsNotCRRSADocument(false);
-    setDetectedDocumentType("");
-    setAiExtractedDetails(null);
-    setAiDocumentQuality(null);
-    setShowExtractedDetails(false);
+  // ✅ FIX: runAiAnalysis with stable dependencies
+  const runAiAnalysis = useCallback(
+    async (base64File, mimeType) => {
+      const startTime = Date.now();
+      setIsAnalyzing(true);
+      setAnalyzeError("");
+      setAiFilledFields({});
+      setAiConfidence(null);
+      setAiNotes("");
+      setIsNotCRRSADocument(false);
+      setDetectedDocumentType("");
+      setAiExtractedDetails(null);
+      setAiDocumentQuality(null);
+      setShowExtractedDetails(false);
 
-    try {
-      const res = await analyzeDocument(base64File, mimeType);
-      const a = res.data?.analysis || {};
+      try {
+        const res = await analyzeDocument(base64File, mimeType);
+        const a = res.data?.analysis || {};
 
-      setAiProcessingTime(Date.now() - startTime);
+        setAiProcessingTime(Date.now() - startTime);
 
-      if (a.notes) {
-        setAiNotes(a.notes);
-        if (a.documentType === "other" || a.confidence === "low") {
-          setForm((prev) => ({ ...prev, notes: a.notes }));
+        if (a.notes) {
+          setAiNotes(a.notes);
+          if (a.documentType === "other" || a.confidence === "low") {
+            setForm((prev) => ({ ...prev, notes: a.notes }));
+          }
         }
-      }
-      if (a.documentType) setDetectedDocumentType(a.documentType);
+        if (a.documentType) setDetectedDocumentType(a.documentType);
 
-      if (a.extractedDetails) {
-        setAiExtractedDetails(a.extractedDetails);
-        setShowExtractedDetails(true);
-      } else {
-        const details = {
-          documentNumber: a.nationalId || a.referenceNumber || null,
-          issuedBy: a.issuingOfficer || a.issuingDepartment || null,
-          issueLocation: a.issueLocation || "Addis Ababa",
-          documentLanguage: a.documentLanguage || "Amharic/English",
-          documentVersion: a.documentVersion || "1.0",
-          pageCount: a.pageCount || 1,
-          fileSize: file ? Math.round(file.size / 1024) : 0,
-          fileType: mimeType,
-        };
-        setAiExtractedDetails(details);
-        setShowExtractedDetails(true);
-      }
-
-      if (a.documentQuality) {
-        setAiDocumentQuality(a.documentQuality);
-      } else {
-        let quality = td("goodQuality", "Good quality document");
-        if (a.confidence === "high") {
-          quality = td(
-            "excellentQuality",
-            "Excellent quality document - All fields clearly visible and legible",
-          );
-        } else if (a.confidence === "medium") {
-          quality = td(
-            "acceptableQuality",
-            "Acceptable quality - Some fields may require manual verification",
-          );
+        if (a.extractedDetails) {
+          setAiExtractedDetails(a.extractedDetails);
+          setShowExtractedDetails(true);
         } else {
-          quality = td(
-            "lowQuality",
-            "Low quality - Document may be blurry or incomplete. Please verify all fields",
-          );
+          const details = {
+            documentNumber: a.nationalId || a.referenceNumber || null,
+            issuedBy: a.issuingOfficer || a.issuingDepartment || null,
+            issueLocation: a.issueLocation || "Addis Ababa",
+            documentLanguage: a.documentLanguage || "Amharic/English",
+            documentVersion: a.documentVersion || "1.0",
+            pageCount: a.pageCount || 1,
+            fileSize: file ? Math.round(file.size / 1024) : 0,
+            fileType: mimeType,
+          };
+          setAiExtractedDetails(details);
+          setShowExtractedDetails(true);
         }
-        setAiDocumentQuality(quality);
-      }
 
-      const isNotCRRSA =
-        a.documentType === "other" ||
-        a.notes?.toLowerCase().includes("not a government document") ||
-        a.notes?.toLowerCase().includes("business card") ||
-        a.notes?.toLowerCase().includes("professional profile") ||
-        a.notes?.toLowerCase().includes("promotional") ||
-        a.notes?.toLowerCase().includes("digital solutions") ||
-        a.notes?.toLowerCase().includes("not a crrsa") ||
-        a.notes?.toLowerCase().includes("not a civil registration") ||
-        (a.confidence === "low" &&
-          !a.citizenName &&
-          !a.issueDate &&
-          !a.title &&
-          a.documentType !== "birth_certificate");
+        if (a.documentQuality) {
+          setAiDocumentQuality(a.documentQuality);
+        } else {
+          let quality = td("goodQuality", "Good quality document");
+          if (a.confidence === "high") {
+            quality = td(
+              "excellentQuality",
+              "Excellent quality document - All fields clearly visible and legible",
+            );
+          } else if (a.confidence === "medium") {
+            quality = td(
+              "acceptableQuality",
+              "Acceptable quality - Some fields may require manual verification",
+            );
+          } else {
+            quality = td(
+              "lowQuality",
+              "Low quality - Document may be blurry or incomplete. Please verify all fields",
+            );
+          }
+          setAiDocumentQuality(quality);
+        }
 
-      if (isNotCRRSA) {
-        setIsNotCRRSADocument(true);
+        const isNotCRRSA =
+          a.documentType === "other" ||
+          a.notes?.toLowerCase().includes("not a government document") ||
+          a.notes?.toLowerCase().includes("business card") ||
+          a.notes?.toLowerCase().includes("professional profile") ||
+          a.notes?.toLowerCase().includes("promotional") ||
+          a.notes?.toLowerCase().includes("digital solutions") ||
+          a.notes?.toLowerCase().includes("not a crrsa") ||
+          a.notes?.toLowerCase().includes("not a civil registration") ||
+          (a.confidence === "low" &&
+            !a.citizenName &&
+            !a.issueDate &&
+            !a.title &&
+            a.documentType !== "birth_certificate");
+
+        if (isNotCRRSA) {
+          setIsNotCRRSADocument(true);
+          const filled = {};
+          setForm((prev) => {
+            const next = { ...prev };
+            if (a.citizenName) {
+              next.citizenName = a.citizenName;
+              filled.citizenName = true;
+            }
+            if (a.title) {
+              next.title = a.title;
+              filled.title = true;
+            }
+            if (a.tags && Array.isArray(a.tags)) {
+              next.tags = a.tags.join(", ");
+              filled.tags = true;
+            }
+            if (a.notes) {
+              next.notes = a.notes;
+              filled.notes = true;
+            }
+            next.documentType = "other";
+            filled.documentType = true;
+            return next;
+          });
+          setAiFilledFields(filled);
+          setAiConfidence(a.confidence || "low");
+          if (a.notes) setAiNotes(`⚠️ ${a.notes}`);
+          return;
+        }
+
         const filled = {};
         setForm((prev) => {
           const next = { ...prev };
-          if (a.citizenName) {
-            next.citizenName = a.citizenName;
-            filled.citizenName = true;
+          if (a.documentType && a.documentType !== "other") {
+            next.documentType = a.documentType;
+            filled.documentType = true;
           }
           if (a.title) {
             next.title = a.title;
             filled.title = true;
           }
-          if (a.tags && Array.isArray(a.tags)) {
+          if (a.citizenName) {
+            next.citizenName = a.citizenName;
+            filled.citizenName = true;
+          }
+          if (a.citizenNameAmharic) {
+            next.citizenNameAmharic = a.citizenNameAmharic;
+            filled.citizenNameAmharic = true;
+          }
+          if (a.issueDate) {
+            next.issueDate = a.issueDate;
+            filled.issueDate = true;
+          }
+          if (a.issuingOfficer) {
+            next.issuingOfficer = a.issuingOfficer;
+            filled.issuingOfficer = true;
+          }
+          if (a.issuingDepartment) {
+            next.issuingDepartment = a.issuingDepartment;
+            filled.issuingDepartment = true;
+          }
+          if (a.nationalId) {
+            next.nationalId = a.nationalId;
+            filled.nationalId = true;
+          }
+          if (Array.isArray(a.tags) && a.tags.length > 0) {
             next.tags = a.tags.join(", ");
             filled.tags = true;
           }
@@ -226,87 +292,36 @@ export default function DocumentUpload({ onSuccess, onClose }) {
             next.notes = a.notes;
             filled.notes = true;
           }
-          next.documentType = "other";
-          filled.documentType = true;
           return next;
         });
+
         setAiFilledFields(filled);
-        setAiConfidence(a.confidence || "low");
-        if (a.notes) setAiNotes(`⚠️ ${a.notes}`);
-        return;
+        setAiConfidence(a.confidence || null);
+
+        if (a.confidence === "high" && a.documentType) {
+          const typeLabel =
+            DOCUMENT_TYPES.find((t) => t.value === a.documentType)?.label ||
+            a.documentType;
+          setAiNotes(
+            `✅ Successfully identified as ${typeLabel} with high confidence`,
+          );
+        }
+      } catch (err) {
+        const errorMsg =
+          err.response?.data?.message ||
+          td(
+            "aiAnalysisFailed",
+            "AI analysis failed. Please fill in the fields manually.",
+          );
+        setAnalyzeError(errorMsg);
+        console.error("AI Analysis error:", err);
+        setAiProcessingTime(Date.now() - startTime);
+      } finally {
+        setIsAnalyzing(false);
       }
-
-      const filled = {};
-      setForm((prev) => {
-        const next = { ...prev };
-        if (a.documentType && a.documentType !== "other") {
-          next.documentType = a.documentType;
-          filled.documentType = true;
-        }
-        if (a.title) {
-          next.title = a.title;
-          filled.title = true;
-        }
-        if (a.citizenName) {
-          next.citizenName = a.citizenName;
-          filled.citizenName = true;
-        }
-        if (a.citizenNameAmharic) {
-          next.citizenNameAmharic = a.citizenNameAmharic;
-          filled.citizenNameAmharic = true;
-        }
-        if (a.issueDate) {
-          next.issueDate = a.issueDate;
-          filled.issueDate = true;
-        }
-        if (a.issuingOfficer) {
-          next.issuingOfficer = a.issuingOfficer;
-          filled.issuingOfficer = true;
-        }
-        if (a.issuingDepartment) {
-          next.issuingDepartment = a.issuingDepartment;
-          filled.issuingDepartment = true;
-        }
-        if (a.nationalId) {
-          next.nationalId = a.nationalId;
-          filled.nationalId = true;
-        }
-        if (Array.isArray(a.tags) && a.tags.length > 0) {
-          next.tags = a.tags.join(", ");
-          filled.tags = true;
-        }
-        if (a.notes) {
-          next.notes = a.notes;
-          filled.notes = true;
-        }
-        return next;
-      });
-
-      setAiFilledFields(filled);
-      setAiConfidence(a.confidence || null);
-
-      if (a.confidence === "high" && a.documentType) {
-        const typeLabel =
-          DOCUMENT_TYPES.find((t) => t.value === a.documentType)?.label ||
-          a.documentType;
-        setAiNotes(
-          `✅ Successfully identified as ${typeLabel} with high confidence`,
-        );
-      }
-    } catch (err) {
-      const errorMsg =
-        err.response?.data?.message ||
-        td(
-          "aiAnalysisFailed",
-          "AI analysis failed. Please fill in the fields manually.",
-        );
-      setAnalyzeError(errorMsg);
-      console.error("AI Analysis error:", err);
-      setAiProcessingTime(Date.now() - startTime);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
+    },
+    [td, file, DOCUMENT_TYPES],
+  );
 
   const onDrop = useCallback(
     (acceptedFiles) => {
