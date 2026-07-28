@@ -18,7 +18,6 @@ import {
   FiFileText,
   FiBarChart2,
   FiFile,
-  FiZap,
 } from "react-icons/fi";
 
 export default function DailyReport({ t, lang }) {
@@ -728,7 +727,7 @@ export default function DailyReport({ t, lang }) {
               </table>
             </div>
 
-            {/* ✅ AI Report Assistant */}
+            {/* ✅ AI Report Assistant - This component provides AI Writing Assistant, Summarize, and Full Report buttons */}
             {rows.length > 0 && rows.some((r) => r.dept || r.service) && (
               <div style={{ marginTop: "clamp(12px, 3vw, 16px)" }}>
                 <AIReportAssistant
@@ -752,10 +751,10 @@ export default function DailyReport({ t, lang }) {
               </div>
             )}
 
-            {/* ✅ Action Buttons - Horizontal layout with better styling */}
+            {/* ✅ Action Buttons - Only Export PDF and Save Report (AI buttons are inside AIReportAssistant) */}
             <div
               style={{
-                marginTop: "clamp(20px, 4vw, 28px)",
+                marginTop: "clamp(16px, 3vw, 24px)",
                 display: "flex",
                 gap: "clamp(8px, 2vw, 14px)",
                 justifyContent: isMobile ? "center" : "flex-start",
@@ -763,7 +762,7 @@ export default function DailyReport({ t, lang }) {
                 padding: isMobile ? "0" : "0",
               }}
             >
-              {/* Export PDF Button - Primary Action */}
+              {/* Export PDF Button */}
               <button
                 style={{
                   background: exporting ? "#94A3B8" : "#DC2626",
@@ -822,7 +821,7 @@ export default function DailyReport({ t, lang }) {
                 )}
               </button>
 
-              {/* Save Report Button - Primary */}
+              {/* Save Report Button */}
               <button
                 style={{
                   background: saving ? "#94A3B8" : C.primary,
@@ -876,123 +875,6 @@ export default function DailyReport({ t, lang }) {
                     {!isMobile && td("save", "Save Report")}
                   </>
                 )}
-              </button>
-
-              {/* AI Writing Assistant - Secondary Action */}
-              <button
-                style={{
-                  background: "#8B5CF6",
-                  color: "#fff",
-                  border: "none",
-                  padding: isMobile
-                    ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
-                    : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
-                  borderRadius: 10,
-                  fontSize: isMobile
-                    ? "clamp(12px, 3vw, 13px)"
-                    : "clamp(13px, 2.5vw, 14px)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  transition: "all 0.3s ease",
-                  boxShadow: "0 4px 15px rgba(139,92,246,0.3)",
-                  flex: isMobile ? "1 1 auto" : "0 1 auto",
-                  minWidth: isMobile ? "auto" : "140px",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow =
-                    "0 6px 20px rgba(139,92,246,0.4)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow =
-                    "0 4px 15px rgba(139,92,246,0.3)";
-                }}
-              >
-                <FiZap size={16} />
-                {!isMobile && td("aiAssistant", "AI Writing Assistant")}
-              </button>
-
-              {/* Summarize Button - Secondary */}
-              <button
-                style={{
-                  background: "#F59E0B",
-                  color: "#fff",
-                  border: "none",
-                  padding: isMobile
-                    ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
-                    : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
-                  borderRadius: 10,
-                  fontSize: isMobile
-                    ? "clamp(12px, 3vw, 13px)"
-                    : "clamp(13px, 2.5vw, 14px)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  transition: "all 0.3s ease",
-                  boxShadow: "0 4px 15px rgba(245,158,11,0.3)",
-                  flex: isMobile ? "1 1 auto" : "0 1 auto",
-                  minWidth: isMobile ? "auto" : "140px",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow =
-                    "0 6px 20px rgba(245,158,11,0.4)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow =
-                    "0 4px 15px rgba(245,158,11,0.3)";
-                }}
-              >
-                <FiBarChart2 size={16} />
-                {!isMobile && td("summarize", "Summarize")}
-              </button>
-
-              {/* Full Report Button - Secondary */}
-              <button
-                style={{
-                  background: "#3B82F6",
-                  color: "#fff",
-                  border: "none",
-                  padding: isMobile
-                    ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
-                    : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
-                  borderRadius: 10,
-                  fontSize: isMobile
-                    ? "clamp(12px, 3vw, 13px)"
-                    : "clamp(13px, 2.5vw, 14px)",
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 8,
-                  transition: "all 0.3s ease",
-                  boxShadow: "0 4px 15px rgba(59,130,246,0.3)",
-                  flex: isMobile ? "1 1 auto" : "0 1 auto",
-                  minWidth: isMobile ? "auto" : "140px",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow =
-                    "0 6px 20px rgba(59,130,246,0.4)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow =
-                    "0 4px 15px rgba(59,130,246,0.3)";
-                }}
-              >
-                <FiFileText size={16} />
-                {!isMobile && td("fullReport", "Full Report")}
               </button>
             </div>
 
