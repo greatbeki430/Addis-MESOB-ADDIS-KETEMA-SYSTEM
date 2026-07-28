@@ -126,33 +126,38 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     const doc = engine.getDoc();
 
     // ✅ IMPORTANT: Load fonts into this document
+    // (createPDF()/engine.init() already calls loadFonts() once, but this
+    // is safe to call again — loadFonts() no-ops if doc.__fontsLoaded is
+    // already true. Kept here for explicitness / defensive re-entry.)
     loadFonts(doc, { silent: false });
 
     // ─── Helper: Set font based on text content ───
+    // ✅ FIXED: previously this switched the FONT NAME for bold
+    // (FONT_NAMES.ethiopicBold / FONT_NAMES.latinBold) while hardcoding
+    // the style argument to "normal" — so bold text asked jsPDF for
+    // ("<name>-Bold", "normal"), a pair that was never registered, and
+    // silently fell back to Helvetica. FONT_NAMES.ethiopic/latin now
+    // resolve to the single registered family for both weights; only the
+    // *style* argument should ever vary.
     const setSmartFont = (text, bold = false) => {
       try {
         const hasAmharic = isAmharic(text);
+        const style = bold ? "bold" : "normal";
 
         if (hasAmharic) {
           // Use Ethiopic fonts if available
           if (doc.__hasEthiopicFont) {
-            doc.setFont(
-              bold ? FONT_NAMES.ethiopicBold : FONT_NAMES.ethiopic,
-              "normal",
-            );
+            doc.setFont(FONT_NAMES.ethiopic, style);
           } else {
             // Fallback to helvetica with bold style
-            doc.setFont("helvetica", bold ? "bold" : "normal");
+            doc.setFont("helvetica", style);
           }
         } else {
           // Use Latin fonts for English/Oromo
           if (doc.__hasLatinFont) {
-            doc.setFont(
-              bold ? FONT_NAMES.latinBold : FONT_NAMES.latin,
-              "normal",
-            );
+            doc.setFont(FONT_NAMES.latin, style);
           } else {
-            doc.setFont("helvetica", bold ? "bold" : "normal");
+            doc.setFont("helvetica", style);
           }
         }
       } catch (error) {
@@ -295,18 +300,21 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         4: { cellWidth: 25, halign: "center" },
         5: { cellWidth: 30, halign: "center" },
       },
-      // ✅ IMPORTANT: Handle mixed language content with proper fonts
+      // ✅ Handle mixed language content with proper fonts.
+      // Only the FAMILY name needs to be chosen per-cell here — the STYLE
+      // (bold for head/foot, normal for body) is already supplied by
+      // headStyles/footStyles/bodyStyles above and is now honored
+      // correctly because fontLoader.js registers bold under the same
+      // family name as regular.
       didParseCell: (data) => {
         const cellText = String(data.cell.raw || "");
         const hasAmharic = /[\u1200-\u137F]/.test(cellText);
 
         if (hasAmharic) {
-          // Use Ethiopic font for Amharic text
           data.cell.styles.font = doc.__hasEthiopicFont
             ? FONT_NAMES.ethiopic
             : "helvetica";
         } else {
-          // Use Latin font for non-Amharic text
           data.cell.styles.font = doc.__hasLatinFont
             ? FONT_NAMES.latin
             : "helvetica";
@@ -380,6 +388,9 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       });
 
       // Page numbers
+      // Note: reuses whatever font setSmartFont(footerText, false) just set
+      // (normal weight) — the page-number label ("ገጽ 1 ከ 1") is not bold,
+      // so this is correct as-is.
       doc.text(
         `${labels.page} ${i} ${labels.of} ${pageCount}`,
         pageWidth - 15,
