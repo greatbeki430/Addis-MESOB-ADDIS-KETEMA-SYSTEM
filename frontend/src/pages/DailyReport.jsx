@@ -13,11 +13,12 @@ import {
   FiList,
   FiPlus,
   FiX,
-  FiDownload,
   FiSave,
   FiLoader,
   FiFileText,
   FiBarChart2,
+  FiFile,
+  FiZap,
 } from "react-icons/fi";
 
 export default function DailyReport({ t, lang }) {
@@ -41,8 +42,16 @@ export default function DailyReport({ t, lang }) {
     female: 0,
   });
   const [savedReportId, setSavedReportId] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const prevRowsRef = useRef(rows);
+
+  // Handle resize
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // ─── Fetch departments and services ──────────────────────────────────────────
   useEffect(() => {
@@ -60,8 +69,6 @@ export default function DailyReport({ t, lang }) {
               ? response.data.services
               : [];
 
-        console.log("📦 Services:", services);
-
         if (cancelled) return;
 
         setAllServices(services);
@@ -70,18 +77,13 @@ export default function DailyReport({ t, lang }) {
 
         services.forEach((s) => {
           if (!s?.dept) return;
-
           deptMap.set(s.dept, lang === "en" ? s.deptEn || s.dept : s.dept);
         });
 
         const deptEntries = [...deptMap.entries()];
-
-        console.log("🏢 Departments:", deptEntries);
-
         setDepartments(deptEntries);
       } catch (err) {
         console.error("Failed to fetch services:", err);
-
         if (!cancelled) {
           setAllServices([]);
           setDepartments([]);
@@ -143,18 +145,15 @@ export default function DailyReport({ t, lang }) {
   const upd = (index, field, value) => {
     setRows((prevRows) => {
       const next = [...prevRows];
-
       next[index] = {
         ...next[index],
         [field]: value,
       };
-
       if (field === "male" || field === "female") {
         next[index].total =
           (Number(field === "male" ? value : next[index].male) || 0) +
           (Number(field === "female" ? value : next[index].female) || 0);
       }
-
       return next;
     });
   };
@@ -518,13 +517,11 @@ export default function DailyReport({ t, lang }) {
                             onChange={(e) => {
                               setRows((prev) => {
                                 const next = [...prev];
-
                                 next[i] = {
                                   ...next[i],
                                   dept: e.target.value,
                                   service: "",
                                 };
-
                                 return next;
                               });
                             }}
@@ -532,7 +529,6 @@ export default function DailyReport({ t, lang }) {
                             <option value="">
                               {td("selectDept", "Select Dept")}
                             </option>
-
                             {departments.map(([rawKey, label]) => (
                               <option key={rawKey} value={rawKey}>
                                 {label}
@@ -720,7 +716,7 @@ export default function DailyReport({ t, lang }) {
               </table>
             </div>
 
-            {/* ✅ NEW — AI Report Assistant */}
+            {/* ✅ AI Report Assistant */}
             {rows.length > 0 && rows.some((r) => r.dept || r.service) && (
               <div style={{ marginTop: "clamp(12px, 3vw, 16px)" }}>
                 <AIReportAssistant
@@ -744,31 +740,43 @@ export default function DailyReport({ t, lang }) {
               </div>
             )}
 
-            {/* Action Buttons */}
+            {/* ✅ IMPROVED: Action Buttons - Horizontal layout with better styling */}
             <div
               style={{
-                marginTop: "clamp(16px, 4vw, 20px)",
+                marginTop: "clamp(20px, 4vw, 28px)",
                 display: "flex",
-                gap: "clamp(8px, 3vw, 12px)",
-                justifyContent: "center",
+                gap: "clamp(8px, 2vw, 14px)",
+                justifyContent: isMobile ? "center" : "flex-start",
                 flexWrap: "wrap",
+                padding: isMobile ? "0" : "0",
               }}
             >
+              {/* Export PDF Button - Primary Action */}
               <button
                 style={{
-                  background: "#dc2626",
+                  background: exporting ? "#94A3B8" : "#DC2626",
                   color: "#fff",
                   border: "none",
-                  padding: "clamp(10px, 2.5vw, 14px) clamp(20px, 5vw, 32px)",
+                  padding: isMobile
+                    ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
+                    : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
                   borderRadius: 10,
-                  fontSize: "clamp(13px, 3.5vw, 15px)",
+                  fontSize: isMobile
+                    ? "clamp(12px, 3vw, 13px)"
+                    : "clamp(13px, 2.5vw, 14px)",
                   fontWeight: 700,
                   cursor: exporting ? "not-allowed" : "pointer",
                   display: "inline-flex",
                   alignItems: "center",
+                  justifyContent: "center",
                   gap: 8,
                   transition: "all 0.3s ease",
                   opacity: exporting ? 0.7 : 1,
+                  boxShadow: exporting
+                    ? "none"
+                    : "0 4px 15px rgba(220,38,38,0.3)",
+                  flex: isMobile ? "1 1 auto" : "0 1 auto",
+                  minWidth: isMobile ? "auto" : "140px",
                 }}
                 onClick={exportPDF}
                 disabled={exporting}
@@ -776,12 +784,14 @@ export default function DailyReport({ t, lang }) {
                   if (!exporting) {
                     e.currentTarget.style.transform = "translateY(-2px)";
                     e.currentTarget.style.boxShadow =
-                      "0 6px 20px rgba(220,38,38,0.3)";
+                      "0 6px 20px rgba(220,38,38,0.4)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.boxShadow = exporting
+                    ? "none"
+                    : "0 4px 15px rgba(220,38,38,0.3)";
                 }}
               >
                 {exporting ? (
@@ -789,53 +799,200 @@ export default function DailyReport({ t, lang }) {
                     <FiLoader
                       size={16}
                       style={{ animation: "spin 1s linear infinite" }}
-                    />{" "}
-                    {td("exporting", "Exporting...")}
+                    />
+                    {!isMobile && td("exporting", "Exporting...")}
                   </>
                 ) : (
                   <>
-                    <FiDownload size={16} /> {td("exportPdf", "Export PDF")}
+                    <FiFile size={16} />
+                    {!isMobile && td("exportPdf", "Export PDF")}
                   </>
                 )}
               </button>
 
+              {/* Save Report Button - Primary */}
               <button
                 style={{
-                  ...btn.primary,
-                  padding: "clamp(10px, 2.5vw, 14px) clamp(20px, 5vw, 32px)",
-                  fontSize: "clamp(13px, 3.5vw, 15px)",
+                  background: saving ? "#94A3B8" : C.primary,
+                  color: "#fff",
+                  border: "none",
+                  padding: isMobile
+                    ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
+                    : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
+                  borderRadius: 10,
+                  fontSize: isMobile
+                    ? "clamp(12px, 3vw, 13px)"
+                    : "clamp(13px, 2.5vw, 14px)",
+                  fontWeight: 700,
+                  cursor: saving ? "not-allowed" : "pointer",
                   display: "inline-flex",
                   alignItems: "center",
+                  justifyContent: "center",
                   gap: 8,
+                  transition: "all 0.3s ease",
                   opacity: saving ? 0.7 : 1,
-                  cursor: saving ? "not-allowed" : "pointer",
+                  boxShadow: saving ? "none" : `0 4px 15px ${C.primary}44`,
+                  flex: isMobile ? "1 1 auto" : "0 1 auto",
+                  minWidth: isMobile ? "auto" : "140px",
                 }}
                 onClick={saveReport}
                 disabled={saving}
+                onMouseEnter={(e) => {
+                  if (!saving) {
+                    e.currentTarget.style.transform = "translateY(-2px)";
+                    e.currentTarget.style.boxShadow = `0 6px 20px ${C.primary}66`;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = saving
+                    ? "none"
+                    : `0 4px 15px ${C.primary}44`;
+                }}
               >
                 {saving ? (
                   <>
                     <FiLoader
                       size={16}
                       style={{ animation: "spin 1s linear infinite" }}
-                    />{" "}
-                    {tcm("saving", "Saving...")}
+                    />
+                    {!isMobile && tcm("saving", "Saving...")}
                   </>
                 ) : (
                   <>
-                    <FiSave size={16} /> {td("save", "Save Report")}
+                    <FiSave size={16} />
+                    {!isMobile && td("save", "Save Report")}
                   </>
                 )}
               </button>
+
+              {/* AI Writing Assistant - Secondary Action */}
+              <button
+                style={{
+                  background: "#8B5CF6",
+                  color: "#fff",
+                  border: "none",
+                  padding: isMobile
+                    ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
+                    : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
+                  borderRadius: 10,
+                  fontSize: isMobile
+                    ? "clamp(12px, 3vw, 13px)"
+                    : "clamp(13px, 2.5vw, 14px)",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  transition: "all 0.3s ease",
+                  boxShadow: "0 4px 15px rgba(139,92,246,0.3)",
+                  flex: isMobile ? "1 1 auto" : "0 1 auto",
+                  minWidth: isMobile ? "auto" : "140px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 6px 20px rgba(139,92,246,0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 15px rgba(139,92,246,0.3)";
+                }}
+              >
+                <FiZap size={16} />
+                {!isMobile && td("aiAssistant", "AI Writing Assistant")}
+              </button>
+
+              {/* Summarize Button - Secondary */}
+              <button
+                style={{
+                  background: "#F59E0B",
+                  color: "#fff",
+                  border: "none",
+                  padding: isMobile
+                    ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
+                    : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
+                  borderRadius: 10,
+                  fontSize: isMobile
+                    ? "clamp(12px, 3vw, 13px)"
+                    : "clamp(13px, 2.5vw, 14px)",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  transition: "all 0.3s ease",
+                  boxShadow: "0 4px 15px rgba(245,158,11,0.3)",
+                  flex: isMobile ? "1 1 auto" : "0 1 auto",
+                  minWidth: isMobile ? "auto" : "140px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 6px 20px rgba(245,158,11,0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 15px rgba(245,158,11,0.3)";
+                }}
+              >
+                <FiBarChart2 size={16} />
+                {!isMobile && td("summarize", "Summarize")}
+              </button>
+
+              {/* Full Report Button - Secondary */}
+              <button
+                style={{
+                  background: "#3B82F6",
+                  color: "#fff",
+                  border: "none",
+                  padding: isMobile
+                    ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
+                    : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
+                  borderRadius: 10,
+                  fontSize: isMobile
+                    ? "clamp(12px, 3vw, 13px)"
+                    : "clamp(13px, 2.5vw, 14px)",
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  transition: "all 0.3s ease",
+                  boxShadow: "0 4px 15px rgba(59,130,246,0.3)",
+                  flex: isMobile ? "1 1 auto" : "0 1 auto",
+                  minWidth: isMobile ? "auto" : "140px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-2px)";
+                  e.currentTarget.style.boxShadow =
+                    "0 6px 20px rgba(59,130,246,0.4)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow =
+                    "0 4px 15px rgba(59,130,246,0.3)";
+                }}
+              >
+                <FiFileText size={16} />
+                {!isMobile && td("fullReport", "Full Report")}
+              </button>
             </div>
 
-            {/* AI Insight panel, only shows once a report has been saved */}
+            {/* ✅ AI Insight panel - Added margin-top for spacing */}
             {savedReportId && (
-              <AISummary
-                fetchFn={(id) => aiAPI.getDailyInsight(id, null)}
-                args={[savedReportId]}
-                label={td("aiInsight", "AI Daily Insight")}
-              />
+              <div style={{ marginTop: "clamp(20px, 4vw, 30px)" }}>
+                <AISummary
+                  fetchFn={(id) => aiAPI.getDailyInsight(id, null)}
+                  args={[savedReportId]}
+                  label={td("aiInsight", "AI Daily Insight")}
+                />
+              </div>
             )}
           </>
         )}

@@ -151,6 +151,7 @@ export const commonTranslations = {
       // ✅ Added View Toggle Translations
       list: "List",
       grid: "Grid",
+      saving: "Saving...",
     },
   },
   am: {
@@ -302,6 +303,7 @@ export const commonTranslations = {
       // ✅ Added View Toggle Translations
       list: "ዝርዝር",
       grid: "ፍርግርግ",
+      saving: "በማስቀመጥ ላይ...",
     },
   },
   om: {
@@ -453,6 +455,7 @@ export const commonTranslations = {
       // ✅ Added View Toggle Translations
       list: "Tarree",
       grid: "Saffoo",
+      saving: "Olkaayaa jira...",
     },
   },
 };
