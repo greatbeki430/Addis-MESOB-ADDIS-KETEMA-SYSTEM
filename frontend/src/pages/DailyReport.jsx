@@ -223,7 +223,6 @@ export default function DailyReport({ t, lang }) {
     }
   };
 
-  // Update the exportPDF function
   const exportPDF = async () => {
     try {
       setExporting(true);
@@ -753,7 +752,7 @@ export default function DailyReport({ t, lang }) {
               </div>
             )}
 
-            {/* ✅ IMPROVED: Action Buttons - Horizontal layout with better styling */}
+            {/* ✅ Action Buttons - Horizontal layout with better styling */}
             <div
               style={{
                 marginTop: "clamp(20px, 4vw, 28px)",
@@ -997,7 +996,7 @@ export default function DailyReport({ t, lang }) {
               </button>
             </div>
 
-            {/* ✅ ADD THE PDF LANGUAGE SELECTOR HERE - right after the action buttons */}
+            {/* ✅ PDF Language Selector */}
             <div
               style={{
                 display: "flex",
@@ -1054,18 +1053,7 @@ export default function DailyReport({ t, lang }) {
               </select>
             </div>
 
-            {/* ✅ AI Insight panel - this already exists below */}
-            {savedReportId && (
-              <div style={{ marginTop: "clamp(20px, 4vw, 30px)" }}>
-                <AISummary
-                  fetchFn={(id) => aiAPI.getDailyInsight(id, null)}
-                  args={[savedReportId]}
-                  label={td("aiInsight", "AI Daily Insight")}
-                />
-              </div>
-            )}
-
-            {/* ✅ AI Insight panel - Added margin-top for spacing */}
+            {/* ✅ AI Insight panel - SINGLE INSTANCE ONLY */}
             {savedReportId && (
               <div style={{ marginTop: "clamp(20px, 4vw, 30px)" }}>
                 <AISummary
