@@ -55,4 +55,59 @@ router.post(
   },
 );
 
+// ✅ Profile photo upload endpoint
+router.post(
+  "/profile-photo",
+  protect,
+  upload.single("photo"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      // Convert buffer to base64
+      const base64 = req.file.buffer.toString("base64");
+      const dataURI = `data:${req.file.mimetype};base64,${base64}`;
+
+      // Upload to Cloudinary
+      const result = await cloudinary.uploader.upload(dataURI, {
+        folder: `profile-photos/${req.user._id}`,
+        public_id: `profile-${Date.now()}`,
+        width: 300,
+        height: 300,
+        crop: "fill",
+      });
+
+      // Update user with new photo
+      const User = require("../models/User");
+      const user = await User.findById(req.user._id);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Delete old photo if exists
+      if (user.profilePhotoPublicId) {
+        try {
+          await cloudinary.uploader.destroy(user.profilePhotoPublicId);
+        } catch (err) {
+          console.warn("Could not delete old photo:", err.message);
+        }
+      }
+
+      user.profilePhotoUrl = result.secure_url;
+      user.profilePhotoPublicId = result.public_id;
+      await user.save();
+
+      res.json({
+        url: result.secure_url,
+        publicId: result.public_id,
+      });
+    } catch (error) {
+      console.error("Profile photo upload error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
 module.exports = router;

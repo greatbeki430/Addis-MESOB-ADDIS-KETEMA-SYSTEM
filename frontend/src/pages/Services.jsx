@@ -1,5 +1,5 @@
 // frontend/src/pages/Services.jsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { card, C, F, inp } from "../styles/theme";
 import { SERVICES } from "../constants/services";
 import { serviceAPI } from "../services/api";
@@ -28,9 +28,8 @@ import {
 } from "react-icons/fi";
 
 export default function Services({ t, lang }) {
-  const safeT = t || {};
-  const ts = safeT.services || {};
-  const safeCommon = safeT.common || {};
+  // ✅ Wrap safeT in useMemo
+  const safeT = useMemo(() => t || {}, [t]);
 
   const [search, setSearch] = useState("");
   const [services, setServices] = useState([]);
@@ -42,6 +41,16 @@ export default function Services({ t, lang }) {
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(12);
+
+  // ✅ Wrap translation helpers in useCallback to stabilize them
+  const tsKey = useCallback(
+    (key, fallback) => safeT?.services?.[key] || fallback,
+    [safeT],
+  );
+  const tcKey = useCallback(
+    (key, fallback) => safeT?.common?.[key] || fallback,
+    [safeT],
+  );
 
   useEffect(() => {
     const loadServices = async () => {
@@ -92,35 +101,38 @@ export default function Services({ t, lang }) {
         }
       } catch (error) {
         console.error("❌ Failed to load services:", error);
-        setError(error.message || "Failed to load services");
+        setError(
+          error.message || tsKey("loadError", "Failed to load services"),
+        );
         setServices(SERVICES);
       } finally {
         setLoading(false);
       }
     };
     loadServices();
-  }, []);
+  }, [tsKey]); // ✅ tsKey is now stable
 
   const localizedServices = services.map((s) => ({
     ...s,
     displayName:
       lang === "en"
-        ? s.nameEn || s.name || "Unnamed Service"
-        : s.name || "Unnamed Service",
+        ? s.nameEn || s.name || tsKey("unnamed", "Unnamed Service")
+        : s.name || tsKey("unnamed", "Unnamed Service"),
     displayDept:
       lang === "en"
-        ? s.deptEn || s.dept || "Uncategorized"
-        : s.dept || "Uncategorized",
+        ? s.deptEn || s.dept || tsKey("uncategorized", "Uncategorized")
+        : s.dept || tsKey("uncategorized", "Uncategorized"),
   }));
 
   const depts = [
-    "All",
+    tsKey("allFilter", "All"),
     ...new Set(localizedServices.map((s) => s.displayDept).filter(Boolean)),
   ];
 
   const filtered = useMemo(() => {
     return localizedServices.filter((s) => {
-      const matchesDept = filter === "All" || s.displayDept === filter;
+      const matchesDept =
+        filter === tsKey("allFilter", "All") || s.displayDept === filter;
       const matchesSearch =
         s.displayName?.toLowerCase().includes(search.toLowerCase()) ||
         s.name?.toLowerCase().includes(search.toLowerCase()) ||
@@ -128,7 +140,7 @@ export default function Services({ t, lang }) {
         s.displayDept?.toLowerCase().includes(search.toLowerCase());
       return matchesDept && matchesSearch;
     });
-  }, [localizedServices, filter, search]);
+  }, [localizedServices, filter, search, tsKey]);
 
   const totalItems = filtered.length;
   const totalPages = Math.ceil(totalItems / itemsPerPage);
@@ -216,7 +228,7 @@ export default function Services({ t, lang }) {
                 backgroundClip: "text",
               }}
             >
-              {ts.title || "Addis MESOB · Services"}
+              {tsKey("title", "Addis MESOB · Services")}
             </h1>
             <p
               style={{
@@ -225,7 +237,7 @@ export default function Services({ t, lang }) {
                 margin: "2px 0 0",
               }}
             >
-              {ts.subtitle || "Digital One-Stop · Services"}
+              {tsKey("subtitle", "Digital One-Stop · Services")}
             </p>
           </div>
         </div>
@@ -246,7 +258,7 @@ export default function Services({ t, lang }) {
           }}
         >
           <FiGrid size={14} />
-          {ts.catalogue || "Service Catalogue"} • {services.length}
+          {tsKey("catalogue", "Service Catalogue")} • {services.length}
         </span>
       </div>
 
@@ -292,7 +304,7 @@ export default function Services({ t, lang }) {
                 boxShadow: searchFocused ? `0 0 0 3px ${C.primary}22` : "none",
                 transition: "all 0.3s ease",
               }}
-              placeholder={ts.search || "Search services..."}
+              placeholder={tsKey("search", "Search services...")}
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               onFocus={() => setSearchFocused(true)}
@@ -308,7 +320,8 @@ export default function Services({ t, lang }) {
               fontSize: "clamp(13px, 3.5vw, 14px)",
               background: C.white,
               transition: "all 0.3s ease",
-              borderColor: filter !== "All" ? C.primary : C.border,
+              borderColor:
+                filter !== tsKey("allFilter", "All") ? C.primary : C.border,
             }}
             value={filter}
             onChange={(e) => handleFilterChange(e.target.value)}
@@ -335,11 +348,13 @@ export default function Services({ t, lang }) {
           }}
         >
           <span style={{ fontSize: "clamp(12px, 3vw, 13px)", color: C.muted }}>
-            Showing {startIndex + 1}–{Math.min(endIndex, totalItems)} of{" "}
-            {totalItems} services
+            {tcKey("showing", "Showing")} {startIndex + 1}–
+            {Math.min(endIndex, totalItems)} {tcKey("of", "of")} {totalItems}{" "}
+            {tsKey("services", "services")}
           </span>
           <span style={{ fontSize: "clamp(12px, 3vw, 13px)", color: C.muted }}>
-            Page {currentPage} of {totalPages}
+            {tcKey("page", "Page")} {currentPage} {tcKey("of", "of")}{" "}
+            {totalPages}
           </span>
         </div>
       )}
@@ -474,7 +489,9 @@ export default function Services({ t, lang }) {
                       lineHeight: 1.3,
                     }}
                   >
-                    {s.displayName || s.name || "Unnamed Service"}
+                    {s.displayName ||
+                      s.name ||
+                      tsKey("unnamed", "Unnamed Service")}
                   </div>
 
                   <div
@@ -501,7 +518,9 @@ export default function Services({ t, lang }) {
                     }}
                   >
                     <FiBriefcase size={12} />
-                    {s.displayDept || s.dept || "Uncategorized"}
+                    {s.displayDept ||
+                      s.dept ||
+                      tsKey("uncategorized", "Uncategorized")}
                   </div>
 
                   <span
@@ -523,12 +542,12 @@ export default function Services({ t, lang }) {
                     {s.active ? (
                       <>
                         <FiCheck size={10} />
-                        {ts.active || "Active"}
+                        {tsKey("active", "Active")}
                       </>
                     ) : (
                       <>
                         <FiX size={10} />
-                        {ts.inactive || "Inactive"}
+                        {tsKey("inactive", "Inactive")}
                       </>
                     )}
                   </span>
@@ -559,7 +578,7 @@ export default function Services({ t, lang }) {
                   />
                 </div>
                 <p style={{ fontSize: "clamp(14px, 3.5vw, 16px)" }}>
-                  {ts.noneFound || "No services found"}
+                  {tsKey("noneFound", "No services found")}
                 </p>
                 <p
                   style={{
@@ -568,8 +587,7 @@ export default function Services({ t, lang }) {
                     marginTop: 8,
                   }}
                 >
-                  {safeCommon.tryAdjusting ||
-                    "Try adjusting your search or filter"}
+                  {tcKey("tryAdjusting", "Try adjusting your search or filter")}
                 </p>
               </div>
             )}
@@ -618,7 +636,7 @@ export default function Services({ t, lang }) {
                 }}
               >
                 <FiChevronLeft size={16} />
-                Previous
+                {tcKey("previous", "Previous")}
               </button>
 
               <div
@@ -726,7 +744,7 @@ export default function Services({ t, lang }) {
                   e.currentTarget.style.boxShadow = "none";
                 }}
               >
-                Next
+                {tcKey("next", "Next")}
                 <FiChevronRight size={16} />
               </button>
             </div>
@@ -742,7 +760,11 @@ export default function Services({ t, lang }) {
                 padding: "8px 0",
               }}
             >
-              {totalItems} {totalItems === 1 ? "service" : "services"} available
+              {totalItems}{" "}
+              {totalItems === 1
+                ? tsKey("service", "service")
+                : tsKey("services", "services")}{" "}
+              {tcKey("available", "available")}
             </div>
           )}
         </div>

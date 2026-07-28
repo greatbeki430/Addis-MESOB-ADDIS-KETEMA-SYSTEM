@@ -26,15 +26,16 @@ let loadingPromise = null;
  * Check if fonts are loaded in jsPDF
  */
 export const areFontsLoaded = (doc) => {
-  if (!doc) return false;
-  try {
-    doc.setFont(FONT_NAMES.ethiopic);
-    return true;
-  } catch (error) {
-    // Font not loaded, return false
-    console.debug("Font not loaded:", error.message);
-    return false;
-  }
+  // ✅ FIXED: jsPDF's setFont() never throws when a font name isn't
+  // registered — it just logs a console.warn ("Unable to look up font
+  // label...") and silently falls back. The old check called setFont()
+  // and treated "didn't throw" as "fonts are loaded", which was ALWAYS
+  // true, so loadFonts() below always thought fonts were already
+  // present and skipped the real addFileToVFS/addFont calls — on every
+  // single new jsPDF() document. That's why Amharic text in every PDF
+  // export fell back to a font with no Ethiopic glyphs.
+  // The real, reliable signal is the flag loadFonts() itself sets.
+  return !!(doc && doc.__fontsLoaded);
 };
 
 /**

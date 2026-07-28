@@ -4,6 +4,7 @@ import { meetingAPI, dailyReportAPI, reportAPI } from "../services/api";
 import { aiAPI } from "../services/api";
 import { AISummary } from "../components/ai";
 import { useAuth } from "../hooks/useAuth";
+import { useLanguage } from "../hooks/useLanguage";
 
 // ✅ Import export utilities
 import * as XLSX from "xlsx";
@@ -33,10 +34,14 @@ import {
   FiFolder,
 } from "react-icons/fi";
 
-export default function Report({ t }) {
+export default function Report({ t: tProp }) {
+  const { t: tHook } = useLanguage();
+  const t = tProp || tHook;
+
   const safeT = t || {};
-  const safeReport = safeT.report || {};
-  const safePeriod = safeT.period || {};
+
+  // Translation helper
+  const tr = (key, fallback) => safeT?.report?.[key] || fallback;
 
   const { user, isLeader, isAdmin, isSuperAdmin } = useAuth();
 
@@ -58,22 +63,22 @@ export default function Report({ t }) {
   const [selectedSavedReport, setSelectedSavedReport] = useState(null);
 
   const reportTypes = [
-    { value: "daily", label: safeReport.daily || "Daily Report" },
-    { value: "weekly", label: safeReport.weekly || "Weekly Report" },
-    { value: "monthly", label: safeReport.monthly || "Monthly Report" },
-    { value: "quarterly", label: safeReport.quarterly || "Quarterly Report" },
-    { value: "half-year", label: safeReport.halfYear || "Half-Year Report" },
-    { value: "yearly", label: safeReport.yearly || "Yearly Report" },
-    { value: "custom", label: safeReport.custom || "Custom Range" },
+    { value: "daily", label: tr("daily", "Daily Report") },
+    { value: "weekly", label: tr("weekly", "Weekly Report") },
+    { value: "monthly", label: tr("monthly", "Monthly Report") },
+    { value: "quarterly", label: tr("quarterly", "Quarterly Report") },
+    { value: "half-year", label: tr("halfYear", "Half-Year Report") },
+    { value: "yearly", label: tr("yearly", "Yearly Report") },
+    { value: "custom", label: tr("custom", "Custom Range") },
   ];
 
   const periods = [
-    { value: "daily", label: safePeriod.daily || "Daily" },
-    { value: "weekly", label: safePeriod.weekly || "Weekly" },
-    { value: "monthly", label: safePeriod.monthly || "Monthly" },
-    { value: "quarterly", label: safePeriod.quarterly || "Quarterly" },
-    { value: "half-year", label: safePeriod.halfYear || "Half Year" },
-    { value: "yearly", label: safePeriod.yearly || "Yearly" },
+    { value: "daily", label: tr("daily", "Daily") },
+    { value: "weekly", label: tr("weekly", "Weekly") },
+    { value: "monthly", label: tr("monthly", "Monthly") },
+    { value: "quarterly", label: tr("quarterly", "Quarterly") },
+    { value: "half-year", label: tr("halfYear", "Half Year") },
+    { value: "yearly", label: tr("yearly", "Yearly") },
   ];
 
   // ✅ Define loadSavedReports FIRST before it's used
@@ -314,8 +319,7 @@ export default function Report({ t }) {
     } catch (error) {
       console.error("Failed to generate report:", error);
       setError(
-        safeReport.generateError ||
-          "Failed to generate report. Please try again.",
+        tr("generateError", "Failed to generate report. Please try again."),
       );
     } finally {
       setLoading(false);
@@ -336,7 +340,15 @@ export default function Report({ t }) {
     if (!reportData || !reportData.data.length) return;
 
     const wsData = [
-      ["#", "Date", "Team", "Type", "Description", "Value", "Status"],
+      [
+        "#",
+        tr("date", "Date"),
+        tr("team", "Team"),
+        tr("typeCol", "Type"),
+        tr("descriptionCol", "Description"),
+        tr("value", "Value"),
+        tr("status", "Status"),
+      ],
       ...reportData.data.map((item, idx) => [
         idx + 1,
         item.date,
@@ -350,7 +362,7 @@ export default function Report({ t }) {
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Report");
+    XLSX.utils.book_append_sheet(wb, ws, tr("report", "Report"));
 
     const colWidths = [
       { wch: 5 },
@@ -393,11 +405,14 @@ export default function Report({ t }) {
       )
       .join("");
 
+    const reportTypeDisplay =
+      reportType.charAt(0).toUpperCase() + reportType.slice(1);
+
     const htmlContent = `
       <html>
         <head>
           <meta charset="UTF-8">
-          <title>Report</title>
+          <title>${tr("report", "Report")}</title>
           <style>
             body { font-family: Arial, sans-serif; padding: 20px; }
             h1 { color: #1a6b4a; }
@@ -412,26 +427,26 @@ export default function Report({ t }) {
           </style>
         </head>
         <body>
-          <h1>📊 ${reportType.toUpperCase()} Report</h1>
-          <p><strong>Generated:</strong> ${new Date(reportData.generatedAt).toLocaleString()}</p>
-          <p><strong>Team:</strong> ${getTeamDisplayName() || "All Teams"}</p>
-          <p><strong>Period:</strong> ${period}</p>
+          <h1>📊 ${reportTypeDisplay} ${tr("report", "Report")}</h1>
+          <p><strong>${tr("generated", "Generated")}:</strong> ${new Date(reportData.generatedAt).toLocaleString()}</p>
+          <p><strong>${tr("team", "Team")}:</strong> ${getTeamDisplayName() || tr("allTeams", "All Teams")}</p>
+          <p><strong>${tr("period", "Period")}:</strong> ${period}</p>
           
           <div class="summary">
-            <div class="summary-card"><h3>Total Records</h3><p>${reportData.summary.total}</p></div>
-            <div class="summary-card"><h3>Completed</h3><p>${reportData.summary.completed}</p></div>
-            <div class="summary-card"><h3>Pending</h3><p>${reportData.summary.pending}</p></div>
-            <div class="summary-card"><h3>Average Value</h3><p>${reportData.summary.average}</p></div>
+            <div class="summary-card"><h3>${tr("totalRecords", "Total Records")}</h3><p>${reportData.summary.total}</p></div>
+            <div class="summary-card"><h3>${tr("completed", "Completed")}</h3><p>${reportData.summary.completed}</p></div>
+            <div class="summary-card"><h3>${tr("pending", "Pending")}</h3><p>${reportData.summary.pending}</p></div>
+            <div class="summary-card"><h3>${tr("average", "Average Value")}</h3><p>${reportData.summary.average}</p></div>
           </div>
 
           <table>
             <thead>
-              <tr><th>#</th><th>Date</th><th>Team</th><th>Type</th>
-              <th>Description</th><th>Value</th><th>Status</th></tr>
+              <tr><th>#</th><th>${tr("date", "Date")}</th><th>${tr("team", "Team")}</th><th>${tr("typeCol", "Type")}</th>
+              <th>${tr("descriptionCol", "Description")}</th><th>${tr("value", "Value")}</th><th>${tr("status", "Status")}</th></tr>
             </thead>
             <tbody>${tableRows}</tbody>
           </table>
-          <div class="footer">Generated by A-MESOB Report Generator © ${new Date().getFullYear()}</div>
+          <div class="footer">${tr("footerText", "Generated by A-MESOB Report Generator")} © ${new Date().getFullYear()}</div>
         </body>
       </html>
     `;
@@ -450,29 +465,57 @@ export default function Report({ t }) {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
+    const reportTypeDisplay =
+      reportType.charAt(0).toUpperCase() + reportType.slice(1);
+
     doc.setFontSize(18);
     doc.setTextColor("#1a6b4a");
-    doc.text(`📊 ${reportType.toUpperCase()} Report`, pageWidth / 2, 20, {
-      align: "center",
-    });
+    doc.text(
+      `📊 ${reportTypeDisplay} ${tr("report", "Report")}`,
+      pageWidth / 2,
+      20,
+      {
+        align: "center",
+      },
+    );
 
     doc.setFontSize(10);
     doc.setTextColor("#666");
     doc.text(
-      `Generated: ${new Date(reportData.generatedAt).toLocaleString()}`,
+      `${tr("generated", "Generated")}: ${new Date(reportData.generatedAt).toLocaleString()}`,
       14,
       35,
     );
-    doc.text(`Team: ${getTeamDisplayName() || "All Teams"}`, 14, 42);
-    doc.text(`Period: ${period}`, 14, 49);
+    doc.text(
+      `${tr("team", "Team")}: ${getTeamDisplayName() || tr("allTeams", "All Teams")}`,
+      14,
+      42,
+    );
+    doc.text(`${tr("period", "Period")}: ${period}`, 14, 49);
 
     const summaryY = 60;
     doc.setFontSize(10);
     doc.setTextColor("#333");
-    doc.text(`Total Records: ${reportData.summary.total}`, 14, summaryY);
-    doc.text(`Completed: ${reportData.summary.completed}`, 80, summaryY);
-    doc.text(`Pending: ${reportData.summary.pending}`, 145, summaryY);
-    doc.text(`Average Value: ${reportData.summary.average}`, 14, summaryY + 10);
+    doc.text(
+      `${tr("totalRecords", "Total Records")}: ${reportData.summary.total}`,
+      14,
+      summaryY,
+    );
+    doc.text(
+      `${tr("completed", "Completed")}: ${reportData.summary.completed}`,
+      80,
+      summaryY,
+    );
+    doc.text(
+      `${tr("pending", "Pending")}: ${reportData.summary.pending}`,
+      145,
+      summaryY,
+    );
+    doc.text(
+      `${tr("average", "Average Value")}: ${reportData.summary.average}`,
+      14,
+      summaryY + 10,
+    );
 
     const tableData = reportData.data.map((item) => [
       item.date,
@@ -485,7 +528,16 @@ export default function Report({ t }) {
 
     doc.autoTable({
       startY: summaryY + 20,
-      head: [["Date", "Team", "Type", "Description", "Value", "Status"]],
+      head: [
+        [
+          tr("date", "Date"),
+          tr("team", "Team"),
+          tr("typeCol", "Type"),
+          tr("descriptionCol", "Description"),
+          tr("value", "Value"),
+          tr("status", "Status"),
+        ],
+      ],
       body: tableData,
       theme: "striped",
       headStyles: {
@@ -508,7 +560,7 @@ export default function Report({ t }) {
     doc.setFontSize(8);
     doc.setTextColor("#999");
     doc.text(
-      `Generated by A-MESOB Report Generator © ${new Date().getFullYear()}`,
+      `${tr("footerText", "Generated by A-MESOB Report Generator")} © ${new Date().getFullYear()}`,
       pageWidth / 2,
       finalY + 10,
       { align: "center" },
@@ -521,13 +573,21 @@ export default function Report({ t }) {
   };
 
   const deleteSavedReport = async (reportId) => {
-    if (window.confirm("Are you sure you want to delete this saved report?")) {
+    if (
+      window.confirm(
+        tr(
+          "deleteConfirm",
+          "Are you sure you want to delete this saved report?",
+        ),
+      )
+    ) {
       try {
         await reportAPI.delete(reportId);
         await loadSavedReports();
+        // Show success toast or message
       } catch (error) {
         console.error("Failed to delete report:", error);
-        alert("Failed to delete report");
+        alert(tr("deleteError", "Failed to delete report"));
       }
     }
   };
@@ -567,12 +627,12 @@ export default function Report({ t }) {
           }}
         >
           <FiBarChart2 size={24} color={C.primary} />
-          {safeReport.title || "Report Generator"}
+          {tr("title", "Report Generator")}
           {getTeamDisplayName()}
           {isLeader && userTeam && (
             <span style={{ fontSize: 16, color: C.primary, fontWeight: 600 }}>
               {" "}
-              - {safeReport.myTeam || "My Team"}
+              - {tr("myTeam", "My Team")}
             </span>
           )}
         </h1>
@@ -592,7 +652,7 @@ export default function Report({ t }) {
             }}
           >
             <FiTrendingUp size={12} />
-            {safeReport.analytics || "Analytics"}
+            {tr("analytics", "Analytics")}
           </span>
           <button
             onClick={() => setShowHistory(!showHistory)}
@@ -612,7 +672,7 @@ export default function Report({ t }) {
             }}
           >
             <FiFolder size={12} />
-            History
+            {tr("history", "History")}
           </button>
         </div>
       </div>
@@ -626,8 +686,10 @@ export default function Report({ t }) {
             fontFamily: F.sans,
           }}
         >
-          {safeReport.description ||
-            "Generate comprehensive reports by merging data from all modules"}
+          {tr(
+            "description",
+            "Generate comprehensive reports by merging data from all modules",
+          )}
         </p>
       )}
 
@@ -647,14 +709,16 @@ export default function Report({ t }) {
           <FiAward size={20} color={C.gold} />
           <div>
             <span style={{ fontWeight: 600, color: C.dark }}>
-              {safeReport.leadingTeam || "Leading Team"}:
+              {tr("leadingTeam", "Leading Team")}:
             </span>
             <span style={{ color: C.primary, fontWeight: 700, marginLeft: 6 }}>
               {userTeam.name}
             </span>
             <span style={{ fontSize: 12, color: C.muted, marginLeft: 12 }}>
-              {safeReport.teamLeaderAccess ||
-                "You have access to your team's analytics only"}
+              {tr(
+                "teamLeaderAccess",
+                "You have access to your team's analytics only",
+              )}
             </span>
           </div>
         </div>
@@ -687,7 +751,7 @@ export default function Report({ t }) {
               }}
             >
               <FiFolder size={16} />
-              Saved Reports
+              {tr("savedReports", "Saved Reports")}
             </h4>
             <button
               onClick={() => setShowHistory(false)}
@@ -705,10 +769,15 @@ export default function Report({ t }) {
             </button>
           </div>
           {loadingHistory ? (
-            <p style={{ textAlign: "center", color: C.muted }}>Loading...</p>
+            <p style={{ textAlign: "center", color: C.muted }}>
+              {tr("loadingHistory", "Loading...")}
+            </p>
           ) : savedReports.length === 0 ? (
             <p style={{ textAlign: "center", color: C.muted }}>
-              No saved reports found. Generate a report to save it.
+              {tr(
+                "noSavedReports",
+                "No saved reports found. Generate a report to save it.",
+              )}
             </p>
           ) : (
             savedReports.map((report) => (
@@ -739,7 +808,7 @@ export default function Report({ t }) {
                   </div>
                   <div style={{ fontSize: 11, color: C.muted }}>
                     {report.type} • {report.period} •{" "}
-                    {report.teamName || "All Teams"} •{" "}
+                    {report.teamName || tr("allTeams", "All Teams")} •{" "}
                     {new Date(report.createdAt).toLocaleDateString()}
                   </div>
                 </div>
@@ -755,7 +824,7 @@ export default function Report({ t }) {
                     display: "flex",
                     alignItems: "center",
                   }}
-                  title="Delete report"
+                  title={tr("deleteReport", "Delete report")}
                 >
                   <FiTrash2 size={16} />
                 </button>
@@ -804,7 +873,7 @@ export default function Report({ t }) {
                 color: C.dark,
               }}
             >
-              {safeReport.typeLabel || "Report Type"}
+              {tr("typeLabel", "Report Type")}
             </label>
             <select
               value={reportType}
@@ -829,7 +898,7 @@ export default function Report({ t }) {
                 color: C.dark,
               }}
             >
-              {safeReport.periodLabel || "Period"}
+              {tr("periodLabel", "Period")}
             </label>
             <select
               value={period}
@@ -855,14 +924,14 @@ export default function Report({ t }) {
                   color: C.dark,
                 }}
               >
-                {safeReport.teamLabel || "Team (Optional)"}
+                {tr("teamLabel", "Team (Optional)")}
               </label>
               <select
                 value={selectedTeam}
                 onChange={(e) => setSelectedTeam(e.target.value)}
                 style={inp}
               >
-                <option value="">{safeReport.allTeams || "All Teams"}</option>
+                <option value="">{tr("allTeams", "All Teams")}</option>
                 {teams.map((team) => (
                   <option key={team.id || team._id} value={team.id || team._id}>
                     {team.name}
@@ -883,7 +952,7 @@ export default function Report({ t }) {
                   color: C.dark,
                 }}
               >
-                {safeReport.teamLabel || "Team"}
+                {tr("teamLabel", "Team")}
               </label>
               <input
                 type="text"
@@ -909,7 +978,7 @@ export default function Report({ t }) {
                 color: C.dark,
               }}
             >
-              {safeReport.startDate || "Start Date"}
+              {tr("startDate", "Start Date")}
             </label>
             <input
               type="date"
@@ -929,7 +998,7 @@ export default function Report({ t }) {
                 color: C.dark,
               }}
             >
-              {safeReport.endDate || "End Date"}
+              {tr("endDate", "End Date")}
             </label>
             <input
               type="date"
@@ -968,12 +1037,12 @@ export default function Report({ t }) {
                   size={16}
                   style={{ animation: "spin 1s linear infinite" }}
                 />
-                {safeReport.generating || "Generating..."}
+                {tr("generating", "Generating...")}
               </>
             ) : (
               <>
                 <FiFilePlus size={16} />
-                Generate & Save Report
+                {tr("generateAndSave", "Generate & Save Report")}
               </>
             )}
           </button>
@@ -997,7 +1066,7 @@ export default function Report({ t }) {
                 }}
               >
                 <FiDownload size={16} />
-                {safeReport.exportBtn || "Export Report"}
+                {tr("exportBtn", "Export Report")}
                 <FiChevronDown size={14} />
               </button>
 
@@ -1040,7 +1109,7 @@ export default function Report({ t }) {
                     }
                   >
                     <FiFile size={18} color="#217346" />
-                    Export as Excel
+                    {tr("exportAsExcel", "Export as Excel")}
                   </button>
                   <button
                     onClick={exportToWord}
@@ -1066,7 +1135,7 @@ export default function Report({ t }) {
                     }
                   >
                     <FiFileText size={18} color="#2b579a" />
-                    Export as Word
+                    {tr("exportAsWord", "Export as Word")}
                   </button>
                   <button
                     onClick={exportToPDF}
@@ -1092,7 +1161,7 @@ export default function Report({ t }) {
                     }
                   >
                     <FiPrinter size={18} color="#dc2626" />
-                    Export as PDF
+                    {tr("exportAsPDF", "Export as PDF")}
                   </button>
                 </div>
               )}
@@ -1125,11 +1194,11 @@ export default function Report({ t }) {
               }}
             >
               <FiList size={18} />
-              {safeReport.results || "Report Results"}
+              {tr("results", "Report Results")}
               {selectedSavedReport && (
                 <span style={{ fontSize: 12, color: C.muted, fontWeight: 400 }}>
                   {" "}
-                  (Loaded from history)
+                  ({tr("loadedFromHistory", "Loaded from history")})
                 </span>
               )}
             </h3>
@@ -1143,7 +1212,7 @@ export default function Report({ t }) {
               }}
             >
               <FiClock size={12} />
-              {safeReport.generated || "Generated"}:{" "}
+              {tr("generated", "Generated")}:{" "}
               {new Date(reportData.generatedAt).toLocaleString()}
             </span>
           </div>
@@ -1184,7 +1253,7 @@ export default function Report({ t }) {
                 }}
               >
                 <FiDatabase size={12} />
-                {safeReport.totalRecords || "Total Records"}
+                {tr("totalRecords", "Total Records")}
               </div>
             </div>
             <div
@@ -1215,7 +1284,7 @@ export default function Report({ t }) {
                 }}
               >
                 <FiCheck size={12} />
-                {safeReport.completed || "Completed"}
+                {tr("completed", "Completed")}
               </div>
             </div>
             <div
@@ -1246,7 +1315,7 @@ export default function Report({ t }) {
                 }}
               >
                 <FiClock size={12} />
-                {safeReport.pending || "Pending"}
+                {tr("pending", "Pending")}
               </div>
             </div>
             <div
@@ -1277,7 +1346,7 @@ export default function Report({ t }) {
                 }}
               >
                 <FiTrendingUp size={12} />
-                {safeReport.average || "Average Value"}
+                {tr("average", "Average Value")}
               </div>
             </div>
           </div>
@@ -1308,7 +1377,7 @@ export default function Report({ t }) {
                       textAlign: "left",
                     }}
                   >
-                    {safeReport.date || "Date"}
+                    {tr("date", "Date")}
                   </th>
                   <th
                     style={{
@@ -1317,7 +1386,7 @@ export default function Report({ t }) {
                       textAlign: "left",
                     }}
                   >
-                    {safeReport.team || "Team"}
+                    {tr("team", "Team")}
                   </th>
                   <th
                     style={{
@@ -1326,7 +1395,7 @@ export default function Report({ t }) {
                       textAlign: "left",
                     }}
                   >
-                    {safeReport.typeCol || "Type"}
+                    {tr("typeCol", "Type")}
                   </th>
                   <th
                     style={{
@@ -1335,7 +1404,7 @@ export default function Report({ t }) {
                       textAlign: "left",
                     }}
                   >
-                    {safeReport.descriptionCol || "Description"}
+                    {tr("descriptionCol", "Description")}
                   </th>
                   <th
                     style={{
@@ -1344,7 +1413,7 @@ export default function Report({ t }) {
                       textAlign: "left",
                     }}
                   >
-                    {safeReport.value || "Value"}
+                    {tr("value", "Value")}
                   </th>
                   <th
                     style={{
@@ -1353,7 +1422,7 @@ export default function Report({ t }) {
                       textAlign: "left",
                     }}
                   >
-                    {safeReport.status || "Status"}
+                    {tr("status", "Status")}
                   </th>
                 </tr>
               </thead>
@@ -1413,12 +1482,13 @@ export default function Report({ t }) {
               activeTeams: teams.length || 0,
               totalServicesLogged: reportData.summary?.total || 0,
               evaluationsCompleted: reportData.summary?.completed || 0,
-              topDepartment: getTeamDisplayName() || "All Teams",
+              topDepartment:
+                getTeamDisplayName() || tr("allTeams", "All Teams"),
               period: period,
             })
           }
           args={[]}
-          label="AI Report Digest"
+          label={tr("aiDigest", "AI Report Digest")}
         />
       )}
 
@@ -1446,11 +1516,13 @@ export default function Report({ t }) {
               marginBottom: 8,
             }}
           >
-            {safeReport.noReportGenerated || "No Report Generated Yet"}
+            {tr("noReportGenerated", "No Report Generated Yet")}
           </h3>
           <p style={{ fontSize: "clamp(12px, 3vw, 14px)", color: C.muted }}>
-            {safeReport.selectParameters ||
-              "Select your report parameters and click 'Generate Report' to view data"}
+            {tr(
+              "selectParameters",
+              "Select your report parameters and click 'Generate Report' to view data",
+            )}
           </p>
         </div>
       )}

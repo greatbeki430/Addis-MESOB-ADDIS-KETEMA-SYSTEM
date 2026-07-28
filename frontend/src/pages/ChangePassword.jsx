@@ -6,6 +6,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { authAPI } from "../services/api";
 import { C, F } from "../styles/theme";
+import { useLanguage } from "../hooks/useLanguage";
 import {
   FiLock,
   FiKey,
@@ -19,6 +20,7 @@ import {
 export default function ChangePassword() {
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { t } = useLanguage();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -29,11 +31,11 @@ export default function ChangePassword() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({
     score: 0,
-    label: "Weak",
+    label: t("changePassword.strengthWeak"),
     color: "#ef4444",
   });
 
-  // Password strength checker
+  // Password strength checker with translated labels
   const checkPasswordStrength = (password) => {
     let score = 0;
     if (password.length >= 8) score++;
@@ -43,12 +45,20 @@ export default function ChangePassword() {
     if (/[^a-zA-Z0-9]/.test(password)) score++;
 
     const levels = [
-      { label: "Very Weak", color: "#ef4444", score: 0 },
-      { label: "Weak", color: "#f59e0b", score: 1 },
-      { label: "Fair", color: "#f59e0b", score: 2 },
-      { label: "Good", color: "#3b82f6", score: 3 },
-      { label: "Strong", color: "#10b981", score: 4 },
-      { label: "Very Strong", color: "#10b981", score: 5 },
+      {
+        label: t("changePassword.strengthVeryWeak"),
+        color: "#ef4444",
+        score: 0,
+      },
+      { label: t("changePassword.strengthWeak"), color: "#f59e0b", score: 1 },
+      { label: t("changePassword.strengthFair"), color: "#f59e0b", score: 2 },
+      { label: t("changePassword.strengthGood"), color: "#3b82f6", score: 3 },
+      { label: t("changePassword.strengthStrong"), color: "#10b981", score: 4 },
+      {
+        label: t("changePassword.strengthVeryStrong"),
+        color: "#10b981",
+        score: 5,
+      },
     ];
 
     return levels.find((l) => l.score === score) || levels[0];
@@ -66,25 +76,22 @@ export default function ChangePassword() {
 
     // Validate
     if (!currentPassword || !newPassword || !confirmPassword) {
-      showToast("All fields are required", "warning");
+      showToast(t("changePassword.errorFieldsRequired"), "warning");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      showToast("New passwords do not match", "error");
+      showToast(t("changePassword.errorNoMatch"), "error");
       return;
     }
 
     if (newPassword.length < 8) {
-      showToast("New password must be at least 8 characters long", "warning");
+      showToast(t("changePassword.errorMinLength"), "warning");
       return;
     }
 
     if (newPassword === currentPassword) {
-      showToast(
-        "New password must be different from current password",
-        "warning",
-      );
+      showToast(t("changePassword.errorSamePassword"), "warning");
       return;
     }
 
@@ -94,42 +101,59 @@ export default function ChangePassword() {
         currentPassword,
         newPassword,
       });
-      showToast("Password changed successfully!", "success");
+      showToast(t("changePassword.successMessage"), "success");
 
       // Clear form
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setPasswordStrength({ score: 0, label: "Weak", color: "#ef4444" });
+      setPasswordStrength({
+        score: 0,
+        label: t("changePassword.strengthWeak"),
+        color: "#ef4444",
+      });
     } catch (error) {
       console.error("Password change error:", error);
       const message =
-        error.response?.data?.message || "Failed to change password";
+        error.response?.data?.message || t("changePassword.errorGeneric");
       showToast(message, "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Password requirements
+  // Password requirements with translated labels
   const requirements = [
-    { label: "At least 8 characters", met: newPassword.length >= 8 },
     {
-      label: "At least 12 characters (recommended)",
+      label: t("changePassword.reqMinChars"),
+      met: newPassword.length >= 8,
+    },
+    {
+      label: t("changePassword.reqMinCharsRecommended"),
       met: newPassword.length >= 12,
     },
     {
-      label: "Uppercase & lowercase letters",
+      label: t("changePassword.reqUpperLower"),
       met: /[a-z]/.test(newPassword) && /[A-Z]/.test(newPassword),
     },
-    { label: "At least one number", met: /\d/.test(newPassword) },
     {
-      label: "At least one special character",
+      label: t("changePassword.reqNumber"),
+      met: /\d/.test(newPassword),
+    },
+    {
+      label: t("changePassword.reqSpecial"),
       met: /[^a-zA-Z0-9]/.test(newPassword),
     },
   ];
 
   const progressPercentage = (passwordStrength.score / 5) * 100;
+
+  // Get translated strength label with interpolation
+  const getStrengthLabel = () => {
+    return t("changePassword.passwordStrength", {
+      strength: passwordStrength.label,
+    });
+  };
 
   return (
     <div
@@ -178,7 +202,7 @@ export default function ChangePassword() {
               margin: 0,
             }}
           >
-            Change Password
+            {t("changePassword.title")}
           </h1>
           <p
             style={{
@@ -188,8 +212,8 @@ export default function ChangePassword() {
             }}
           >
             {user?.name
-              ? `Hi ${user.name}, update your password`
-              : "Update your password to keep your account secure"}
+              ? `${t("common.welcome") || "Hi"} ${user.name}, ${t("changePassword.subtitle")}`
+              : t("changePassword.subtitle")}
           </p>
         </div>
 
@@ -205,14 +229,14 @@ export default function ChangePassword() {
                 marginBottom: 6,
               }}
             >
-              Current Password
+              {t("changePassword.currentPasswordLabel")}
             </label>
             <div style={{ position: "relative" }}>
               <input
                 type={showCurrentPassword ? "text" : "password"}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder="Enter your current password"
+                placeholder={t("changePassword.currentPasswordPlaceholder")}
                 style={{
                   width: "100%",
                   padding: "12px 44px 12px 14px",
@@ -268,14 +292,14 @@ export default function ChangePassword() {
                 marginBottom: 6,
               }}
             >
-              New Password
+              {t("changePassword.newPasswordLabel")}
             </label>
             <div style={{ position: "relative" }}>
               <input
                 type={showNewPassword ? "text" : "password"}
                 value={newPassword}
                 onChange={handleNewPasswordChange}
-                placeholder="Enter your new password"
+                placeholder={t("changePassword.newPasswordPlaceholder")}
                 style={{
                   width: "100%",
                   padding: "12px 44px 12px 14px",
@@ -349,7 +373,7 @@ export default function ChangePassword() {
                     color: passwordStrength.color,
                   }}
                 >
-                  <span>Strength: {passwordStrength.label}</span>
+                  <span>{getStrengthLabel()}</span>
                   <span>{passwordStrength.score}/5</span>
                 </div>
               </div>
@@ -367,14 +391,14 @@ export default function ChangePassword() {
                 marginBottom: 6,
               }}
             >
-              Confirm New Password
+              {t("changePassword.confirmNewPasswordLabel")}
             </label>
             <div style={{ position: "relative" }}>
               <input
                 type={showConfirmPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your new password"
+                placeholder={t("changePassword.confirmNewPasswordPlaceholder")}
                 style={{
                   width: "100%",
                   padding: "12px 44px 12px 14px",
@@ -442,7 +466,7 @@ export default function ChangePassword() {
                   }}
                 >
                   <FiAlertCircle size={14} />
-                  Passwords do not match
+                  {t("changePassword.passwordNoMatch")}
                 </div>
               )}
             {confirmPassword &&
@@ -459,7 +483,7 @@ export default function ChangePassword() {
                   }}
                 >
                   <FiCheckCircle size={14} />
-                  Passwords match
+                  {t("changePassword.passwordMatch")}
                 </div>
               )}
           </div>
@@ -482,7 +506,7 @@ export default function ChangePassword() {
                   marginBottom: 6,
                 }}
               >
-                Password Requirements:
+                {t("changePassword.passwordRequirements")}
               </p>
               {requirements.map((req, idx) => (
                 <div
@@ -550,12 +574,12 @@ export default function ChangePassword() {
             {loading ? (
               <>
                 <span style={{ animation: "spin 1s linear infinite" }}>⏳</span>
-                Changing Password...
+                {t("changePassword.submittingBtn")}
               </>
             ) : (
               <>
                 <FiLock size={18} />
-                Change Password
+                {t("changePassword.submitBtn")}
               </>
             )}
           </button>
@@ -569,7 +593,7 @@ export default function ChangePassword() {
             }}
           >
             <FiKey size={12} style={{ marginRight: 4 }} />
-            For security, use a strong and unique password
+            {t("changePassword.securityNote")}
           </div>
         </form>
       </div>
