@@ -146,7 +146,51 @@ export default function DailyReport({ t, lang }) {
       loadingRef.current = true;
       setHistoryLoading(true);
       const response = await dailyReportAPI.getUserHistory();
-      setHistory(response.data || []);
+
+      // ✅ Fix: Handle different response structures
+      let historyData = [];
+
+      // Check if response.data exists
+      if (response && response.data) {
+        // If response.data is an array, use it directly
+        if (Array.isArray(response.data)) {
+          historyData = response.data;
+        }
+        // If response.data has a data property that is an array (nested response)
+        else if (response.data.data && Array.isArray(response.data.data)) {
+          historyData = response.data.data;
+        }
+        // If response.data.data has a data property that is an array (deeply nested)
+        else if (
+          response.data.data &&
+          response.data.data.data &&
+          Array.isArray(response.data.data.data)
+        ) {
+          historyData = response.data.data.data;
+        }
+        // Fallback: try to get array from any property
+        else {
+          // Look for any property that is an array
+          let found = false;
+          for (const key in response.data) {
+            if (Array.isArray(response.data[key])) {
+              historyData = response.data[key];
+              found = true;
+              break;
+            }
+          }
+          // If no array found, try response itself if it's an array
+          if (!found && Array.isArray(response)) {
+            historyData = response;
+          }
+        }
+      } else if (Array.isArray(response)) {
+        // If response itself is an array
+        historyData = response;
+      }
+
+      // Ensure we have an array
+      setHistory(Array.isArray(historyData) ? historyData : []);
       historyLoadedRef.current = true;
     } catch (error) {
       console.error("Failed to load history:", error);
@@ -155,19 +199,12 @@ export default function DailyReport({ t, lang }) {
         "error",
       );
       historyLoadedRef.current = true;
+      setHistory([]); // ✅ Set to empty array on error
     } finally {
       setHistoryLoading(false);
       loadingRef.current = false;
     }
   }, [td, showToast]); // ✅ Only depend on td and showToast
-
-  // ✅ Load history when tab changes to history
-  useEffect(() => {
-    if (activeTab === "history" && !historyLoadedRef.current) {
-      loadHistory();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
 
   // ─── Calculate Totals ──────────────────────────────────────────────────────
   const calculateTotals = (rowsData) => {
