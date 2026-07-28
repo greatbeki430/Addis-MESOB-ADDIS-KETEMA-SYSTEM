@@ -1,7 +1,7 @@
 // frontend/src/utils/pdf/pdfEngine.js
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { loadFonts, FONT_NAMES, getPreloadedFontsDoc } from "./fontLoader";
+import { loadFonts, FONT_NAMES } from "./fontLoader";
 import { getTheme } from "./themes";
 import { encodeText, isAmharic } from "./language";
 
@@ -35,41 +35,20 @@ export class PDFEngine {
    * Initialize PDF document with fonts
    */
   init() {
-    // Try to use preloaded fonts document
-    const preloadedDoc = getPreloadedFontsDoc();
+    this.doc = new jsPDF({
+      orientation: this.config.orientation,
+      unit: this.config.unit,
+      format: this.config.format,
+      compress: this.config.compress,
+    });
 
-    if (preloadedDoc) {
-      // Clone the preloaded document
-      this.doc = new jsPDF({
-        orientation: this.config.orientation,
-        unit: this.config.unit,
-        format: this.config.format,
-        compress: this.config.compress,
-      });
-
-      // Copy font data from preloaded document
-      this.doc.__fontsLoaded = preloadedDoc.__fontsLoaded;
-      this.doc.__hasEthiopicFont = preloadedDoc.__hasEthiopicFont;
-      this.doc.__hasLatinFont = preloadedDoc.__hasLatinFont;
-
-      // Try to use preloaded fonts
-      try {
-        this.doc.setFont(FONT_NAMES.latin);
-      } catch (error) {
-        // Log the error and load fonts if preloaded ones don't work
-        console.warn("Preloaded fonts failed, loading fresh:", error.message);
-        loadFonts(this.doc);
-      }
-    } else {
-      // Create new document and load fonts
-      this.doc = new jsPDF({
-        orientation: this.config.orientation,
-        unit: this.config.unit,
-        format: this.config.format,
-        compress: this.config.compress,
-      });
-      loadFonts(this.doc);
-    }
+    // Always actually embed the fonts on THIS document instance.
+    // (Do not "clone" flags from a cached/preloaded doc — jsPDF's
+    // setFont() never throws for an unregistered font, so any
+    // try/catch used to detect a missing font silently does nothing,
+    // and the real addFileToVFS/addFont calls in loadFonts() get
+    // skipped entirely.)
+    loadFonts(this.doc);
 
     this.pageWidth = this.doc.internal.pageSize.getWidth();
     this.pageHeight = this.doc.internal.pageSize.getHeight();
@@ -96,8 +75,14 @@ export class PDFEngine {
     const { bold = false, size = 10, color = null } = options;
 
     try {
-      const fontName = this.getFontForText(text, bold);
-      this.doc.setFont(fontName);
+      const fontName = this.getFontForText(text);
+      // Pass the style explicitly. Regular and Bold are registered under
+      // the SAME family name in fontLoader.js (jsPDF looks fonts up by the
+      // (name, style) pair), so omitting the style here made jsPDF default
+      // to "normal" and silently fail to find e.g. ("NotoSansEthiopic",
+      // "bold") — which fell back to Helvetica and garbled every bold
+      // Amharic string (titles, section headers, table headers/footers).
+      this.doc.setFont(fontName, bold ? "bold" : "normal");
     } catch (error) {
       // Log the error and try fallback
       console.warn("Font application failed, using helvetica:", error.message);
@@ -117,19 +102,21 @@ export class PDFEngine {
   }
 
   /**
-   * Get appropriate font for text
+   * Get appropriate font for text.
+   * Returns the base family name only — bold vs. normal is a *style*,
+   * supplied separately by the caller to setFont(), not baked into which
+   * font name gets returned (Regular/Bold share one family name; see
+   * fontLoader.js).
    */
-  getFontForText(text, bold = false) {
+  getFontForText(text) {
     if (!text) return FONT_NAMES.latin;
 
     const hasAmharic = /[\u1200-\u137F]/.test(String(text));
 
     if (hasAmharic) {
-      // Check if Ethiopic font is available
       if (this.doc.__hasEthiopicFont) {
-        return bold ? FONT_NAMES.ethiopicBold : FONT_NAMES.ethiopic;
+        return FONT_NAMES.ethiopic;
       }
-      // Log warning if Ethiopic font not available
       console.warn(
         "Ethiopic font not available, using helvetica for:",
         text.substring(0, 20),
@@ -138,7 +125,7 @@ export class PDFEngine {
     }
 
     if (this.doc.__hasLatinFont) {
-      return bold ? FONT_NAMES.latinBold : FONT_NAMES.latin;
+      return FONT_NAMES.latin;
     }
 
     return "helvetica";
@@ -406,14 +393,27 @@ export class PDFEngine {
       },
     };
 
-    // Add custom cell rendering for mixed content
-    tableConfig.didDrawCell = (data) => {
-      if (data.cell && data.cell.raw) {
-        const cellText = String(data.cell.raw);
-        if (isAmharic(cellText) && this.doc.__hasEthiopicFont) {
-          // Log for debugging if needed
-          // The actual font switching will happen via the styles
-        }
+    // Switch each cell to the correct font family based on its own content.
+    // A table's font can't be fixed globally (via `styles.font` above) when
+    // it mixes Amharic and Latin text — e.g. Amharic column headers next to
+    // numeric values. Without this, Amharic head/foot cells were rendered
+    // with the Latin-only font, which has no Ethiopic glyphs, so the text
+    // silently disappeared (no console warning, since jsPDF just draws
+    // nothing for glyphs it can't find rather than throwing).
+    // NOTE: use didParseCell, not didDrawCell — didParseCell runs before
+    // autoTable applies cell styles, so the font override actually takes
+    // effect. didDrawCell runs after and is too late to change the font
+    // used for that cell's own text.
+    tableConfig.didParseCell = (data) => {
+      const cellText = String(data.cell.raw ?? "");
+      if (isAmharic(cellText)) {
+        data.cell.styles.font = this.doc.__hasEthiopicFont
+          ? FONT_NAMES.ethiopic
+          : "helvetica";
+      } else {
+        data.cell.styles.font = this.doc.__hasLatinFont
+          ? FONT_NAMES.latin
+          : "helvetica";
       }
     };
 
