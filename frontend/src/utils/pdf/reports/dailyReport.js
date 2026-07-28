@@ -4,11 +4,7 @@ import { encodeText, isAmharic, detectLanguage } from "../language";
 import { loadFonts, FONT_NAMES } from "../fontLoader";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ✅ NEW: Gregorian → Ethiopian calendar conversion
-// Standard Julian-Day-Number based conversion (Amete Mihret era, the era in
-// current use). If your project already has an Ethiopian date utility
-// elsewhere, prefer that one instead — this is a self-contained fallback so
-// this file has no new dependency.
+// ✅ Ethiopian calendar conversion (Gregorian → Ethiopian)
 // ─────────────────────────────────────────────────────────────────────────────
 const ETHIOPIAN_MONTHS_AM = [
   "መስከረም",
@@ -129,8 +125,8 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         title: "ዕለታዊ ሪፖርት",
         subtitle: "የአዲስ መሶብ የአንድ ማዕከል አገልግሎት",
         reportDate: "የሪፖርቱ ቀን",
-        generatedOn: "የተዘጋጀበት ቀን", // ✅ NEW
-        colNo: "ተ/ቁ", // ✅ FIXED: shortened so it stays on one horizontal line
+        generatedOn: "የተዘጋጀበት ቀን",
+        colNo: "ተ/ቁ",
         colDept: "ዘርፍ",
         colService: "አገልግሎት",
         colMale: "ወንድ",
@@ -146,7 +142,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         title: "Daily Report",
         subtitle: "A-MESOB One-Stop Service Center",
         reportDate: "Report Date",
-        generatedOn: "Generated On", // ✅ NEW
+        generatedOn: "Generated On",
         colNo: "#",
         colDept: "Department",
         colService: "Service",
@@ -163,7 +159,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         title: "Guyyaa Guyyaa Oduu",
         subtitle: "A-MESOB One-Stop Tajaajila",
         reportDate: "Guyyaa Oduu",
-        generatedOn: "Guyyaa Qophaa'ame", // ✅ NEW
+        generatedOn: "Guyyaa Qophaa'ame",
         colNo: "#",
         colDept: "Kutaa",
         colService: "Tajaajila",
@@ -217,7 +213,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     // ─── Set document metadata ────────────────────────────────────────────────
     try {
       doc.setProperties({
-        title: `${labels.title} - ${date}`, // ✅ meaningful title, not just generic label
+        title: `${labels.title} - ${date}`,
         author: options?.author || "A-MESOB One-Stop Service Center",
         subject:
           options?.subject || `${labels.title} (${labels.reportDate}: ${date})`,
@@ -248,7 +244,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     yPos += 10;
     doc.setTextColor(0, 0, 0);
 
-    // ─── Date ──────────────────────────────────────────────────────────────────
+    // ─── Report Date ──────────────────────────────────────────────────────────
     const reportDate = date || new Date().toISOString().split("T")[0];
     const displayDate = reportDate.split("-").reverse().join("/");
 
@@ -264,8 +260,10 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     );
     yPos += 8;
 
-    // ─── ✅ NEW: Generated On (Ethiopian calendar) ─────────────────────────────
-    const generatedOnText = `${labels.generatedOn}: ${formatEthiopianDate(new Date())}`;
+    // ─── ✅ Generated On (Ethiopian calendar) ────────────────────────────────
+    const ethiopianDate = formatEthiopianDate(new Date());
+    const generatedOnText = `${labels.generatedOn}: ${ethiopianDate}`;
+
     setSmartFont(generatedOnText, false);
     doc.setFontSize(9);
     doc.setTextColor(120, 120, 120);
@@ -350,9 +348,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         valign: "middle",
       },
       columnStyles: {
-        // ✅ FIXED: was 15 (too narrow for "ቁጥር", forced it to wrap onto its
-        // own line). Widened slightly AND the label itself was shortened to
-        // "ተ/ቁ" above — the combination keeps it on a single horizontal line.
         0: { cellWidth: 18, halign: "center" },
         1: { cellWidth: "auto" },
         2: { cellWidth: "auto" },
@@ -386,18 +381,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     yPos = doc.lastAutoTable?.finalY + 10 || yPos + 50;
 
     // ─── Add Watermark if requested ──────────────────────────────────────────
-    // ✅ FIXED:
-    //  - text now defaults to the report's own title ("ዕለታዊ ሪፖርት" / "Daily
-    //    Report" / ...) instead of the word "Confidential" ("ሚስጥራዊ").
-    //  - no longer bold — plain weight reads as a mark, not a stamp.
-    //  - drawn at very low opacity via jsPDF's GState, so it never competes
-    //    with the table content. (True z-order "behind the table" isn't used
-    //    here on purpose: the table's striped row backgrounds are opaque, so
-    //    a watermark drawn before the table would simply be erased underneath
-    //    every row and only show in the margins. Low opacity gives the look
-    //    you want — faint, unobtrusive, visible everywhere — without that
-    //    side effect. Multi-page reports also need the page count, which is
-    //    only known once the table has finished laying itself out.)
     if (options?.showWatermark) {
       try {
         const watermarkText = options?.watermarkText || labels.title;
@@ -418,9 +401,8 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
             );
           }
 
-          setSmartFont(watermarkText, false); // not bold
+          setSmartFont(watermarkText, false);
           doc.setFontSize(options?.watermarkSize || 50);
-          // Fallback color is very light in case GState opacity isn't available
           doc.setTextColor(
             gStateApplied ? 150 : 225,
             gStateApplied ? 150 : 225,
@@ -483,7 +465,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     // ─── Save ──────────────────────────────────────────────────────────────────
     const safeDate = reportDate.replace(/\//g, "-");
     const langSuffix = lang === "am" ? "_am" : lang === "om" ? "_om" : "_en";
-    // ✅ FIXED: more descriptive/meaningful filename (org name + report + lang + date)
     const filename =
       options?.filename || `AMESOB_DailyReport${langSuffix}_${safeDate}.pdf`;
     engine.save(filename);
