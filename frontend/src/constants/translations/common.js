@@ -148,6 +148,9 @@ export const commonTranslations = {
       published: "Published",
       archived: "Archived",
       restored: "Restored",
+      // ✅ Added View Toggle Translations
+      list: "List",
+      grid: "Grid",
     },
   },
   am: {
@@ -296,6 +299,9 @@ export const commonTranslations = {
       published: "ታትሟል",
       archived: "ተመዝግቧል",
       restored: "ተመልሷል",
+      // ✅ Added View Toggle Translations
+      list: "ዝርዝር",
+      grid: "ፍርግርግ",
     },
   },
   om: {
@@ -444,6 +450,9 @@ export const commonTranslations = {
       published: "Maxxanfame",
       archived: "Kusame",
       restored: "Deebifame",
+      // ✅ Added View Toggle Translations
+      list: "Tarree",
+      grid: "Saffoo",
     },
   },
 };
