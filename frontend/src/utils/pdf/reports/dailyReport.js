@@ -3,6 +3,70 @@ import { createPDF } from "../pdfEngine";
 import { encodeText, isAmharic, detectLanguage } from "../language";
 import { loadFonts, FONT_NAMES } from "../fontLoader";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ NEW: Gregorian → Ethiopian calendar conversion
+// Standard Julian-Day-Number based conversion (Amete Mihret era, the era in
+// current use). If your project already has an Ethiopian date utility
+// elsewhere, prefer that one instead — this is a self-contained fallback so
+// this file has no new dependency.
+// ─────────────────────────────────────────────────────────────────────────────
+const ETHIOPIAN_MONTHS_AM = [
+  "መስከረም",
+  "ጥቅምት",
+  "ህዳር",
+  "ታህሳስ",
+  "ጥር",
+  "የካቲት",
+  "መጋቢት",
+  "ሚያዝያ",
+  "ግንቦት",
+  "ሰኔ",
+  "ሐምሌ",
+  "ነሐሴ",
+  "ጳጉሜ",
+];
+
+const JDN_EPOCH_OFFSET_AMETE_MIHRET = 1723856;
+
+function gregorianToJDN(year, month, day) {
+  const a = Math.floor((14 - month) / 12);
+  const y = year + 4800 - a;
+  const m = month + 12 * a - 3;
+  return (
+    day +
+    Math.floor((153 * m + 2) / 5) +
+    365 * y +
+    Math.floor(y / 4) -
+    Math.floor(y / 100) +
+    Math.floor(y / 400) -
+    32045
+  );
+}
+
+function toEthiopianDate(date = new Date()) {
+  const jdn = gregorianToJDN(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    date.getDate(),
+  );
+  const offsetDays = jdn - JDN_EPOCH_OFFSET_AMETE_MIHRET;
+  const r = offsetDays % 1461;
+  const n = (r % 365) + 365 * Math.floor(r / 1460);
+  const year =
+    4 * Math.floor(offsetDays / 1461) +
+    Math.floor(r / 365) -
+    Math.floor(r / 1460);
+  const month = Math.floor(n / 30) + 1;
+  const day = (n % 30) + 1;
+  return { year, month, day, monthName: ETHIOPIAN_MONTHS_AM[month - 1] };
+}
+
+function formatEthiopianDate(date = new Date()) {
+  const { year, day, monthName } = toEthiopianDate(date);
+  return `${monthName} ${day} ቀን ${year} ዓ.ም`;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * Generate Daily Report PDF with full Amharic support
  * @param {Array} rows - Array of report rows with dept, service, male, female, total
@@ -30,7 +94,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     }
 
     // ─── 🔍 AUTO-DETECT LANGUAGE USING detectLanguage ───
-    // Get sample text from first few rows for language detection
     const sampleText = validRows
       .slice(0, 5)
       .map((r) => (r.dept || "") + " " + (r.service || ""))
@@ -39,10 +102,8 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     const detected = detectLanguage(sampleText);
     console.log(`🔍 Detected language from content: ${detected}`);
 
-    // Determine language: use options if provided, otherwise detect
     let lang = options?.language || "am";
 
-    // Auto-detect if no language specified in options
     if (!options?.language) {
       if (detected === "amharic") {
         lang = "am";
@@ -51,10 +112,10 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         lang = "en";
         console.log(`🔍 Auto-detected English content, using English font`);
       } else if (detected === "mixed") {
-        lang = "am"; // Default to Amharic for mixed content
+        lang = "am";
         console.log(`🔍 Mixed content detected, defaulting to Amharic font`);
       } else {
-        lang = "am"; // Default to Amharic
+        lang = "am";
         console.log(`🔍 Language not detected, defaulting to Amharic`);
       }
     } else {
@@ -68,7 +129,8 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         title: "ዕለታዊ ሪፖርት",
         subtitle: "የአዲስ መሶብ የአንድ ማዕከል አገልግሎት",
         reportDate: "የሪፖርቱ ቀን",
-        colNo: "ቁጥር",
+        generatedOn: "የተዘጋጀበት ቀን", // ✅ NEW
+        colNo: "ተ/ቁ", // ✅ FIXED: shortened so it stays on one horizontal line
         colDept: "ዘርፍ",
         colService: "አገልግሎት",
         colMale: "ወንድ",
@@ -84,6 +146,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         title: "Daily Report",
         subtitle: "A-MESOB One-Stop Service Center",
         reportDate: "Report Date",
+        generatedOn: "Generated On", // ✅ NEW
         colNo: "#",
         colDept: "Department",
         colService: "Service",
@@ -100,6 +163,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         title: "Guyyaa Guyyaa Oduu",
         subtitle: "A-MESOB One-Stop Tajaajila",
         reportDate: "Guyyaa Oduu",
+        generatedOn: "Guyyaa Qophaa'ame", // ✅ NEW
         colNo: "#",
         colDept: "Kutaa",
         colService: "Tajaajila",
@@ -122,38 +186,22 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       theme: "daily",
     });
 
-    // Get the document instance
     const doc = engine.getDoc();
 
-    // ✅ IMPORTANT: Load fonts into this document
-    // (createPDF()/engine.init() already calls loadFonts() once, but this
-    // is safe to call again — loadFonts() no-ops if doc.__fontsLoaded is
-    // already true. Kept here for explicitness / defensive re-entry.)
     loadFonts(doc, { silent: false });
 
-    // ─── Helper: Set font based on text content ───
-    // ✅ FIXED: previously this switched the FONT NAME for bold
-    // (FONT_NAMES.ethiopicBold / FONT_NAMES.latinBold) while hardcoding
-    // the style argument to "normal" — so bold text asked jsPDF for
-    // ("<name>-Bold", "normal"), a pair that was never registered, and
-    // silently fell back to Helvetica. FONT_NAMES.ethiopic/latin now
-    // resolve to the single registered family for both weights; only the
-    // *style* argument should ever vary.
     const setSmartFont = (text, bold = false) => {
       try {
         const hasAmharic = isAmharic(text);
         const style = bold ? "bold" : "normal";
 
         if (hasAmharic) {
-          // Use Ethiopic fonts if available
           if (doc.__hasEthiopicFont) {
             doc.setFont(FONT_NAMES.ethiopic, style);
           } else {
-            // Fallback to helvetica with bold style
             doc.setFont("helvetica", style);
           }
         } else {
-          // Use Latin fonts for English/Oromo
           if (doc.__hasLatinFont) {
             doc.setFont(FONT_NAMES.latin, style);
           } else {
@@ -169,9 +217,10 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     // ─── Set document metadata ────────────────────────────────────────────────
     try {
       doc.setProperties({
-        title: labels.title,
+        title: `${labels.title} - ${date}`, // ✅ meaningful title, not just generic label
         author: options?.author || "A-MESOB One-Stop Service Center",
-        subject: options?.subject || labels.title,
+        subject:
+          options?.subject || `${labels.title} (${labels.reportDate}: ${date})`,
         keywords: options?.keywords || "daily, report, service, Amharic",
         creator: "A-MESOB PDF Generator",
       });
@@ -201,7 +250,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     // ─── Date ──────────────────────────────────────────────────────────────────
     const reportDate = date || new Date().toISOString().split("T")[0];
-    // Format date for display
     const displayDate = reportDate.split("-").reverse().join("/");
 
     setSmartFont(`${labels.reportDate}: ${displayDate}`, false);
@@ -214,7 +262,18 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         align: "center",
       },
     );
-    yPos += 14;
+    yPos += 8;
+
+    // ─── ✅ NEW: Generated On (Ethiopian calendar) ─────────────────────────────
+    const generatedOnText = `${labels.generatedOn}: ${formatEthiopianDate(new Date())}`;
+    setSmartFont(generatedOnText, false);
+    doc.setFontSize(9);
+    doc.setTextColor(120, 120, 120);
+    doc.text(encodeText(generatedOnText), pageWidth / 2, yPos, {
+      align: "center",
+    });
+    doc.setTextColor(0, 0, 0);
+    yPos += 10;
 
     // ─── Draw separator line ──────────────────────────────────────────────────
     doc.setDrawColor(26, 107, 74);
@@ -245,7 +304,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       ],
     ];
 
-    // Build body with proper encoding
     const body = validRows.map((row, idx) => [
       `${idx + 1}`,
       encodeText(row.dept || "—"),
@@ -259,7 +317,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       ["", "", labels.grandTotal, grandMale, grandFemale, grandTotal],
     ];
 
-    // ─── Import autoTable dynamically ────────────────────────────────────────
     const autoTable = (await import("jspdf-autotable")).default;
 
     autoTable(doc, {
@@ -293,19 +350,16 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         valign: "middle",
       },
       columnStyles: {
-        0: { cellWidth: 15, halign: "center" },
+        // ✅ FIXED: was 15 (too narrow for "ቁጥር", forced it to wrap onto its
+        // own line). Widened slightly AND the label itself was shortened to
+        // "ተ/ቁ" above — the combination keeps it on a single horizontal line.
+        0: { cellWidth: 18, halign: "center" },
         1: { cellWidth: "auto" },
         2: { cellWidth: "auto" },
         3: { cellWidth: 25, halign: "center" },
         4: { cellWidth: 25, halign: "center" },
         5: { cellWidth: 30, halign: "center" },
       },
-      // ✅ Handle mixed language content with proper fonts.
-      // Only the FAMILY name needs to be chosen per-cell here — the STYLE
-      // (bold for head/foot, normal for body) is already supplied by
-      // headStyles/footStyles/bodyStyles above and is now honored
-      // correctly because fontLoader.js registers bold under the same
-      // family name as regular.
       didParseCell: (data) => {
         const cellText = String(data.cell.raw || "");
         const hasAmharic = /[\u1200-\u137F]/.test(cellText);
@@ -320,7 +374,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
             : "helvetica";
         }
 
-        // Ensure proper encoding
         data.cell.raw = encodeText(cellText);
       },
       styles: {
@@ -330,26 +383,49 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       tableWidth: "auto",
     });
 
-    // Update yPos after table
     yPos = doc.lastAutoTable?.finalY + 10 || yPos + 50;
 
     // ─── Add Watermark if requested ──────────────────────────────────────────
+    // ✅ FIXED:
+    //  - text now defaults to the report's own title ("ዕለታዊ ሪፖርት" / "Daily
+    //    Report" / ...) instead of the word "Confidential" ("ሚስጥራዊ").
+    //  - no longer bold — plain weight reads as a mark, not a stamp.
+    //  - drawn at very low opacity via jsPDF's GState, so it never competes
+    //    with the table content. (True z-order "behind the table" isn't used
+    //    here on purpose: the table's striped row backgrounds are opaque, so
+    //    a watermark drawn before the table would simply be erased underneath
+    //    every row and only show in the margins. Low opacity gives the look
+    //    you want — faint, unobtrusive, visible everywhere — without that
+    //    side effect. Multi-page reports also need the page count, which is
+    //    only known once the table has finished laying itself out.)
     if (options?.showWatermark) {
       try {
-        const watermarkText =
-          options?.watermarkText ||
-          (lang === "am"
-            ? "ሚስጥራዊ"
-            : lang === "om"
-              ? "Iccitii"
-              : "Confidential");
+        const watermarkText = options?.watermarkText || labels.title;
         const pageCount = doc.internal.getNumberOfPages();
 
         for (let i = 1; i <= pageCount; i++) {
           doc.setPage(i);
-          setSmartFont(watermarkText, true);
-          doc.setFontSize(options?.watermarkSize || 60);
-          doc.setTextColor(200, 200, 200);
+
+          let gStateApplied = false;
+          try {
+            doc.saveGraphicsState();
+            doc.setGState(new doc.GState({ opacity: 0.06 }));
+            gStateApplied = true;
+          } catch (gStateError) {
+            console.debug(
+              "GState opacity unsupported, falling back to light color:",
+              gStateError.message,
+            );
+          }
+
+          setSmartFont(watermarkText, false); // not bold
+          doc.setFontSize(options?.watermarkSize || 50);
+          // Fallback color is very light in case GState opacity isn't available
+          doc.setTextColor(
+            gStateApplied ? 150 : 225,
+            gStateApplied ? 150 : 225,
+            gStateApplied ? 150 : 225,
+          );
           doc.text(
             encodeText(watermarkText),
             doc.internal.pageSize.getWidth() / 2,
@@ -359,6 +435,17 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
               angle: options?.watermarkAngle || -45,
             },
           );
+
+          if (gStateApplied) {
+            try {
+              doc.restoreGraphicsState();
+            } catch (restoreError) {
+              console.debug(
+                "restoreGraphicsState failed:",
+                restoreError.message,
+              );
+            }
+          }
         }
         doc.setTextColor(0, 0, 0);
       } catch (watermarkError) {
@@ -374,12 +461,10 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
 
-      // Draw footer line
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.3);
       doc.line(15, footerY - 4, pageWidth - 15, footerY - 4);
 
-      // Footer text
       setSmartFont(footerText, false);
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
@@ -387,10 +472,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         align: "center",
       });
 
-      // Page numbers
-      // Note: reuses whatever font setSmartFont(footerText, false) just set
-      // (normal weight) — the page-number label ("ገጽ 1 ከ 1") is not bold,
-      // so this is correct as-is.
       doc.text(
         `${labels.page} ${i} ${labels.of} ${pageCount}`,
         pageWidth - 15,
@@ -402,8 +483,9 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     // ─── Save ──────────────────────────────────────────────────────────────────
     const safeDate = reportDate.replace(/\//g, "-");
     const langSuffix = lang === "am" ? "_am" : lang === "om" ? "_om" : "_en";
+    // ✅ FIXED: more descriptive/meaningful filename (org name + report + lang + date)
     const filename =
-      options?.filename || `daily_report${langSuffix}_${safeDate}.pdf`;
+      options?.filename || `AMESOB_DailyReport${langSuffix}_${safeDate}.pdf`;
     engine.save(filename);
 
     console.log(
