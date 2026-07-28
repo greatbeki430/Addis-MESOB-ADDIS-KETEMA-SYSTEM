@@ -22,6 +22,23 @@ const ETHIOPIAN_MONTHS_AM = [
   "ጳጉሜ",
 ];
 
+// Oromo month names
+const ETHIOPIAN_MONTHS_OM = [
+  "Amajjii",
+  "Guraandhala",
+  "Bitooteessa",
+  "Ebla",
+  "Caamsaa",
+  "Waxabajjii",
+  "Adooleessa",
+  "Hagayya",
+  "Fuulbana",
+  "Onkololeessa",
+  "Sadaasa",
+  "Muddee",
+  "Qormaata",
+];
+
 const JDN_EPOCH_OFFSET_AMETE_MIHRET = 1723856;
 
 function gregorianToJDN(year, month, day) {
@@ -54,12 +71,65 @@ function toEthiopianDate(date = new Date()) {
     Math.floor(r / 1460);
   const month = Math.floor(n / 30) + 1;
   const day = (n % 30) + 1;
-  return { year, month, day, monthName: ETHIOPIAN_MONTHS_AM[month - 1] };
+  return { year, month, day };
 }
 
-function formatEthiopianDate(date = new Date()) {
-  const { year, day, monthName } = toEthiopianDate(date);
+function formatEthiopianDateAmharic(date = new Date()) {
+  const { year, day, month } = toEthiopianDate(date);
+  const monthName = ETHIOPIAN_MONTHS_AM[month - 1];
   return `${monthName} ${day} ቀን ${year} ዓ.ም`;
+}
+
+function formatEthiopianDateOromo(date = new Date()) {
+  const { year, day, month } = toEthiopianDate(date);
+  const monthName = ETHIOPIAN_MONTHS_OM[month - 1];
+  return `${monthName} ${day}, ${year} A.M`;
+}
+
+// ✅ Format date based on language
+function formatDateForLanguage(dateStr, lang) {
+  if (!dateStr) return "N/A";
+
+  const dateObj = new Date(dateStr);
+
+  // For Amharic: Ethiopian calendar in Amharic
+  if (lang === "am") {
+    return formatEthiopianDateAmharic(dateObj);
+  }
+
+  // For Oromo: Ethiopian calendar in Oromo
+  if (lang === "om") {
+    return formatEthiopianDateOromo(dateObj);
+  }
+
+  // For English: Gregorian calendar
+  return dateObj.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+// Format Ethiopian date for English (used for "Generated On" in English)
+function formatEthiopianDateForEnglish(date = new Date()) {
+  const { year, day, month } = toEthiopianDate(date);
+  // Format as "Month/Day/Year (Ethiopian Calendar)"
+  const monthNames = [
+    "Meskerem",
+    "Tikimt",
+    "Hidar",
+    "Tahsas",
+    "Tir",
+    "Yekatit",
+    "Megabit",
+    "Miazia",
+    "Genbot",
+    "Sene",
+    "Hamle",
+    "Nehase",
+    "Pagume",
+  ];
+  return `${monthNames[month - 1]} ${day}, ${year} (Ethiopian)`;
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -69,10 +139,6 @@ function formatEthiopianDate(date = new Date()) {
  * @param {string} date - Report date string
  * @param {Object} t - Translation function object
  * @param {Object} options - Additional options for PDF generation
- * @param {string} options.filename - Custom filename (optional)
- * @param {string} options.footerText - Custom footer text (optional)
- * @param {boolean} options.showWatermark - Show watermark (optional)
- * @param {string} options.language - Output language: 'am', 'en', 'om'
  */
 export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
   try {
@@ -186,6 +252,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     loadFonts(doc, { silent: false });
 
+    // ─── Helper: Set font based on text content ────────────────────────────
     const setSmartFont = (text, bold = false) => {
       try {
         const hasAmharic = isAmharic(text);
@@ -195,6 +262,9 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
           if (doc.__hasEthiopicFont) {
             doc.setFont(FONT_NAMES.ethiopic, style);
           } else {
+            console.warn(
+              "⚠️ Ethiopic font not available, using helvetica for Amharic text",
+            );
             doc.setFont("helvetica", style);
           }
         } else {
@@ -246,10 +316,13 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     // ─── Report Date ──────────────────────────────────────────────────────────
     const reportDate = date || new Date().toISOString().split("T")[0];
-    const displayDate = reportDate.split("-").reverse().join("/");
 
-    // ✅ FIX: Encode the full string properly
-    const reportDateText = `${labels.reportDate}: ${displayDate}`;
+    // ✅ Format date based on language
+    const formattedReportDate = formatDateForLanguage(reportDate, lang);
+    const reportDateText = `${labels.reportDate}: ${formattedReportDate}`;
+
+    console.log(`📅 Report Date (${lang}): ${formattedReportDate}`);
+
     setSmartFont(reportDateText, false);
     doc.setFontSize(11);
     doc.text(encodeText(reportDateText), pageWidth / 2, yPos, {
@@ -257,11 +330,24 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     });
     yPos += 8;
 
-    // ─── ✅ Generated On (Ethiopian calendar) ────────────────────────────────
-    const ethiopianDate = formatEthiopianDate(new Date());
-    const generatedOnText = `${labels.generatedOn}: ${ethiopianDate}`;
+    // ─── ✅ Generated On (Ethiopian calendar for all languages) ──────────────
+    const currentDate = new Date();
+    let generatedOnDate;
 
-    // ✅ FIX: Encode the full string properly and ensure font is set
+    // ✅ Use Ethiopian calendar for all languages
+    if (lang === "am") {
+      generatedOnDate = formatEthiopianDateAmharic(currentDate);
+    } else if (lang === "om") {
+      generatedOnDate = formatEthiopianDateOromo(currentDate);
+    } else {
+      // English: Use Ethiopian date with clear label
+      generatedOnDate = formatEthiopianDateForEnglish(currentDate);
+    }
+
+    const generatedOnText = `${labels.generatedOn}: ${generatedOnDate}`;
+
+    console.log(`📅 Generated On (${lang}): ${generatedOnDate}`);
+
     setSmartFont(generatedOnText, false);
     doc.setFontSize(9);
     doc.setTextColor(120, 120, 120);
