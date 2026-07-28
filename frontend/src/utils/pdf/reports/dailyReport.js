@@ -30,7 +30,7 @@ const AMHARIC_LABELS = {
  * @param {string} options.footerText - Custom footer text (optional)
  * @param {boolean} options.showWatermark - Show watermark (optional)
  */
-export const generateDailyReportPDF = (rows, date, t, options = {}) => {
+export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
   try {
     console.log("📄 Generating Daily Report PDF...");
 
@@ -64,7 +64,10 @@ export const generateDailyReportPDF = (rows, date, t, options = {}) => {
     const setSmartFont = (text, bold = false) => {
       try {
         if (isAmharic(text)) {
-          doc.setFont(bold ? FONT_NAMES.ethiopicBold : FONT_NAMES.ethiopic, "normal");
+          doc.setFont(
+            bold ? FONT_NAMES.ethiopicBold : FONT_NAMES.ethiopic,
+            "normal",
+          );
         } else {
           doc.setFont(bold ? FONT_NAMES.latinBold : FONT_NAMES.latin, "normal");
         }
@@ -92,22 +95,31 @@ export const generateDailyReportPDF = (rows, date, t, options = {}) => {
     doc.setFontSize(18);
     const pageWidth = doc.internal.pageSize.getWidth();
     let yPos = 20;
-    doc.text(encodeText(labels.title), pageWidth / 2, yPos, { align: "center" });
+    doc.text(encodeText(labels.title), pageWidth / 2, yPos, {
+      align: "center",
+    });
     yPos += 10;
 
     // ─── Subtitle ──────────────────────────────────────────────────────────────
     setSmartFont(labels.subtitle, false);
     doc.setFontSize(10);
-    doc.text(encodeText(labels.subtitle), pageWidth / 2, yPos, { align: "center" });
+    doc.text(encodeText(labels.subtitle), pageWidth / 2, yPos, {
+      align: "center",
+    });
     yPos += 10;
 
     // ─── Date ──────────────────────────────────────────────────────────────────
     const reportDate = date || new Date().toISOString().split("T")[0];
     setSmartFont(`${labels.reportDate}: ${reportDate}`, false);
     doc.setFontSize(10);
-    doc.text(encodeText(`${labels.reportDate}: ${reportDate}`), pageWidth / 2, yPos, {
-      align: "center",
-    });
+    doc.text(
+      encodeText(`${labels.reportDate}: ${reportDate}`),
+      pageWidth / 2,
+      yPos,
+      {
+        align: "center",
+      },
+    );
     yPos += 12;
 
     // ─── Calculate Totals ─────────────────────────────────────────────────────
@@ -143,14 +155,7 @@ export const generateDailyReportPDF = (rows, date, t, options = {}) => {
     ]);
 
     const foot = [
-      [
-        "",
-        "",
-        labels.grandTotal,
-        grandMale,
-        grandFemale,
-        grandTotal,
-      ],
+      ["", "", labels.grandTotal, grandMale, grandFemale, grandTotal],
     ];
 
     // ─── Import autoTable dynamically ────────────────────────────────────────
@@ -243,12 +248,14 @@ export const generateDailyReportPDF = (rows, date, t, options = {}) => {
       setSmartFont(footerText, false);
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text(encodeText(footerText), pageWidth / 2, footerY, { align: "center" });
+      doc.text(encodeText(footerText), pageWidth / 2, footerY, {
+        align: "center",
+      });
       doc.text(
         `${labels.generatedBy} ${i} ${labels.of} ${pageCount}`,
         pageWidth - 15,
         footerY,
-        { align: "right" }
+        { align: "right" },
       );
     }
 
