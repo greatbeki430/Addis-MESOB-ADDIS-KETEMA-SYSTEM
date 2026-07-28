@@ -305,7 +305,7 @@ const DocumentCard = ({ doc, onDownload, t }) => {
             gap: "6px",
             background: "#F8FAFC",
             padding: isMobile ? "4px 10px" : "6px 14px",
-            borderRadius: "8px",
+            borderRadius: "6px",
             border: "1px solid #E2E8F0",
             width: isMobile ? "auto" : "100%",
             justifyContent: isMobile ? "flex-start" : "center",
@@ -1015,7 +1015,7 @@ export default function DocumentVault() {
           </select>
         </div>
 
-        {/* View Toggle */}
+        {/* View Toggle - Icons Only */}
         <div
           style={{
             display: "flex",
@@ -1029,46 +1029,42 @@ export default function DocumentVault() {
           <button
             onClick={() => setViewMode("list")}
             style={{
-              padding: isMobile ? "6px 12px" : "8px 16px",
+              padding: isMobile ? "6px 10px" : "8px 12px",
               borderRadius: "6px",
               border: "none",
               background: viewMode === "list" ? "#fff" : "transparent",
-              color: viewMode === "list" ? "#0F172A" : "#64748B",
-              fontWeight: 600,
-              fontSize: isMobile ? "11px" : "12px",
+              color: viewMode === "list" ? "#2563EB" : "#64748B",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
-              gap: "6px",
+              justifyContent: "center",
               boxShadow:
                 viewMode === "list" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
               transition: "all 0.2s",
             }}
+            title={tc("list", "List")}
           >
-            <FiList size={isMobile ? 14 : 16} />
-            {tc("list", "List")}
+            <FiList size={isMobile ? 18 : 20} />
           </button>
           <button
             onClick={() => setViewMode("grid")}
             style={{
-              padding: isMobile ? "6px 12px" : "8px 16px",
+              padding: isMobile ? "6px 10px" : "8px 12px",
               borderRadius: "6px",
               border: "none",
               background: viewMode === "grid" ? "#fff" : "transparent",
-              color: viewMode === "grid" ? "#0F172A" : "#64748B",
-              fontWeight: 600,
-              fontSize: isMobile ? "11px" : "12px",
+              color: viewMode === "grid" ? "#2563EB" : "#64748B",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
-              gap: "6px",
+              justifyContent: "center",
               boxShadow:
                 viewMode === "grid" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
               transition: "all 0.2s",
             }}
+            title={tc("grid", "Grid")}
           >
-            <FiGrid size={isMobile ? 14 : 16} />
-            {tc("grid", "Grid")}
+            <FiGrid size={isMobile ? 18 : 20} />
           </button>
         </div>
       </div>
