@@ -43,6 +43,7 @@ export default function DailyReport({ t, lang }) {
   });
   const [savedReportId, setSavedReportId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [pdfLanguage, setPdfLanguage] = useState("am");
 
   const prevRowsRef = useRef(rows);
 
@@ -222,6 +223,7 @@ export default function DailyReport({ t, lang }) {
     }
   };
 
+  // Update the exportPDF function
   const exportPDF = async () => {
     try {
       setExporting(true);
@@ -233,7 +235,18 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
-      await generateDailyReportPDF(exportData, date, t);
+      // Pass language option to PDF generator
+      await generateDailyReportPDF(exportData, date, t, {
+        language: pdfLanguage,
+        showWatermark: true,
+        watermarkText:
+          pdfLanguage === "am"
+            ? "ሚስጥራዊ"
+            : pdfLanguage === "om"
+              ? "Iccitii"
+              : "Confidential",
+      });
+
       showToast(
         td("exportSuccess", "✅ PDF exported successfully!"),
         "success",
@@ -983,6 +996,74 @@ export default function DailyReport({ t, lang }) {
                 {!isMobile && td("fullReport", "Full Report")}
               </button>
             </div>
+
+            {/* ✅ ADD THE PDF LANGUAGE SELECTOR HERE - right after the action buttons */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginTop: "clamp(12px, 2vw, 16px)",
+                paddingTop: "clamp(12px, 2vw, 16px)",
+                borderTop: `1px solid ${C.border}`,
+                width: "100%",
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "clamp(11px, 2vw, 13px)",
+                  color: C.muted,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                }}
+              >
+                <FiFile size={14} />
+                {td("pdfLanguage", "PDF Language:")}
+              </span>
+              <select
+                value={pdfLanguage}
+                onChange={(e) => setPdfLanguage(e.target.value)}
+                style={{
+                  border: `1.5px solid ${C.border}`,
+                  borderRadius: 8,
+                  padding: isMobile ? "6px 12px" : "8px 14px",
+                  fontSize: isMobile ? "12px" : "13px",
+                  background: "#fff",
+                  cursor: "pointer",
+                  outline: "none",
+                  width: isMobile ? "100%" : "auto",
+                  minWidth: isMobile ? "100%" : "180px",
+                  fontWeight: 500,
+                  transition: "all 0.2s ease",
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = C.primary;
+                  e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = C.border;
+                  e.currentTarget.style.boxShadow = "none";
+                }}
+              >
+                <option value="am">አማርኛ (Amharic)</option>
+                <option value="en">English</option>
+                <option value="om">Oromo</option>
+              </select>
+            </div>
+
+            {/* ✅ AI Insight panel - this already exists below */}
+            {savedReportId && (
+              <div style={{ marginTop: "clamp(20px, 4vw, 30px)" }}>
+                <AISummary
+                  fetchFn={(id) => aiAPI.getDailyInsight(id, null)}
+                  args={[savedReportId]}
+                  label={td("aiInsight", "AI Daily Insight")}
+                />
+              </div>
+            )}
 
             {/* ✅ AI Insight panel - Added margin-top for spacing */}
             {savedReportId && (
