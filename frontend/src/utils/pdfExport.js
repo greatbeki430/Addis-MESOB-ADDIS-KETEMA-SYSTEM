@@ -557,11 +557,16 @@ export const exportDailyReportToPDF = (rows, date, t) => {
 
 // ✅ Export Evaluation Report to PDF (with Comments Support)
 // ✅ Helper: pick the right embedded font for whatever script the text uses
+// FIXED: previously switched to a mismatched "-Bold" family name while
+// hardcoding the style to "normal" (the same bug as dailyReport.js's
+// setSmartFont). FONT_NAMES.ethiopic/latin now resolve to the one
+// registered family for both weights — only pass the real style through.
 const setSmartFont = (doc, text, bold = false) => {
+  const style = bold ? "bold" : "normal";
   if (isAmharic(text)) {
-    doc.setFont(bold ? FONT_NAMES.ethiopicBold : FONT_NAMES.ethiopic, "normal");
+    doc.setFont(FONT_NAMES.ethiopic, style);
   } else {
-    doc.setFont(bold ? FONT_NAMES.latinBold : FONT_NAMES.latin, "normal");
+    doc.setFont(FONT_NAMES.latin, style);
   }
 };
 
@@ -746,7 +751,7 @@ export const exportEvaluationReportToPDF = (
       yPos += 8;
 
       doc.setFontSize(10);
-      // ✅ Force Ethiopic font for Amharic text
+      // ✅ Force Ethiopic font for Amharic text (normal weight body copy)
       doc.setFont(FONT_NAMES.ethiopic, "normal");
       doc.setTextColor(50, 50, 50);
 
