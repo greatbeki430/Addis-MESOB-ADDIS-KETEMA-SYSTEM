@@ -145,11 +145,9 @@ const getSummaryReport = async (req, res) => {
     const { start, end, team, fiscalYearStart } = req.query;
 
     if (!start || !end) {
-      return res
-        .status(400)
-        .json({
-          message: "start and end query params are required (YYYY-MM-DD)",
-        });
+      return res.status(400).json({
+        message: "start and end query params are required (YYYY-MM-DD)",
+      });
     }
 
     const startDate = new Date(start);
@@ -237,10 +235,158 @@ const getSummaryReport = async (req, res) => {
   }
 };
 
+// ─── ✅ NEW: Get user's report history ──────────────────────────────────────
+const getUserHistory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { limit = 100, skip = 0 } = req.query;
+
+    // Get all reports for this user, sorted by newest first
+    const reports = await DailyReport.find({
+      createdBy: userId,
+    })
+      .populate("team", "name nameEn")
+      .sort({ createdAt: -1 })
+      .skip(parseInt(skip))
+      .limit(parseInt(limit));
+
+    const total = await DailyReport.countDocuments({
+      createdBy: userId,
+    });
+
+    res.status(200).json({
+      success: true,
+      count: reports.length,
+      total: total,
+      data: reports,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching user history:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch report history",
+      error: error.message,
+    });
+  }
+};
+
+// ─── ✅ NEW: Get single report by ID ────────────────────────────────────────
+const getReportById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const report = await DailyReport.findOne({
+      _id: id,
+      createdBy: userId,
+    })
+      .populate("team", "name nameEn")
+      .populate("createdBy", "name");
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found or you don't have permission to view it",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    console.error("❌ Error fetching report by ID:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch report",
+      error: error.message,
+    });
+  }
+};
+
+// ─── ✅ NEW: Update report by ID ────────────────────────────────────────────
+const updateReportById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const { entries, date, team, grandTotal } = req.body;
+
+    const report = await DailyReport.findOne({
+      _id: id,
+      createdBy: userId,
+    });
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found or you don't have permission to update it",
+      });
+    }
+
+    // Update fields
+    if (entries) report.entries = entries;
+    if (date) report.date = new Date(date);
+    if (team) report.team = team;
+    if (grandTotal !== undefined) report.grandTotal = grandTotal;
+
+    await report.save();
+
+    res.status(200).json({
+      success: true,
+      data: report,
+    });
+  } catch (error) {
+    console.error("❌ Error updating report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update report",
+      error: error.message,
+    });
+  }
+};
+
+// ─── ✅ NEW: Delete report by ID ────────────────────────────────────────────
+const deleteReportById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+
+    const report = await DailyReport.findOne({
+      _id: id,
+      createdBy: userId,
+    });
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found or you don't have permission to delete it",
+      });
+    }
+
+    await DailyReport.deleteOne({ _id: id });
+
+    res.status(200).json({
+      success: true,
+      message: "Report deleted successfully",
+    });
+  } catch (error) {
+    console.error("❌ Error deleting report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete report",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   createDailyReport,
   getDailyReports,
   getReportByDate,
   deleteReportByDate,
   getSummaryReport,
+  getUserHistory,
+  getReportById,
+  updateReportById,
+  deleteReportById,
 };

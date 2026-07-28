@@ -132,6 +132,14 @@ export const dailyReportAPI = {
   getAll: (params) => api.get("/daily-reports", { params }),
   getByDate: (date) => api.get(`/daily-reports/date/${date}`),
   deleteByDate: (date) => api.delete(`/daily-reports/date/${date}`),
+  // ✅ ADD THIS - Get user's report history
+  getUserHistory: () => api.get("/daily-reports/history"),
+  // ✅ ADD THIS - Get single report by ID
+  getById: (id) => api.get(`/daily-reports/${id}`),
+  // ✅ ADD THIS - Update report
+  update: (id, data) => api.put(`/daily-reports/${id}`, data),
+  // ✅ ADD THIS - Delete report by ID
+  delete: (id) => api.delete(`/daily-reports/${id}`),
 };
 
 // ============================================================
