@@ -24,9 +24,10 @@ import {
   FiHardDrive,
   FiUpload,
   FiDatabase,
-  FiInfo,
   FiBook,
   FiArchive,
+  FiCalendar,
+  FiHash,
 } from "react-icons/fi";
 
 const fetchDocuments = (params) => documentAPI.getAll(params);
@@ -34,14 +35,22 @@ const getDocumentDownloadUrl = (id) => documentAPI.getDownloadUrl(id);
 
 // ─── Document Card ────────────────────────────────────────────
 const DocumentCard = ({ doc, onDownload, t }) => {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 480);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 480);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const getFileIcon = (fileType) => {
     const icons = {
-      pdf: <FiFile size={24} />,
-      jpg: <FiImage size={24} />,
-      png: <FiImage size={24} />,
-      tiff: <FiImage size={24} />,
+      pdf: <FiFile size={isMobile ? 28 : 32} />,
+      jpg: <FiImage size={isMobile ? 28 : 32} />,
+      png: <FiImage size={isMobile ? 28 : 32} />,
+      tiff: <FiImage size={isMobile ? 28 : 32} />,
     };
-    return icons[fileType] || <FiFileText size={24} />;
+    return icons[fileType] || <FiFileText size={isMobile ? 28 : 32} />;
   };
 
   const getTypeLabel = (type) => {
@@ -69,38 +78,47 @@ const DocumentCard = ({ doc, onDownload, t }) => {
     return labels[type] || type;
   };
 
+  const formatFileSize = (bytes) => {
+    if (!bytes) return "0 KB";
+    const kb = bytes / 1024;
+    if (kb < 1024) return `${Math.round(kb)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(1)} MB`;
+  };
+
   return (
     <div
       style={{
         background: "#fff",
         border: "1px solid #E2E8F0",
         borderRadius: "12px",
-        padding: "clamp(12px, 2vw, 16px)",
-        display: "flex",
-        gap: "clamp(10px, 1.5vw, 14px)",
-        alignItems: "flex-start",
-        transition: "box-shadow 0.2s",
-        flexDirection: window.innerWidth < 480 ? "column" : "row",
+        padding: isMobile ? "14px" : "16px",
+        transition: "box-shadow 0.2s, transform 0.2s",
+        display: "grid",
+        gridTemplateColumns: isMobile ? "1fr" : "auto 1fr auto",
+        gap: isMobile ? "12px" : "16px",
+        alignItems: "center",
       }}
       onMouseEnter={(e) =>
         (e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.08)")
       }
       onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
     >
-      {/* Thumbnail or icon */}
+      {/* Left Column: Document Image/Icon */}
       <div
         style={{
-          width: "clamp(40px, 8vw, 52px)",
-          height: "clamp(40px, 8vw, 52px)",
-          borderRadius: "8px",
-          background: "#F1F5F9",
+          width: isMobile ? "100%" : "80px",
+          height: isMobile ? "100px" : "80px",
+          borderRadius: "10px",
+          background: `linear-gradient(135deg, #EFF6FF, #DBEAFE)`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: "clamp(20px, 4vw, 26px)",
-          flexShrink: 0,
+          fontSize: isMobile ? "32px" : "36px",
           overflow: "hidden",
-          color: "#64748B",
+          color: "#2563EB",
+          border: "1px solid #BFDBFE",
+          position: "relative",
         }}
       >
         {doc.thumbnailUrl ? (
@@ -112,39 +130,71 @@ const DocumentCard = ({ doc, onDownload, t }) => {
         ) : (
           getFileIcon(doc.fileType)
         )}
+        {/* File type badge on image */}
+        <span
+          style={{
+            position: "absolute",
+            bottom: "4px",
+            right: "4px",
+            background: "rgba(0,0,0,0.7)",
+            color: "#fff",
+            fontSize: "9px",
+            padding: "2px 6px",
+            borderRadius: "4px",
+            fontWeight: 600,
+            textTransform: "uppercase",
+          }}
+        >
+          {doc.fileType?.toUpperCase() || "FILE"}
+        </span>
       </div>
 
-      {/* Info */}
-      <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
+      {/* Middle Column: Document Info */}
+      <div
+        style={{
+          flex: 1,
+          minWidth: 0,
+          width: "100%",
+        }}
+      >
+        {/* Title */}
         <div
           style={{
             fontWeight: 600,
-            fontSize: "clamp(13px, 2.5vw, 14px)",
-            color: "#1E293B",
+            fontSize: isMobile ? "14px" : "15px",
+            color: "#0F172A",
             display: "flex",
             alignItems: "center",
             gap: "6px",
-            flexWrap: "wrap",
+            marginBottom: "4px",
           }}
         >
-          <FiFileText size={14} color="#64748B" />
           <span style={{ wordBreak: "break-word" }}>{doc.title}</span>
         </div>
+
+        {/* Reference Number */}
         <div
           style={{
-            fontSize: "clamp(11px, 2vw, 12px)",
+            fontSize: isMobile ? "11px" : "12px",
             color: "#64748B",
-            marginTop: "2px",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+            marginBottom: "4px",
           }}
         >
-          <FiInfo size={12} style={{ marginRight: "4px" }} />
-          {doc.referenceNumber}
+          <FiHash size={12} color="#94A3B8" />
+          <span style={{ fontFamily: "monospace", fontSize: "11px" }}>
+            {doc.referenceNumber}
+          </span>
         </div>
+
+        {/* Tags and Badges - Row 1 */}
         <div
           style={{
             display: "flex",
             gap: "6px",
-            marginTop: "6px",
+            marginBottom: "4px",
             flexWrap: "wrap",
           }}
         >
@@ -152,8 +202,8 @@ const DocumentCard = ({ doc, onDownload, t }) => {
             style={{
               background: "#EFF6FF",
               color: "#1D4ED8",
-              fontSize: "clamp(10px, 1.8vw, 11px)",
-              padding: "2px 8px",
+              fontSize: isMobile ? "10px" : "11px",
+              padding: "2px 10px",
               borderRadius: "99px",
               display: "inline-flex",
               alignItems: "center",
@@ -168,8 +218,8 @@ const DocumentCard = ({ doc, onDownload, t }) => {
               style={{
                 background: "#F0FDF4",
                 color: "#15803D",
-                fontSize: "clamp(10px, 1.8vw, 11px)",
-                padding: "2px 8px",
+                fontSize: isMobile ? "10px" : "11px",
+                padding: "2px 10px",
                 borderRadius: "99px",
                 display: "inline-flex",
                 alignItems: "center",
@@ -180,66 +230,142 @@ const DocumentCard = ({ doc, onDownload, t }) => {
               {t?.("documentVault.lifetime") || "Lifetime"}
             </span>
           )}
+          {doc.retentionPolicy === "10_years" && (
+            <span
+              style={{
+                background: "#FEF3C7",
+                color: "#92400E",
+                fontSize: isMobile ? "10px" : "11px",
+                padding: "2px 10px",
+                borderRadius: "99px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <FiCalendar size={10} />
+              {t?.("documentVault.tenYears") || "10 Years"}
+            </span>
+          )}
+          {doc.retentionPolicy === "5_years" && (
+            <span
+              style={{
+                background: "#FEF3C7",
+                color: "#92400E",
+                fontSize: isMobile ? "10px" : "11px",
+                padding: "2px 10px",
+                borderRadius: "99px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "4px",
+              }}
+            >
+              <FiCalendar size={10} />
+              {t?.("documentVault.fiveYears") || "5 Years"}
+            </span>
+          )}
         </div>
+
+        {/* Citizen Name */}
         {doc.citizenName && (
           <div
             style={{
-              fontSize: "clamp(11px, 2vw, 12px)",
+              fontSize: isMobile ? "11px" : "12px",
               color: "#475569",
-              marginTop: "4px",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
             }}
           >
-            <FiUser size={12} style={{ marginRight: "4px" }} />
+            <FiUser size={12} color="#94A3B8" />
             {doc.citizenName}
           </div>
         )}
       </div>
 
-      {/* Actions */}
+      {/* Right Column: File Size & Download */}
       <div
         style={{
           display: "flex",
-          flexDirection: window.innerWidth < 480 ? "row" : "column",
-          gap: "6px",
+          flexDirection: isMobile ? "row" : "column",
+          alignItems: isMobile ? "center" : "flex-end",
+          gap: isMobile ? "8px" : "8px",
           flexShrink: 0,
-          width: window.innerWidth < 480 ? "100%" : "auto",
+          width: isMobile ? "100%" : "auto",
+          justifyContent: isMobile ? "space-between" : "flex-start",
         }}
       >
+        {/* File Size */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            background: "#F8FAFC",
+            padding: isMobile ? "4px 12px" : "6px 14px",
+            borderRadius: "20px",
+            border: "1px solid #E2E8F0",
+            width: isMobile ? "auto" : "100%",
+            justifyContent: isMobile ? "flex-start" : "center",
+          }}
+        >
+          <FiHardDrive size={14} color="#64748B" />
+          <span
+            style={{
+              fontSize: isMobile ? "11px" : "12px",
+              fontWeight: 600,
+              color: "#1E293B",
+            }}
+          >
+            {formatFileSize(doc.fileSize)}
+          </span>
+        </div>
+
+        {/* Download Button */}
         <button
           onClick={() => onDownload(doc._id)}
           style={{
             background: "#2563EB",
             color: "#fff",
             border: "none",
-            borderRadius: "7px",
-            padding: "clamp(6px, 1.5vw, 8px) clamp(12px, 2vw, 16px)",
-            fontSize: "clamp(11px, 2vw, 12px)",
+            borderRadius: "8px",
+            padding: isMobile ? "8px 16px" : "8px 18px",
+            fontSize: isMobile ? "12px" : "13px",
             cursor: "pointer",
             whiteSpace: "nowrap",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "4px",
-            width: window.innerWidth < 480 ? "100%" : "auto",
+            gap: "6px",
+            width: isMobile ? "100%" : "100%",
+            fontWeight: 600,
+            transition: "all 0.2s",
+            minWidth: isMobile ? "auto" : "100px",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#1D4ED8";
+            e.currentTarget.style.transform = "translateY(-1px)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "#2563EB";
+            e.currentTarget.style.transform = "translateY(0)";
           }}
         >
           <FiDownload size={14} />
           {t?.("common.download") || "Download"}
         </button>
+
+        {/* File Type - Small indicator */}
         <div
           style={{
-            fontSize: "clamp(10px, 1.8vw, 11px)",
+            fontSize: "9px",
             color: "#94A3B8",
-            textAlign: "center",
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            justifyContent: "center",
+            textTransform: "uppercase",
+            letterSpacing: "0.5px",
+            display: isMobile ? "none" : "block",
           }}
         >
-          <FiHardDrive size={12} />
-          {doc.fileType?.toUpperCase()}
-          {doc.fileSize ? ` · ${(doc.fileSize / 1024).toFixed(0)}KB` : ""}
+          {doc.fileType?.toUpperCase() || "FILE"}
         </div>
       </div>
     </div>
@@ -255,11 +381,19 @@ export default function DocumentVault() {
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 480);
   const { user } = useAuth();
 
   // Translation helpers
   const td = (key, fallback) => t?.(`documentVault.${key}`) || fallback;
   const tc = (key, fallback) => t?.(`common.${key}`) || fallback;
+
+  // Handle resize
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 480);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // ✅ Use ref to track if component is mounted
   const isMounted = useRef(true);
@@ -367,9 +501,9 @@ export default function DocumentVault() {
       <div
         style={{
           display: "flex",
-          flexDirection: window.innerWidth < 480 ? "column" : "row",
+          flexDirection: isMobile ? "column" : "row",
           justifyContent: "space-between",
-          alignItems: window.innerWidth < 480 ? "stretch" : "flex-start",
+          alignItems: isMobile ? "stretch" : "flex-start",
           gap: "12px",
           marginBottom: "clamp(16px, 3vw, 24px)",
         }}
@@ -387,10 +521,7 @@ export default function DocumentVault() {
               flexWrap: "wrap",
             }}
           >
-            <FiFolder
-              size={window.innerWidth < 480 ? 20 : 28}
-              color="#2563EB"
-            />
+            <FiFolder size={isMobile ? 20 : 28} color="#2563EB" />
             {td("title", "CRRSA Document Vault")}
           </h1>
           <p
@@ -427,7 +558,7 @@ export default function DocumentVault() {
               alignItems: "center",
               justifyContent: "center",
               gap: "6px",
-              width: window.innerWidth < 480 ? "100%" : "auto",
+              width: isMobile ? "100%" : "auto",
             }}
           >
             <FiUpload size={16} />
@@ -483,13 +614,13 @@ export default function DocumentVault() {
           gap: "12px",
           marginBottom: "20px",
           flexWrap: "wrap",
-          justifyContent: window.innerWidth < 480 ? "flex-start" : "flex-end",
+          justifyContent: isMobile ? "flex-start" : "flex-end",
         }}
       >
         <div
           style={{
             position: "relative",
-            width: window.innerWidth < 480 ? "100%" : "auto",
+            width: isMobile ? "100%" : "auto",
           }}
         >
           <FiFilter
@@ -514,10 +645,10 @@ export default function DocumentVault() {
               background: "#fff",
               outline: "none",
               appearance: "none",
-              minWidth: window.innerWidth < 480 ? "100%" : "200px",
+              minWidth: isMobile ? "100%" : "200px",
               cursor: "pointer",
               transition: "border-color 0.2s",
-              width: window.innerWidth < 480 ? "100%" : "auto",
+              width: isMobile ? "100%" : "auto",
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = "#2563EB";
