@@ -476,7 +476,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
           let gStateApplied = false;
           try {
             doc.saveGraphicsState();
-            doc.setGState(new doc.GState({ opacity: 0.06 }));
+            doc.setGState(new doc.GState({ opacity: 0.25 }));
             gStateApplied = true;
           } catch (gStateError) {
             console.debug(
