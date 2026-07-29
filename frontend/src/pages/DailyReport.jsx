@@ -366,10 +366,10 @@ export default function DailyReport({ t, lang }) {
         showWatermark: true,
         watermarkText:
           pdfLanguage === "am"
-            ? "ሚስጥራዊ"
+            ? "ዕለታዊ ሪፖርት"
             : pdfLanguage === "om"
-              ? "Iccitii"
-              : "Confidential",
+              ? "Gabaasa Guyyaa"
+              : "Daily Report",
       });
       showToast(
         td("exportSuccess", "✅ PDF exported successfully!"),
@@ -402,10 +402,10 @@ export default function DailyReport({ t, lang }) {
         showWatermark: true,
         watermarkText:
           pdfLanguage === "am"
-            ? "ሚስጥራዊ"
+            ? "ዕለታዊ ሪፖርት"
             : pdfLanguage === "om"
-              ? "Iccitii"
-              : "Confidential",
+              ? "Gabaasa Guyyaa"
+              : "Daily Report",
       });
 
       showToast(
