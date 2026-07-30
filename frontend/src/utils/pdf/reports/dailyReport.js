@@ -145,11 +145,6 @@ function formatEthiopianDateForEnglish(date = new Date()) {
 // render as blank (.notdef), and jsPDF's align:"center" width calculation
 // (based on that same single font) gets thrown off for the rest of the line.
 //
-// This is why:
-//  - Pure-Amharic labels/titles (no digits) rendered fine.
-//  - Pure-number table cells rendered fine (single script, own font).
-//  - Any string mixing "ቀን" + digits + "." (dates) silently failed.
-//
 // The fix: split the string into runs of same-script characters, render each
 // run with its own font (Ethiopic vs Latin/Helvetica), and manually walk the
 // x-cursor across runs — including manual centering, since jsPDF's built-in
@@ -234,13 +229,28 @@ function drawMixedScriptText(doc, text, x, y, opts = {}) {
   return totalWidth;
 }
 
-/**
- * Draws a centered, rotated watermark on the CURRENT page.
- * Manually computes the start point instead of relying on jsPDF's
- * align:"center" + angle combination — that combo doesn't correctly
- * center rotated text; the offset is computed before rotation is
- * applied, so the visual center drifts away from the intended anchor.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ Watermark
+//
+// IMPORTANT: this is drawn AFTER the table (i.e. on top in z-order), not
+// before it. Drawing it before the table caused it to vanish entirely —
+// autoTable's "striped" theme paints OPAQUE cell backgrounds for every row
+// (including the "white" ones), so anything drawn underneath at page-center
+// gets fully covered up.
+//
+// Real-world PDF/Word watermarks aren't literally behind the content either
+// — they're drawn on top with heavy transparency (opacity ~0.15–0.3), which
+// is what makes crisp black table text/borders still read clearly over a
+// faint gray watermark, creating the visual impression of a "background"
+// element. That's the effect this function produces.
+//
+// The one real bug this function fixes: jsPDF's align:"center" + angle
+// combination does NOT correctly center rotated text — the horizontal
+// offset for centering is computed in the pre-rotation frame, so once
+// rotated the visual center drifts away from the intended anchor point.
+// This function computes the correct start point manually instead of
+// relying on jsPDF's built-in align option when an angle is used.
+// ─────────────────────────────────────────────────────────────────────────────
 function drawWatermark(doc, text, opts = {}) {
   const { angle = 0, fontSize = 50, opacity = 0.25 } = opts;
 
@@ -278,6 +288,9 @@ function drawWatermark(doc, text, opts = {}) {
 
   if (angle) {
     const rad = (angle * Math.PI) / 180;
+    // Manually compute the left-aligned start point so the text's visual
+    // center lands on (cx, cy) once rotated — jsPDF's built-in align+angle
+    // combination does not do this correctly on its own.
     const startX = cx - (textWidth / 2) * Math.cos(rad);
     const startY = cy + (textWidth / 2) * Math.sin(rad);
     doc.text(encodeText(text), startX, startY, { align: "left", angle });
@@ -378,7 +391,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         colFemale: "Female",
         colTotal: "Total",
         grandTotal: "Grand Total",
-        // footer: "Reported by A-MESOB One-Stop Service Center",
         footer: "PREPARED BY A-MESOB ONE-STOP SERVICE CENTER!",
         generatedBy: "Page",
         of: "of",
@@ -477,7 +489,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     yPos += 10;
     doc.setTextColor(0, 0, 0);
 
-    // ─── Report Date (MIXED SCRIPT — this is the string that was invisible) ─
+    // ─── Report Date (MIXED SCRIPT) ──────────────────────────────────────────
     const reportDate = date || new Date().toISOString().split("T")[0];
 
     // ✅ Format date based on language
@@ -488,10 +500,9 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
-    // ✅ FIX: use drawMixedScriptText instead of setSmartFont()+doc.text().
-    // It renders each script run (Amharic vs digits/punctuation) with its
-    // own font instead of forcing the whole string through one font that's
-    // missing glyphs for the digits.
+    // ✅ Uses drawMixedScriptText instead of setSmartFont()+doc.text() so
+    // Amharic and digit/punctuation runs each get a font that has their
+    // glyphs, and centering is computed correctly across the whole string.
     drawMixedScriptText(doc, reportDateText, pageWidth / 2, yPos, {
       align: "center",
       bold: false,
@@ -518,8 +529,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     doc.setFontSize(9);
     doc.setTextColor(120, 120, 120);
-    // ✅ Same mixed-script fix applied here (this string also mixes Amharic
-    // labels/month names with digits and periods).
     drawMixedScriptText(doc, generatedOnText, pageWidth / 2, yPos, {
       align: "center",
       bold: false,
@@ -532,18 +541,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     doc.setLineWidth(0.5);
     doc.line(15, yPos, pageWidth - 15, yPos);
     yPos += 10;
-
-    // ─── Watermark (drawn BEHIND the table, since draw order = paint order) ───
-    if (options?.showWatermark) {
-      try {
-        drawWatermark(doc, options?.watermarkText || labels.title, {
-          angle: options?.watermarkAngle ?? 0,
-          fontSize: options?.watermarkSize || 50,
-        });
-      } catch (watermarkError) {
-        console.warn("Watermark addition failed:", watermarkError.message);
-      }
-    }
 
     // ─── Calculate Totals ─────────────────────────────────────────────────────
     const grandTotal = validRows.reduce(
@@ -644,97 +641,28 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       tableWidth: "auto",
     });
 
-    // ─── Watermark on any extra pages the table spilled onto ──────────────────
-    // (these pages didn't exist yet when the watermark above was drawn, so this
-    // unavoidably paints on top for pages 2+ — rare in practice for this report)
-    const totalPages = doc.internal.getNumberOfPages();
-    if (options?.showWatermark && totalPages > 1) {
-      for (let p = 2; p <= totalPages; p++) {
-        doc.setPage(p);
-        drawWatermark(doc, options?.watermarkText || labels.title, {
-          angle: options?.watermarkAngle ?? 0,
-          fontSize: options?.watermarkSize || 50,
-        });
-      }
-      doc.setPage(1);
-    }
-
     yPos = doc.lastAutoTable?.finalY + 10 || yPos + 50;
 
-    // ─── Add Watermark if requested ──────────────────────────────────────────
-    // if (options?.showWatermark) {
-    //   try {
-    //     const watermarkText = options?.watermarkText || labels.title;
-    //     const pageCount = doc.internal.getNumberOfPages();
+    // ─── Watermark (drawn AFTER the table — on top, translucent, centered) ───
+    // See the drawWatermark() doc-comment above for why "after" (not
+    // "before") the table is the correct place to draw this.
+    if (options?.showWatermark) {
+      try {
+        const watermarkText = options?.watermarkText || labels.title;
+        const pageCount = doc.internal.getNumberOfPages();
 
-    //     for (let i = 1; i <= pageCount; i++) {
-    //       doc.setPage(i);
-
-    //       let gStateApplied = false;
-    //       try {
-    //         doc.saveGraphicsState();
-    //         doc.setGState(new doc.GState({ opacity: 0.25 }));
-    //         gStateApplied = true;
-    //       } catch (gStateError) {
-    //         console.debug(
-    //           "GState opacity unsupported, falling back to light color:",
-    //           gStateError.message,
-    //         );
-    //       }
-
-    //       doc.setFontSize(options?.watermarkSize || 50);
-    //       doc.setTextColor(
-    //         gStateApplied ? 150 : 225,
-    //         gStateApplied ? 150 : 225,
-    //         gStateApplied ? 150 : 225,
-    //       );
-    //       // ✅ Watermark text can also mix scripts depending on options;
-    //       // use the same safe renderer. Note: jsPDF's rotated-text "angle"
-    //       // option only applies within a single doc.text() call, so runs
-    //       // sharing one rotation still need to be positioned along the
-    //       // rotated axis — for a centered single-line watermark this is
-    //       // rare in practice (watermark text is usually single-script),
-    //       // but drawMixedScriptText still measures/draws correctly for the
-    //       // common case. If you pass a genuinely mixed watermark string
-    //       // together with `angle`, prefer keeping the watermark text
-    //       // single-script.
-    //       if (options?.watermarkAngle) {
-    //         setSmartFont(watermarkText, false);
-    //         doc.text(
-    //           encodeText(watermarkText),
-    //           doc.internal.pageSize.getWidth() / 2,
-    //           doc.internal.pageSize.getHeight() / 2,
-    //           {
-    //             align: "center",
-    //             angle: options.watermarkAngle,
-    //           },
-    //         );
-    //       } else {
-    //         drawMixedScriptText(
-    //           doc,
-    //           watermarkText,
-    //           doc.internal.pageSize.getWidth() / 2,
-    //           doc.internal.pageSize.getHeight() / 2,
-    //           { align: "center", bold: false },
-    //         );
-    //       }
-
-    //       if (gStateApplied) {
-    //         try {
-    //           doc.restoreGraphicsState();
-    //         } catch (restoreError) {
-    //           console.debug(
-    //             "restoreGraphicsState failed:",
-    //             restoreError.message,
-    //           );
-    //         }
-    //       }
-    //     }
-    //     doc.setTextColor(0, 0, 0);
-    //   } catch (watermarkError) {
-    //     console.warn("Watermark addition failed:", watermarkError.message);
-    //   }
-    // }
+        for (let i = 1; i <= pageCount; i++) {
+          doc.setPage(i);
+          drawWatermark(doc, watermarkText, {
+            angle: options?.watermarkAngle ?? 0,
+            fontSize: options?.watermarkSize || 50,
+            opacity: options?.watermarkOpacity ?? 0.25,
+          });
+        }
+      } catch (watermarkError) {
+        console.warn("Watermark addition failed:", watermarkError.message);
+      }
+    }
 
     // ─── Footer ────────────────────────────────────────────────────────────────
     const footerText = options?.footerText || labels.footer;
