@@ -4,9 +4,9 @@
 export const dailyReportTranslations = {
   en: {
     dailyReport: {
-      title: "Daily Report",
-      reportDate: "📅 Report Date",
-      serviceList: "📋 Service List",
+      title: "DAILY REPORT",
+      reportDate: "📅 REPORT DATE",
+      serviceList: "📋 SERVICE LIST",
       colNo: "#",
       colDept: "Department",
       colService: "Service",
@@ -119,15 +119,15 @@ export const dailyReportTranslations = {
   },
   om: {
     dailyReport: {
-      title: "Gabaasa Guyyaa",
-      reportDate: "📅 Guyyaa Gabaasaa",
+      title: "GABAASA GUYYAA GUYYAA",
+      reportDate: "📅 GUYYAA GABAASAA",
       serviceList: "📋 Tarree Tajaajilaa",
       colNo: "#",
-      colDept: "Kutaa",
+      colDept: "DEPARTIMENTII",
       colService: "Tajaajila",
       colMale: "Dh",
-      colFemale: "Du",
-      colTotal: "Ida'ama",
+      colFemale: "Dha",
+      colTotal: "Waliigala",
       grandTotal: "Ida'ama Waliigalaa",
       addRow: "+ Tarree Dabali",
       save: "Gabaasa Olkaayi",
