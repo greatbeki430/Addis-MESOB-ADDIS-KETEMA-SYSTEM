@@ -110,27 +110,6 @@ function formatDateForLanguage(dateStr, lang) {
   });
 }
 
-// Format Ethiopian date for English (used for "Generated On" in English)
-// function formatEthiopianDateForEnglish(date = new Date()) {
-//   const { year, day, month } = toEthiopianDate(date);
-//   const monthNames = [
-//     "Meskerem",
-//     "Tikimt",
-//     "Hidar",
-//     "Tahsas",
-//     "Tir",
-//     "Yekatit",
-//     "Megabit",
-//     "Miazia",
-//     "Genbot",
-//     "Sene",
-//     "Hamle",
-//     "Nehase",
-//     "Pagume",
-//   ];
-//   return `${monthNames[month - 1]} ${day}, ${year} (Ethiopian)`;
-// }
-
 // Gregorian month names for the "Generated On" date, per language
 const GREGORIAN_MONTHS_AM = [
   "ጃንዋሪ",
@@ -182,29 +161,10 @@ function formatGregorianDateForLanguage(date, lang) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────────────────────
 // ✅ ROOT-CAUSE FIX: mixed-script text rendering
-//
-// jsPDF's doc.text() applies exactly ONE currently-active font to an entire
-// string. The Ethiopic font (NotoSansEthiopic) only embeds glyphs for the
-// Ethiopic Unicode block (U+1200–U+137F) — it has no glyphs for Western
-// digits ("0"–"9") or most Latin punctuation. Strings like
-// "የሪፖርቱ ቀን: ሐምሌ 20 ቀን 2018 ዓ.ም" mix Ethiopic text with Latin digits and
-// punctuation, so a single setFont() call can never render the whole thing
-// correctly — whichever characters aren't in the active font's glyph table
-// render as blank (.notdef), and jsPDF's align:"center" width calculation
-// (based on that same single font) gets thrown off for the rest of the line.
-//
-// The fix: split the string into runs of same-script characters, render each
-// run with its own font (Ethiopic vs Latin/Helvetica), and manually walk the
-// x-cursor across runs — including manual centering, since jsPDF's built-in
-// align option only works within a single font call.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const AMHARIC_CHAR_RE = /[\u1200-\u137F]/;
-// Splits into runs of "all-Amharic" vs "everything else" (digits, Latin,
-// punctuation, spaces). Adjacent same-type characters are merged into one run.
 const SCRIPT_RUN_RE = /[\u1200-\u137F]+|[^\u1200-\u137F]+/g;
 
 function splitIntoScriptRuns(text) {
@@ -241,23 +201,12 @@ function setFontForRun(doc, isAmharicRun, bold) {
  * switching fonts per script run so every character actually has a glyph to
  * render, and manually computing alignment since jsPDF can't align mixed-font
  * text on its own.
- *
- * @param {jsPDF} doc
- * @param {string} text
- * @param {number} x - reference x coordinate (meaning depends on align)
- * @param {number} y
- * @param {Object} [opts]
- * @param {"left"|"center"|"right"} [opts.align="left"]
- * @param {boolean} [opts.bold=false]
- * @returns {number} total rendered width (in doc units)
  */
 function drawMixedScriptText(doc, text, x, y, opts = {}) {
   const { align = "left", bold = false } = opts;
 
   const runs = splitIntoScriptRuns(text);
 
-  // First pass: measure each run's width using the font that will actually
-  // render it (font metrics differ between Ethiopic and Latin fonts).
   const widths = runs.map((run) => {
     setFontForRun(doc, run.isAmharic, bold);
     return doc.getTextWidth(run.text);
@@ -269,7 +218,6 @@ function drawMixedScriptText(doc, text, x, y, opts = {}) {
   if (align === "center") startX = x - totalWidth / 2;
   else if (align === "right") startX = x - totalWidth;
 
-  // Second pass: actually draw, walking the cursor forward per run.
   let cursorX = startX;
   runs.forEach((run, i) => {
     setFontForRun(doc, run.isAmharic, bold);
@@ -281,34 +229,17 @@ function drawMixedScriptText(doc, text, x, y, opts = {}) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ✅ Watermark
-//
-// IMPORTANT: this is drawn AFTER the table (i.e. on top in z-order), not
-// before it. Drawing it before the table caused it to vanish entirely —
-// autoTable's "striped" theme paints OPAQUE cell backgrounds for every row
-// (including the "white" ones), so anything drawn underneath at page-center
-// gets fully covered up.
-//
-// Real-world PDF/Word watermarks aren't literally behind the content either
-// — they're drawn on top with heavy transparency (opacity ~0.15–0.3), which
-// is what makes crisp black table text/borders still read clearly over a
-// faint gray watermark, creating the visual impression of a "background"
-// element. That's the effect this function produces.
-//
-// The one real bug this function fixes: jsPDF's align:"center" + angle
-// combination does NOT correctly center rotated text — the horizontal
-// offset for centering is computed in the pre-rotation frame, so once
-// rotated the visual center drifts away from the intended anchor point.
-// This function computes the correct start point manually instead of
-// relying on jsPDF's built-in align option when an angle is used.
+// ✅ Watermark - FIXED: Position adjusted to avoid table header
 // ─────────────────────────────────────────────────────────────────────────────
 function drawWatermark(doc, text, opts = {}) {
-  const { angle = 0, fontSize = 50, opacity = 0.25 } = opts;
+  const { angle = 0, fontSize = 50, opacity = 0.25, yOffset = 30 } = opts;
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+
+  // ✅ Moved down by 30px to avoid table header cutting off the watermark
   const cx = pageWidth / 2;
-  const cy = pageHeight / 2;
+  const cy = pageHeight / 2 + yOffset;
 
   let gStateApplied = false;
   try {
@@ -339,9 +270,6 @@ function drawWatermark(doc, text, opts = {}) {
 
   if (angle) {
     const rad = (angle * Math.PI) / 180;
-    // Manually compute the left-aligned start point so the text's visual
-    // center lands on (cx, cy) once rotated — jsPDF's built-in align+angle
-    // combination does not do this correctly on its own.
     const startX = cx - (textWidth / 2) * Math.cos(rad);
     const startY = cy + (textWidth / 2) * Math.sin(rad);
     doc.text(encodeText(text), startX, startY, { align: "left", angle });
@@ -361,10 +289,6 @@ function drawWatermark(doc, text, opts = {}) {
 
 /**
  * Generate Daily Report PDF with full Amharic support
- * @param {Array} rows - Array of report rows with dept, service, male, female, total
- * @param {string} date - Report date string
- * @param {Object} t - Translation function object
- * @param {Object} options - Additional options for PDF generation
  */
 export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
   try {
@@ -374,14 +298,13 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       throw new Error("No data to export");
     }
 
-    // Filter valid rows
     const validRows = rows.filter((r) => r.dept || r.service);
 
     if (validRows.length === 0) {
       throw new Error("No valid data to export");
     }
 
-    // ─── 🔍 AUTO-DETECT LANGUAGE USING detectLanguage ───
+    // ─── 🔍 AUTO-DETECT LANGUAGE ───
     const sampleText = validRows
       .slice(0, 5)
       .map((r) => (r.dept || "") + " " + (r.service || ""))
@@ -409,16 +332,15 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     } else {
       console.log(`📄 Using user-specified language: ${lang.toUpperCase()}`);
     }
-    // ─── END OF AUTO-DETECTION ───
 
-    // Language-specific labels
+    // ─── Language-specific labels ──────────────────────────────────────────────
     const LABELS = {
       am: {
         title: "ዕለታዊ ሪፖርት",
         subtitle: "የአዲስ መሶብ የአንድ ማዕከል አገልግሎት",
         reportDate: "የሪፖርቱ ቀን",
         generatedOn: "የተዘጋጀበት ቀን",
-        preparedBy: "የተዘጋጀው በ", // ✅ ADD THIS
+        preparedBy: "የተዘጋጀው በ",
         colNo: "ተ.ቁ",
         colDept: "ዘርፍ",
         colService: "አገልግሎት",
@@ -436,7 +358,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         subtitle: "A-MESOB ONE-STOP SERVICE CENTER",
         reportDate: "REPORT DATE: ",
         generatedOn: "REPORTED ON: ",
-        preparedBy: "Prepared By", // ✅ ADD THIS
+        preparedBy: "Prepared By",
         colNo: "#",
         colDept: "Department",
         colService: "Service",
@@ -454,7 +376,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         subtitle: "WIIRTUU TAJAAJILA IDDOO TOKKOO (A-MESOB)",
         reportDate: "GUYYAA GABAASAA: ",
         generatedOn: "GUYYAA ITTI QOPHAA'E: ",
-        preparedBy: "Kan Qophaa'e", // ✅ ADD THIS
+        preparedBy: "Kan Qophaa'e",
         colNo: "#",
         colDept: "Kutaa",
         colService: "Tajaajila",
@@ -471,7 +393,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     const labels = LABELS[lang] || LABELS.am;
 
-    // Create PDF engine with daily theme
+    // ─── Create PDF ────────────────────────────────────────────────────────────
     const engine = createPDF({
       orientation: "landscape",
       theme: "daily",
@@ -481,7 +403,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     loadFonts(doc, { silent: false });
 
-    // ─── Helper: Set font based on text content (single-script strings) ───
+    // ─── Helper: Set font based on text content ────────────────────────────────
     const setSmartFont = (text, bold = false) => {
       try {
         const hasAmharic = isAmharic(text);
@@ -523,7 +445,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       console.debug("Could not set document metadata:", metadataError.message);
     }
 
-    // ─── Title (single-script — plain setSmartFont + doc.text is fine) ──────
+    // ─── Title ────────────────────────────────────────────────────────────────
     setSmartFont(labels.title, true);
     doc.setFontSize(20);
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -533,7 +455,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     });
     yPos += 12;
 
-    // ─── Subtitle (single-script) ────────────────────────────────────────────
+    // ─── Subtitle ──────────────────────────────────────────────────────────────
     setSmartFont(labels.subtitle, false);
     doc.setFontSize(11);
     doc.setTextColor(100, 100, 100);
@@ -543,35 +465,31 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     yPos += 10;
     doc.setTextColor(0, 0, 0);
 
-    // ─── ✅ NEW: Prepared By Info with Branch ──────────────────────────────────
+    // ─── ✅ UPDATED: Prepared By Info with Department (not role) ──────────────
     if (options?.preparedBy) {
-      // Build the prepared by text with branch if available
+      // Build the prepared by text - prioritize department over role
       let preparedByText = `${labels.preparedBy}: ${options.preparedBy}`;
 
-      // Collect all parts (department, branch, role)
+      // Collect all parts (department first, then branch)
       const parts = [];
 
+      // ✅ PRIORITY 1: Department (if available and not "N/A")
       if (
         options.preparedByDepartment &&
-        options.preparedByDepartment !== "N/A"
+        options.preparedByDepartment !== "N/A" &&
+        options.preparedByDepartment !== "Staff"
       ) {
         parts.push(options.preparedByDepartment);
       }
 
+      // ✅ PRIORITY 2: Branch (if available)
       if (options.preparedByBranch) {
         parts.push(options.preparedByBranch);
       }
 
-      // Add role if not already in department
-      if (options.preparedByRole && options.preparedByRole !== "Staff") {
-        // Only add role if it's not already shown
-        if (
-          !parts.some(
-            (p) => p.toLowerCase() === options.preparedByRole.toLowerCase(),
-          )
-        ) {
-          parts.push(options.preparedByRole);
-        }
+      // ✅ ONLY use role as LAST RESORT if no department is available
+      if (parts.length === 0 && options.preparedByRole) {
+        parts.push(options.preparedByRole);
       }
 
       if (parts.length > 0) {
@@ -588,10 +506,8 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       yPos += 8;
     }
 
-    // ─── Report Date (MIXED SCRIPT) ──────────────────────────────────────────
+    // ─── Report Date ──────────────────────────────────────────────────────────
     const reportDate = date || new Date().toISOString().split("T")[0];
-
-    // ✅ Format date based on language
     const formattedReportDate = formatDateForLanguage(reportDate, lang);
     const reportDateText = `${labels.reportDate}: ${formattedReportDate}`;
 
@@ -599,33 +515,15 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
-    // ✅ Uses drawMixedScriptText instead of setSmartFont()+doc.text() so
-    // Amharic and digit/punctuation runs each get a font that has their
-    // glyphs, and centering is computed correctly across the whole string.
     drawMixedScriptText(doc, reportDateText, pageWidth / 2, yPos, {
       align: "center",
       bold: false,
     });
     yPos += 8;
 
-    // ─── ✅ Generated On (Ethiopian calendar for all languages) ──────────────
-    // const currentDate = new Date();
-    // let generatedOnDate;
-
-    // // ✅ Use Ethiopian calendar for all languages
-    // if (lang === "am") {
-    //   generatedOnDate = formatEthiopianDateAmharic(currentDate);
-    // } else if (lang === "om") {
-    //   generatedOnDate = formatEthiopianDateOromo(currentDate);
-    // } else {
-    //   // English: Use Ethiopian date with clear label
-    //   generatedOnDate = formatEthiopianDateForEnglish(currentDate);
-    // }
-
+    // ─── Generated On ──────────────────────────────────────────────────────────
     const currentDate = new Date();
-    // ✅ "Generated On" now always shows the Gregorian date, per language
     const generatedOnDate = formatGregorianDateForLanguage(currentDate, lang);
-
     const generatedOnText = `${labels.generatedOn}: ${generatedOnDate}`;
 
     console.log(`📅 Generated On (${lang}): ${generatedOnDate}`);
@@ -746,9 +644,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     yPos = doc.lastAutoTable?.finalY + 10 || yPos + 50;
 
-    // ─── Watermark (drawn AFTER the table — on top, translucent, centered) ───
-    // See the drawWatermark() doc-comment above for why "after" (not
-    // "before") the table is the correct place to draw this.
+    // ─── Watermark (drawn AFTER the table with yOffset moved down) ────────────
     if (options?.showWatermark) {
       try {
         const watermarkText = options?.watermarkText || labels.title;
@@ -756,10 +652,12 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
         for (let i = 1; i <= pageCount; i++) {
           doc.setPage(i);
+          // ✅ yOffset: 30px down from center to avoid table header
           drawWatermark(doc, watermarkText, {
             angle: options?.watermarkAngle ?? 0,
             fontSize: options?.watermarkSize || 50,
             opacity: options?.watermarkOpacity ?? 0.25,
+            yOffset: 30, // ✅ Moved down
           });
         }
       } catch (watermarkError) {
@@ -782,8 +680,6 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
 
-      // ✅ Left: Prepared by (if available)
-      // footer
       if (options?.preparedBy) {
         const preparedFooterText =
           lang === "am"
@@ -797,13 +693,11 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         });
       }
 
-      // Center: Footer text
       drawMixedScriptText(doc, footerText, pageWidth / 2, footerY, {
         align: "center",
         bold: false,
       });
 
-      // Right: Page X of Y
       setSmartFont(`${labels.page} ${i} ${labels.of} ${pageCount}`, false);
       doc.text(
         `${labels.page} ${i} ${labels.of} ${pageCount}`,
