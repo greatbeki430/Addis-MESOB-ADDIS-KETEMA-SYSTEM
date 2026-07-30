@@ -368,6 +368,21 @@ export default function DailyReport({ t, lang }) {
         showToast(td("noDataToExport", "No data to export"), "warning");
         return;
       }
+
+      // ✅ Get user info with fallbacks
+      const userName =
+        user?.fullName ||
+        user?.displayName ||
+        user?.name ||
+        user?.username ||
+        "Unknown User";
+      const userDepartment =
+        user?.department ||
+        user?.team?.name ||
+        user?.teamName ||
+        user?.team ||
+        "N/A";
+
       await generateDailyReportPDF(exportData, report.date, t, {
         language: pdfLanguage,
         showWatermark: true,
@@ -377,9 +392,9 @@ export default function DailyReport({ t, lang }) {
             : pdfLanguage === "om"
               ? "Gabaasa Guyyaa"
               : "Daily Report",
-        // ✅ ADD THIS - Pass user info to PDF
-        preparedBy: user?.name || user?.username || "Unknown",
-        preparedByDepartment: user?.department || user?.team || "N/A",
+        // ✅ Pass user info
+        preparedBy: userName,
+        preparedByDepartment: userDepartment,
         preparedByRole: user?.role || "Staff",
       });
       showToast(
@@ -408,6 +423,23 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
+      // ✅ Get user info with fallbacks
+      const userName =
+        user?.fullName ||
+        user?.displayName ||
+        user?.name ||
+        user?.username ||
+        "Unknown User";
+      const userDepartment =
+        user?.department ||
+        user?.team?.name ||
+        user?.teamName ||
+        user?.team ||
+        "N/A";
+      const userRole = user?.role || "Staff";
+
+      console.log("👤 PDF prepared by:", userName, "from", userDepartment);
+
       await generateDailyReportPDF(exportData, date, t, {
         language: pdfLanguage,
         showWatermark: true,
@@ -418,10 +450,10 @@ export default function DailyReport({ t, lang }) {
             : pdfLanguage === "om"
               ? "Gabaasa Guyyaa"
               : "Daily Report",
-        // ✅ ADD THIS - Pass user info to PDF
-        preparedBy: user?.name || user?.username || "Unknown",
-        preparedByDepartment: user?.department || user?.team || "N/A",
-        preparedByRole: user?.role || "Staff",
+        // ✅ Pass user info
+        preparedBy: userName,
+        preparedByDepartment: userDepartment,
+        preparedByRole: userRole,
       });
 
       showToast(
