@@ -369,7 +369,7 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
-      // ✅ Get user info with fallbacks
+      // ✅ Get user info with professional fallback
       const userName =
         user?.fullName ||
         user?.displayName ||
@@ -377,6 +377,7 @@ export default function DailyReport({ t, lang }) {
         user?.username ||
         "Unknown User";
 
+      // ✅ Department/Team - NO role, professional default
       const userDepartment =
         user?.team?.department ||
         user?.team?.name ||
@@ -398,7 +399,7 @@ export default function DailyReport({ t, lang }) {
         preparedBy: userName,
         preparedByDepartment: userDepartment,
         preparedByRole: user?.role || "Staff",
-        preparedByBranch: userBranch, // ✅ ADD THIS
+        preparedByBranch: userBranch,
       });
       showToast(
         td("exportSuccess", "✅ PDF exported successfully!"),
@@ -415,6 +416,7 @@ export default function DailyReport({ t, lang }) {
     }
   };
 
+  // ─── Main Export PDF ────────────────────────────────────────────────────────
   const exportPDF = async () => {
     try {
       setExporting(true);
@@ -426,7 +428,7 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
-      // ✅ Get user info with better fallbacks
+      // ✅ Get user info with professional fallback
       const userName =
         user?.fullName ||
         user?.displayName ||
@@ -434,13 +436,12 @@ export default function DailyReport({ t, lang }) {
         user?.username ||
         "Unknown User";
 
-      // ✅ Try ALL possible locations for department
+      // ✅ Department/Team - NO role, professional default
       const userDepartment =
         user?.team?.department || // Department from team object
         user?.team?.name || // Team name as fallback
         user?.department || // Direct user department
-        user?.role || // Role as fallback
-        "N/A";
+        "A-MESOB Staff"; // Professional default (NOT "N/A" or role)
 
       // ✅ Get branch/location
       const userBranch = user?.branch || "Addis Ketema";
@@ -470,7 +471,7 @@ export default function DailyReport({ t, lang }) {
         preparedBy: userName,
         preparedByDepartment: userDepartment,
         preparedByRole: userRole,
-        preparedByBranch: userBranch, // ✅ ADD THIS
+        preparedByBranch: userBranch,
       });
 
       showToast(
@@ -487,6 +488,7 @@ export default function DailyReport({ t, lang }) {
       setExporting(false);
     }
   };
+
   // ─── Style helpers ───────────────────────────────────────────────────────────
   const th = {
     background: C.dark,
