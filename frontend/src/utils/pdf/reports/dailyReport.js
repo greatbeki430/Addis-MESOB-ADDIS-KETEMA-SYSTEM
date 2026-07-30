@@ -706,13 +706,12 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         bold: false,
       });
 
-      setSmartFont(`${labels.page} ${i} ${labels.of} ${pageCount}`, false);
-      doc.text(
-        `${labels.page} ${i} ${labels.of} ${pageCount}`,
-        pageWidth - 15,
-        footerY,
-        { align: "right" },
-      );
+      // ✅ Use drawMixedScriptText for page number too
+      const pageText = `${labels.page} ${i} ${labels.of} ${pageCount}`;
+      drawMixedScriptText(doc, pageText, pageWidth - 15, footerY, {
+        align: "right",
+        bold: false,
+      });
     }
 
     // ─── Save ──────────────────────────────────────────────────────────────────
