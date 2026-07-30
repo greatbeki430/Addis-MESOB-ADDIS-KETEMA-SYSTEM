@@ -375,8 +375,12 @@ export default function DailyReport({ t, lang }) {
           pdfLanguage === "am"
             ? "ዕለታዊ ሪፖርት"
             : pdfLanguage === "om"
-              ? "Gabaasa Guyyaa Har'aa"
+              ? "Gabaasa Guyyaa"
               : "Daily Report",
+        // ✅ ADD THIS - Pass user info to PDF
+        preparedBy: user?.name || user?.username || "Unknown",
+        preparedByDepartment: user?.department || user?.team || "N/A",
+        preparedByRole: user?.role || "Staff",
       });
       showToast(
         td("exportSuccess", "✅ PDF exported successfully!"),
@@ -414,6 +418,10 @@ export default function DailyReport({ t, lang }) {
             : pdfLanguage === "om"
               ? "Gabaasa Guyyaa"
               : "Daily Report",
+        // ✅ ADD THIS - Pass user info to PDF
+        preparedBy: user?.name || user?.username || "Unknown",
+        preparedByDepartment: user?.department || user?.team || "N/A",
+        preparedByRole: user?.role || "Staff",
       });
 
       showToast(
