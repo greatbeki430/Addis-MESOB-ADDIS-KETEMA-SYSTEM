@@ -543,10 +543,41 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     yPos += 10;
     doc.setTextColor(0, 0, 0);
 
-    // ─── ✅ NEW: Prepared By Info ─────────────────────────────────────────────
-    // header
+    // ─── ✅ NEW: Prepared By Info with Branch ──────────────────────────────────
     if (options?.preparedBy) {
-      const preparedByText = `${labels.preparedBy}: ${options.preparedBy}${options.preparedByDepartment ? ` (${options.preparedByDepartment})` : ""}`;
+      // Build the prepared by text with branch if available
+      let preparedByText = `${labels.preparedBy}: ${options.preparedBy}`;
+
+      // Collect all parts (department, branch, role)
+      const parts = [];
+
+      if (
+        options.preparedByDepartment &&
+        options.preparedByDepartment !== "N/A"
+      ) {
+        parts.push(options.preparedByDepartment);
+      }
+
+      if (options.preparedByBranch) {
+        parts.push(options.preparedByBranch);
+      }
+
+      // Add role if not already in department
+      if (options.preparedByRole && options.preparedByRole !== "Staff") {
+        // Only add role if it's not already shown
+        if (
+          !parts.some(
+            (p) => p.toLowerCase() === options.preparedByRole.toLowerCase(),
+          )
+        ) {
+          parts.push(options.preparedByRole);
+        }
+      }
+
+      if (parts.length > 0) {
+        preparedByText += ` (${parts.join(" - ")})`;
+      }
+
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
       drawMixedScriptText(doc, preparedByText, pageWidth / 2, yPos, {

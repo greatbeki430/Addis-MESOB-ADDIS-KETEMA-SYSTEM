@@ -1,4 +1,3 @@
-// backend/src/models/User.js
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs");
 
@@ -16,9 +15,27 @@ const userSchema = new mongoose.Schema(
     phone: String,
     signature: String,
     telegramChatId: { type: String, default: null },
-    // ✅ ADD THESE TWO FIELDS
     profilePhotoUrl: { type: String, default: "" },
     profilePhotoPublicId: { type: String, default: "" },
+    // ✅ ADD THIS - Branch/Location
+    branch: {
+      type: String,
+      enum: [
+        "Addis Ketema",
+        "Lideta",
+        "Kirkos",
+        "Bole",
+        "Yeka",
+        "Gulele",
+        "Nifas Silk",
+        "Kolfe Keranio",
+        "Arada",
+        "Akaki Kality",
+        "Lemi Kura",
+        "Other",
+      ],
+      default: "Addis Ketema",
+    },
   },
   { timestamps: true },
 );

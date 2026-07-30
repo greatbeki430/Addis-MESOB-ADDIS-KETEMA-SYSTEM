@@ -215,6 +215,7 @@ const STEPS = {
   SKILLS: "awaiting_skills",
   PHOTO: "awaiting_photo",
   OTP: "awaiting_otp",
+  BRANCH: "awaiting_branch", // ✅ NEW STEP
 };
 
 function parseSkills(input) {
@@ -230,9 +231,6 @@ function parseSkills(input) {
 
 // ─── SET BOT COMMANDS (appears when user types "/" in input) ──────
 async function setBotCommands() {
-  // These commands appear in the input bar when user types "/"
-  // The menu button (grid icon ⊞) will appear INSIDE the input bar
-  // Position: To the LEFT of the attachment icon (📎)
   const commands = [
     { command: "start", description: "🚀 Start the bot" },
     { command: "menu", description: "⊞ Open main menu" },
@@ -252,7 +250,9 @@ async function setBotCommands() {
   });
 
   if (result.ok) {
-    console.log("✅ Bot commands set - Menu button (⊞) is now INSIDE the input bar!");
+    console.log(
+      "✅ Bot commands set - Menu button (⊞) is now INSIDE the input bar!",
+    );
     console.log("📌 Position: [⊞] [📎] [😊] Type a message...");
   } else {
     console.warn("⚠️ Failed to set bot commands");
@@ -263,18 +263,17 @@ async function setBotCommands() {
 
 // ─── SET CHAT MENU BUTTON (Grid icon INSIDE the input bar) ────────
 async function setChatMenuButton(chatId) {
-  // This places the menu button (⊞) INSIDE the input bar
-  // It appears to the LEFT of the attachment icon (📎)
-  // The button stays permanently in the input bar - never gets hidden!
   const result = await callTelegramApi("setChatMenuButton", {
     chat_id: chatId,
     menu_button: {
-      type: "default", // Shows the grid icon (⊞) in the input bar
-    }
+      type: "default",
+    },
   });
 
   if (result.ok) {
-    console.log(`✅ Menu button (⊞) placed INSIDE input bar for chat: ${chatId}`);
+    console.log(
+      `✅ Menu button (⊞) placed INSIDE input bar for chat: ${chatId}`,
+    );
     console.log(`📌 Position: [⊞] [📎] [😊] Type a message...`);
   } else {
     console.warn(`⚠️ Failed to set menu button for chat: ${chatId}`);
@@ -285,9 +284,6 @@ async function setChatMenuButton(chatId) {
 
 // ─── SET DEFAULT MENU BUTTON FOR ALL CHATS ─────────────────────────
 async function setDefaultMenuButton() {
-  // This sets the menu button for ALL chats with the bot
-  // The grid icon (⊞) appears INSIDE the input bar for all users
-  // NOTE: This uses the correct method for setting default menu button
   const result = await callTelegramApi("setMyDefaultAdministratorRights", {
     rights: {
       is_anonymous: false,
@@ -306,7 +302,9 @@ async function setDefaultMenuButton() {
 
   if (result.ok) {
     console.log("✅ Default administrator rights set for all chats!");
-    console.log("📌 The grid icon will appear INSIDE the input bar for everyone!");
+    console.log(
+      "📌 The grid icon will appear INSIDE the input bar for everyone!",
+    );
   } else {
     console.warn("⚠️ Failed to set default administrator rights");
   }
@@ -321,10 +319,7 @@ async function setupPersistentMenu() {
   console.log("📌 Position: [⊞] [📎] [😊] Type a message...");
 
   try {
-    // Set bot commands that appear when typing "/"
     await setBotCommands();
-
-    // Set default menu button for all chats
     await setDefaultMenuButton();
 
     console.log("✅ Persistent menu setup complete!");
@@ -340,8 +335,6 @@ async function setupPersistentMenu() {
 }
 
 // ─── PERSISTENT MENU ───────────────────────────────────────
-// This is the main menu that will always be accessible via the menu button
-// Using GRID VIEW icon (9 squares/dots) - the icon that looks like a grid
 const PERSISTENT_MENU_BUTTONS = {
   inline_keyboard: [
     [{ text: "⊞ Main Menu", callback_data: "menu" }],
@@ -390,9 +383,8 @@ function showMainMenu(chatId, extraText = "") {
 
 // ─── PERSISTENT MENU HANDLER ──────────────────────────────
 async function showPersistentMenu(chatId, messageText = "⊞ *Main Menu*") {
-  // Ensure the menu button is set for this chat
   await setChatMenuButton(chatId);
-  
+
   const menuText = `${messageText}\n\nSelect an option from the menu below:`;
 
   return sendMessage(chatId, menuText, {
@@ -423,8 +415,6 @@ async function showPersistentMenu(chatId, messageText = "⊞ *Main Menu*") {
 async function handleStart(msg) {
   const chatId = msg.chat.id.toString();
 
-  // Place the menu button (⊞) INSIDE the user's input bar
-  // Position: [⊞] [📎] [😊] Type a message...
   await setChatMenuButton(chatId);
 
   const existingPending = await PendingRegistration.findOne({
@@ -454,7 +444,6 @@ async function handleStart(msg) {
     );
   }
 
-  // Start registration
   registrationSessions.set(chatId, {
     step: STEPS.NAME,
     data: {
@@ -483,10 +472,12 @@ async function handleRegistrationMessage(msg) {
 
   const text = (msg.text || "").trim();
 
-  // Handle /menu command during registration
   if (text === "/menu" || text === "/start") {
     registrationSessions.delete(chatId);
-    return showPersistentMenu(chatId, "🔄 Registration cancelled. Returning to main menu.");
+    return showPersistentMenu(
+      chatId,
+      "🔄 Registration cancelled. Returning to main menu.",
+    );
   }
 
   if (msg.photo && session.step === STEPS.PHOTO) {
@@ -513,8 +504,7 @@ async function handleRegistrationMessage(msg) {
 
     case STEPS.EMAIL: {
       const email = text.toLowerCase();
-      // Basic email validation
-      if (!email.includes('@') || !email.includes('.')) {
+      if (!email.includes("@") || !email.includes(".")) {
         return sendMessage(
           chatId,
           "❌ Please enter a valid email address (e.g., name@domain.com).\n\nClick ⊞ in input bar or type /menu to cancel.",
@@ -540,6 +530,55 @@ async function handleRegistrationMessage(msg) {
 
     case STEPS.PHONE: {
       session.data.phone = text.toLowerCase() === "skip" ? "" : text;
+      session.step = STEPS.BRANCH; // ✅ NEW: Go to branch after phone
+      sendMessage(
+        chatId,
+        "📍 *What is your branch location?*\n\nPlease select your branch:\n\n" +
+          "Addis Ketema\n" +
+          "Lideta\n" +
+          "Kirkos\n" +
+          "Bole\n" +
+          "Yeka\n" +
+          "Gulele\n" +
+          "Nifas Silk\n" +
+          "Kolfe Keranio\n" +
+          "Arada\n" +
+          "Akaki Kality\n" +
+          "Lemi Kura\n" +
+          "Other\n\n" +
+          "Or type 'skip' to use default (Addis Ketema)\n\nClick ⊞ in input bar or type /menu to cancel.",
+        { parse_mode: "Markdown" },
+      );
+      break;
+    }
+
+    case STEPS.BRANCH: {
+      // ✅ NEW STEP
+      const validBranches = [
+        "Addis Ketema",
+        "Lideta",
+        "Kirkos",
+        "Bole",
+        "Yeka",
+        "Gulele",
+        "Nifas Silk",
+        "Kolfe Keranio",
+        "Arada",
+        "Akaki Kality",
+        "Lemi Kura",
+        "Other",
+      ];
+
+      if (text.toLowerCase() === "skip") {
+        session.data.branch = "Addis Ketema";
+      } else {
+        // Try to match the branch (case insensitive)
+        const matchedBranch = validBranches.find(
+          (b) => b.toLowerCase() === text.toLowerCase(),
+        );
+        session.data.branch = matchedBranch || text;
+      }
+
       session.step = STEPS.DEPARTMENT;
       sendMessage(
         chatId,
@@ -646,6 +685,7 @@ async function completeRegistration(chatId, session) {
     name: session.data.name,
     email: session.data.email,
     phone: session.data.phone || "",
+    branch: session.data.branch || "Addis Ketema", // ✅ ADD THIS
     department: session.data.department || "",
     position: session.data.position || "",
     skills: session.data.skills || [],
@@ -673,12 +713,18 @@ async function handleOtpVerification(chatId, session, text) {
 
   if (!pending) {
     registrationSessions.delete(chatId);
-    return showPersistentMenu(chatId, "❌ Something went wrong. Please try again.");
+    return showPersistentMenu(
+      chatId,
+      "❌ Something went wrong. Please try again.",
+    );
   }
 
   if (!pending.otpExpiresAt || pending.otpExpiresAt < new Date()) {
     registrationSessions.delete(chatId);
-    return showPersistentMenu(chatId, "❌ That code expired. Please try again.");
+    return showPersistentMenu(
+      chatId,
+      "❌ That code expired. Please try again.",
+    );
   }
 
   if (text !== pending.otpCode) {
@@ -716,6 +762,7 @@ async function notifyAdminsForApproval(pending) {
     `👤 Name: ${pending.name}\n` +
     `📧 Email: ${pending.email}\n` +
     `📱 Phone: ${pending.phone || "Not provided"}\n` +
+    `📍 Branch: ${pending.branch || "Addis Ketema"}\n` + // ✅ ADD THIS
     `🏛️ Department: ${pending.department || "Not provided"}\n` +
     `💼 Position: ${pending.position || "Not provided"}\n` +
     `🛠️ Skills: ${pending.skills?.length ? pending.skills.join(", ") : "Not provided"}\n` +
@@ -736,7 +783,6 @@ async function notifyAdminsForApproval(pending) {
   });
 }
 
-
 // ─── APPROVE REGISTRATION ──────────────────────────────────
 async function approveRegistration(pendingId, reviewer) {
   console.log("📝 Approving registration:", pendingId);
@@ -751,7 +797,7 @@ async function approveRegistration(pendingId, reviewer) {
     console.log("👤 Creating user account for:", pending.email);
     const tempPassword = generateTempPassword();
 
-    // ✅ FIXED: Pass profilePhotoUrl to createUserAccount
+    // ✅ FIXED: Pass ALL fields to createUserAccount
     const user = await createUserAccount({
       name: pending.name,
       email: pending.email,
@@ -759,8 +805,8 @@ async function approveRegistration(pendingId, reviewer) {
       role: "employee",
       phone: pending.phone,
       telegramChatId: pending.telegramChatId,
-      profilePhotoUrl: pending.profilePhotoUrl || "", // ✅ ADD THIS
-      // profilePhotoPublicId: pending.profilePhotoPublicId || "", // Add if you have it
+      profilePhotoUrl: pending.profilePhotoUrl || "",
+      branch: pending.branch || "Addis Ketema", // ✅ ADD THIS
     });
 
     console.log("✅ User created with ID:", user._id);
@@ -804,7 +850,6 @@ async function approveRegistration(pendingId, reviewer) {
     pending.reviewedAt = new Date();
     await pending.save();
 
-    // SEND LOGIN LINK WITH PASSWORD
     console.log("📤 Sending login link to:", pending.telegramChatId);
     await sendLoginLink(pending.telegramChatId, pending.email, tempPassword);
 
@@ -820,6 +865,7 @@ async function approveRegistration(pendingId, reviewer) {
     throw error;
   }
 }
+
 // ─── REJECT REGISTRATION ──────────────────────────────────
 async function rejectRegistration(pendingId, reviewer, reason) {
   const pending = await PendingRegistration.findById(pendingId);
@@ -874,7 +920,6 @@ async function handleCallback(query) {
   const messageId = query.message.message_id;
   const data = query.data;
 
-  // ── MENU ──
   if (data === "menu") {
     await showPersistentMenu(chatId);
     await callTelegramApi("answerCallbackQuery", {
@@ -884,7 +929,6 @@ async function handleCallback(query) {
     return;
   }
 
-  // ── RESET ──
   if (data === "reset") {
     registrationSessions.delete(chatId);
     await showPersistentMenu(chatId, "🔄 Session reset. Starting fresh.");
@@ -895,9 +939,7 @@ async function handleCallback(query) {
     return;
   }
 
-  // ── REGISTER ──
   if (data === "register") {
-    // Check if already registered
     const existingPending = await PendingRegistration.findOne({
       telegramChatId: chatId,
     }).sort({ createdAt: -1 });
@@ -927,7 +969,6 @@ async function handleCallback(query) {
       }
     }
 
-    // Start registration
     await handleStart({ chat: { id: chatId }, from: { username: "" } });
     await callTelegramApi("answerCallbackQuery", {
       callback_query_id: query.id,
@@ -936,7 +977,6 @@ async function handleCallback(query) {
     return;
   }
 
-  // ── ABOUT GOLDEN MONDAY ──
   if (data === "about_gm") {
     await sendMessage(
       chatId,
@@ -957,7 +997,6 @@ async function handleCallback(query) {
     return;
   }
 
-  // ── MY STATUS ──
   if (data === "my_status") {
     const pending = await PendingRegistration.findOne({
       telegramChatId: chatId,
@@ -980,7 +1019,9 @@ async function handleCallback(query) {
         `*Your Registration Status*\n\n` +
           `Status: ${statusMap[pending.status] || pending.status}\n` +
           `Name: ${pending.name}\n` +
-          `Email: ${pending.email}\n\n` +
+          `Email: ${pending.email}\n` +
+          `📍 Branch: ${pending.branch || "Addis Ketema"}\n` + // ✅ ADD THIS
+          `🏛️ Department: ${pending.department || "Not set"}\n\n` +
           `🔹 Click the ⊞ in your input bar to see all options.`,
         { parse_mode: "Markdown" },
       );
@@ -992,7 +1033,6 @@ async function handleCallback(query) {
     return;
   }
 
-  // ── CONTACT ADMIN ──
   if (data === "contact_admin") {
     await sendMessage(
       chatId,
@@ -1011,7 +1051,6 @@ async function handleCallback(query) {
     return;
   }
 
-  // ── HELP ──
   if (data === "help") {
     await sendMessage(
       chatId,
@@ -1037,7 +1076,6 @@ async function handleCallback(query) {
     return;
   }
 
-  // ─── APPROVAL/REJECTION CALLBACKS ──────────────────────
   const [action, pendingId] = data.split(":");
   if (pendingId) {
     const pending = await PendingRegistration.findById(pendingId);
@@ -1120,17 +1158,14 @@ async function handleWebhookUpdate(update) {
       const msg = update.message;
       const text = msg.text || "";
 
-      // Handle /menu command
       if (text === "/menu") {
         return showPersistentMenu(msg.chat.id.toString());
       }
 
-      // Handle /start command
       if (text.startsWith("/start")) {
         return handleStart(msg);
       }
 
-      // Handle other commands
       if (text === "/register") {
         return handleCallback({
           id: "command_register",
@@ -1175,11 +1210,10 @@ async function handleWebhookUpdate(update) {
         return sendMessage(
           msg.chat.id.toString(),
           `🌐 Visit our website: ${FRONTEND_URL}`,
-          { parse_mode: "Markdown" }
+          { parse_mode: "Markdown" },
         );
       }
 
-      // Handle registration messages
       if (msg.text || msg.photo) {
         await handleRegistrationMessage(msg);
       }
