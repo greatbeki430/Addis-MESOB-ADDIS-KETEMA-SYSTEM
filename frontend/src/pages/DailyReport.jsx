@@ -422,22 +422,26 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
-      // ✅ Get user info with fallbacks
+      // ✅ Get user info with better fallbacks
       const userName =
         user?.fullName ||
         user?.displayName ||
         user?.name ||
         user?.username ||
         "Unknown User";
+
+      // ✅ Try ALL possible locations for department
       const userDepartment =
-        user?.department ||
-        user?.team?.name ||
-        user?.teamName ||
-        user?.team ||
+        user?.team?.department || // Department from team object
+        user?.team?.name || // Team name as fallback
+        user?.department || // Direct user department
+        user?.role || // Role as fallback
         "N/A";
+
       const userRole = user?.role || "Staff";
 
       console.log("👤 PDF prepared by:", userName, "from", userDepartment);
+      console.log("🔍 Full user data:", user);
 
       await generateDailyReportPDF(exportData, date, t, {
         language: pdfLanguage,
@@ -449,7 +453,6 @@ export default function DailyReport({ t, lang }) {
             : pdfLanguage === "om"
               ? "Gabaasa Guyyaa"
               : "Daily Report",
-        // ✅ Pass user info
         preparedBy: userName,
         preparedByDepartment: userDepartment,
         preparedByRole: userRole,
@@ -469,7 +472,6 @@ export default function DailyReport({ t, lang }) {
       setExporting(false);
     }
   };
-
   // ─── Style helpers ───────────────────────────────────────────────────────────
   const th = {
     background: C.dark,
