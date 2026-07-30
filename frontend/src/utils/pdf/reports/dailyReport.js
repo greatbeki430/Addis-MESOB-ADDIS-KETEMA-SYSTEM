@@ -113,7 +113,6 @@ function formatDateForLanguage(dateStr, lang) {
 // Format Ethiopian date for English (used for "Generated On" in English)
 function formatEthiopianDateForEnglish(date = new Date()) {
   const { year, day, month } = toEthiopianDate(date);
-  // Format as "Month/Day/Year (Ethiopian Calendar)"
   const monthNames = [
     "Meskerem",
     "Tikimt",
@@ -132,6 +131,108 @@ function formatEthiopianDateForEnglish(date = new Date()) {
   return `${monthNames[month - 1]} ${day}, ${year} (Ethiopian)`;
 }
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ ROOT-CAUSE FIX: mixed-script text rendering
+//
+// jsPDF's doc.text() applies exactly ONE currently-active font to an entire
+// string. The Ethiopic font (NotoSansEthiopic) only embeds glyphs for the
+// Ethiopic Unicode block (U+1200–U+137F) — it has no glyphs for Western
+// digits ("0"–"9") or most Latin punctuation. Strings like
+// "የሪፖርቱ ቀን: ሐምሌ 20 ቀን 2018 ዓ.ም" mix Ethiopic text with Latin digits and
+// punctuation, so a single setFont() call can never render the whole thing
+// correctly — whichever characters aren't in the active font's glyph table
+// render as blank (.notdef), and jsPDF's align:"center" width calculation
+// (based on that same single font) gets thrown off for the rest of the line.
+//
+// This is why:
+//  - Pure-Amharic labels/titles (no digits) rendered fine.
+//  - Pure-number table cells rendered fine (single script, own font).
+//  - Any string mixing "ቀን" + digits + "." (dates) silently failed.
+//
+// The fix: split the string into runs of same-script characters, render each
+// run with its own font (Ethiopic vs Latin/Helvetica), and manually walk the
+// x-cursor across runs — including manual centering, since jsPDF's built-in
+// align option only works within a single font call.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AMHARIC_CHAR_RE = /[\u1200-\u137F]/;
+// Splits into runs of "all-Amharic" vs "everything else" (digits, Latin,
+// punctuation, spaces). Adjacent same-type characters are merged into one run.
+const SCRIPT_RUN_RE = /[\u1200-\u137F]+|[^\u1200-\u137F]+/g;
+
+function splitIntoScriptRuns(text) {
+  const str = String(text ?? "");
+  const runs = str.match(SCRIPT_RUN_RE) || [str];
+  return runs.map((run) => ({
+    text: run,
+    isAmharic: AMHARIC_CHAR_RE.test(run),
+  }));
+}
+
+/**
+ * Sets doc's active font to the correct family/style for a given run.
+ */
+function setFontForRun(doc, isAmharicRun, bold) {
+  const style = bold ? "bold" : "normal";
+  try {
+    if (isAmharicRun) {
+      doc.setFont(
+        doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica",
+        style,
+      );
+    } else {
+      doc.setFont(doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica", style);
+    }
+  } catch (error) {
+    console.warn("Font fallback while drawing mixed text:", error.message);
+    doc.setFont("helvetica", style);
+  }
+}
+
+/**
+ * Draws a string that may mix Amharic and Latin/digit/punctuation characters,
+ * switching fonts per script run so every character actually has a glyph to
+ * render, and manually computing alignment since jsPDF can't align mixed-font
+ * text on its own.
+ *
+ * @param {jsPDF} doc
+ * @param {string} text
+ * @param {number} x - reference x coordinate (meaning depends on align)
+ * @param {number} y
+ * @param {Object} [opts]
+ * @param {"left"|"center"|"right"} [opts.align="left"]
+ * @param {boolean} [opts.bold=false]
+ * @returns {number} total rendered width (in doc units)
+ */
+function drawMixedScriptText(doc, text, x, y, opts = {}) {
+  const { align = "left", bold = false } = opts;
+
+  const runs = splitIntoScriptRuns(text);
+
+  // First pass: measure each run's width using the font that will actually
+  // render it (font metrics differ between Ethiopic and Latin fonts).
+  const widths = runs.map((run) => {
+    setFontForRun(doc, run.isAmharic, bold);
+    return doc.getTextWidth(run.text);
+  });
+
+  const totalWidth = widths.reduce((sum, w) => sum + w, 0);
+
+  let startX = x;
+  if (align === "center") startX = x - totalWidth / 2;
+  else if (align === "right") startX = x - totalWidth;
+
+  // Second pass: actually draw, walking the cursor forward per run.
+  let cursorX = startX;
+  runs.forEach((run, i) => {
+    setFontForRun(doc, run.isAmharic, bold);
+    doc.text(run.text, cursorX, y, { align: "left" });
+    cursorX += widths[i];
+  });
+
+  return totalWidth;
+}
 
 /**
  * Generate Daily Report PDF with full Amharic support
@@ -252,7 +353,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     loadFonts(doc, { silent: false });
 
-    // ─── Helper: Set font based on text content ────────────────────────────
+    // ─── Helper: Set font based on text content (single-script strings) ───
     const setSmartFont = (text, bold = false) => {
       try {
         const hasAmharic = isAmharic(text);
@@ -294,7 +395,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       console.debug("Could not set document metadata:", metadataError.message);
     }
 
-    // ─── Title ────────────────────────────────────────────────────────────────
+    // ─── Title (single-script — plain setSmartFont + doc.text is fine) ──────
     setSmartFont(labels.title, true);
     doc.setFontSize(20);
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -304,7 +405,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     });
     yPos += 12;
 
-    // ─── Subtitle ──────────────────────────────────────────────────────────────
+    // ─── Subtitle (single-script) ────────────────────────────────────────────
     setSmartFont(labels.subtitle, false);
     doc.setFontSize(11);
     doc.setTextColor(100, 100, 100);
@@ -314,7 +415,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     yPos += 10;
     doc.setTextColor(0, 0, 0);
 
-    // ─── Report Date ──────────────────────────────────────────────────────────
+    // ─── Report Date (MIXED SCRIPT — this is the string that was invisible) ─
     const reportDate = date || new Date().toISOString().split("T")[0];
 
     // ✅ Format date based on language
@@ -323,10 +424,15 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     console.log(`📅 Report Date (${lang}): ${formattedReportDate}`);
 
-    setSmartFont(reportDateText, false);
     doc.setFontSize(11);
-    doc.text(encodeText(reportDateText), pageWidth / 2, yPos, {
+    doc.setTextColor(0, 0, 0);
+    // ✅ FIX: use drawMixedScriptText instead of setSmartFont()+doc.text().
+    // It renders each script run (Amharic vs digits/punctuation) with its
+    // own font instead of forcing the whole string through one font that's
+    // missing glyphs for the digits.
+    drawMixedScriptText(doc, reportDateText, pageWidth / 2, yPos, {
       align: "center",
+      bold: false,
     });
     yPos += 8;
 
@@ -348,11 +454,13 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
     console.log(`📅 Generated On (${lang}): ${generatedOnDate}`);
 
-    setSmartFont(generatedOnText, false);
     doc.setFontSize(9);
     doc.setTextColor(120, 120, 120);
-    doc.text(encodeText(generatedOnText), pageWidth / 2, yPos, {
+    // ✅ Same mixed-script fix applied here (this string also mixes Amharic
+    // labels/month names with digits and periods).
+    drawMixedScriptText(doc, generatedOnText, pageWidth / 2, yPos, {
       align: "center",
+      bold: false,
     });
     doc.setTextColor(0, 0, 0);
     yPos += 10;
@@ -485,22 +593,42 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
             );
           }
 
-          setSmartFont(watermarkText, false);
           doc.setFontSize(options?.watermarkSize || 50);
           doc.setTextColor(
             gStateApplied ? 150 : 225,
             gStateApplied ? 150 : 225,
             gStateApplied ? 150 : 225,
           );
-          doc.text(
-            encodeText(watermarkText),
-            doc.internal.pageSize.getWidth() / 2,
-            doc.internal.pageSize.getHeight() / 2,
-            {
-              align: "center",
-              angle: options?.watermarkAngle || -45,
-            },
-          );
+          // ✅ Watermark text can also mix scripts depending on options;
+          // use the same safe renderer. Note: jsPDF's rotated-text "angle"
+          // option only applies within a single doc.text() call, so runs
+          // sharing one rotation still need to be positioned along the
+          // rotated axis — for a centered single-line watermark this is
+          // rare in practice (watermark text is usually single-script),
+          // but drawMixedScriptText still measures/draws correctly for the
+          // common case. If you pass a genuinely mixed watermark string
+          // together with `angle`, prefer keeping the watermark text
+          // single-script.
+          if (options?.watermarkAngle) {
+            setSmartFont(watermarkText, false);
+            doc.text(
+              encodeText(watermarkText),
+              doc.internal.pageSize.getWidth() / 2,
+              doc.internal.pageSize.getHeight() / 2,
+              {
+                align: "center",
+                angle: options.watermarkAngle,
+              },
+            );
+          } else {
+            drawMixedScriptText(
+              doc,
+              watermarkText,
+              doc.internal.pageSize.getWidth() / 2,
+              doc.internal.pageSize.getHeight() / 2,
+              { align: "center", bold: false },
+            );
+          }
 
           if (gStateApplied) {
             try {
@@ -531,13 +659,17 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       doc.setLineWidth(0.3);
       doc.line(15, footerY - 4, pageWidth - 15, footerY - 4);
 
-      setSmartFont(footerText, false);
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      doc.text(encodeText(footerText), pageWidth / 2, footerY, {
+      // Footer text is generally single-script, but mixed-safe rendering
+      // costs nothing here either.
+      drawMixedScriptText(doc, footerText, pageWidth / 2, footerY, {
         align: "center",
+        bold: false,
       });
 
+      // Page X of Y is Latin/digits only — plain doc.text is fine.
+      setSmartFont(`${labels.page} ${i} ${labels.of} ${pageCount}`, false);
       doc.text(
         `${labels.page} ${i} ${labels.of} ${pageCount}`,
         pageWidth - 15,
