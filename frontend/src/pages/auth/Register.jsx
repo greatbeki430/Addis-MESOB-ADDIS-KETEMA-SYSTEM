@@ -1,3 +1,4 @@
+// frontend/src/pages/Register.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
@@ -113,7 +114,6 @@ const registerStyles = {
     minHeight: 44,
     transition: "background 0.2s, color 0.2s",
   },
-  // Gold accent divider between sections
   divider: {
     height: 2,
     background: "linear-gradient(90deg, transparent, #f5c518, transparent)",
@@ -133,7 +133,8 @@ export default function Register({ onClose, t }) {
     confirmPassword: "",
     role: "employee",
     phone: "",
-    branch: "Addis Ketema", // ✅ ADDED Branch field
+    branch: "Addis Ketema",
+    position: "", // ✅ ADDED Position field
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -170,10 +171,10 @@ export default function Register({ onClose, t }) {
         confirmPassword: "",
         role: "employee",
         phone: "",
-        branch: "Addis Ketema", // ✅ Reset branch
+        branch: "Addis Ketema",
+        position: "", // ✅ Reset position
       });
 
-      // ✅ Navigate to dashboard after successful registration
       setTimeout(() => {
         if (onClose) {
           onClose();
@@ -194,7 +195,6 @@ export default function Register({ onClose, t }) {
           "Create a new user account with specific role permissions"}
       </p>
 
-      {/* Gold accent divider */}
       <div style={registerStyles.divider} />
 
       {error && <div style={registerStyles.error}>❌ {error}</div>}
@@ -301,6 +301,7 @@ export default function Register({ onClose, t }) {
           </div>
         </div>
 
+        {/* Role and Phone row */}
         <div style={registerStyles.row}>
           <div>
             <label style={registerStyles.label}>
@@ -342,7 +343,7 @@ export default function Register({ onClose, t }) {
           </div>
         </div>
 
-        {/* ✅ NEW ROW: Branch Selection */}
+        {/* Branch and Position row */}
         <div style={registerStyles.row}>
           <div>
             <label style={registerStyles.label}>
@@ -366,10 +367,32 @@ export default function Register({ onClose, t }) {
               <option value="Kolfe Keranio">Kolfe Keranio</option>
               <option value="Arada">Arada</option>
               <option value="Akaki Kality">Akaki Kality</option>
+              <option value="Lemi Kura">Lemi Kura</option>
               <option value="Other">Other</option>
             </select>
           </div>
-          <div>{/* Empty cell for alignment */}</div>
+          <div>
+            <label style={registerStyles.label}>
+              {tu.position || "Position"}
+            </label>
+            <input
+              type="text"
+              name="position"
+              style={registerStyles.input}
+              value={formData.position}
+              onChange={handleChange}
+              placeholder="e.g., Manager, Developer, Officer"
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#1a3aad";
+                e.currentTarget.style.boxShadow =
+                  "0 0 0 3px rgba(26,58,173,0.13)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#c8d0ef";
+                e.currentTarget.style.boxShadow = "none";
+              }}
+            />
+          </div>
         </div>
 
         <div style={registerStyles.buttonRow}>
