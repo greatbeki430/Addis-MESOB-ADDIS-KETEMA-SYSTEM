@@ -62,7 +62,8 @@ export const AuthProvider = ({ children }) => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const register = async (userData) => {
+  // ✅ FIX: Wrap register in useCallback
+  const register = useCallback(async (userData) => {
     try {
       const response = await authAPI.register(userData);
       return { success: true, data: response.data };
@@ -72,8 +73,10 @@ export const AuthProvider = ({ children }) => {
         error: error.response?.data?.message || "Registration failed",
       };
     }
-  };
-  const login = async (credentials) => {
+  }, []); // No dependencies needed
+
+  // ✅ FIX: Wrap login in useCallback
+  const login = useCallback(async (credentials) => {
     try {
       const response = await authAPI.login(credentials);
       const { token: newToken, ...userInfo } = response.data;
@@ -103,7 +106,7 @@ export const AuthProvider = ({ children }) => {
         error: error.response?.data?.message || "Login failed",
       };
     }
-  };
+  }, []); // No dependencies needed
 
   const isAdmin = user?.role === "admin";
   const isSuperAdmin = user?.role === "superadmin";
