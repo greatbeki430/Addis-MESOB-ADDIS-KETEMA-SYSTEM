@@ -206,6 +206,13 @@ export default function DailyReport({ t, lang }) {
     }
   }, [td, showToast]); // ✅ Only depend on td and showToast
 
+  // ─── Auto-load history when the History tab becomes active ─────────────────
+  useEffect(() => {
+    if (activeTab === "history" && !historyLoadedRef.current) {
+      loadHistory();
+    }
+  }, [activeTab, loadHistory]);
+
   // ─── Calculate Totals ──────────────────────────────────────────────────────
   const calculateTotals = (rowsData) => {
     const total = rowsData.reduce((a, r) => a + (r.total || 0), 0);
