@@ -111,25 +111,76 @@ function formatDateForLanguage(dateStr, lang) {
 }
 
 // Format Ethiopian date for English (used for "Generated On" in English)
-function formatEthiopianDateForEnglish(date = new Date()) {
-  const { year, day, month } = toEthiopianDate(date);
-  const monthNames = [
-    "Meskerem",
-    "Tikimt",
-    "Hidar",
-    "Tahsas",
-    "Tir",
-    "Yekatit",
-    "Megabit",
-    "Miazia",
-    "Genbot",
-    "Sene",
-    "Hamle",
-    "Nehase",
-    "Pagume",
-  ];
-  return `${monthNames[month - 1]} ${day}, ${year} (Ethiopian)`;
+// function formatEthiopianDateForEnglish(date = new Date()) {
+//   const { year, day, month } = toEthiopianDate(date);
+//   const monthNames = [
+//     "Meskerem",
+//     "Tikimt",
+//     "Hidar",
+//     "Tahsas",
+//     "Tir",
+//     "Yekatit",
+//     "Megabit",
+//     "Miazia",
+//     "Genbot",
+//     "Sene",
+//     "Hamle",
+//     "Nehase",
+//     "Pagume",
+//   ];
+//   return `${monthNames[month - 1]} ${day}, ${year} (Ethiopian)`;
+// }
+
+// Gregorian month names for the "Generated On" date, per language
+const GREGORIAN_MONTHS_AM = [
+  "ጃንዋሪ",
+  "ፌብሩዋሪ",
+  "ማርች",
+  "ኤፕሪል",
+  "ሜይ",
+  "ጁን",
+  "ጁላይ",
+  "ኦገስት",
+  "ሴፕቴምበር",
+  "ኦክቶበር",
+  "ኖቬምበር",
+  "ዲሴምበር",
+];
+
+const GREGORIAN_MONTHS_OM = [
+  "Amajjii",
+  "Guraandhala",
+  "Bitootessa",
+  "Ebla",
+  "Caamsaa",
+  "Waxabajjii",
+  "Adooleessa",
+  "Hagayya",
+  "Fuulbana",
+  "Onkololeessa",
+  "Sadaasa",
+  "Muddee",
+];
+
+// ✅ Formats a plain Gregorian date, per language, for "Generated On"
+function formatGregorianDateForLanguage(date, lang) {
+  const day = date.getDate();
+  const year = date.getFullYear();
+  const monthIdx = date.getMonth(); // 0–11
+
+  if (lang === "am") {
+    return `${GREGORIAN_MONTHS_AM[monthIdx]} ${day}, ${year}`;
+  }
+  if (lang === "om") {
+    return `${GREGORIAN_MONTHS_OM[monthIdx]} ${day}, ${year}`;
+  }
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -510,18 +561,22 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     yPos += 8;
 
     // ─── ✅ Generated On (Ethiopian calendar for all languages) ──────────────
-    const currentDate = new Date();
-    let generatedOnDate;
+    // const currentDate = new Date();
+    // let generatedOnDate;
 
-    // ✅ Use Ethiopian calendar for all languages
-    if (lang === "am") {
-      generatedOnDate = formatEthiopianDateAmharic(currentDate);
-    } else if (lang === "om") {
-      generatedOnDate = formatEthiopianDateOromo(currentDate);
-    } else {
-      // English: Use Ethiopian date with clear label
-      generatedOnDate = formatEthiopianDateForEnglish(currentDate);
-    }
+    // // ✅ Use Ethiopian calendar for all languages
+    // if (lang === "am") {
+    //   generatedOnDate = formatEthiopianDateAmharic(currentDate);
+    // } else if (lang === "om") {
+    //   generatedOnDate = formatEthiopianDateOromo(currentDate);
+    // } else {
+    //   // English: Use Ethiopian date with clear label
+    //   generatedOnDate = formatEthiopianDateForEnglish(currentDate);
+    // }
+
+    const currentDate = new Date();
+    // ✅ "Generated On" now always shows the Gregorian date, per language
+    const generatedOnDate = formatGregorianDateForLanguage(currentDate, lang);
 
     const generatedOnText = `${labels.generatedOn}: ${generatedOnDate}`;
 
