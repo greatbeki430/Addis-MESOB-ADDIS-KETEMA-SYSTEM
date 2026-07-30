@@ -418,6 +418,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         subtitle: "የአዲስ መሶብ የአንድ ማዕከል አገልግሎት",
         reportDate: "የሪፖርቱ ቀን",
         generatedOn: "የተዘጋጀበት ቀን",
+        preparedBy: "የተዘጋጀው በ", // ✅ ADD THIS
         colNo: "ተ.ቁ",
         colDept: "ዘርፍ",
         colService: "አገልግሎት",
@@ -435,6 +436,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         subtitle: "A-MESOB ONE-STOP SERVICE CENTER",
         reportDate: "REPORT DATE: ",
         generatedOn: "REPORTED ON: ",
+        preparedBy: "Prepared By", // ✅ ADD THIS
         colNo: "#",
         colDept: "Department",
         colService: "Service",
@@ -452,6 +454,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         subtitle: "WIIRTUU TAJAAJILA IDDOO TOKKOO (A-MESOB)",
         reportDate: "GUYYAA GABAASAA: ",
         generatedOn: "GUYYAA ITTI QOPHAA'E: ",
+        preparedBy: "Kan Qophaa'e", // ✅ ADD THIS
         colNo: "#",
         colDept: "Kutaa",
         colService: "Tajaajila",
@@ -539,6 +542,19 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     });
     yPos += 10;
     doc.setTextColor(0, 0, 0);
+
+    // ─── ✅ NEW: Prepared By Info ─────────────────────────────────────────────
+    if (options?.preparedBy) {
+      const preparedByText = `${labels.preparedBy}: ${options.preparedBy}${options.preparedByDepartment ? ` (${options.preparedByDepartment})` : ""}`;
+      setSmartFont(preparedByText, false);
+      doc.setFontSize(9);
+      doc.setTextColor(100, 100, 100);
+      doc.text(encodeText(preparedByText), pageWidth / 2, yPos, {
+        align: "center",
+      });
+      doc.setTextColor(0, 0, 0);
+      yPos += 8;
+    }
 
     // ─── Report Date (MIXED SCRIPT) ──────────────────────────────────────────
     const reportDate = date || new Date().toISOString().split("T")[0];
@@ -733,14 +749,28 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
 
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-      // Footer text is generally single-script, but mixed-safe rendering
-      // costs nothing here either.
+
+      // ✅ Left: Prepared by (if available)
+      if (options?.preparedBy) {
+        const preparedFooterText =
+          lang === "am"
+            ? `ተዘጋጅቷል በ: ${options.preparedBy}`
+            : lang === "om"
+              ? `Qophaa'e: ${options.preparedBy}`
+              : `Prepared by: ${options.preparedBy}`;
+        setSmartFont(preparedFooterText, false);
+        doc.text(encodeText(preparedFooterText), 15, footerY, {
+          align: "left",
+        });
+      }
+
+      // Center: Footer text
       drawMixedScriptText(doc, footerText, pageWidth / 2, footerY, {
         align: "center",
         bold: false,
       });
 
-      // Page X of Y is Latin/digits only — plain doc.text is fine.
+      // Right: Page X of Y
       setSmartFont(`${labels.page} ${i} ${labels.of} ${pageCount}`, false);
       doc.text(
         `${labels.page} ${i} ${labels.of} ${pageCount}`,
