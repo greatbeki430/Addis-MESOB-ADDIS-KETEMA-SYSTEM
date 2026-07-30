@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; // ✅ ADD THIS
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
 import mesobLogo from "../../assets/mesoblogo.png";
@@ -87,7 +87,7 @@ const COLORS = {
 };
 
 export default function Login({ onSwitchToRegister }) {
-  const navigate = useNavigate(); // ✅ ADD THIS
+  const navigate = useNavigate();
   const { t } = useLanguage();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -110,7 +110,7 @@ export default function Login({ onSwitchToRegister }) {
       setTitleRotation((prev) => (prev + 0.3) % 360);
     }, 50);
 
-    // ✅ Alternating between "A" and "አ" with flip effect
+    // Alternating between "A" and "አ" with flip effect
     const flipInterval = setInterval(() => {
       setIsFlipping(true);
       setTimeout(() => {
@@ -134,7 +134,13 @@ export default function Login({ onSwitchToRegister }) {
     try {
       const result = await login({ email, password });
       if (result.success) {
-        // ✅ Redirect to dashboard after successful login
+        // ✅ Log branch info for debugging
+        console.log("📍 Branch:", result.data?.branch || "Addis Ketema");
+        console.log(
+          "🏢 Department:",
+          result.data?.team?.department || "Not set",
+        );
+        // Redirect to dashboard after successful login
         navigate("/dashboard");
       } else {
         setError(result.error || t?.auth?.loginFailed || "Login failed");
@@ -172,7 +178,7 @@ export default function Login({ onSwitchToRegister }) {
       </div>
 
       <div style={loginStyles.card}>
-        {/* ✅ Animated Logo Section with Alternating "A" ↔ "አ" */}
+        {/* Animated Logo Section with Alternating "A" ↔ "አ" */}
         <div style={loginStyles.logoContainer}>
           <div
             style={{

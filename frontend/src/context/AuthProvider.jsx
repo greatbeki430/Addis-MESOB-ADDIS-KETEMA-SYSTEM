@@ -73,7 +73,6 @@ export const AuthProvider = ({ children }) => {
       };
     }
   };
-
   const login = async (credentials) => {
     try {
       const response = await authAPI.login(credentials);
@@ -82,6 +81,10 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem("token", newToken);
       setToken(newToken);
       setUser(userInfo);
+
+      console.log("🔑 Logged in user:", userInfo.name);
+      console.log("📍 Branch:", userInfo.branch || "Not set");
+      console.log("🏢 Department:", userInfo.team?.department || "Not set");
 
       try {
         const payload = JSON.parse(atob(newToken.split(".")[1]));

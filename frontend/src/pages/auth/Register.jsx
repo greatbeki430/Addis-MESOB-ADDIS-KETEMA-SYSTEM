@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom"; // ✅ ADD THIS
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 
 const registerStyles = {
@@ -124,7 +124,7 @@ const registerStyles = {
 };
 
 export default function Register({ onClose, t }) {
-  const navigate = useNavigate(); // ✅ ADD THIS
+  const navigate = useNavigate();
   const tu = t?.userManagement || {};
   const [formData, setFormData] = useState({
     name: "",
@@ -133,6 +133,7 @@ export default function Register({ onClose, t }) {
     confirmPassword: "",
     role: "employee",
     phone: "",
+    branch: "Addis Ketema", // ✅ ADDED Branch field
   });
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -169,6 +170,7 @@ export default function Register({ onClose, t }) {
         confirmPassword: "",
         role: "employee",
         phone: "",
+        branch: "Addis Ketema", // ✅ Reset branch
       });
 
       // ✅ Navigate to dashboard after successful registration
@@ -338,6 +340,36 @@ export default function Register({ onClose, t }) {
               }}
             />
           </div>
+        </div>
+
+        {/* ✅ NEW ROW: Branch Selection */}
+        <div style={registerStyles.row}>
+          <div>
+            <label style={registerStyles.label}>
+              {tu.branch || "Branch"}{" "}
+              <span style={{ color: "#ef4444" }}>*</span>
+            </label>
+            <select
+              name="branch"
+              style={registerStyles.select}
+              value={formData.branch}
+              onChange={handleChange}
+              required
+            >
+              <option value="Addis Ketema">Addis Ketema</option>
+              <option value="Lideta">Lideta</option>
+              <option value="Kirkos">Kirkos</option>
+              <option value="Bole">Bole</option>
+              <option value="Yeka">Yeka</option>
+              <option value="Gulele">Gulele</option>
+              <option value="Nifas Silk">Nifas Silk</option>
+              <option value="Kolfe Keranio">Kolfe Keranio</option>
+              <option value="Arada">Arada</option>
+              <option value="Akaki Kality">Akaki Kality</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div>{/* Empty cell for alignment */}</div>
         </div>
 
         <div style={registerStyles.buttonRow}>
