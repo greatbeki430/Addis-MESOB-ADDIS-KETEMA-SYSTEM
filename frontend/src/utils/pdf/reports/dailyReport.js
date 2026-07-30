@@ -235,6 +235,67 @@ function drawMixedScriptText(doc, text, x, y, opts = {}) {
 }
 
 /**
+ * Draws a centered, rotated watermark on the CURRENT page.
+ * Manually computes the start point instead of relying on jsPDF's
+ * align:"center" + angle combination — that combo doesn't correctly
+ * center rotated text; the offset is computed before rotation is
+ * applied, so the visual center drifts away from the intended anchor.
+ */
+function drawWatermark(doc, text, opts = {}) {
+  const { angle = 0, fontSize = 50, opacity = 0.25 } = opts;
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const cx = pageWidth / 2;
+  const cy = pageHeight / 2;
+
+  let gStateApplied = false;
+  try {
+    doc.saveGraphicsState();
+    doc.setGState(new doc.GState({ opacity }));
+    gStateApplied = true;
+  } catch (e) {
+    console.debug("GState opacity unsupported:", e.message);
+  }
+
+  doc.setFontSize(fontSize);
+  const shade = gStateApplied ? 150 : 225;
+  doc.setTextColor(shade, shade, shade);
+
+  const hasAm = isAmharic(text);
+  doc.setFont(
+    hasAm
+      ? doc.__hasEthiopicFont
+        ? FONT_NAMES.ethiopic
+        : "helvetica"
+      : doc.__hasLatinFont
+        ? FONT_NAMES.latin
+        : "helvetica",
+    "normal",
+  );
+
+  const textWidth = doc.getTextWidth(text);
+
+  if (angle) {
+    const rad = (angle * Math.PI) / 180;
+    const startX = cx - (textWidth / 2) * Math.cos(rad);
+    const startY = cy + (textWidth / 2) * Math.sin(rad);
+    doc.text(encodeText(text), startX, startY, { align: "left", angle });
+  } else {
+    doc.text(encodeText(text), cx, cy, { align: "center" });
+  }
+
+  if (gStateApplied) {
+    try {
+      doc.restoreGraphicsState();
+    } catch (e) {
+      console.debug("restoreGraphicsState failed:", e.message);
+    }
+  }
+  doc.setTextColor(0, 0, 0);
+}
+
+/**
  * Generate Daily Report PDF with full Amharic support
  * @param {Array} rows - Array of report rows with dept, service, male, female, total
  * @param {string} date - Report date string
@@ -472,6 +533,18 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     doc.line(15, yPos, pageWidth - 15, yPos);
     yPos += 10;
 
+    // ─── Watermark (drawn BEHIND the table, since draw order = paint order) ───
+    if (options?.showWatermark) {
+      try {
+        drawWatermark(doc, options?.watermarkText || labels.title, {
+          angle: options?.watermarkAngle ?? 0,
+          fontSize: options?.watermarkSize || 50,
+        });
+      } catch (watermarkError) {
+        console.warn("Watermark addition failed:", watermarkError.message);
+      }
+    }
+
     // ─── Calculate Totals ─────────────────────────────────────────────────────
     const grandTotal = validRows.reduce(
       (sum, row) => sum + (row.total || 0),
@@ -571,82 +644,97 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       tableWidth: "auto",
     });
 
+    // ─── Watermark on any extra pages the table spilled onto ──────────────────
+    // (these pages didn't exist yet when the watermark above was drawn, so this
+    // unavoidably paints on top for pages 2+ — rare in practice for this report)
+    const totalPages = doc.internal.getNumberOfPages();
+    if (options?.showWatermark && totalPages > 1) {
+      for (let p = 2; p <= totalPages; p++) {
+        doc.setPage(p);
+        drawWatermark(doc, options?.watermarkText || labels.title, {
+          angle: options?.watermarkAngle ?? 0,
+          fontSize: options?.watermarkSize || 50,
+        });
+      }
+      doc.setPage(1);
+    }
+
     yPos = doc.lastAutoTable?.finalY + 10 || yPos + 50;
 
     // ─── Add Watermark if requested ──────────────────────────────────────────
-    if (options?.showWatermark) {
-      try {
-        const watermarkText = options?.watermarkText || labels.title;
-        const pageCount = doc.internal.getNumberOfPages();
+    // if (options?.showWatermark) {
+    //   try {
+    //     const watermarkText = options?.watermarkText || labels.title;
+    //     const pageCount = doc.internal.getNumberOfPages();
 
-        for (let i = 1; i <= pageCount; i++) {
-          doc.setPage(i);
+    //     for (let i = 1; i <= pageCount; i++) {
+    //       doc.setPage(i);
 
-          let gStateApplied = false;
-          try {
-            doc.saveGraphicsState();
-            doc.setGState(new doc.GState({ opacity: 0.25 }));
-            gStateApplied = true;
-          } catch (gStateError) {
-            console.debug(
-              "GState opacity unsupported, falling back to light color:",
-              gStateError.message,
-            );
-          }
+    //       let gStateApplied = false;
+    //       try {
+    //         doc.saveGraphicsState();
+    //         doc.setGState(new doc.GState({ opacity: 0.25 }));
+    //         gStateApplied = true;
+    //       } catch (gStateError) {
+    //         console.debug(
+    //           "GState opacity unsupported, falling back to light color:",
+    //           gStateError.message,
+    //         );
+    //       }
 
-          doc.setFontSize(options?.watermarkSize || 50);
-          doc.setTextColor(
-            gStateApplied ? 150 : 225,
-            gStateApplied ? 150 : 225,
-            gStateApplied ? 150 : 225,
-          );
-          // ✅ Watermark text can also mix scripts depending on options;
-          // use the same safe renderer. Note: jsPDF's rotated-text "angle"
-          // option only applies within a single doc.text() call, so runs
-          // sharing one rotation still need to be positioned along the
-          // rotated axis — for a centered single-line watermark this is
-          // rare in practice (watermark text is usually single-script),
-          // but drawMixedScriptText still measures/draws correctly for the
-          // common case. If you pass a genuinely mixed watermark string
-          // together with `angle`, prefer keeping the watermark text
-          // single-script.
-          if (options?.watermarkAngle) {
-            setSmartFont(watermarkText, false);
-            doc.text(
-              encodeText(watermarkText),
-              doc.internal.pageSize.getWidth() / 2,
-              doc.internal.pageSize.getHeight() / 2,
-              {
-                align: "center",
-                angle: options.watermarkAngle,
-              },
-            );
-          } else {
-            drawMixedScriptText(
-              doc,
-              watermarkText,
-              doc.internal.pageSize.getWidth() / 2,
-              doc.internal.pageSize.getHeight() / 2,
-              { align: "center", bold: false },
-            );
-          }
+    //       doc.setFontSize(options?.watermarkSize || 50);
+    //       doc.setTextColor(
+    //         gStateApplied ? 150 : 225,
+    //         gStateApplied ? 150 : 225,
+    //         gStateApplied ? 150 : 225,
+    //       );
+    //       // ✅ Watermark text can also mix scripts depending on options;
+    //       // use the same safe renderer. Note: jsPDF's rotated-text "angle"
+    //       // option only applies within a single doc.text() call, so runs
+    //       // sharing one rotation still need to be positioned along the
+    //       // rotated axis — for a centered single-line watermark this is
+    //       // rare in practice (watermark text is usually single-script),
+    //       // but drawMixedScriptText still measures/draws correctly for the
+    //       // common case. If you pass a genuinely mixed watermark string
+    //       // together with `angle`, prefer keeping the watermark text
+    //       // single-script.
+    //       if (options?.watermarkAngle) {
+    //         setSmartFont(watermarkText, false);
+    //         doc.text(
+    //           encodeText(watermarkText),
+    //           doc.internal.pageSize.getWidth() / 2,
+    //           doc.internal.pageSize.getHeight() / 2,
+    //           {
+    //             align: "center",
+    //             angle: options.watermarkAngle,
+    //           },
+    //         );
+    //       } else {
+    //         drawMixedScriptText(
+    //           doc,
+    //           watermarkText,
+    //           doc.internal.pageSize.getWidth() / 2,
+    //           doc.internal.pageSize.getHeight() / 2,
+    //           { align: "center", bold: false },
+    //         );
+    //       }
 
-          if (gStateApplied) {
-            try {
-              doc.restoreGraphicsState();
-            } catch (restoreError) {
-              console.debug(
-                "restoreGraphicsState failed:",
-                restoreError.message,
-              );
-            }
-          }
-        }
-        doc.setTextColor(0, 0, 0);
-      } catch (watermarkError) {
-        console.warn("Watermark addition failed:", watermarkError.message);
-      }
-    }
+    //       if (gStateApplied) {
+    //         try {
+    //           doc.restoreGraphicsState();
+    //         } catch (restoreError) {
+    //           console.debug(
+    //             "restoreGraphicsState failed:",
+    //             restoreError.message,
+    //           );
+    //         }
+    //       }
+    //     }
+    //     doc.setTextColor(0, 0, 0);
+    //   } catch (watermarkError) {
+    //     console.warn("Watermark addition failed:", watermarkError.message);
+    //   }
+    // }
 
     // ─── Footer ────────────────────────────────────────────────────────────────
     const footerText = options?.footerText || labels.footer;
