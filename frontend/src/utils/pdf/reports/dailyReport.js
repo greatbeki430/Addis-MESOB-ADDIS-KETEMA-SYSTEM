@@ -521,11 +521,11 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     // ✅ Add calendar indicator for Report Date
     let reportDateLabel = labels.reportDate;
     if (lang === "am") {
-      reportDateLabel = `${labels.reportDate} (የኢትዮጵያ ቀን)`;
+      reportDateLabel = `${labels.reportDate} (ኢንደ ኢትዮጵያን አቆጣጠር)`;
     } else if (lang === "om") {
-      reportDateLabel = `${labels.reportDate} (Guyyaa Itoophiyaa)`;
+      reportDateLabel = `${labels.reportDate} (A.L.I)`;
     } else {
-      reportDateLabel = `${labels.reportDate} (Ethiopian Calendar)`;
+      reportDateLabel = `${labels.reportDate} (E.C)`;
     }
 
     const reportDateText = `${reportDateLabel}: ${formattedReportDate}`;
