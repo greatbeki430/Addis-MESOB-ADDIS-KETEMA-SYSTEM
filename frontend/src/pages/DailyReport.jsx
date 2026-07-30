@@ -375,7 +375,7 @@ export default function DailyReport({ t, lang }) {
           pdfLanguage === "am"
             ? "ዕለታዊ ሪፖርት"
             : pdfLanguage === "om"
-              ? "Gabaasa Guyyaa"
+              ? "Gabaasa Guyyaa Har'aa"
               : "Daily Report",
       });
       showToast(
