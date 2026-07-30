@@ -366,7 +366,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
         title: "ዕለታዊ ሪፖርት",
         subtitle: "የአዲስ መሶብ የአንድ ማዕከል አገልግሎት",
         reportDate: "የሪፖርቱ ቀን",
-        generatedOn: "የተዘጋጀበት ቀን",
+        // generatedOn: "የተዘጋጀበት ቀን",
         colNo: "ተ.ቁ",
         colDept: "ዘርፍ",
         colService: "አገልግሎት",
