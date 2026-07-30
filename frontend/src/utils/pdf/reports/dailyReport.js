@@ -544,13 +544,14 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     doc.setTextColor(0, 0, 0);
 
     // ─── ✅ NEW: Prepared By Info ─────────────────────────────────────────────
+    // header
     if (options?.preparedBy) {
       const preparedByText = `${labels.preparedBy}: ${options.preparedBy}${options.preparedByDepartment ? ` (${options.preparedByDepartment})` : ""}`;
-      setSmartFont(preparedByText, false);
       doc.setFontSize(9);
       doc.setTextColor(100, 100, 100);
-      doc.text(encodeText(preparedByText), pageWidth / 2, yPos, {
+      drawMixedScriptText(doc, preparedByText, pageWidth / 2, yPos, {
         align: "center",
+        bold: false,
       });
       doc.setTextColor(0, 0, 0);
       yPos += 8;
@@ -751,6 +752,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
       doc.setTextColor(150, 150, 150);
 
       // ✅ Left: Prepared by (if available)
+      // footer
       if (options?.preparedBy) {
         const preparedFooterText =
           lang === "am"
@@ -758,9 +760,9 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
             : lang === "om"
               ? `Qophaa'e: ${options.preparedBy}`
               : `Prepared by: ${options.preparedBy}`;
-        setSmartFont(preparedFooterText, false);
-        doc.text(encodeText(preparedFooterText), 15, footerY, {
+        drawMixedScriptText(doc, preparedFooterText, 15, footerY, {
           align: "left",
+          bold: false,
         });
       }
 

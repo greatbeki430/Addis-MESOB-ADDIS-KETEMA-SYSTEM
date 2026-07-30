@@ -70,12 +70,13 @@ const registerUser = async (req, res) => {
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email }).populate(
+      "team",
+      "name department",
+    );
 
     if (user && (await bcrypt.compare(password, user.password))) {
       res.json({
@@ -85,6 +86,13 @@ const loginUser = async (req, res) => {
         role: user.role,
         profilePhotoUrl: user.profilePhotoUrl || "",
         phone: user.phone || "",
+        team: user.team
+          ? {
+              _id: user.team._id,
+              name: user.team.name,
+              department: user.team.department || "",
+            }
+          : null,
         token: generateToken(user._id),
       });
     } else {
@@ -98,7 +106,10 @@ const loginUser = async (req, res) => {
 // @desc    Get current user
 // @route   GET /api/auth/me
 const getMe = async (req, res) => {
-  const user = req.user;
+  const user = await User.findById(req.user._id).populate(
+    "team",
+    "name department",
+  );
   res.json({
     _id: user._id,
     name: user.name,
@@ -107,6 +118,13 @@ const getMe = async (req, res) => {
     profilePhotoUrl: user.profilePhotoUrl || "",
     phone: user.phone || "",
     telegramChatId: user.telegramChatId || null,
+    team: user.team
+      ? {
+          _id: user.team._id,
+          name: user.team.name,
+          department: user.team.department || "",
+        }
+      : null,
   });
 };
 
