@@ -517,7 +517,18 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     // ─── Report Date ──────────────────────────────────────────────────────────
     const reportDate = date || new Date().toISOString().split("T")[0];
     const formattedReportDate = formatDateForLanguage(reportDate, lang);
-    const reportDateText = `${labels.reportDate}: ${formattedReportDate}`;
+
+    // ✅ Add calendar indicator for Report Date
+    let reportDateLabel = labels.reportDate;
+    if (lang === "am") {
+      reportDateLabel = `${labels.reportDate} (የኢትዮጵያ ቀን)`;
+    } else if (lang === "om") {
+      reportDateLabel = `${labels.reportDate} (Guyyaa Itoophiyaa)`;
+    } else {
+      reportDateLabel = `${labels.reportDate} (Ethiopian Calendar)`;
+    }
+
+    const reportDateText = `${reportDateLabel}: ${formattedReportDate}`;
 
     console.log(`📅 Report Date (${lang}): ${formattedReportDate}`);
 
@@ -532,7 +543,18 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     // ─── Generated On ──────────────────────────────────────────────────────────
     const currentDate = new Date();
     const generatedOnDate = formatGregorianDateForLanguage(currentDate, lang);
-    const generatedOnText = `${labels.generatedOn}: ${generatedOnDate}`;
+
+    // ✅ Add calendar indicator for Generated On
+    let generatedOnLabel = labels.generatedOn;
+    if (lang === "am") {
+      generatedOnLabel = `${labels.generatedOn} (ግሪጎሪያን ቀን)`;
+    } else if (lang === "om") {
+      generatedOnLabel = `${labels.generatedOn} (A.L.A)`;
+    } else {
+      generatedOnLabel = `${labels.generatedOn} (G.C)`;
+    }
+
+    const generatedOnText = `${generatedOnLabel}: ${generatedOnDate}`;
 
     console.log(`📅 Generated On (${lang}): ${generatedOnDate}`);
 
