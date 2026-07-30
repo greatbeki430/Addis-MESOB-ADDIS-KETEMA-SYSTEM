@@ -657,7 +657,7 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
             angle: options?.watermarkAngle ?? 0,
             fontSize: options?.watermarkSize || 50,
             opacity: options?.watermarkOpacity ?? 0.25,
-            yOffset: 30, // ✅ Moved down
+            yOffset: 20,
           });
         }
       } catch (watermarkError) {
