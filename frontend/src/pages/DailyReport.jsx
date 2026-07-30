@@ -377,11 +377,10 @@ export default function DailyReport({ t, lang }) {
         user?.username ||
         "Unknown User";
       const userDepartment =
-        user?.department ||
+        user?.team?.department ||
         user?.team?.name ||
-        user?.teamName ||
-        user?.team ||
-        "N/A";
+        user?.department ||
+        "A-MESOB Staff";
 
       await generateDailyReportPDF(exportData, report.date, t, {
         language: pdfLanguage,
