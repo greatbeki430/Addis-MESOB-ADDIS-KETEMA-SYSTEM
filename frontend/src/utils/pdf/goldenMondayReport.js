@@ -2,8 +2,8 @@
 // Golden Monday Report PDF Generator - Based on dailyReport.js pattern
 
 import { createPDF } from "../pdfEngine";
-import { encodeText, isAmharic, detectLanguage } from "../language";
-import { loadFonts, FONT_NAMES } from "../fontLoader";
+import { encodeText, isAmharic } from "../language";
+import { loadFonts } from "../fontLoader";
 import autoTable from "jspdf-autotable";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -109,44 +109,11 @@ export const generateGoldenMondayReportPDF = async (
         } else {
           doc.setFont(doc.__hasLatinFont ? "Roboto" : "helvetica", style);
         }
-      } catch (error) {
+      } catch (_error) {
         doc.setFont("helvetica", bold ? "bold" : "normal");
+        console.debug("PDF metadata could not be set:", _error.message);
       }
     };
-
-    // ─── Draw mixed-script text ──────────────────────────────────────────
-    const AMHARIC_CHAR_RE = /[\u1200-\u137F]/;
-    const SCRIPT_RUN_RE = /[\u1200-\u137F]+|[^\u1200-\u137F]+/g;
-
-    function splitIntoScriptRuns(text) {
-      const str = String(text ?? "");
-      const runs = str.match(SCRIPT_RUN_RE) || [str];
-      return runs.map((run) => ({
-        text: run,
-        isAmharic: AMHARIC_CHAR_RE.test(run),
-      }));
-    }
-
-    function drawMixedScriptText(text, x, y, opts = {}) {
-      const { align = "left", bold = false } = opts;
-      const runs = splitIntoScriptRuns(text);
-      const widths = runs.map((run) => {
-        const hasAmharic = run.isAmharic;
-        setSmartFont(run.text, bold);
-        return doc.getTextWidth(run.text);
-      });
-      const totalWidth = widths.reduce((sum, w) => sum + w, 0);
-      let startX = x;
-      if (align === "center") startX = x - totalWidth / 2;
-      else if (align === "right") startX = x - totalWidth;
-      let cursorX = startX;
-      runs.forEach((run, i) => {
-        setSmartFont(run.text, bold);
-        doc.text(run.text, cursorX, y, { align: "left" });
-        cursorX += widths[i];
-      });
-      return totalWidth;
-    }
 
     // ─── Document properties ──────────────────────────────────────────────
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -159,7 +126,10 @@ export const generateGoldenMondayReportPDF = async (
         subject: labels.title,
         creator: "A-MESOB PDF Generator",
       });
-    } catch (e) {}
+    } catch (_error) {
+      // Silently handle metadata error - non-critical for PDF generation
+      console.debug("PDF metadata could not be set:", _error.message);
+    }
 
     // ─── Title ────────────────────────────────────────────────────────────
     setSmartFont(labels.title, true);
@@ -200,40 +170,16 @@ export const generateGoldenMondayReportPDF = async (
     // ─── Content based on report type ────────────────────────────────────
     switch (reportType) {
       case "attendance":
-        yPos = renderAttendanceReport(
-          doc,
-          data,
-          labels,
-          yPos,
-          drawMixedScriptText,
-        );
+        yPos = renderAttendanceReport(doc, data, labels, yPos);
         break;
       case "sessions":
-        yPos = renderSessionsReport(
-          doc,
-          data,
-          labels,
-          yPos,
-          drawMixedScriptText,
-        );
+        yPos = renderSessionsReport(doc, data, labels, yPos);
         break;
       case "gallery":
-        yPos = renderGalleryReport(
-          doc,
-          data,
-          labels,
-          yPos,
-          drawMixedScriptText,
-        );
+        yPos = renderGalleryReport(doc, data, labels, yPos);
         break;
       default:
-        yPos = renderGeneralReport(
-          doc,
-          data,
-          labels,
-          yPos,
-          drawMixedScriptText,
-        );
+        yPos = renderGeneralReport(doc, labels, yPos);
     }
 
     // ─── Footer ────────────────────────────────────────────────────────────
@@ -264,17 +210,19 @@ export const generateGoldenMondayReportPDF = async (
 
     // ─── Save ──────────────────────────────────────────────────────────────
     const safeDate = reportDate.replace(/\//g, "-");
+    const langSuffix = lang === "am" ? "_am" : lang === "om" ? "_om" : "_en";
     const filename =
-      options?.filename || `GoldenMonday_${reportType}_${safeDate}.pdf`;
+      options?.filename ||
+      `GoldenMonday_${reportType}${langSuffix}_${safeDate}.pdf`;
     engine.save(filename);
 
     console.log(
-      `✅ Golden Monday ${reportType} Report generated successfully!`,
+      `✅ Golden Monday ${reportType} Report generated successfully in ${lang.toUpperCase()}!`,
     );
     return true;
-  } catch (error) {
-    console.error("❌ Golden Monday PDF Error:", error.message);
-    throw error;
+  } catch (_error) {
+    console.error("❌ Golden Monday PDF Error:", _error.message);
+    throw _error;
   }
 };
 
@@ -331,9 +279,8 @@ function getLabels(lang) {
 }
 
 // ─── RENDER ATTENDANCE REPORT ─────────────────────────────────────────────
-function renderAttendanceReport(doc, data, labels, yPos, drawMixedScriptText) {
+function renderAttendanceReport(doc, data, labels, yPos) {
   const attendance = data?.attendance || [];
-  const stats = data?.stats || {};
   const total = attendance.length;
   const present = attendance.filter((a) => a.attended).length;
   const absent = total - present;
@@ -341,9 +288,11 @@ function renderAttendanceReport(doc, data, labels, yPos, drawMixedScriptText) {
 
   // Summary box
   const summaryText = `${labels.total}: ${total}  |  ${labels.present}: ${present}  |  ${labels.absent}: ${absent}  |  ${labels.attendanceRate}: ${rate}%`;
-  drawMixedScriptText(summaryText, doc.internal.pageSize.getWidth() / 2, yPos, {
-    align: "center",
-  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setFontSize(11);
+  doc.setTextColor(0, 0, 0);
+  doc.text(encodeText(summaryText), pageWidth / 2, yPos, { align: "center" });
   yPos += 10;
 
   // Table
@@ -384,7 +333,7 @@ function renderAttendanceReport(doc, data, labels, yPos, drawMixedScriptText) {
 }
 
 // ─── RENDER SESSIONS REPORT ──────────────────────────────────────────────
-function renderSessionsReport(doc, data, labels, yPos, drawMixedScriptText) {
+function renderSessionsReport(doc, data, labels, yPos) {
   const sessions = data?.sessions || [];
 
   const head = [
@@ -417,7 +366,7 @@ function renderSessionsReport(doc, data, labels, yPos, drawMixedScriptText) {
 }
 
 // ─── RENDER GALLERY REPORT ────────────────────────────────────────────────
-function renderGalleryReport(doc, data, labels, yPos, drawMixedScriptText) {
+function renderGalleryReport(doc, data, labels, yPos) {
   const photos = data?.photos || [];
 
   const head = [
@@ -443,10 +392,13 @@ function renderGalleryReport(doc, data, labels, yPos, drawMixedScriptText) {
 }
 
 // ─── RENDER GENERAL REPORT ────────────────────────────────────────────────
-function renderGeneralReport(doc, data, labels, yPos, drawMixedScriptText) {
-  drawMixedScriptText(
-    "No data available for this report type.",
-    doc.internal.pageSize.getWidth() / 2,
+function renderGeneralReport(doc, labels, yPos) {
+  const pageWidth = doc.internal.pageSize.getWidth();
+  doc.setFontSize(12);
+  doc.setTextColor(100, 100, 100);
+  doc.text(
+    encodeText("No data available for this report type."),
+    pageWidth / 2,
     yPos,
     { align: "center" },
   );
