@@ -465,35 +465,43 @@ export const generateDailyReportPDF = async (rows, date, t, options = {}) => {
     yPos += 10;
     doc.setTextColor(0, 0, 0);
 
-    // ─── ✅ UPDATED: Prepared By Info with Department (not role) ──────────────
+    // frontend/src/utils/pdf/reports/dailyReport.js
+    // Only the Prepared By section changes
+
+    // ─── ✅ UPDATED: Prepared By Info with Department (from team) and Position ───
     if (options?.preparedBy) {
-      // Build the prepared by text - prioritize department over role
       let preparedByText = `${labels.preparedBy}: ${options.preparedBy}`;
 
-      // Collect all parts (department first, then branch)
-      const parts = [];
+      // Use pre-formatted display if available
+      if (options.preparedByDisplay) {
+        preparedByText += ` ${options.preparedByDisplay}`;
+      } else {
+        // Fallback: build from parts
+        const parts = [];
 
-      // ✅ PRIORITY 1: Department (if available and not "N/A")
-      if (
-        options.preparedByDepartment &&
-        options.preparedByDepartment !== "N/A" &&
-        options.preparedByDepartment !== "Staff"
-      ) {
-        parts.push(options.preparedByDepartment);
-      }
+        if (
+          options.preparedByDepartment &&
+          options.preparedByDepartment !== "" &&
+          options.preparedByDepartment !== "N/A"
+        ) {
+          parts.push(options.preparedByDepartment);
+        }
 
-      // ✅ PRIORITY 2: Branch (if available)
-      if (options.preparedByBranch) {
-        parts.push(options.preparedByBranch);
-      }
+        if (
+          options.preparedByPosition &&
+          options.preparedByPosition !== "" &&
+          options.preparedByPosition !== "N/A"
+        ) {
+          parts.push(options.preparedByPosition);
+        }
 
-      // ✅ ONLY use role as LAST RESORT if no department is available
-      if (parts.length === 0 && options.preparedByRole) {
-        parts.push(options.preparedByRole);
-      }
+        if (options.preparedByBranch) {
+          parts.push(options.preparedByBranch);
+        }
 
-      if (parts.length > 0) {
-        preparedByText += ` (${parts.join(" - ")})`;
+        if (parts.length > 0) {
+          preparedByText += ` (${parts.join(" - ")})`;
+        }
       }
 
       doc.setFontSize(9);

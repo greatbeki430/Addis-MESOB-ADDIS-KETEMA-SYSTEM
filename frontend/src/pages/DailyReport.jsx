@@ -417,6 +417,7 @@ export default function DailyReport({ t, lang }) {
   };
 
   // ─── Main Export PDF ────────────────────────────────────────────────────────
+
   const exportPDF = async () => {
     try {
       setExporting(true);
@@ -428,7 +429,7 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
-      // ✅ Get user info with professional fallback
+      // ✅ Get user name
       const userName =
         user?.fullName ||
         user?.displayName ||
@@ -436,27 +437,43 @@ export default function DailyReport({ t, lang }) {
         user?.username ||
         "Unknown User";
 
-      // ✅ Department/Team - NO role, professional default
+      // ✅ Get department from team (NOT from user directly)
       const userDepartment =
-        user?.team?.department || // Department from team object
+        user?.team?.department || // Department from team
         user?.team?.name || // Team name as fallback
-        user?.department || // Direct user department
-        "A-MESOB Staff"; // Professional default (NOT "N/A" or role)
+        "";
 
-      // ✅ Get branch/location
+      // ✅ Get position from user
+      const userPosition = user?.position || "";
+
+      // ✅ Get branch
       const userBranch = user?.branch || "Addis Ketema";
 
-      const userRole = user?.role || "Staff";
+      // ✅ Build the parts array - Department and Position together
+      const parts = [];
 
-      console.log(
-        "👤 PDF prepared by:",
-        userName,
-        "from",
-        userDepartment,
-        "📍",
-        userBranch,
-      );
-      console.log("🔍 Full user data:", user);
+      // Add department if exists
+      if (userDepartment && userDepartment !== "") {
+        parts.push(userDepartment);
+      }
+
+      // Add position if exists
+      if (userPosition && userPosition !== "") {
+        parts.push(userPosition);
+      }
+
+      // Add branch if exists
+      if (userBranch && userBranch !== "") {
+        parts.push(userBranch);
+      }
+
+      // If no department, position, or branch - show nothing
+      const displayParts = parts.length > 0 ? `(${parts.join(" - ")})` : "";
+
+      console.log("👤 PDF prepared by:", userName);
+      console.log("🏢 Department (from team):", userDepartment);
+      console.log("💼 Position:", userPosition);
+      console.log("📍 Branch:", userBranch);
 
       await generateDailyReportPDF(exportData, date, t, {
         language: pdfLanguage,
@@ -470,8 +487,9 @@ export default function DailyReport({ t, lang }) {
               : "Daily Report",
         preparedBy: userName,
         preparedByDepartment: userDepartment,
-        preparedByRole: userRole,
+        preparedByPosition: userPosition,
         preparedByBranch: userBranch,
+        preparedByDisplay: displayParts,
       });
 
       showToast(

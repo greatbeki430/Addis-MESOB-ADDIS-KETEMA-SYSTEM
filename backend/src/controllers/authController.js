@@ -4,11 +4,7 @@ const { generateToken } = require("../config/jwt");
 const bcrypt = require("bcryptjs");
 
 /**
- * Core account-creation logic, usable outside of an HTTP request/response
- * cycle (e.g. from the Telegram registration approval flow). Throws on
- * failure — callers decide how to surface that (HTTP response, Telegram
- * message, etc). Password hashing still happens via the User model's
- * existing pre-save hook — nothing about that changes.
+ * Core account-creation logic
  */
 const createUserAccount = async ({
   name,
@@ -20,6 +16,7 @@ const createUserAccount = async ({
   profilePhotoUrl,
   profilePhotoPublicId,
   branch,
+  position,
 }) => {
   const userExists = await User.findOne({ email });
   if (userExists) {
@@ -35,6 +32,7 @@ const createUserAccount = async ({
     role: role || "employee",
     phone,
     branch: branch || "Addis Ketema",
+    position: position || "",
     ...(telegramChatId ? { telegramChatId } : {}),
     ...(profilePhotoUrl ? { profilePhotoUrl } : {}),
     ...(profilePhotoPublicId ? { profilePhotoPublicId } : {}),
@@ -45,7 +43,7 @@ const createUserAccount = async ({
 
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role, phone, branch } = req.body;
+    const { name, email, password, role, phone, branch, position } = req.body;
     const user = await createUserAccount({
       name,
       email,
@@ -53,6 +51,7 @@ const registerUser = async (req, res) => {
       role,
       phone,
       branch,
+      position,
     });
 
     res.status(201).json({
@@ -62,6 +61,7 @@ const registerUser = async (req, res) => {
       role: user.role,
       profilePhotoUrl: user.profilePhotoUrl || "",
       branch: user.branch || "Addis Ketema",
+      position: user.position || "",
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -89,6 +89,7 @@ const loginUser = async (req, res) => {
         profilePhotoUrl: user.profilePhotoUrl || "",
         phone: user.phone || "",
         branch: user.branch || "Addis Ketema",
+        position: user.position || "",
         team: user.team
           ? {
               _id: user.team._id,
@@ -120,6 +121,7 @@ const getMe = async (req, res) => {
     phone: user.phone || "",
     telegramChatId: user.telegramChatId || null,
     branch: user.branch || "Addis Ketema",
+    position: user.position || "",
     team: user.team
       ? {
           _id: user.team._id,
