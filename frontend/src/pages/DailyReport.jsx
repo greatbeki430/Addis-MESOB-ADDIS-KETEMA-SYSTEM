@@ -400,6 +400,7 @@ export default function DailyReport({ t, lang }) {
       await generateDailyReportPDF(exportData, date, t, {
         language: pdfLanguage,
         showWatermark: true,
+        watermarkAngle: 30,
         watermarkText:
           pdfLanguage === "am"
             ? "ዕለታዊ ሪፖርት"
