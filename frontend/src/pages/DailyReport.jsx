@@ -376,11 +376,15 @@ export default function DailyReport({ t, lang }) {
         user?.name ||
         user?.username ||
         "Unknown User";
+
       const userDepartment =
         user?.team?.department ||
         user?.team?.name ||
         user?.department ||
         "A-MESOB Staff";
+
+      // ✅ Get branch/location
+      const userBranch = user?.branch || "Addis Ketema";
 
       await generateDailyReportPDF(exportData, report.date, t, {
         language: pdfLanguage,
@@ -391,10 +395,10 @@ export default function DailyReport({ t, lang }) {
             : pdfLanguage === "om"
               ? "Gabaasa Guyyaa"
               : "Daily Report",
-        // ✅ Pass user info
         preparedBy: userName,
         preparedByDepartment: userDepartment,
         preparedByRole: user?.role || "Staff",
+        preparedByBranch: userBranch, // ✅ ADD THIS
       });
       showToast(
         td("exportSuccess", "✅ PDF exported successfully!"),
@@ -438,9 +442,19 @@ export default function DailyReport({ t, lang }) {
         user?.role || // Role as fallback
         "N/A";
 
+      // ✅ Get branch/location
+      const userBranch = user?.branch || "Addis Ketema";
+
       const userRole = user?.role || "Staff";
 
-      console.log("👤 PDF prepared by:", userName, "from", userDepartment);
+      console.log(
+        "👤 PDF prepared by:",
+        userName,
+        "from",
+        userDepartment,
+        "📍",
+        userBranch,
+      );
       console.log("🔍 Full user data:", user);
 
       await generateDailyReportPDF(exportData, date, t, {
@@ -456,6 +470,7 @@ export default function DailyReport({ t, lang }) {
         preparedBy: userName,
         preparedByDepartment: userDepartment,
         preparedByRole: userRole,
+        preparedByBranch: userBranch, // ✅ ADD THIS
       });
 
       showToast(

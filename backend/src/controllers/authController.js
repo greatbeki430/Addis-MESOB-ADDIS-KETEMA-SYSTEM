@@ -17,8 +17,9 @@ const createUserAccount = async ({
   role,
   phone,
   telegramChatId,
-  profilePhotoUrl, // ✅ ADD THIS
-  profilePhotoPublicId, // ✅ ADD THIS
+  profilePhotoUrl,
+  profilePhotoPublicId,
+  branch,
 }) => {
   const userExists = await User.findOne({ email });
   if (userExists) {
@@ -33,6 +34,7 @@ const createUserAccount = async ({
     password,
     role: role || "employee",
     phone,
+    branch: branch || "Addis Ketema",
     ...(telegramChatId ? { telegramChatId } : {}),
     ...(profilePhotoUrl ? { profilePhotoUrl } : {}),
     ...(profilePhotoPublicId ? { profilePhotoPublicId } : {}),
@@ -41,17 +43,16 @@ const createUserAccount = async ({
   return user;
 };
 
-// @desc    Register user
-// @route   POST /api/auth/register
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role, phone } = req.body;
+    const { name, email, password, role, phone, branch } = req.body;
     const user = await createUserAccount({
       name,
       email,
       password,
       role,
       phone,
+      branch,
     });
 
     res.status(201).json({
@@ -60,6 +61,7 @@ const registerUser = async (req, res) => {
       email: user.email,
       role: user.role,
       profilePhotoUrl: user.profilePhotoUrl || "",
+      branch: user.branch || "Addis Ketema",
       token: generateToken(user._id),
     });
   } catch (error) {
@@ -86,6 +88,7 @@ const loginUser = async (req, res) => {
         role: user.role,
         profilePhotoUrl: user.profilePhotoUrl || "",
         phone: user.phone || "",
+        branch: user.branch || "Addis Ketema",
         team: user.team
           ? {
               _id: user.team._id,
@@ -103,8 +106,6 @@ const loginUser = async (req, res) => {
   }
 };
 
-// @desc    Get current user
-// @route   GET /api/auth/me
 const getMe = async (req, res) => {
   const user = await User.findById(req.user._id).populate(
     "team",
@@ -118,6 +119,7 @@ const getMe = async (req, res) => {
     profilePhotoUrl: user.profilePhotoUrl || "",
     phone: user.phone || "",
     telegramChatId: user.telegramChatId || null,
+    branch: user.branch || "Addis Ketema",
     team: user.team
       ? {
           _id: user.team._id,
