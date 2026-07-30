@@ -7,15 +7,14 @@ import { goldenMondayAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
 import { showToast } from "../../utils/toastHelper";
-import SignatureCanvas from "./SignatureCanvas";
 import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
+import SignatureModal from "./SignatureModal";
 import {
   FiUsers,
   FiUserCheck,
   FiUserX,
   FiClock,
   FiCheck,
-  FiX,
   FiRefreshCw,
   FiLoader,
   FiSearch,
@@ -43,6 +42,8 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
   const [departments, setDepartments] = useState([]);
   const [mySignature, setMySignature] = useState(null);
   const [signingFor, setSigningFor] = useState(null);
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [signingEmployee, setSigningEmployee] = useState(null);
 
   // State for showing signed employees
   const [showSigned, setShowSigned] = useState(false);
@@ -82,20 +83,13 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
     if (onRefresh) onRefresh();
   };
 
-  const handleSignAttendance = async (userId) => {
-    if (!mySignature) {
-      showToast(
-        t.pleaseSignFirst || "Please sign first by drawing or typing your name",
-        "warning",
-      );
-      return;
-    }
-
+  // ✅ UPDATED: Handle signature from modal
+  const handleSignAttendance = async (userId, signatureData) => {
     try {
       await goldenMondayAPI.recordAttendance(sessionId, {
         userId,
-        signature: mySignature,
-        signatureType: "draw",
+        signature: signatureData,
+        signatureType: signatureData ? "draw" : "none",
       });
       showToast(
         t.attendanceRecorded || "Attendance recorded successfully!",
@@ -500,7 +494,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                                         emp.user?._id || emp.user || emp.userId;
                                       const isCurrentUser =
                                         user?._id === userId;
-                                      const isSigning = signingFor === userId;
+                                      // const isSigning = signingFor === userId;
                                       const canSign = isCurrentUser || isAdmin;
 
                                       return (
@@ -608,100 +602,15 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
                                               gap: 6,
                                             }}
                                           >
-                                            {isSigning ? (
-                                              <div
-                                                style={{
-                                                  display: "flex",
-                                                  flexDirection: "column",
-                                                  alignItems: "flex-end",
-                                                  gap: 4,
-                                                  maxWidth: "180px",
-                                                }}
-                                              >
-                                                <SignatureCanvas
-                                                  onSave={(data) => {
-                                                    console.log(
-                                                      "✍️ Signature saved:",
-                                                      data ? "✅ Yes" : "❌ No",
-                                                    );
-                                                    setMySignature(data);
-                                                  }}
-                                                  height={40}
-                                                  width={180}
-                                                  label=""
-                                                />
-                                                <div
-                                                  style={{
-                                                    display: "flex",
-                                                    gap: 4,
-                                                  }}
-                                                >
-                                                  <button
-                                                    onClick={() => {
-                                                      console.log(
-                                                        "🔄 Confirm clicked for user:",
-                                                        userId,
-                                                      );
-                                                      handleSignAttendance(
-                                                        userId,
-                                                      );
-                                                    }}
-                                                    style={{
-                                                      padding: "2px 10px",
-                                                      background: C.primary,
-                                                      color: "#fff",
-                                                      border: "none",
-                                                      borderRadius: 4,
-                                                      cursor: "pointer",
-                                                      fontSize: 10,
-                                                      fontWeight: 600,
-                                                      display: "flex",
-                                                      alignItems: "center",
-                                                      gap: 3,
-                                                    }}
-                                                    aria-label={
-                                                      t.confirmSignature ||
-                                                      "Confirm signature"
-                                                    }
-                                                  >
-                                                    <FiCheck size={10} />
-                                                    {t.confirm || "Confirm"}
-                                                  </button>
-                                                  <button
-                                                    onClick={() => {
-                                                      setSigningFor(null);
-                                                      setMySignature(null);
-                                                    }}
-                                                    style={{
-                                                      padding: "2px 6px",
-                                                      background: "none",
-                                                      border: "none",
-                                                      cursor: "pointer",
-                                                      color: "#999",
-                                                      display: "flex",
-                                                      alignItems: "center",
-                                                      gap: 3,
-                                                    }}
-                                                    aria-label={
-                                                      t.cancelSignature ||
-                                                      "Cancel signing"
-                                                    }
-                                                  >
-                                                    <FiX size={12} />
-                                                    {t.cancel || "Cancel"}
-                                                  </button>
-                                                </div>
-                                              </div>
-                                            ) : canSign ? (
+                                            {canSign ? (
                                               <button
                                                 onClick={() => {
                                                   console.log(
                                                     "🖊️ Sign In clicked for:",
                                                     emp.name,
-                                                    "userId:",
-                                                    userId,
                                                   );
-                                                  setSigningFor(userId);
+                                                  setSigningEmployee(emp);
+                                                  setShowSignatureModal(true);
                                                 }}
                                                 style={{
                                                   padding: "3px 12px",
@@ -992,6 +901,25 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
           )}
         </div>
       )}
+
+      {/* ✅ Signature Modal */}
+      <SignatureModal
+        isOpen={showSignatureModal}
+        onClose={() => {
+          setShowSignatureModal(false);
+          setSigningEmployee(null);
+        }}
+        onConfirm={(signature) => {
+          if (signingEmployee) {
+            const userId = signingEmployee.user?._id || signingEmployee.user;
+            handleSignAttendance(userId, signature);
+          }
+          setShowSignatureModal(false);
+          setSigningEmployee(null);
+        }}
+        employee={signingEmployee}
+        sessionName={`Golden Monday - ${new Date().toLocaleDateString()}`}
+      />
 
       <style>{`
         @keyframes spin {
