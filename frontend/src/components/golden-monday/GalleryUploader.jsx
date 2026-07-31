@@ -118,14 +118,21 @@ export default function GalleryUploader({
       // The upload progress will continue in the background via the queue
       onClose();
 
-      // Start the upload process
-      await onUploadComplete(folderId, uploadTopic);
-
+      // Reset topic for next time
       setUploadTopic("");
+
+      // Start the upload process (this runs in the background)
+      // We don't await this - let it run asynchronously
+      onUploadComplete(folderId, uploadTopic).catch((error) => {
+        console.error("Upload process error:", error);
+        showToast(
+          "Some files failed to upload. Check the queue for details.",
+          "error",
+        );
+      });
     } catch (error) {
       console.error("Folder creation failed:", error);
       showToast("Failed to create folder. Please try again.", "error");
-    } finally {
       setIsCreating(false);
     }
   };
