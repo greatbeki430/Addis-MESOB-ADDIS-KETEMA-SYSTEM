@@ -1,5 +1,6 @@
 // components/golden-monday/GalleryGrid.jsx
-// Golden Monday Gallery with categories, lightbox, multi-upload, AI categorization, delete modal, clear all, and auto-clear
+// Golden Monday Gallery with Folder Structure (Ethiopian Date + Topic)
+// Supports AI Categorization, Auto-Clear, Bulk Actions, and Modals
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { C, F } from "../../styles/theme";
@@ -23,7 +24,44 @@ import {
   FiClock,
   FiSettings,
   FiCalendar,
+  FiArrowLeft,
+  FiFolder,
 } from "react-icons/fi";
+
+// Import our new separate components
+import GalleryItem from "./GalleryItem";
+import GalleryUploader from "./GalleryUploader";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ FIX (setState-in-effect warning): these two helpers compute the initial
+// value for their respective useState calls directly from localStorage, via
+// React's lazy-initializer form (`useState(() => ...)`). This replaces a
+// mount-only effect that called setState synchronously just to seed state
+// from an external source — exactly the case lazy initial state exists for.
+// No effect, no extra render, no warning.
+// ─────────────────────────────────────────────────────────────────────────────
+const DEFAULT_AUTO_CLEAR_SETTINGS = {
+  enabled: false,
+  period: "30", // days
+  category: "all",
+  lastRun: null,
+};
+
+function getInitialDontAskAgain() {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("galleryDeleteDontAskAgain") === "true";
+}
+
+function getInitialAutoClearSettings() {
+  if (typeof window === "undefined") return DEFAULT_AUTO_CLEAR_SETTINGS;
+  try {
+    const saved = localStorage.getItem("galleryAutoClearSettings");
+    return saved ? JSON.parse(saved) : DEFAULT_AUTO_CLEAR_SETTINGS;
+  } catch (e) {
+    console.error("Failed to parse auto-clear settings:", e);
+    return DEFAULT_AUTO_CLEAR_SETTINGS;
+  }
+}
 
 export default function GalleryGrid({ sessionId = null, onRefresh }) {
   const { user } = useAuth();
@@ -33,16 +71,23 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   // Get translations based on language
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
-  const [photos, setPhotos] = useState([]);
+  // ── Core State ──
+  const [items, setItems] = useState([]); // Holds Folders OR Photos
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState("all");
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [viewMode, setViewMode] = useState("grid");
+
+  // ── Folder Navigation State ──
+  const [currentFolder, setCurrentFolder] = useState(null);
+
+  // ── Upload State ──
   const [uploading, setUploading] = useState(false);
   const [uploadQueue, setUploadQueue] = useState([]);
   const [isAIAnalyzing, setIsAIAnalyzing] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   // ── Delete Modal State ──
   const [deleteModal, setDeleteModal] = useState({
@@ -50,7 +95,8 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     photoId: null,
     photoTitle: "",
   });
-  const [dontAskAgain, setDontAskAgain] = useState(false);
+  // ✅ Lazy-initialized from localStorage — no mount effect needed.
+  const [dontAskAgain, setDontAskAgain] = useState(getInitialDontAskAgain);
 
   // ── Clear All Modal State ──
   const [clearAllModal, setClearAllModal] = useState({
@@ -59,15 +105,11 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   });
 
   // ── Auto-Clear Settings State ──
-  const [autoClearSettings, setAutoClearSettings] = useState({
-    enabled: false,
-    period: "30", // days
-    category: "all",
-    lastRun: null,
-  });
+  // ✅ Lazy-initialized from localStorage — no mount effect needed.
+  const [autoClearSettings, setAutoClearSettings] = useState(
+    getInitialAutoClearSettings,
+  );
   const [showAutoClearSettings, setShowAutoClearSettings] = useState(false);
-
-  // ── Use ref for autoClearSettings to avoid dependency issues ──
   const autoClearSettingsRef = useRef(autoClearSettings);
 
   // Update ref when autoClearSettings changes
@@ -75,28 +117,9 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     autoClearSettingsRef.current = autoClearSettings;
   }, [autoClearSettings]);
 
-  // Check if user has previously set "don't ask again"
-  useEffect(() => {
-    const savedPreference = localStorage.getItem("galleryDeleteDontAskAgain");
-    if (savedPreference === "true") {
-      setDontAskAgain(true);
-    }
-
-    // Load auto-clear settings from localStorage
-    const savedAutoClear = localStorage.getItem("galleryAutoClearSettings");
-    if (savedAutoClear) {
-      try {
-        const parsed = JSON.parse(savedAutoClear);
-        setAutoClearSettings(parsed);
-      } catch (e) {
-        console.error("Failed to parse auto-clear settings:", e);
-      }
-    }
-  }, []);
-
   const isAdmin = ["admin", "superadmin"].includes(user?.role);
 
-  // Category labels with translations - memoized to avoid recreation
+  // Category labels with translations
   const getCategoryLabel = useCallback(
     (cat) => {
       const categoryMap = {
@@ -110,53 +133,29 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       };
       return categoryMap[cat] || cat;
     },
-    [
-      t.allPhotos,
-      t.flagRaising,
-      t.presentations,
-      t.groupPhotos,
-      t.attendees,
-      t.events,
-      t.other,
-    ],
+    [t],
   );
 
-  // Categories with translations - memoized to avoid recreation
+  // Categories list
   const CATEGORIES = useCallback(
     () => [
       { value: "all", label: t.allPhotos || "All Photos" },
-      {
-        value: "flag-raising",
-        label: t.flagRaising || "🇪🇹 Flag Raising",
-        icon: "🇪🇹",
-      },
-      {
-        value: "presentation",
-        label: t.presentations || "🎤 Presentations",
-        icon: "🎤",
-      },
-      {
-        value: "group-photo",
-        label: t.groupPhotos || "📸 Group Photos",
-        icon: "📸",
-      },
-      { value: "attendees", label: t.attendees || "👥 Attendees", icon: "👥" },
-      { value: "event", label: t.events || "🎉 Events", icon: "🎉" },
-      { value: "other", label: t.other || "📁 Other", icon: "📁" },
+      { value: "flag-raising", label: t.flagRaising || "🇪🇹 Flag Raising" },
+      { value: "presentation", label: t.presentations || "🎤 Presentations" },
+      { value: "group-photo", label: t.groupPhotos || "📸 Group Photos" },
+      { value: "attendees", label: t.attendees || "👥 Attendees" },
+      { value: "event", label: t.events || "🎉 Events" },
+      { value: "other", label: t.other || "📁 Other" },
     ],
-    [
-      t.allPhotos,
-      t.flagRaising,
-      t.presentations,
-      t.groupPhotos,
-      t.attendees,
-      t.events,
-      t.other,
-    ],
+    [t],
   );
-
   const categories = CATEGORIES();
 
+  // ── Helper functions for modals ──
+  const closeClearAllModal = () =>
+    setClearAllModal({ isOpen: false, category: "all" });
+
+  // ── Data Fetching (Folders vs. Photos) ──
   const loadGallery = useCallback(async () => {
     try {
       setLoading(true);
@@ -168,18 +167,31 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       if (category !== "all") params.category = category;
       if (sessionId) params.session = sessionId;
 
-      const response = await goldenMondayAPI.getGallery(params);
-      setPhotos(response.data.photos || []);
+      let endpoint = "getFolders"; // Default view fetches folders
+
+      // If inside a folder, fetch specific photos
+      if (currentFolder) {
+        params.folderId = currentFolder._id;
+        endpoint = "getGallery";
+      }
+
+      const response = await goldenMondayAPI[endpoint](params);
+
+      // Handle response structure (Folders vs Photos)
+      if (currentFolder) {
+        setItems(response.data.photos || []);
+      } else {
+        setItems(response.data.folders || []);
+      }
       setTotalPages(response.data.pagination?.pages || 1);
     } catch (error) {
       console.error("Failed to load gallery:", error);
-      showToast(t.loadError || "Failed to load gallery photos", "error");
+      showToast(t.loadError || "Failed to load gallery", "error");
     } finally {
       setLoading(false);
     }
-  }, [page, category, sessionId, language, t.loadError]);
+  }, [page, category, currentFolder, sessionId, language, t.loadError]);
 
-  // Effect for data fetching
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -189,7 +201,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     }
   }, [loadGallery]);
 
-  // ─── Auto-Clear Check - FIXED with proper dependencies ──
+  // ─── Auto-Clear Check ──
   useEffect(() => {
     const settings = autoClearSettingsRef.current;
     if (!settings.enabled) return;
@@ -207,10 +219,9 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           `[Auto-Clear] Running scheduled clear (${periodDays} days)`,
         );
         try {
+          // Only clear photos, not folders (depends on your backend logic)
           const filter =
             settings.category !== "all" ? { category: settings.category } : {};
-
-          // Get photos to delete
           const response = await goldenMondayAPI.getGallery({
             ...filter,
             limit: 1000,
@@ -218,8 +229,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           const photosToDelete = response.data.photos || [];
 
           if (photosToDelete.length === 0) {
-            console.log("[Auto-Clear] No photos to delete");
-            // Update last run even if no photos
             const newSettings = {
               ...settings,
               lastRun: new Date().toISOString(),
@@ -232,7 +241,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             return;
           }
 
-          // Delete each photo
           let deletedCount = 0;
           for (const photo of photosToDelete) {
             try {
@@ -249,7 +257,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             "success",
           );
 
-          // Update last run
           const newSettings = {
             ...settings,
             lastRun: new Date().toISOString(),
@@ -260,7 +267,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             JSON.stringify(newSettings),
           );
 
-          // Refresh gallery
           await loadGallery();
           if (onRefresh) onRefresh();
         } catch (error) {
@@ -269,14 +275,12 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       }
     };
 
-    // Check on mount and then periodically
     checkAndClear();
-    const interval = setInterval(checkAndClear, 60 * 60 * 1000); // Check every hour
-
+    const interval = setInterval(checkAndClear, 60 * 60 * 1000);
     return () => clearInterval(interval);
   }, [getCategoryLabel, loadGallery, onRefresh]);
 
-  // AI Auto-Categorization function
+  // ─── AI & Upload Logic ──
   const analyzeAndCategorizePhoto = async (imageData) => {
     try {
       const response = await goldenMondayAPI.analyzeGalleryPhoto({
@@ -290,178 +294,129 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     }
   };
 
-  // Handle multiple file selection
+  // ─────────────────────────────────────────────────────────────────────────
+  // ✅ FIX ("cannot be modified" / immutable-value error): this used to be
+  // `let detectedCategory = item.category;` reassigned later inside a
+  // try/catch/finally block. The React Compiler rejects reassigning a plain
+  // local variable across that kind of control flow when it's derived from
+  // component state/props it's tracking. Restructuring it as a function that
+  // *returns* the resolved category — rather than mutating an outer variable
+  // — sidesteps the problem entirely and is arguably clearer code besides.
+  // ─────────────────────────────────────────────────────────────────────────
+  const resolveUploadCategory = useCallback(
+    async (item, imageData) => {
+      if (item.category) return item.category;
+
+      setIsAIAnalyzing(true);
+      try {
+        const aiResult = await analyzeAndCategorizePhoto(imageData);
+        return aiResult.category || "other";
+      } catch {
+        return "other";
+      } finally {
+        setIsAIAnalyzing(false);
+      }
+    },
+    [sessionId],
+  );
+
+  // Handle multiple file selection (Kickstarts the Uploader modal)
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
-    // Validate files
     const validFiles = files.filter((file) => {
-      if (!file.type.startsWith("image/")) {
-        showToast(
-          `${file.name}: ${t.selectImage || "Please select an image file"}`,
-          "warning",
-        );
-        return false;
-      }
-      if (file.size > 10 * 1024 * 1024) {
-        showToast(
-          `${file.name}: ${t.imageTooLarge || "Image must be less than 10MB"}`,
-          "warning",
-        );
-        return false;
-      }
+      if (!file.type.startsWith("image/")) return false;
+      if (file.size > 10 * 1024 * 1024) return false;
       return true;
     });
 
-    if (validFiles.length === 0) return;
-
-    // Add to upload queue
-    const newQueue = validFiles.map((file) => ({
-      file,
-      id: Date.now() + Math.random(),
-      status: "pending",
-      progress: 0,
-      category: category !== "all" ? category : null,
-      error: null,
-    }));
-
-    setUploadQueue((prev) => [...prev, ...newQueue]);
-
-    // Start upload process
-    processUploadQueue(newQueue);
-
-    // Reset input
-    e.target.value = "";
-  };
-
-  // Process upload queue
-  const processUploadQueue = async (queue = uploadQueue) => {
-    if (uploading) return;
-    if (queue.length === 0) return;
-
-    setUploading(true);
-
-    const pendingItems = queue.filter((item) => item.status === "pending");
-    if (pendingItems.length === 0) {
-      setUploading(false);
+    if (validFiles.length === 0) {
+      showToast("Please select valid image files under 10MB", "warning");
       return;
     }
 
-    // Process one at a time to avoid overloading
-    const item = pendingItems[0];
+    // Pass the files to the uploader modal
+    setUploadQueue(
+      validFiles.map((file) => ({
+        file,
+        id: Date.now() + Math.random(),
+        status: "pending",
+        progress: 0,
+        category: category !== "all" ? category : null,
+      })),
+    );
+    setIsUploadModalOpen(true);
+    e.target.value = "";
+  };
 
-    try {
-      // Update status to uploading
-      setUploadQueue((prev) =>
-        prev.map((q) =>
-          q.id === item.id ? { ...q, status: "uploading", progress: 10 } : q,
-        ),
-      );
+  // Process upload queue (Triggered from the Modal after topic input)
+  const processUploadQueue = async (folderId, topic) => {
+    if (uploading || uploadQueue.length === 0) return;
+    setUploading(true);
 
-      // Convert to base64
-      const imageData = await fileToBase64(item.file);
+    let processed = 0;
+    for (const item of uploadQueue) {
+      try {
+        setUploadQueue((prev) =>
+          prev.map((q) =>
+            q.id === item.id ? { ...q, status: "uploading", progress: 10 } : q,
+          ),
+        );
 
-      setUploadQueue((prev) =>
-        prev.map((q) => (q.id === item.id ? { ...q, progress: 30 } : q)),
-      );
+        const imageData = await fileToBase64(item.file);
+        setUploadQueue((prev) =>
+          prev.map((q) => (q.id === item.id ? { ...q, progress: 30 } : q)),
+        );
 
-      // AI Auto-Categorization (if no category selected)
-      let detectedCategory = item.category;
-      let aiConfidence = 0;
+        // ✅ Resolved via a function return value, not a reassigned `let`.
+        const wasAutoDetected = !item.category;
+        const detectedCategory = await resolveUploadCategory(item, imageData);
 
-      if (!detectedCategory) {
-        setIsAIAnalyzing(true);
-        try {
-          const aiResult = await analyzeAndCategorizePhoto(imageData);
-          detectedCategory = aiResult.category || "other";
-          aiConfidence = aiResult.confidence || 0;
-
+        if (wasAutoDetected) {
           setUploadQueue((prev) =>
             prev.map((q) =>
               q.id === item.id
-                ? {
-                    ...q,
-                    progress: 50,
-                    aiCategory: detectedCategory,
-                    aiConfidence,
-                  }
+                ? { ...q, progress: 50, aiCategory: detectedCategory }
                 : q,
             ),
           );
-        } catch (aiError) {
-          console.warn("AI analysis failed, using fallback:", aiError);
-          detectedCategory = "other";
-        } finally {
-          setIsAIAnalyzing(false);
         }
-      } else {
+
+        await goldenMondayAPI.uploadGalleryPhoto({
+          image: imageData,
+          folderId: folderId, // Associate with the created folder
+          category: detectedCategory,
+          sessionId: sessionId || undefined,
+          lang: language,
+        });
+
+        processed++;
         setUploadQueue((prev) =>
-          prev.map((q) => (q.id === item.id ? { ...q, progress: 50 } : q)),
+          prev.map((q) =>
+            q.id === item.id ? { ...q, status: "completed", progress: 100 } : q,
+          ),
+        );
+        setTimeout(() => {
+          setUploadQueue((prev) => prev.filter((q) => q.id !== item.id));
+        }, 1500);
+      } catch (error) {
+        console.error("Upload error:", error);
+        setUploadQueue((prev) =>
+          prev.map((q) => (q.id === item.id ? { ...q, status: "error" } : q)),
         );
       }
+    }
 
-      // Upload to server
-      await goldenMondayAPI.uploadGalleryPhoto({
-        image: imageData,
-        category: detectedCategory,
-        sessionId: sessionId || undefined,
-        lang: language,
-      });
-
-      setUploadQueue((prev) =>
-        prev.map((q) =>
-          q.id === item.id
-            ? {
-                ...q,
-                status: "completed",
-                progress: 100,
-                category: detectedCategory,
-              }
-            : q,
-        ),
-      );
-
-      const categoryLabel = getCategoryLabel(detectedCategory);
+    if (processed > 0) {
       showToast(
-        `${item.file.name}: ${t.uploadSuccess || "Photo uploaded successfully!"}${detectedCategory !== "other" ? ` (${categoryLabel})` : ""}`,
+        `Successfully uploaded ${processed} image(s) to "${topic}"`,
         "success",
       );
-
-      // Remove from queue after delay
-      setTimeout(() => {
-        setUploadQueue((prev) => prev.filter((q) => q.id !== item.id));
-      }, 2000);
-
-      // Refresh gallery
       await loadGallery();
       if (onRefresh) onRefresh();
-    } catch (error) {
-      console.error("Upload error:", error);
-      setUploadQueue((prev) =>
-        prev.map((q) =>
-          q.id === item.id
-            ? { ...q, status: "error", error: error.message || "Upload failed" }
-            : q,
-        ),
-      );
-      showToast(
-        `${item.file.name}: ${t.uploadError || "Failed to upload photo"}`,
-        "error",
-      );
-    } finally {
-      setIsAIAnalyzing(false);
-      // Process next item
-      setUploadQueue((prev) => {
-        const remaining = prev.filter((q) => q.status === "pending");
-        if (remaining.length > 0) {
-          setTimeout(() => processUploadQueue(prev), 500);
-        } else {
-          setUploading(false);
-        }
-        return prev;
-      });
     }
+    setUploading(false);
   };
 
   // Remove a file from queue
@@ -469,9 +424,17 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     setUploadQueue((prev) => prev.filter((q) => q.id !== id));
   };
 
-  // ─── Open Delete Confirmation Modal ──
+  const fileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // ─── Delete Modal Logic ──
   const openDeleteModal = (photoId, photoTitle) => {
-    // If "don't ask again" is checked, delete immediately
     if (dontAskAgain) {
       confirmDelete(photoId);
       return;
@@ -479,12 +442,9 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     setDeleteModal({ isOpen: true, photoId, photoTitle });
   };
 
-  // ─── Close Delete Confirmation Modal ──
-  const closeDeleteModal = () => {
+  const closeDeleteModal = () =>
     setDeleteModal({ isOpen: false, photoId: null, photoTitle: "" });
-  };
 
-  // ─── Confirm Delete ──
   const confirmDelete = async (photoId) => {
     try {
       await goldenMondayAPI.deleteGalleryPhoto(photoId);
@@ -499,38 +459,26 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     }
   };
 
-  // ─── Handle Delete with Modal ──
   const handleDelete = (photoId) => {
-    const photo = photos.find((p) => p._id === photoId);
+    const photo = items.find((p) => p._id === photoId);
     const photoTitle =
       photo?.title || photo?.caption || t.untitled || "Untitled";
     openDeleteModal(photoId, photoTitle);
   };
 
-  // ─── Handle "Don't Ask Again" Toggle ──
   const handleDontAskAgainToggle = (e) => {
     const checked = e.target.checked;
     setDontAskAgain(checked);
-    if (checked) {
-      localStorage.setItem("galleryDeleteDontAskAgain", "true");
-    } else {
-      localStorage.removeItem("galleryDeleteDontAskAgain");
-    }
+    if (checked) localStorage.setItem("galleryDeleteDontAskAgain", "true");
+    else localStorage.removeItem("galleryDeleteDontAskAgain");
   };
 
-  // ─── Clear All Photos - FIXED ──
+  // ─── Clear All Photos ──
   const clearAllPhotos = async () => {
     try {
-      // Get all photos from the current view (respecting the current category filter)
-      const params = {
-        limit: 1000,
-        page: 1,
-      };
-
-      // If a specific category is selected in the modal, filter by it
-      if (clearAllModal.category !== "all") {
+      const params = { limit: 1000, page: 1 };
+      if (clearAllModal.category !== "all")
         params.category = clearAllModal.category;
-      }
 
       const response = await goldenMondayAPI.getGallery(params);
       const photosToDelete = response.data.photos || [];
@@ -540,67 +488,40 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           `No photos found in ${clearAllModal.category !== "all" ? getCategoryLabel(clearAllModal.category) : "all categories"}`,
           "info",
         );
-        setClearAllModal({ isOpen: false, category: "all" });
+        closeClearAllModal();
         return;
       }
 
-      // Confirm with user before proceeding with bulk delete
-      const confirmMessage = `This will permanently delete ${photosToDelete.length} photo${photosToDelete.length > 1 ? "s" : ""} from ${clearAllModal.category !== "all" ? getCategoryLabel(clearAllModal.category) : "all categories"}. This action cannot be undone!`;
-      if (!window.confirm(confirmMessage)) {
+      if (
+        !window.confirm(
+          `This will permanently delete ${photosToDelete.length} photo(s). This action cannot be undone!`,
+        )
+      )
         return;
-      }
 
       let deletedCount = 0;
-      let failedCount = 0;
-
-      // Delete each photo one by one with proper error handling
       for (const photo of photosToDelete) {
         try {
           await goldenMondayAPI.deleteGalleryPhoto(photo._id);
           deletedCount++;
         } catch (e) {
           console.error(`Failed to delete photo ${photo._id}:`, e);
-          failedCount++;
         }
       }
 
-      const categoryLabel =
-        clearAllModal.category !== "all"
-          ? getCategoryLabel(clearAllModal.category)
-          : "all categories";
-
-      if (deletedCount > 0) {
-        showToast(
-          `Successfully cleared ${deletedCount} photo${deletedCount > 1 ? "s" : ""} from ${categoryLabel}${failedCount > 0 ? ` (${failedCount} failed)` : ""}`,
-          failedCount > 0 ? "warning" : "success",
-        );
-      } else if (failedCount > 0) {
-        showToast(
-          `Failed to clear ${failedCount} photo${failedCount > 1 ? "s" : ""}. Please try again.`,
-          "error",
-        );
-      }
-
-      setClearAllModal({ isOpen: false, category: "all" });
+      showToast(
+        `Successfully cleared ${deletedCount} photo(s)`,
+        deletedCount > 0 ? "success" : "warning",
+      );
+      closeClearAllModal();
       await loadGallery();
       if (onRefresh) onRefresh();
     } catch (error) {
       console.error("Clear all error:", error);
-      showToast("Failed to clear photos. Please try again.", "error");
+      showToast("Failed to clear photos.", "error");
     }
   };
 
-  // ─── Open Clear All Modal ──
-  const openClearAllModal = () => {
-    setClearAllModal({ isOpen: true, category: "all" });
-  };
-
-  // ─── Close Clear All Modal ──
-  const closeClearAllModal = () => {
-    setClearAllModal({ isOpen: false, category: "all" });
-  };
-
-  // ─── Auto-Clear Settings ──
   const updateAutoClearSettings = (key, value) => {
     const newSettings = { ...autoClearSettings, [key]: value };
     setAutoClearSettings(newSettings);
@@ -610,26 +531,61 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     );
   };
 
-  const formatDate = (date) => {
-    return new Date(date).toLocaleDateString(language, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  };
-
-  // Helper to convert file to base64
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
+  // ─── Render ──
   return (
     <div style={{ fontFamily: F.sans }}>
+      {/* Uploader Modal Component */}
+      <GalleryUploader
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        category={category}
+        uploadQueue={uploadQueue}
+        setUploadQueue={setUploadQueue}
+        onUploadComplete={processUploadQueue}
+        uploading={uploading}
+      />
+
+      {/* Folder Back Navigation */}
+      {currentFolder && (
+        <div
+          style={{
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <button
+            onClick={() => {
+              setCurrentFolder(null);
+              setPage(1);
+            }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 14px",
+              border: `1px solid ${C.border}`,
+              borderRadius: 8,
+              background: C.white,
+              color: C.dark,
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: "pointer",
+            }}
+          >
+            <FiArrowLeft size={16} /> Back to Folders
+          </button>
+          <span style={{ fontSize: 14, color: C.muted }}>
+            <FiFolder
+              size={14}
+              style={{ verticalAlign: "middle", marginRight: 4 }}
+            />{" "}
+            {currentFolder.title}
+          </span>
+        </div>
+      )}
+
       {/* Controls */}
       <div
         style={{
@@ -645,7 +601,10 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           {categories.map((cat) => (
             <button
               key={cat.value}
-              onClick={() => setCategory(cat.value)}
+              onClick={() => {
+                setCategory(cat.value);
+                setPage(1);
+              }}
               style={{
                 padding: "6px 14px",
                 borderRadius: 20,
@@ -695,12 +654,12 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                     <FiLoader
                       size={14}
                       style={{ animation: "spin 1s linear infinite" }}
-                    />
+                    />{" "}
                     {isAIAnalyzing ? "AI Analyzing..." : "Uploading..."}
                   </>
                 ) : (
                   <>
-                    <FiUpload size={14} /> {t.upload || "Upload"}
+                    <FiUpload size={14} /> {t.upload || "Upload Media"}
                   </>
                 )}
                 <input
@@ -713,9 +672,10 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 />
               </label>
 
-              {/* Clear All Button */}
               <button
-                onClick={openClearAllModal}
+                onClick={() =>
+                  setClearAllModal({ isOpen: true, category: "all" })
+                }
                 style={{
                   padding: "6px 12px",
                   borderRadius: 8,
@@ -728,21 +688,11 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                   display: "flex",
                   alignItems: "center",
                   gap: 4,
-                  fontFamily: F.sans,
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#fecaca";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#fee2e2";
                 }}
               >
-                <FiTrash2 size={14} />
-                Clear All
+                <FiTrash2 size={14} /> Clear All
               </button>
 
-              {/* Auto-Clear Settings Button */}
               <button
                 onClick={() => setShowAutoClearSettings(!showAutoClearSettings)}
                 style={{
@@ -754,17 +704,12 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                     : "transparent",
                   color: autoClearSettings.enabled ? C.primary : C.muted,
                   fontSize: 12,
-                  fontWeight: autoClearSettings.enabled ? 600 : 400,
-                  cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
                   gap: 4,
-                  fontFamily: F.sans,
-                  transition: "all 0.2s ease",
                 }}
               >
-                <FiClock size={14} />
-                Auto-Clear
+                <FiClock size={14} /> Auto-Clear{" "}
                 {autoClearSettings.enabled && (
                   <span
                     style={{
@@ -778,7 +723,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 )}
               </button>
 
-              {/* AI Auto-Categorization Indicator */}
               {uploadQueue.some((q) => q.aiCategory) && (
                 <span
                   style={{
@@ -789,8 +733,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                     gap: 4,
                   }}
                 >
-                  <FiCpu size={14} />
-                  AI Categorizing
+                  <FiCpu size={14} /> AI Categorizing
                 </span>
               )}
             </>
@@ -806,7 +749,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               color: viewMode === "grid" ? "#fff" : C.muted,
               cursor: "pointer",
             }}
-            aria-label={t.gridView || "Grid view"}
           >
             <FiGrid size={16} />
           </button>
@@ -820,7 +762,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               color: viewMode === "list" ? "#fff" : C.muted,
               cursor: "pointer",
             }}
-            aria-label={t.listView || "List view"}
           >
             <FiList size={16} />
           </button>
@@ -898,15 +839,13 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                     cursor: "pointer",
                     marginRight: 6,
                   }}
-                />
+                />{" "}
                 Enable Auto-Clear
               </label>
             </div>
-
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <label style={{ fontSize: 13, color: C.dark }}>
-                <FiCalendar size={14} style={{ marginRight: 4 }} />
-                Clear every:
+                <FiCalendar size={14} style={{ marginRight: 4 }} /> Clear every:
               </label>
               <select
                 value={autoClearSettings.period}
@@ -932,7 +871,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 <option value="365">1 year</option>
               </select>
             </div>
-
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <label style={{ fontSize: 13, color: C.dark }}>Category:</label>
               <select
@@ -957,7 +895,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 ))}
               </select>
             </div>
-
             {autoClearSettings.lastRun && (
               <div
                 style={{
@@ -968,12 +905,11 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                   gap: 4,
                 }}
               >
-                <FiClock size={12} />
-                Last run: {new Date(autoClearSettings.lastRun).toLocaleString()}
+                <FiClock size={12} /> Last run:{" "}
+                {new Date(autoClearSettings.lastRun).toLocaleString()}
               </div>
             )}
           </div>
-
           <div
             style={{
               marginTop: 10,
@@ -987,9 +923,8 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               gap: 6,
             }}
           >
-            <FiAlertCircle size={14} />
-            Photos will be automatically deleted based on the selected period
-            and category.
+            <FiAlertCircle size={14} /> Photos will be automatically deleted
+            based on the selected period and category.{" "}
             {autoClearSettings.enabled
               ? " Auto-clear is active."
               : " Enable to activate."}
@@ -998,7 +933,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       )}
 
       {/* Upload Queue */}
-      {uploadQueue.length > 0 && (
+      {uploadQueue.length > 0 && !isUploadModalOpen && (
         <div
           style={{
             marginBottom: 16,
@@ -1045,13 +980,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                   padding: "6px 10px",
                   borderRadius: 6,
                   background: C.white,
-                  border: `1px solid ${
-                    item.status === "error"
-                      ? "#fecaca"
-                      : item.status === "completed"
-                        ? "#6ee7b7"
-                        : C.border
-                  }`,
+                  border: `1px solid ${item.status === "error" ? "#fecaca" : item.status === "completed" ? "#6ee7b7" : C.border}`,
                 }}
               >
                 <div
@@ -1165,190 +1094,60 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         </div>
       )}
 
-      {/* Photos Grid */}
+      {/* Main Content */}
       {loading ? (
         <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>🖼️</div>
           <p>{t.loadingGallery || "Loading gallery..."}</p>
         </div>
-      ) : photos.length === 0 ? (
+      ) : items.length === 0 ? (
         <div
           style={{ textAlign: "center", padding: "60px 20px", color: C.muted }}
         >
-          <div style={{ fontSize: 48, marginBottom: 12 }}>📸</div>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>
+            {currentFolder ? "🖼️" : "📂"}
+          </div>
           <p style={{ fontSize: 16, marginBottom: 4 }}>
-            {t.noPhotos || "No photos yet"}
+            {currentFolder
+              ? "No photos in this folder"
+              : t.noPhotos || "No folders yet"}
           </p>
           <p style={{ fontSize: 13, color: "#999" }}>
             {isAdmin
-              ? t.uploadPhotos || "Upload photos from Golden Monday events"
-              : t.checkBackLater || "Check back later for photos"}
+              ? currentFolder
+                ? "Upload photos to this folder"
+                : "Upload media to create a new Golden Monday folder"
+              : t.checkBackLater || "Check back later"}
           </p>
         </div>
-      ) : viewMode === "grid" ? (
+      ) : (
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-            gap: 12,
+            gridTemplateColumns:
+              viewMode === "grid"
+                ? "repeat(auto-fill, minmax(220px, 1fr))"
+                : "1fr",
+            gap: viewMode === "grid" ? 16 : 8,
           }}
         >
-          {photos.map((photo) => (
-            <div
-              key={photo._id}
-              style={{
-                position: "relative",
-                borderRadius: 10,
-                overflow: "hidden",
-                cursor: "pointer",
-                aspectRatio: "1/1",
-                background: C.bg,
-                border: `1px solid ${C.border}`,
-                transition: "transform 0.3s ease, box-shadow 0.3s ease",
+          {items.map((item) => (
+            <GalleryItem
+              key={item._id}
+              item={item}
+              viewMode={viewMode}
+              isAdmin={isAdmin}
+              onDelete={handleDelete}
+              onClick={(clickedItem) => {
+                // Click logic: If folder (no url), open it. If photo (has url), open lightbox.
+                if (!clickedItem.url) {
+                  setCurrentFolder(clickedItem);
+                  setPage(1);
+                } else {
+                  setSelectedPhoto(clickedItem);
+                }
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "scale(1.03)";
-                e.currentTarget.style.boxShadow = "0 8px 30px rgba(0,0,0,0.15)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
-              onClick={() => setSelectedPhoto(photo)}
-            >
-              <img
-                src={photo.thumbnailUrl || photo.url}
-                alt={photo.title || photo.caption || "Golden Monday"}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                }}
-                loading="lazy"
-              />
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  padding: "6px 10px",
-                  background: "linear-gradient(transparent, rgba(0,0,0,0.7))",
-                  color: "#fff",
-                  fontSize: 10,
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                }}
-              >
-                <span style={{ fontWeight: 600 }}>
-                  {photo.category && getCategoryLabel(photo.category)}
-                </span>
-                <span style={{ opacity: 0.7 }}>
-                  {formatDate(photo.createdAt)}
-                </span>
-              </div>
-              {isAdmin && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(photo._id);
-                  }}
-                  style={{
-                    position: "absolute",
-                    top: 6,
-                    right: 6,
-                    width: 28,
-                    height: 28,
-                    borderRadius: "50%",
-                    background: "rgba(239,68,68,0.9)",
-                    color: "#fff",
-                    border: "none",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                  aria-label={t.delete || "Delete photo"}
-                >
-                  <FiTrash2 size={14} />
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        // List view
-        <div style={{ display: "grid", gap: 8 }}>
-          {photos.map((photo) => (
-            <div
-              key={photo._id}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                padding: "10px 14px",
-                borderRadius: 8,
-                border: `1px solid ${C.border}`,
-                background: C.white,
-                cursor: "pointer",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = C.bg;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = C.white;
-              }}
-              onClick={() => setSelectedPhoto(photo)}
-            >
-              <img
-                src={photo.thumbnailUrl || photo.url}
-                alt={photo.title || photo.caption || "Golden Monday"}
-                style={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 6,
-                  objectFit: "cover",
-                }}
-                loading="lazy"
-              />
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, color: C.dark, fontSize: 13 }}>
-                  {photo.title || photo.caption || t.untitled || "Untitled"}
-                </div>
-                <div style={{ fontSize: 11, color: C.muted }}>
-                  {getCategoryLabel(photo.category)} •{" "}
-                  {formatDate(photo.createdAt)}
-                  {photo.uploadedByName && (
-                    <>
-                      {" "}
-                      • {t.by || "By"} {photo.uploadedByName}
-                    </>
-                  )}
-                </div>
-              </div>
-              {isAdmin && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDelete(photo._id);
-                  }}
-                  style={{
-                    padding: "4px 10px",
-                    background: "#fee2e2",
-                    color: "#dc2626",
-                    border: "none",
-                    borderRadius: 4,
-                    cursor: "pointer",
-                    fontSize: 11,
-                  }}
-                  aria-label={t.delete || "Delete photo"}
-                >
-                  <FiTrash2 size={14} />
-                </button>
-              )}
-            </div>
+            />
           ))}
         </div>
       )}
@@ -1374,7 +1173,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               color: page === 1 ? "#999" : C.dark,
               cursor: page === 1 ? "not-allowed" : "pointer",
             }}
-            aria-label="Previous page"
           >
             <FiChevronLeft size={14} />
           </button>
@@ -1392,7 +1190,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               color: page === totalPages ? "#999" : C.dark,
               cursor: page === totalPages ? "not-allowed" : "pointer",
             }}
-            aria-label="Next page"
           >
             <FiChevronRight size={14} />
           </button>
@@ -1413,9 +1210,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             padding: 20,
           }}
           onClick={() => setSelectedPhoto(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Photo lightbox"
         >
           <div
             style={{
@@ -1427,9 +1221,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           >
             <img
               src={selectedPhoto.url}
-              alt={
-                selectedPhoto.title || selectedPhoto.caption || "Golden Monday"
-              }
+              alt={selectedPhoto.title || "Golden Monday"}
               style={{
                 maxWidth: "100%",
                 maxHeight: "85vh",
@@ -1437,24 +1229,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 objectFit: "contain",
               }}
             />
-            <div
-              style={{
-                position: "absolute",
-                bottom: -40,
-                left: 0,
-                right: 0,
-                color: "#fff",
-                textAlign: "center",
-                fontSize: 13,
-              }}
-            >
-              {selectedPhoto.title || selectedPhoto.caption || ""}
-              {selectedPhoto.category && (
-                <span style={{ opacity: 0.7, marginLeft: 10 }}>
-                  {getCategoryLabel(selectedPhoto.category)}
-                </span>
-              )}
-            </div>
             <button
               onClick={() => setSelectedPhoto(null)}
               style={{
@@ -1473,7 +1247,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 alignItems: "center",
                 justifyContent: "center",
               }}
-              aria-label="Close lightbox"
             >
               <FiX size={24} />
             </button>
@@ -1483,423 +1256,349 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
 
       {/* ─── DELETE CONFIRMATION MODAL ─── */}
       {deleteModal.isOpen && (
-        <>
-          {/* Backdrop */}
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            animation: "fadeIn 0.3s ease",
+          }}
+          onClick={closeDeleteModal}
+        >
           <div
             style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.6)",
-              zIndex: 2000,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              animation: "fadeIn 0.3s ease",
+              background: "#fff",
+              borderRadius: 16,
+              padding: "clamp(24px, 4vw, 32px)",
+              maxWidth: 450,
+              width: "92%",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+              position: "relative",
+              animation: "slideUp 0.3s ease",
             }}
-            onClick={closeDeleteModal}
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal */}
+            <button
+              onClick={closeDeleteModal}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 16,
+                background: "none",
+                border: "none",
+                fontSize: 20,
+                cursor: "pointer",
+                color: "#999",
+                padding: "4px",
+              }}
+            >
+              <FiX size={20} />
+            </button>
             <div
               style={{
-                background: "#fff",
-                borderRadius: 16,
-                padding: "clamp(24px, 4vw, 32px)",
-                maxWidth: 450,
-                width: "92%",
-                boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
-                position: "relative",
-                animation: "slideUp 0.3s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 16,
               }}
-              onClick={(e) => e.stopPropagation()}
             >
-              {/* Close Button */}
-              <button
-                onClick={closeDeleteModal}
-                style={{
-                  position: "absolute",
-                  top: 12,
-                  right: 16,
-                  background: "none",
-                  border: "none",
-                  fontSize: 20,
-                  cursor: "pointer",
-                  color: "#999",
-                  padding: "4px",
-                }}
-                aria-label="Close"
-              >
-                <FiX size={20} />
-              </button>
-
-              {/* Icon */}
               <div
                 style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: "50%",
+                  background: "#fee2e2",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  marginBottom: 16,
                 }}
               >
-                <div
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    background: "#fee2e2",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <FiTrash2 size={28} color="#dc2626" />
-                </div>
-              </div>
-
-              {/* Title */}
-              <h3
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: "clamp(16px, 2.5vw, 20px)",
-                  fontWeight: 700,
-                  color: C.dark,
-                  textAlign: "center",
-                  fontFamily: F.serif,
-                }}
-              >
-                {t.deleteConfirmTitle || "Delete Photo?"}
-              </h3>
-
-              {/* Description */}
-              <p
-                style={{
-                  fontSize: 14,
-                  color: C.muted,
-                  textAlign: "center",
-                  marginBottom: 20,
-                  lineHeight: 1.6,
-                }}
-              >
-                {t.deleteConfirmMessage || "Are you sure you want to delete"}
-                <strong style={{ color: C.dark }}>
-                  {" "}
-                  "{deleteModal.photoTitle || "Untitled"}"
-                </strong>
-                ? {t.deleteWarning || "This action cannot be undone."}
-              </p>
-
-              {/* "Don't ask again" Checkbox */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  marginBottom: 20,
-                  padding: "8px 12px",
-                  background: C.bg,
-                  borderRadius: 8,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  id="dontAskAgain"
-                  checked={dontAskAgain}
-                  onChange={handleDontAskAgainToggle}
-                  style={{
-                    width: 18,
-                    height: 18,
-                    accentColor: C.primary,
-                    cursor: "pointer",
-                  }}
-                />
-                <label
-                  htmlFor="dontAskAgain"
-                  style={{
-                    fontSize: 13,
-                    color: C.dark,
-                    cursor: "pointer",
-                    userSelect: "none",
-                  }}
-                >
-                  {t.dontAskAgain || "Don't ask me again"}
-                </label>
-              </div>
-
-              {/* Buttons */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  justifyContent: "flex-end",
-                }}
-              >
-                <button
-                  onClick={closeDeleteModal}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 8,
-                    border: `1px solid ${C.border}`,
-                    background: "transparent",
-                    color: C.dark,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    fontFamily: F.sans,
-                    transition: "background 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = C.bg;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  {t.cancel || "Cancel"}
-                </button>
-                <button
-                  onClick={() => confirmDelete(deleteModal.photoId)}
-                  style={{
-                    padding: "10px 24px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: "#dc2626",
-                    color: "#fff",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    fontFamily: F.sans,
-                    transition: "background 0.2s ease, transform 0.2s ease",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#b91c1c";
-                    e.currentTarget.style.transform = "scale(1.02)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#dc2626";
-                    e.currentTarget.style.transform = "scale(1)";
-                  }}
-                >
-                  <FiTrash2 size={14} />
-                  {t.delete || "Delete"}
-                </button>
+                <FiTrash2 size={28} color="#dc2626" />
               </div>
             </div>
+            <h3
+              style={{
+                margin: "0 0 8px",
+                fontSize: "clamp(16px, 2.5vw, 20px)",
+                fontWeight: 700,
+                color: C.dark,
+                textAlign: "center",
+                fontFamily: F.serif,
+              }}
+            >
+              {t.deleteConfirmTitle || "Delete Photo?"}
+            </h3>
+            <p
+              style={{
+                fontSize: 14,
+                color: C.muted,
+                textAlign: "center",
+                marginBottom: 20,
+                lineHeight: 1.6,
+              }}
+            >
+              {t.deleteConfirmMessage || "Are you sure you want to delete"}{" "}
+              <strong style={{ color: C.dark }}>
+                {" "}
+                "{deleteModal.photoTitle || "Untitled"}"
+              </strong>
+              ? {t.deleteWarning || "This action cannot be undone."}
+            </p>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                marginBottom: 20,
+                padding: "8px 12px",
+                background: C.bg,
+                borderRadius: 8,
+              }}
+            >
+              <input
+                type="checkbox"
+                id="dontAskAgain"
+                checked={dontAskAgain}
+                onChange={handleDontAskAgainToggle}
+                style={{
+                  width: 18,
+                  height: 18,
+                  accentColor: C.primary,
+                  cursor: "pointer",
+                }}
+              />
+              <label
+                htmlFor="dontAskAgain"
+                style={{
+                  fontSize: 13,
+                  color: C.dark,
+                  cursor: "pointer",
+                  userSelect: "none",
+                }}
+              >
+                {t.dontAskAgain || "Don't ask me again"}
+              </label>
+            </div>
+            <div
+              style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
+            >
+              <button
+                onClick={closeDeleteModal}
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  background: "transparent",
+                  color: C.dark,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                {t.cancel || "Cancel"}
+              </button>
+              <button
+                onClick={() => confirmDelete(deleteModal.photoId)}
+                style={{
+                  padding: "10px 24px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#dc2626",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <FiTrash2 size={14} /> {t.delete || "Delete"}
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
 
       {/* ─── CLEAR ALL CONFIRMATION MODAL ─── */}
       {clearAllModal.isOpen && (
-        <>
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            animation: "fadeIn 0.3s ease",
+          }}
+          onClick={closeClearAllModal}
+        >
           <div
             style={{
-              position: "fixed",
-              inset: 0,
-              background: "rgba(0,0,0,0.6)",
-              zIndex: 2000,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              animation: "fadeIn 0.3s ease",
+              background: "#fff",
+              borderRadius: 16,
+              padding: "clamp(24px, 4vw, 32px)",
+              maxWidth: 450,
+              width: "92%",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+              position: "relative",
+              animation: "slideUp 0.3s ease",
             }}
-            onClick={closeClearAllModal}
+            onClick={(e) => e.stopPropagation()}
           >
+            <button
+              onClick={closeClearAllModal}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 16,
+                background: "none",
+                border: "none",
+                fontSize: 20,
+                cursor: "pointer",
+                color: "#999",
+                padding: "4px",
+              }}
+            >
+              <FiX size={20} />
+            </button>
             <div
               style={{
-                background: "#fff",
-                borderRadius: 16,
-                padding: "clamp(24px, 4vw, 32px)",
-                maxWidth: 450,
-                width: "92%",
-                boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
-                position: "relative",
-                animation: "slideUp 0.3s ease",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                marginBottom: 16,
               }}
-              onClick={(e) => e.stopPropagation()}
+            >
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: "50%",
+                  background: "#fee2e2",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <FiTrash2 size={28} color="#dc2626" />
+              </div>
+            </div>
+            <h3
+              style={{
+                margin: "0 0 8px",
+                fontSize: "clamp(16px, 2.5vw, 20px)",
+                fontWeight: 700,
+                color: C.dark,
+                textAlign: "center",
+                fontFamily: F.serif,
+              }}
+            >
+              {t.clearAllTitle || "Clear All Photos?"}
+            </h3>
+            <p
+              style={{
+                fontSize: 14,
+                color: C.muted,
+                textAlign: "center",
+                marginBottom: 16,
+                lineHeight: 1.6,
+              }}
+            >
+              {t.clearAllMessage ||
+                "This will permanently delete all photos in the selected category."}
+              <br />
+              <strong style={{ color: "#dc2626" }}>
+                {t.deleteWarning || "This action cannot be undone!"}
+              </strong>
+            </p>
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{
+                  fontSize: 13,
+                  color: C.dark,
+                  display: "block",
+                  marginBottom: 4,
+                }}
+              >
+                {t.category || "Category"}:
+              </label>
+              <select
+                value={clearAllModal.category}
+                onChange={(e) =>
+                  setClearAllModal((prev) => ({
+                    ...prev,
+                    category: e.target.value,
+                  }))
+                }
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  fontSize: 13,
+                  background: C.white,
+                  outline: "none",
+                }}
+              >
+                {categories.map((cat) => (
+                  <option key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div
+              style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
             >
               <button
                 onClick={closeClearAllModal}
                 style={{
-                  position: "absolute",
-                  top: 12,
-                  right: 16,
-                  background: "none",
-                  border: "none",
-                  fontSize: 20,
+                  padding: "10px 20px",
+                  borderRadius: 8,
+                  border: `1px solid ${C.border}`,
+                  background: "transparent",
+                  color: C.dark,
+                  fontSize: 13,
+                  fontWeight: 500,
                   cursor: "pointer",
-                  color: "#999",
-                  padding: "4px",
                 }}
               >
-                <FiX size={20} />
+                {t.cancel || "Cancel"}
               </button>
-
-              <div
+              <button
+                onClick={clearAllPhotos}
                 style={{
+                  padding: "10px 24px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#dc2626",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 16,
+                  gap: 6,
                 }}
               >
-                <div
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: "50%",
-                    background: "#fee2e2",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <FiTrash2 size={28} color="#dc2626" />
-                </div>
-              </div>
-
-              <h3
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: "clamp(16px, 2.5vw, 20px)",
-                  fontWeight: 700,
-                  color: C.dark,
-                  textAlign: "center",
-                  fontFamily: F.serif,
-                }}
-              >
-                {t.clearAllTitle || "Clear All Photos?"}
-              </h3>
-
-              <p
-                style={{
-                  fontSize: 14,
-                  color: C.muted,
-                  textAlign: "center",
-                  marginBottom: 16,
-                  lineHeight: 1.6,
-                }}
-              >
-                {t.clearAllMessage ||
-                  "This will permanently delete all photos in the selected category."}
-                <br />
-                <strong style={{ color: "#dc2626" }}>
-                  {t.deleteWarning || "This action cannot be undone!"}
-                </strong>
-              </p>
-
-              <div style={{ marginBottom: 16 }}>
-                <label
-                  style={{
-                    fontSize: 13,
-                    color: C.dark,
-                    display: "block",
-                    marginBottom: 4,
-                  }}
-                >
-                  {t.category || "Category"}:
-                </label>
-                <select
-                  value={clearAllModal.category}
-                  onChange={(e) =>
-                    setClearAllModal((prev) => ({
-                      ...prev,
-                      category: e.target.value,
-                    }))
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "8px 12px",
-                    borderRadius: 8,
-                    border: `1px solid ${C.border}`,
-                    fontSize: 13,
-                    background: C.white,
-                    outline: "none",
-                  }}
-                >
-                  {categories.map((cat) => (
-                    <option key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  justifyContent: "flex-end",
-                }}
-              >
-                <button
-                  onClick={closeClearAllModal}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: 8,
-                    border: `1px solid ${C.border}`,
-                    background: "transparent",
-                    color: C.dark,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                    fontFamily: F.sans,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = C.bg;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
-                >
-                  {t.cancel || "Cancel"}
-                </button>
-                <button
-                  onClick={clearAllPhotos}
-                  style={{
-                    padding: "10px 24px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: "#dc2626",
-                    color: "#fff",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    fontFamily: F.sans,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#b91c1c";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#dc2626";
-                  }}
-                >
-                  <FiTrash2 size={14} />
-                  {t.clearAll || "Clear All"}
-                </button>
-              </div>
+                <FiTrash2 size={14} /> {t.clearAll || "Clear All"}
+              </button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
       <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );
