@@ -13,6 +13,17 @@ const goldenMondayGallerySchema = new mongoose.Schema(
       index: true,
     },
 
+    // ✅ NEW — Folder reference (Ethiopian date + topic grouping).
+    // Populated when a photo is uploaded through GalleryUploader.jsx's
+    // folder flow. Kept in sync with GoldenMondayFolder.count/coverPhoto
+    // by the gallery upload/delete routes in goldenMondayRoutes.js.
+    folder: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "GoldenMondayFolder",
+      default: null,
+      index: true,
+    },
+
     // Photo metadata
     title: { type: String, default: "", trim: true },
     description: { type: String, default: "", trim: true },
@@ -68,6 +79,7 @@ const goldenMondayGallerySchema = new mongoose.Schema(
 // Indexes
 goldenMondayGallerySchema.index({ category: 1, createdAt: -1 });
 goldenMondayGallerySchema.index({ session: 1 });
+goldenMondayGallerySchema.index({ folder: 1 }); // ✅ NEW — powers "inside a folder" queries
 goldenMondayGallerySchema.index({ tags: 1 });
 
 module.exports = mongoose.model(
