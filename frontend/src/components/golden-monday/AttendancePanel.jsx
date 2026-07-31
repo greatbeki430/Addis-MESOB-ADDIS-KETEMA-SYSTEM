@@ -84,29 +84,39 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
   };
 
   // ✅ UPDATED: Handle signature from modal with debug logging
+  // ✅ UPDATED: Handle signature from modal with debug logging
   const handleSignAttendance = async (userId, signatureData) => {
     // 🔍 DEBUG: Log the signature data being sent
     console.log("📝 [SIGNATURE] Sending signature for user:", userId);
     console.log("📝 [SIGNATURE] Signature length:", signatureData?.length || 0);
     console.log("📝 [SIGNATURE] Signature type:", typeof signatureData);
     console.log(
-      "📝 [SIGNATURE] Signature preview:",
-      signatureData?.substring(0, 100) + "...",
+      "📝 [SIGNATURE] Signature is data URL:",
+      signatureData?.startsWith("data:image") || false,
     );
     console.log(
-      "📝 [SIGNATURE] Is valid data URL:",
-      signatureData?.startsWith("data:image") || false,
+      "📝 [SIGNATURE] Signature preview:",
+      signatureData?.substring(0, 100) + "...",
     );
 
     try {
       const payload = {
         userId,
-        signature: signatureData,
+        signature: signatureData || "",
         signatureType: signatureData ? "draw" : "none",
       };
-      console.log("📝 [SIGNATURE] Full payload:", payload);
+      console.log("📝 [SIGNATURE] Full payload being sent:", {
+        userId: payload.userId,
+        signatureLength: payload.signature.length,
+        signatureType: payload.signatureType,
+      });
 
-      await goldenMondayAPI.recordAttendance(sessionId, payload);
+      const response = await goldenMondayAPI.recordAttendance(
+        sessionId,
+        payload,
+      );
+      console.log("📝 [SIGNATURE] Response from server:", response.data);
+
       showToast(
         t.attendanceRecorded || "Attendance recorded successfully!",
         "success",
@@ -117,6 +127,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
       if (onRefresh) onRefresh();
     } catch (error) {
       console.error("❌ [SIGNATURE] Failed to record attendance:", error);
+      console.error("❌ [SIGNATURE] Error response:", error.response?.data);
       showToast(
         t.failedToRecordAttendance || "Failed to record attendance",
         "error",
