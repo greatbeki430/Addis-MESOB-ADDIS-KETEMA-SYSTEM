@@ -1,16 +1,10 @@
-// components/golden-monday/GalleryUploader.jsx
 import { useState } from "react";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
 import { C } from "../../styles/theme";
-import { FiCalendar } from "react-icons/fi";
+import { FiCalendar, FiUpload, FiLoader } from "react-icons/fi";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ✅ Ethiopian calendar conversion (Gregorian → Ethiopian)
-// Ported from dailyReport.js so both places compute the SAME date, instead
-// of this file using date-and-time's plain Gregorian formatter under a
-// misleading "Ethiopian" function name.
-// ─────────────────────────────────────────────────────────────────────────────
+// Ethiopian calendar conversion (unchanged)
 const ETHIOPIAN_MONTHS_AM = [
   "መስከረም",
   "ጥቅምት",
@@ -67,7 +61,6 @@ function formatEthiopianDateAmharic(date = new Date()) {
   const monthName = ETHIOPIAN_MONTHS_AM[month - 1];
   return `${monthName} ${day} ቀን ${year} ዓ.ም`;
 }
-// ─────────────────────────────────────────────────────────────────────────────
 
 export default function GalleryUploader({
   isOpen,
@@ -77,14 +70,13 @@ export default function GalleryUploader({
   onUploadComplete,
 }) {
   const [uploadTopic, setUploadTopic] = useState("");
-  const [creatingFolder, setCreatingFolder] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
-  // ✅ Now returns a genuine Ethiopian-calendar date, e.g. "ሐምሌ 23 ቀን 2018 ዓ.ም"
   const getEthiopianDateString = () => formatEthiopianDateAmharic(new Date());
 
   const handleUpload = async () => {
     if (uploadQueue.length === 0) {
-      showToast("Please select at least one photo", "error");
+      showToast("Please select at least one file", "error");
       return;
     }
     if (!uploadTopic.trim()) {
@@ -92,11 +84,13 @@ export default function GalleryUploader({
       return;
     }
 
-    setCreatingFolder(true);
-    const dateStr = getEthiopianDateString();
-    const folderName = `${dateStr} - ${uploadTopic}`;
+    setIsCreating(true);
 
     try {
+      // Get the week folder (the backend will handle find-or-create)
+      const dateStr = getEthiopianDateString();
+      const folderName = `${dateStr} - ${uploadTopic}`;
+
       let folderId = null;
       try {
         const folderRes = await goldenMondayAPI.createFolder({
@@ -105,25 +99,45 @@ export default function GalleryUploader({
           topic: uploadTopic,
           category: category !== "all" ? category : "other",
         });
-        folderId = folderRes.data.folderId;
+        folderId = folderRes.data.folderId || folderRes.data._id;
       } catch (error) {
         if (error.response?.data?.folderId) {
           folderId = error.response.data.folderId;
+        } else if (error.response?.data?._id) {
+          folderId = error.response.data._id;
         } else {
           throw error;
         }
       }
 
+      if (!folderId) {
+        throw new Error("Failed to create folder");
+      }
+
+      // ✅ CLOSE MODAL IMMEDIATELY after folder creation
+      // The upload progress will continue in the background via the queue
+      onClose();
+
+      // Start the upload process
       await onUploadComplete(folderId, uploadTopic);
 
       setUploadTopic("");
-      onClose();
     } catch (error) {
       console.error("Folder creation failed:", error);
       showToast("Failed to create folder. Please try again.", "error");
     } finally {
-      setCreatingFolder(false);
+      setIsCreating(false);
     }
+  };
+
+  // ✅ Allow closing only if not currently creating
+  const handleClose = () => {
+    if (isCreating) {
+      showToast("Please wait for folder creation to complete", "warning");
+      return;
+    }
+    setUploadTopic("");
+    onClose();
   };
 
   if (!isOpen) return null;
@@ -172,6 +186,7 @@ export default function GalleryUploader({
           placeholder="Ex: Leadership Training - Team A"
           value={uploadTopic}
           onChange={(e) => setUploadTopic(e.target.value)}
+          disabled={isCreating}
           style={{
             width: "100%",
             padding: "10px 12px",
@@ -179,47 +194,83 @@ export default function GalleryUploader({
             border: `1px solid ${C.border}`,
             marginBottom: 16,
             fontSize: 14,
+            background: isCreating ? "#f5f5f5" : "white",
           }}
           autoFocus
         />
 
         <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
           {uploadQueue.length} file(s) selected for upload.
+          {isCreating && (
+            <span style={{ marginLeft: 8, color: C.primary }}>
+              <FiLoader
+                size={14}
+                style={{
+                  animation: "spin 1s linear infinite",
+                  display: "inline-block",
+                }}
+              />
+              Creating folder...
+            </span>
+          )}
         </div>
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button
-            onClick={() => {
-              setUploadTopic("");
-              onClose();
-            }}
+            onClick={handleClose}
+            disabled={isCreating}
             style={{
               padding: "8px 16px",
               background: "transparent",
               border: `1px solid ${C.border}`,
               borderRadius: 6,
-              cursor: "pointer",
+              cursor: isCreating ? "not-allowed" : "pointer",
+              opacity: isCreating ? 0.5 : 1,
             }}
           >
             Cancel
           </button>
           <button
             onClick={handleUpload}
-            disabled={!uploadTopic.trim() || creatingFolder}
+            disabled={!uploadTopic.trim() || isCreating}
             style={{
               padding: "8px 20px",
               background: C.primary,
               color: "#fff",
               border: "none",
               borderRadius: 6,
-              cursor: "pointer",
+              cursor:
+                !uploadTopic.trim() || isCreating ? "not-allowed" : "pointer",
               fontWeight: 600,
-              opacity: !uploadTopic.trim() || creatingFolder ? 0.6 : 1,
+              opacity: !uploadTopic.trim() || isCreating ? 0.6 : 1,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
-            {creatingFolder ? "Creating..." : "Upload & Create"}
+            {isCreating ? (
+              <>
+                <FiLoader
+                  size={16}
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                Creating...
+              </>
+            ) : (
+              <>
+                <FiUpload size={16} />
+                Upload & Create
+              </>
+            )}
           </button>
         </div>
+
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     </div>
   );

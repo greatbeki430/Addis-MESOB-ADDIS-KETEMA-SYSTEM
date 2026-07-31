@@ -1,59 +1,60 @@
 // backend/src/models/GoldenMondayFolder.js
-// Represents a folder that groups Golden Monday gallery photos together
-// by Ethiopian date + topic (e.g. "ሐምሌ 23 ቀን 2018 ዓ.ም - Leadership Training").
+// Two-level folder hierarchy:
+//   1. "week" folders — one per calendar week, keyed by that week's Monday
+//      (weekOf), regardless of which day within the week a file was
+//      actually uploaded on. This is what fixes "uploading twice on the
+//      same day creates two folders."
+//   2. "fileType" folders — children of a week folder, one per file type
+//      (image/pdf/presentation/document/video/other), created on demand
+//      the first time that type appears in that week.
 //
-// GalleryUploader.jsx creates one of these (find-or-create, keyed on `name`)
-// before uploading photos into it. GalleryGrid.jsx / GalleryItem.jsx read
-// folders back via `title`, `coverPhoto`, and `count` — see the shaping done
-// in goldenMondayRoutes.js's GET /gallery/folders route.
+// Old single-level date+topic folders are migrated into this shape by
+// scripts/migrateGoldenMondayFolders.js — see that file for details.
 
 const mongoose = require("mongoose");
 
 const goldenMondayFolderSchema = new mongoose.Schema(
   {
-    // Full display name, e.g. "ሐምሌ 23 ቀን 2018 ዓ.ም - Leadership Training".
-    // Unique so repeated uploads on the same day/topic reuse the same
-    // folder instead of creating duplicates (see the find-or-create route).
-    name: {
+    folderType: {
       type: String,
+      enum: ["week", "fileType"],
       required: true,
-      trim: true,
-      unique: true,
-    },
-
-    // The Ethiopian-calendar date string as generated on the frontend
-    // (e.g. "ሐምሌ 23 ቀን 2018 ዓ.ም"), stored as-is for display — this is a
-    // denormalized display string, not a queryable Date field.
-    ethiopianDate: { type: String, default: "", trim: true },
-
-    // The topic/presenter name entered when the folder was created.
-    topic: { type: String, required: true, trim: true },
-
-    // Same category enum as GoldenMondayGallery, so a folder can carry a
-    // default category for photos uploaded into it.
-    category: {
-      type: String,
-      enum: [
-        "flag-raising",
-        "presentation",
-        "group-photo",
-        "attendees",
-        "event",
-        "other",
-      ],
-      default: "other",
       index: true,
     },
 
-    // Denormalized for fast folder-grid rendering without a join:
-    // - coverPhoto: thumbnail URL of the most recently uploaded photo
-    // - count: number of photos currently in this folder
-    // Kept in sync by the gallery upload/delete routes in
-    // goldenMondayRoutes.js (increment/decrement + refresh cover on delete).
+    // Only set on folderType === "week". Normalized to that week's Monday
+    // at 00:00:00 local server time — this is the actual de-duplication
+    // key that replaces the old "ethiopianDate + topic" string key.
+    weekOf: { type: Date, default: null, index: true },
+
+    // Display string version of weekOf for the Ethiopian calendar, set
+    // once at creation time purely for display (not queried on).
+    weekOfEthiopianDate: { type: String, default: "", trim: true },
+
+    // Every distinct topic/presenter name typed in during any upload into
+    // this week gets appended here (case-insensitive de-duped), since a
+    // week can now span multiple upload sessions instead of exactly one.
+    topics: { type: [String], default: [] },
+
+    // Only set on folderType === "fileType".
+    parentFolder: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "GoldenMondayFolder",
+      default: null,
+      index: true,
+    },
+    fileType: {
+      type: String,
+      enum: ["image", "pdf", "presentation", "document", "video", "other"],
+      default: null,
+    },
+
+    // Denormalized for fast grid rendering without a join. On a "week"
+    // folder these are aggregated across all its fileType children; on a
+    // "fileType" folder they're scoped to that type only.
     coverPhoto: { type: String, default: "" },
     count: { type: Number, default: 0 },
 
-    // Who created the folder
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -64,7 +65,16 @@ const goldenMondayFolderSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Indexes
-goldenMondayFolderSchema.index({ category: 1, createdAt: -1 });
+// A week folder is unique per calendar week.
+goldenMondayFolderSchema.index(
+  { weekOf: 1 },
+  { unique: true, partialFilterExpression: { folderType: "week" } },
+);
+
+// A fileType folder is unique per (parentFolder, fileType) pair.
+goldenMondayFolderSchema.index(
+  { parentFolder: 1, fileType: 1 },
+  { unique: true, partialFilterExpression: { folderType: "fileType" } },
+);
 
 module.exports = mongoose.model("GoldenMondayFolder", goldenMondayFolderSchema);

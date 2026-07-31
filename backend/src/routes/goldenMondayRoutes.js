@@ -28,8 +28,37 @@ const GoldenMondaySession = require("../models/GoldenMondaySession");
 const GoldenMondayPresenter = require("../models/GoldenMondayPresenter");
 const GoldenMondayAttendance = require("../models/GoldenMondayAttendance");
 const GoldenMondayGallery = require("../models/GoldenMondayGallery");
-const GoldenMondayFolder = require("../models/GoldenMondayFolder"); // ✅ NEW
+const GoldenMondayFolder = require("../models/GoldenMondayFolder");
+const GoldenMondayCategory = require("../models/GoldenMondayCategory");
 const User = require("../models/User");
+
+// ── NEW: Multi-file upload middleware and services ──────────
+const {
+  galleryUpload,
+  SIZE_LIMITS_BYTES,
+} = require("../middleware/galleryUpload");
+const { fileTypeFromBuffer } = require("file-type");
+const pdfParse = require("pdf-parse");
+const mammoth = require("mammoth");
+const {
+  getOrCreateWeekFolder,
+  getOrCreateTypeFolder,
+  updateWeekFolderAggregates,
+  getFileTypeLabel,
+} = require("../services/galleryFolderService");
+const {
+  computeContentHash,
+  computePerceptualHash,
+  findDuplicateInFolder,
+} = require("../services/galleryDedupService");
+const {
+  categorizeImage,
+} = require("../services/galleryImageCategorizationService");
+const {
+  resolveGalleryCategory,
+} = require("../services/galleryCategorizationService");
+const { categorizeGalleryDocumentText } = require("../services/aiService");
+const { BUILT_IN_CATEGORIES } = require("../constants/goldenMondayCategories");
 
 // ── Sessions ────────────────────────────────────────────────
 router.get("/", protect, anyRole, getSessions);
@@ -198,7 +227,7 @@ router.get("/pillars", protect, anyRole, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
-// ATTENDANCE ROUTES - FIXED WITH BETTER ERROR HANDLING
+// ATTENDANCE ROUTES
 // ──────────────────────────────────────────────────────────────
 
 // GET /api/golden-monday/:sessionId/attendance
@@ -212,7 +241,6 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       .populate("user", "name email department")
       .sort({ checkedInAt: -1 });
 
-    // Get all eligible employees from the roster
     const allEmployees = await GoldenMondayPresenter.find({
       isEligible: true,
     }).select("user name email department");
@@ -228,9 +256,7 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       "attendance records",
     );
 
-    // Build report with all employees
     const report = allEmployees.map((emp) => {
-      // Find if this employee has an attendance record
       const record = attendance.find(
         (a) =>
           a.user &&
@@ -266,7 +292,7 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   }
 });
 
-// POST /api/golden-monday/:sessionId/attendance - FIXED
+// POST /api/golden-monday/:sessionId/attendance
 router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   try {
     const {
@@ -285,13 +311,11 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
     console.log("  hasSignature:", !!signature);
     console.log("  signature length:", signature?.length || 0);
 
-    // 1. Validate userId
     if (!userId) {
       console.log("❌ [ATTENDANCE] Missing userId");
       return res.status(400).json({ error: "User ID is required" });
     }
 
-    // 2. Find the session
     const session = await GoldenMondaySession.findById(req.params.sessionId);
     if (!session) {
       console.log("❌ [ATTENDANCE] Session not found:", req.params.sessionId);
@@ -299,7 +323,6 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
     }
     console.log("✅ [ATTENDANCE] Session found:", session._id);
 
-    // 3. Find the user
     const user = await User.findById(userId);
     if (!user) {
       console.log("❌ [ATTENDANCE] User not found:", userId);
@@ -307,7 +330,6 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
     }
     console.log("✅ [ATTENDANCE] User found:", user.name, user.email);
 
-    // 4. Check if attendance record exists
     let attendance = await GoldenMondayAttendance.findOne({
       session: req.params.sessionId,
       user: userId,
@@ -345,7 +367,6 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       console.log("✅ [ATTENDANCE] New attendance created:", attendance._id);
     }
 
-    // 5. Update session attendees
     const existingAttendee = session.attendees.find(
       (a) => a.user.toString() === userId,
     );
@@ -444,46 +465,57 @@ router.post(
 );
 
 // ──────────────────────────────────────────────────────────────
-// 📁 GALLERY FOLDERS  (✅ NEW — Ethiopian Date + Topic grouping)
-//
-// GalleryUploader.jsx already calls createFolder() before uploading, and
-// GalleryGrid.jsx already calls getFolders() at the gallery root — these
-// two routes are what was missing on the backend to make both work.
+// 📁 GALLERY FOLDERS - UPDATED for two-level hierarchy
 // ──────────────────────────────────────────────────────────────
 
 // GET /api/golden-monday/gallery/folders
 router.get("/gallery/folders", protect, anyRole, async (req, res) => {
   try {
     const { category, limit = 20, page = 1 } = req.query;
-    const filter = {};
-    if (category && category !== "all") filter.category = category;
+    const filter = { folderType: "week" };
+    if (category && category !== "all") filter["topics"] = { $in: [category] };
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const [folders, total] = await Promise.all([
+    const [weekFolders, total] = await Promise.all([
       GoldenMondayFolder.find(filter)
-        .sort({ createdAt: -1 })
+        .sort({ weekOf: -1 })
         .skip(skip)
         .limit(parseInt(limit)),
       GoldenMondayFolder.countDocuments(filter),
     ]);
 
-    // Shaped to match exactly what GalleryItem.jsx reads for a folder:
-    // item.title, item.coverPhoto, item.count (and item.url is absent,
-    // which is how GalleryItem/GalleryGrid distinguish "folder" from "photo").
-    const shaped = folders.map((f) => ({
-      _id: f._id,
-      title: f.name,
-      topic: f.topic,
-      ethiopianDate: f.ethiopianDate,
-      category: f.category,
-      coverPhoto: f.coverPhoto,
-      count: f.count,
-      createdAt: f.createdAt,
-    }));
+    const shapedFolders = [];
+    for (const week of weekFolders) {
+      const childFolders = await GoldenMondayFolder.find({
+        folderType: "fileType",
+        parentFolder: week._id,
+      });
+
+      const children = childFolders.map((child) => ({
+        _id: child._id,
+        fileType: child.fileType,
+        label: getFileTypeLabel(child.fileType),
+        count: child.count,
+        coverPhoto: child.coverPhoto,
+      }));
+
+      shapedFolders.push({
+        _id: week._id,
+        folderType: "week",
+        title:
+          week.weekOfEthiopianDate || week.weekOf.toISOString().slice(0, 10),
+        weekOf: week.weekOf,
+        topics: week.topics,
+        count: week.count,
+        coverPhoto: week.coverPhoto,
+        children,
+        createdAt: week.createdAt,
+      });
+    }
 
     res.json({
-      folders: shaped,
+      folders: shapedFolders,
       pagination: {
         total,
         page: parseInt(page),
@@ -498,10 +530,8 @@ router.get("/gallery/folders", protect, anyRole, async (req, res) => {
 });
 
 // POST /api/golden-monday/gallery/folders
-// Idempotent find-or-create, matching what GalleryUploader.jsx already
-// assumes: either the success path returns a usable folderId, or (on a
-// race where two uploads create "the same" folder at once) the duplicate
-// path still resolves to the winning folder's ID rather than erroring out.
+// Find-or-create folder (kept for backward compatibility, but new uploads
+// use the week-based system automatically)
 router.post("/gallery/folders", protect, leaderOrAdmin, async (req, res) => {
   try {
     const { name, ethiopianDate, topic, category } = req.body;
@@ -510,33 +540,18 @@ router.post("/gallery/folders", protect, leaderOrAdmin, async (req, res) => {
       return res.status(400).json({ error: "name and topic are required" });
     }
 
-    let folder = await GoldenMondayFolder.findOne({ name: name.trim() });
-
-    if (!folder) {
-      try {
-        folder = await GoldenMondayFolder.create({
-          name: name.trim(),
-          ethiopianDate: ethiopianDate || "",
-          topic: topic.trim(),
-          category: category || "other",
-          createdBy: req.user._id,
-          createdByName: req.user.name,
-        });
-      } catch (createError) {
-        // Unique-index race: someone else created the same-named folder
-        // between our findOne() and create() calls. Fetch and use theirs.
-        if (createError.code === 11000) {
-          folder = await GoldenMondayFolder.findOne({ name: name.trim() });
-        } else {
-          throw createError;
-        }
-      }
-    }
+    // For backward compatibility: create a week folder based on the name
+    const weekFolder = await getOrCreateWeekFolder({
+      uploadDate: new Date(),
+      topic,
+      userId: req.user._id,
+      userName: req.user.name,
+    });
 
     res.status(201).json({
       success: true,
-      folderId: folder._id,
-      folder,
+      folderId: weekFolder._id,
+      folder: weekFolder,
     });
   } catch (error) {
     console.error("❌ [CREATE FOLDER] Error:", error);
@@ -545,7 +560,7 @@ router.post("/gallery/folders", protect, leaderOrAdmin, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
-// GALLERY ROUTES
+// 🖼️ GALLERY ROUTES - UPDATED Multi-file upload
 // ──────────────────────────────────────────────────────────────
 
 // GET /api/golden-monday/gallery
@@ -555,7 +570,7 @@ router.get("/gallery", protect, anyRole, async (req, res) => {
     const filter = {};
     if (category) filter.category = category;
     if (session) filter.session = session;
-    if (folderId) filter.folder = folderId; // ✅ NEW — powers "inside a folder" view
+    if (folderId) filter.folder = folderId;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -583,93 +598,425 @@ router.get("/gallery", protect, anyRole, async (req, res) => {
   }
 });
 
-// POST /api/golden-monday/gallery
-router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
-  try {
-    const {
-      image,
-      title,
-      description,
-      caption,
-      category,
-      tags,
-      sessionId,
-      folderId, // ✅ NEW
-      photoDate,
-    } = req.body;
+// POST /api/golden-monday/gallery - MULTI-FILE UPLOAD
+router.post(
+  "/gallery",
+  protect,
+  leaderOrAdmin,
+  galleryUpload.array("image", 20),
+  async (req, res) => {
+    try {
+      const {
+        folderId,
+        sessionId,
+        category: providedCategory,
+        lang,
+        topic,
+      } = req.body;
 
-    if (!image) {
-      return res.status(400).json({ error: "Image data is required" });
-    }
-
-    const cloudinary = require("../config/cloudinary");
-    const result = await cloudinary.uploader.upload(image, {
-      folder: "golden-monday-gallery",
-      public_id: `gm-${Date.now()}`,
-      overwrite: false,
-    });
-
-    const thumbnailResult = await cloudinary.uploader.upload(image, {
-      folder: "golden-monday-gallery/thumbnails",
-      public_id: `thumb-${Date.now()}`,
-      transformation: { width: 300, height: 300, crop: "fill" },
-      overwrite: false,
-    });
-
-    const galleryPhoto = new GoldenMondayGallery({
-      session: sessionId || null,
-      folder: folderId || null, // ✅ NEW
-      title: title || "",
-      description: description || "",
-      caption: caption || "",
-      url: result.secure_url,
-      publicId: result.public_id,
-      thumbnailUrl: thumbnailResult.secure_url,
-      thumbnailPublicId: thumbnailResult.public_id,
-      width: result.width || 0,
-      height: result.height || 0,
-      size: result.bytes || 0,
-      format: result.format || "",
-      category: category || "other",
-      tags: tags || [],
-      uploadedBy: req.user._id,
-      uploadedByName: req.user.name,
-      photoDate: photoDate ? new Date(photoDate) : null,
-    });
-
-    await galleryPhoto.save();
-
-    // ✅ NEW: keep the folder's denormalized cover photo + count in sync
-    if (folderId) {
-      await GoldenMondayFolder.findByIdAndUpdate(folderId, {
-        $inc: { count: 1 },
-        $set: { coverPhoto: thumbnailResult.secure_url },
-      });
-    }
-
-    if (sessionId) {
-      const session = await GoldenMondaySession.findById(sessionId);
-      if (session) {
-        session.photos.push({
-          url: result.secure_url,
-          publicId: result.public_id,
-          caption: caption || "",
-          uploadedAt: new Date(),
-          uploadedBy: req.user._id,
-        });
-        await session.save();
+      if (!req.files || req.files.length === 0) {
+        return res.status(400).json({ error: "At least one file is required" });
       }
-    }
 
-    res.status(201).json({
-      success: true,
-      photo: galleryPhoto,
-    });
-  } catch (error) {
-    console.error("❌ [POST GALLERY] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+      const cloudinary = require("../config/cloudinary");
+      const uploadedItems = [];
+      const failedItems = [];
+      let weekFolder = null;
+      let typeFolders = {};
+
+      for (const file of req.files) {
+        try {
+          // ── 1. DETECT TRUE FILE TYPE ──────────────────────────
+          const fileTypeResult = await fileTypeFromBuffer(file.buffer);
+          const trueMime =
+            fileTypeResult?.mime || file.mimetype || "application/octet-stream";
+          const trueExt = fileTypeResult?.ext || "bin";
+
+          let fileType = "other";
+          let cloudinaryResourceType = "raw";
+
+          if (trueMime.startsWith("image/")) {
+            fileType = "image";
+            cloudinaryResourceType = "image";
+          } else if (trueMime === "application/pdf") {
+            fileType = "pdf";
+            cloudinaryResourceType = "raw";
+          } else if (
+            trueMime === "application/vnd.ms-powerpoint" ||
+            trueMime ===
+              "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+          ) {
+            fileType = "presentation";
+            cloudinaryResourceType = "raw";
+          } else if (
+            trueMime === "application/msword" ||
+            trueMime ===
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          ) {
+            fileType = "document";
+            cloudinaryResourceType = "raw";
+          } else if (trueMime.startsWith("video/")) {
+            fileType = "video";
+            cloudinaryResourceType = "video";
+          }
+
+          // ── 2. ENFORCE SIZE LIMITS ────────────────────────────
+          const sizeLimit =
+            SIZE_LIMITS_BYTES[fileType] || SIZE_LIMITS_BYTES.other;
+          if (file.size > sizeLimit) {
+            failedItems.push({
+              filename: file.originalname,
+              reason: `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB, max ${(sizeLimit / 1024 / 1024).toFixed(0)}MB)`,
+            });
+            continue;
+          }
+
+          // ── 3. GET OR CREATE WEEK FOLDER ──────────────────────
+          if (!weekFolder) {
+            weekFolder = await getOrCreateWeekFolder({
+              uploadDate: new Date(),
+              topic: topic || "Golden Monday",
+              userId: req.user._id,
+              userName: req.user.name,
+            });
+          }
+
+          // ── 4. GET OR CREATE FILE-TYPE SUBFOLDER ──────────────
+          if (!typeFolders[fileType]) {
+            typeFolders[fileType] = await getOrCreateTypeFolder({
+              weekFolder,
+              fileType,
+              userId: req.user._id,
+              userName: req.user.name,
+            });
+          }
+          const targetFolder = typeFolders[fileType];
+
+          // ── 5. DEDUPLICATION CHECK ─────────────────────────────
+          const contentHash = computeContentHash(file.buffer);
+          let perceptualHash = null;
+          if (fileType === "image") {
+            perceptualHash = await computePerceptualHash(file.buffer);
+          }
+
+          const duplicateCheck = await findDuplicateInFolder({
+            folderId: targetFolder._id,
+            fileType,
+            contentHash,
+            perceptualHash,
+          });
+
+          if (duplicateCheck.match) {
+            failedItems.push({
+              filename: file.originalname,
+              reason:
+                duplicateCheck.reason === "exact"
+                  ? "Duplicate file (exact match)"
+                  : `Similar image already exists (similarity score: ${duplicateCheck.distance || "N/A"})`,
+              existingItem: {
+                title:
+                  duplicateCheck.match.title ||
+                  duplicateCheck.match.originalFilename,
+                url:
+                  duplicateCheck.match.thumbnailUrl || duplicateCheck.match.url,
+              },
+            });
+            continue;
+          }
+
+          // ── 6. AI CATEGORIZATION ──────────────────────────────
+          let category = providedCategory || "other";
+          let categoryConfidence = null;
+          let categorySource = "manual";
+          let categorizationProvider = "";
+          let categorizationAttempts = [];
+
+          if (!providedCategory) {
+            try {
+              if (fileType === "image") {
+                const base64Data = file.buffer.toString("base64");
+                const result = await categorizeImage(base64Data, trueMime);
+                category = result.category;
+                categoryConfidence = result.confidence;
+                categorySource = "ai";
+                categorizationProvider = "vision";
+              } else if (
+                fileType === "pdf" ||
+                fileType === "document" ||
+                fileType === "presentation"
+              ) {
+                let extractedText = "";
+                if (fileType === "pdf") {
+                  const pdfData = await pdfParse(file.buffer);
+                  extractedText = pdfData.text || "";
+                } else if (fileType === "document") {
+                  const docResult = await mammoth.extractRawText({
+                    buffer: file.buffer,
+                  });
+                  extractedText = docResult.value || "";
+                } else {
+                  try {
+                    const docResult = await mammoth.extractRawText({
+                      buffer: file.buffer,
+                    });
+                    extractedText = docResult.value || "";
+                  } catch (e) {
+                    try {
+                      const pdfData = await pdfParse(file.buffer);
+                      extractedText = pdfData.text || "";
+                    } catch (e2) {
+                      extractedText = "";
+                    }
+                  }
+                }
+
+                if (extractedText && extractedText.trim().length > 10) {
+                  const existingSlugs = await GoldenMondayCategory.find()
+                    .select("slug name")
+                    .lean();
+                  const allCategoryNames = [
+                    ...BUILT_IN_CATEGORIES,
+                    ...existingSlugs.map((c) => c.name),
+                  ];
+                  const aiResult = await categorizeGalleryDocumentText(
+                    extractedText,
+                    allCategoryNames,
+                  );
+                  category = aiResult.category || "other";
+                  categoryConfidence = aiResult.confidence || 0.5;
+                  categorySource = "ai";
+                  categorizationProvider = "text-chain";
+                }
+              }
+            } catch (aiError) {
+              console.error(
+                `[Gallery Upload] AI categorization failed for ${file.originalname}:`,
+                aiError.message,
+              );
+              categorizationAttempts.push({
+                provider: "categorization",
+                success: false,
+                errorCode: aiError.code || "AI_FAILED",
+              });
+            }
+          }
+
+          // ── 7. RESOLVE CATEGORY ────────────────────────────────
+          let resolvedCategory = "other";
+          let resolvedSource = categorySource;
+          let resolvedConfidence = categoryConfidence;
+
+          if (categorySource === "ai") {
+            const resolution = await resolveGalleryCategory({
+              candidateCategory: category,
+              confidence: categoryConfidence || 0.5,
+              candidateNewCategoryName: category,
+            });
+            resolvedCategory = resolution.category;
+            resolvedSource = resolution.categorySource;
+            resolvedConfidence = resolution.categoryConfidence;
+          } else {
+            const dynamicCats =
+              await GoldenMondayCategory.find().select("slug");
+            const allSlugs = [
+              ...BUILT_IN_CATEGORIES,
+              ...dynamicCats.map((c) => c.slug),
+            ];
+            resolvedCategory = allSlugs.includes(category) ? category : "other";
+          }
+
+          // ── 8. UPLOAD TO CLOUDINARY ──────────────────────────
+          const baseOptions = {
+            folder: "golden-monday-gallery",
+            public_id: `gm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            overwrite: false,
+          };
+
+          let uploadResult, thumbnailResult;
+          const dataURI = `data:${trueMime};base64,${file.buffer.toString("base64")}`;
+
+          if (fileType === "image") {
+            uploadResult = await cloudinary.uploader.upload(dataURI, {
+              ...baseOptions,
+              resource_type: "image",
+            });
+            thumbnailResult = await cloudinary.uploader.upload(dataURI, {
+              folder: "golden-monday-gallery/thumbnails",
+              public_id: `thumb-${Date.now()}`,
+              transformation: { width: 300, height: 300, crop: "fill" },
+              resource_type: "image",
+              overwrite: false,
+            });
+          } else if (fileType === "video") {
+            uploadResult = await cloudinary.uploader.upload(dataURI, {
+              ...baseOptions,
+              resource_type: "video",
+            });
+            try {
+              const posterResult = await cloudinary.uploader.upload(dataURI, {
+                folder: "golden-monday-gallery/thumbnails",
+                public_id: `video-thumb-${Date.now()}`,
+                resource_type: "image",
+                transformation: {
+                  width: 300,
+                  height: 300,
+                  crop: "fill",
+                  start_offset: "2",
+                },
+                overwrite: false,
+              });
+              thumbnailResult = posterResult;
+            } catch (posterErr) {
+              console.warn(
+                "[Gallery Upload] Could not generate video poster:",
+                posterErr.message,
+              );
+              thumbnailResult = {
+                secure_url: "/static/video-icon.png",
+                thumbnailIsGeneric: true,
+              };
+            }
+          } else {
+            uploadResult = await cloudinary.uploader.upload(dataURI, {
+              ...baseOptions,
+              resource_type: "raw",
+            });
+            if (fileType === "pdf") {
+              try {
+                const pdfThumb = await cloudinary.uploader.upload(dataURI, {
+                  folder: "golden-monday-gallery/thumbnails",
+                  public_id: `pdf-thumb-${Date.now()}`,
+                  resource_type: "image",
+                  transformation: {
+                    width: 300,
+                    height: 300,
+                    crop: "fill",
+                    page: 1,
+                  },
+                  overwrite: false,
+                });
+                thumbnailResult = pdfThumb;
+              } catch (pdfThumbErr) {
+                console.warn(
+                  "[Gallery Upload] Could not generate PDF thumbnail:",
+                  pdfThumbErr.message,
+                );
+                thumbnailResult = {
+                  secure_url: "/static/pdf-icon.png",
+                  thumbnailIsGeneric: true,
+                };
+              }
+            } else {
+              thumbnailResult = {
+                secure_url: `/static/${fileType}-icon.png`,
+                thumbnailIsGeneric: true,
+              };
+            }
+          }
+
+          // ── 9. SAVE TO DATABASE ──────────────────────────────
+          const galleryItem = new GoldenMondayGallery({
+            session: sessionId || null,
+            folder: targetFolder._id,
+            title:
+              file.originalname.split(".").slice(0, -1).join(".") ||
+              file.originalname,
+            fileType,
+            originalFilename: file.originalname,
+            mimeType: trueMime,
+            cloudinaryResourceType,
+            url: uploadResult.secure_url,
+            publicId: uploadResult.public_id,
+            thumbnailUrl: thumbnailResult?.secure_url || "",
+            thumbnailPublicId: thumbnailResult?.public_id || "",
+            thumbnailIsGeneric: !!thumbnailResult?.thumbnailIsGeneric,
+            width: uploadResult.width || 0,
+            height: uploadResult.height || 0,
+            size: file.size,
+            format: uploadResult.format || trueExt,
+            durationSec: uploadResult.duration || 0,
+            contentHash,
+            perceptualHash: perceptualHash || "",
+            category: resolvedCategory,
+            categorySource: resolvedSource,
+            categoryConfidence: resolvedConfidence,
+            categorizationProvider,
+            categorizationAttempts,
+            uploadedBy: req.user._id,
+            uploadedByName: req.user.name,
+            photoDate: new Date(),
+          });
+
+          await galleryItem.save();
+
+          // ── 10. UPDATE FOLDER COUNTS ──────────────────────────
+          targetFolder.count = (targetFolder.count || 0) + 1;
+          if (!targetFolder.coverPhoto) {
+            targetFolder.coverPhoto =
+              galleryItem.thumbnailUrl || galleryItem.url;
+          }
+          await targetFolder.save();
+
+          await updateWeekFolderAggregates(weekFolder._id);
+
+          if (sessionId) {
+            const session = await GoldenMondaySession.findById(sessionId);
+            if (session) {
+              session.photos.push({
+                url: uploadResult.secure_url,
+                publicId: uploadResult.public_id,
+                caption: file.originalname,
+                uploadedAt: new Date(),
+                uploadedBy: req.user._id,
+              });
+              await session.save();
+            }
+          }
+
+          uploadedItems.push({
+            id: galleryItem._id,
+            filename: file.originalname,
+            fileType,
+            category: resolvedCategory,
+            url: galleryItem.url,
+            thumbnailUrl: galleryItem.thumbnailUrl,
+          });
+        } catch (fileError) {
+          console.error(
+            `[Gallery Upload] Error processing ${file.originalname}:`,
+            fileError,
+          );
+          failedItems.push({
+            filename: file.originalname,
+            reason: fileError.message || "Upload failed",
+          });
+        }
+      }
+
+      const response = {
+        success: true,
+        uploaded: uploadedItems.length,
+        failed: failedItems.length,
+        items: uploadedItems,
+        errors: failedItems.length > 0 ? failedItems : undefined,
+        folderId: weekFolder?._id,
+      };
+
+      if (uploadedItems.length > 0) {
+        res.status(201).json(response);
+      } else {
+        res.status(400).json({
+          success: false,
+          message: "No files were uploaded successfully",
+          errors: failedItems,
+        });
+      }
+    } catch (error) {
+      console.error("❌ [POST GALLERY] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 // DELETE /api/golden-monday/gallery/:photoId
 router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
@@ -680,17 +1027,27 @@ router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
     }
 
     const cloudinary = require("../config/cloudinary");
-    await cloudinary.uploader.destroy(photo.publicId);
-    if (photo.thumbnailPublicId) {
-      await cloudinary.uploader.destroy(photo.thumbnailPublicId);
+    const resourceType = photo.cloudinaryResourceType || "image";
+
+    try {
+      await cloudinary.uploader.destroy(photo.publicId, {
+        resource_type: resourceType,
+      });
+      if (photo.thumbnailPublicId) {
+        await cloudinary.uploader.destroy(photo.thumbnailPublicId, {
+          resource_type: "image",
+        });
+      }
+    } catch (cloudinaryErr) {
+      console.error(
+        `❌ [DELETE GALLERY] Cloudinary destroy failed for ${photo.publicId} (resource_type: ${resourceType}):`,
+        cloudinaryErr.message,
+      );
     }
 
-    const folderId = photo.folder; // capture before deleteOne()
+    const folderId = photo.folder;
     await photo.deleteOne();
 
-    // ✅ NEW: keep the folder's count/cover in sync; remove the folder
-    // once it's empty so the folder grid never shows a ghost 0-photo
-    // folder.
     if (folderId) {
       const folder = await GoldenMondayFolder.findById(folderId);
       if (folder) {
@@ -726,10 +1083,9 @@ router.post(
 );
 
 // ──────────────────────────────────────────────────────────────
-// 🔍 DEBUG ROUTES - Remove these in production
+// 🔍 DEBUG ROUTES
 // ──────────────────────────────────────────────────────────────
 
-// DEBUG: Check roster data
 router.get("/debug/roster", protect, async (req, res) => {
   try {
     console.log("🔍 [DEBUG] Fetching roster...");
@@ -756,7 +1112,6 @@ router.get("/debug/roster", protect, async (req, res) => {
   }
 });
 
-// DEBUG: Check attendance data for a session
 router.get("/debug/attendance/:sessionId", protect, async (req, res) => {
   try {
     console.log(
@@ -787,7 +1142,6 @@ router.get("/debug/attendance/:sessionId", protect, async (req, res) => {
   }
 });
 
-// DEBUG: Check all users
 router.get("/debug/users", protect, async (req, res) => {
   try {
     console.log("🔍 [DEBUG] Fetching all users...");
@@ -812,7 +1166,6 @@ router.get("/debug/users", protect, async (req, res) => {
 // SESSION RECORDING & DOWNLOAD ROUTES
 // ──────────────────────────────────────────────────────────────
 
-// GET /api/golden-monday/:sessionId/download-slides
 router.get(
   "/:sessionId/download-slides",
   protect,
@@ -841,7 +1194,6 @@ router.get(
   },
 );
 
-// POST /api/golden-monday/:sessionId/slides
 router.post("/:sessionId/slides", protect, leaderOrAdmin, async (req, res) => {
   try {
     const { slides } = req.body;

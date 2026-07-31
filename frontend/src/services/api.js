@@ -10,7 +10,7 @@ console.log("API_BASE_URL =", API_BASE_URL);
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000, // fail fast instead of hanging forever on a dead/unreachable backend
+  timeout: 120000, // fail fast instead of hanging forever on a dead/unreachable backend
   headers: {
     "Content-Type": "application/json",
   },
@@ -326,25 +326,58 @@ export const goldenMondayAPI = {
     api.post(`/golden-monday/${sessionId}/attendance`, data),
 
   // ──────────────────────────────────────────────────────────────
-  // 🖼️ GALLERY MANAGEMENT - ✅ UPDATED TO MATCH BACKEND
+  // 🖼️ GALLERY MANAGEMENT - UPDATED with timeout and progress
   // ──────────────────────────────────────────────────────────────
 
   // GET /api/golden-monday/gallery - Get gallery photos with filters
   getGallery: (params) => api.get("/golden-monday/gallery", { params }),
 
-  // POST /api/golden-monday/gallery - Upload a gallery photo
-  uploadGalleryPhoto: (data) => api.post("/golden-monday/gallery", data),
+  // ✅ POST /api/golden-monday/gallery - Upload with progress and longer timeout
+  uploadGalleryPhoto: (data, onProgress) => {
+    const formData = new FormData();
+
+    // Handle base64 image
+    if (data.image && data.image.startsWith("data:image")) {
+      const blob = dataURLtoBlob(data.image);
+      formData.append("image", blob, "photo.jpg");
+    } else {
+      formData.append("image", data.image);
+    }
+
+    if (data.folderId) formData.append("folderId", data.folderId);
+    if (data.category) formData.append("category", data.category);
+    if (data.sessionId) formData.append("sessionId", data.sessionId);
+    if (data.lang) formData.append("lang", data.lang);
+
+    return api.post("/golden-monday/gallery", formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+      timeout: 180000, // 3 minutes for upload
+      onUploadProgress: (progressEvent) => {
+        if (onProgress) {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total,
+          );
+          onProgress(percentCompleted);
+        }
+      },
+    });
+  },
 
   // DELETE /api/golden-monday/gallery/:photoId - Delete a gallery photo
   deleteGalleryPhoto: (photoId) =>
     api.delete(`/golden-monday/gallery/${photoId}`),
 
-  // ✅ NEW — GET /api/golden-monday/gallery/folders - list folders
-  // (grouped by Ethiopian date + topic)
+  // ✅ GET /api/golden-monday/gallery/folders - list folders
   getFolders: (params) => api.get("/golden-monday/gallery/folders", { params }),
 
-  // ✅ NEW — POST /api/golden-monday/gallery/folders - find-or-create a folder
+  // ✅ POST /api/golden-monday/gallery/folders - find-or-create a folder
   createFolder: (data) => api.post("/golden-monday/gallery/folders", data),
+
+  // ✅ POST /api/golden-monday/gallery/analyze - AI analyze with 30s timeout
+  analyzeGalleryPhoto: (data) =>
+    api.post("/golden-monday/gallery/analyze", data, {
+      timeout: 30000, // 30 seconds for AI
+    }),
 
   // ──────────────────────────────────────────────────────────────
   // 🎥 RECORDINGS MANAGEMENT
@@ -437,10 +470,6 @@ export const goldenMondayAPI = {
   // POST /api/telegram/post/:sessionId - Post session announcement to Telegram
   postToTelegram: (sessionId) => api.post(`/telegram/post/${sessionId}`),
 
-  // POST /api/golden-monday/gallery/analyze - AI analyze and categorize a photo
-  analyzeGalleryPhoto: (data) =>
-    api.post("/golden-monday/gallery/analyze", data),
-
   // ──────────────────────────────────────────────────────────────
   // 📋 PENDING REGISTRATIONS (Telegram Bot Self-Registration)
   // ──────────────────────────────────────────────────────────────
@@ -470,6 +499,19 @@ export const goldenMondayAPI = {
       withCredentials: true,
     }),
 };
+
+// ✅ Helper: dataURL to Blob (add at the bottom of the file, before export default)
+function dataURLtoBlob(dataURL) {
+  const arr = dataURL.split(",");
+  const mime = arr[0].match(/:(.*?);/)[1];
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+}
 
 // ============================================================
 // DEFAULT EXPORT
