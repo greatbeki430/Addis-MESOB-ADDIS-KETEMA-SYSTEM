@@ -281,18 +281,22 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   }, [getCategoryLabel, loadGallery, onRefresh]);
 
   // ─── AI & Upload Logic ──
-  const analyzeAndCategorizePhoto = async (imageData) => {
-    try {
-      const response = await goldenMondayAPI.analyzeGalleryPhoto({
-        image: imageData,
-        sessionId: sessionId || undefined,
-      });
-      return response.data;
-    } catch (error) {
-      console.error("AI categorization failed:", error);
-      return { category: "other", confidence: 0 };
-    }
-  };
+  // ─── AI & Upload Logic ──
+  const analyzeAndCategorizePhoto = useCallback(
+    async (imageData) => {
+      try {
+        const response = await goldenMondayAPI.analyzeGalleryPhoto({
+          image: imageData,
+          sessionId: sessionId || undefined,
+        });
+        return response.data;
+      } catch (error) {
+        console.error("AI categorization failed:", error);
+        return { category: "other", confidence: 0 };
+      }
+    },
+    [sessionId], // ✅ sessionId is a dependency
+  );
 
   // ─────────────────────────────────────────────────────────────────────────
   // ✅ FIX ("cannot be modified" / immutable-value error): this used to be
@@ -317,7 +321,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         setIsAIAnalyzing(false);
       }
     },
-    [sessionId],
+    [analyzeAndCategorizePhoto], // ✅ Fixed: Now depends on analyzeAndCategorizePhoto
   );
 
   // Handle multiple file selection (Kickstarts the Uploader modal)
