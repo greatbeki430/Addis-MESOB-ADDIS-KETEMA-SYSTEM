@@ -1,30 +1,35 @@
-// backend/scripts/migrateGoldenMondayFolders.js
+// backend/src/scripts/migrateGoldenMondayFolders.js
 // One-time migration script: converts old date+topic folders to the new
-// two-level weekly model. Run once via: node scripts/migrateGoldenMondayFolders.js
+// two-level weekly model. Run via: node backend/src/scripts/migrateGoldenMondayFolders.js
 
-require("dotenv").config();
+const path = require("path");
+// Load .env from the root directory (3 levels up from backend/src/scripts)
+require("dotenv").config({ path: path.resolve(__dirname, "../../../.env") });
+
 const mongoose = require("mongoose");
-const GoldenMondayFolder = require("../src/models/GoldenMondayFolder");
-const GoldenMondayGallery = require("../src/models/GoldenMondayGallery");
+// ✅ CORRECT PATHS - from src/scripts/, go up to src/, then into models/
+const GoldenMondayFolder = require("../models/GoldenMondayFolder");
+const GoldenMondayGallery = require("../models/GoldenMondayGallery");
 const {
   mondayOf,
   getOrCreateWeekFolder,
   getOrCreateTypeFolder,
   updateWeekFolderAggregates,
-} = require("../src/services/galleryFolderService");
+} = require("../services/galleryFolderService");
 
 const MONGODB_URI = process.env.MONGO_URI;
 
 if (!MONGODB_URI) {
   console.error("❌ MONGO_URI not set in .env");
+  console.error("📁 Current directory:", __dirname);
+  console.error("📁 .env path:", path.resolve(__dirname, "../../../.env"));
   process.exit(1);
 }
 
+console.log("📡 Connecting to MongoDB...");
+
 const migrate = async () => {
   console.log("🔄 Starting Golden Monday folder migration...");
-  console.log(
-    `📡 Connecting to: ${MONGODB_URI.replace(/\/\/.*@/, "//****:****@")}`,
-  );
 
   try {
     await mongoose.connect(MONGODB_URI, {
@@ -51,7 +56,7 @@ const migrate = async () => {
     console.log("\n📋 Folders to migrate:");
     oldFolders.forEach((f, i) => {
       console.log(
-        `  ${i + 1}. ${f.name} (created: ${f.createdAt?.toISOString().slice(0, 10) || "unknown"})`,
+        `  ${i + 1}. ${f.name || "Unnamed"} (created: ${f.createdAt?.toISOString().slice(0, 10) || "unknown"})`,
       );
     });
     console.log("");
@@ -62,7 +67,7 @@ const migrate = async () => {
 
     for (const oldFolder of oldFolders) {
       try {
-        console.log(`\n📂 Processing: ${oldFolder.name}`);
+        console.log(`\n📂 Processing: ${oldFolder.name || "Unnamed"}`);
 
         // 2. Determine the week based on createdAt or the folder's date
         const referenceDate = oldFolder.createdAt || new Date();
@@ -75,7 +80,7 @@ const migrate = async () => {
           topic: oldFolder.topic || "Golden Monday",
           weekOfEthiopianDate: oldFolder.ethiopianDate || "",
           userId: oldFolder.createdBy,
-          userName: oldFolder.createdByName,
+          userName: oldFolder.createdByName || "System",
         });
         console.log(`   📁 Week folder: ${weekFolder._id}`);
 
@@ -115,7 +120,7 @@ const migrate = async () => {
             weekFolder,
             fileType,
             userId: oldFolder.createdBy,
-            userName: oldFolder.createdByName,
+            userName: oldFolder.createdByName || "System",
           });
 
           // Reassign photos to the new type folder
@@ -164,9 +169,12 @@ const migrate = async () => {
       console.log("⚠️ Some folders failed to migrate. Check the logs above.");
     }
 
+    await mongoose.disconnect();
+    console.log("✅ Disconnected from MongoDB");
     process.exit(0);
   } catch (error) {
     console.error("❌ Migration failed:", error);
+    await mongoose.disconnect().catch(() => {});
     process.exit(1);
   }
 };
