@@ -135,7 +135,8 @@ export default function ReportExport({ sessionId }) {
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
 
-      const doc = new jsPDF("p", "mm", "a4");
+      // Use LANDSCAPE orientation for more width
+      const doc = new jsPDF("l", "mm", "a4");
       const pageWidth = doc.internal.pageSize.getWidth();
 
       // Title
@@ -212,20 +213,20 @@ export default function ReportExport({ sessionId }) {
         // Check if any attendance has signatures
         const hasSignatures = presentWithSignatures.length > 0;
 
-        // Table headers
+        // Table headers - shorter names to save space
         const headers = [
           ct("name", "Name"),
-          ct("department", "Department"),
+          ct("dept", "Dept"),
           ct("email", "Email"),
           ct("status", "Status"),
-          gt("signature", "Signature"),
+          gt("sig", "Sig"),
         ];
 
-        // Column widths - REDUCED signature column width
-        const colWidths = [35, 30, 45, 25, 25]; // Signature column reduced from 40 to 25
+        // Column widths - MUCH REDUCED for landscape
+        const colWidths = [30, 25, 50, 20, 18];
 
         // Row height for signatures (smaller)
-        const signatureRowHeight = hasSignatures ? 10 : 8;
+        const signatureRowHeight = hasSignatures ? 9 : 7;
 
         // Build table data
         const tableData = sortedAttendance.map((a) => {
@@ -266,7 +267,7 @@ export default function ReportExport({ sessionId }) {
           ),
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 7, cellPadding: 1.5 },
+          styles: { fontSize: 6, cellPadding: 1 },
           columnStyles: {
             0: { cellWidth: colWidths[0] },
             1: { cellWidth: colWidths[1] },
@@ -285,7 +286,7 @@ export default function ReportExport({ sessionId }) {
               ) {
                 data.cell.styles = {
                   cellWidth: colWidths[4],
-                  minCellHeight: 8,
+                  minCellHeight: 7,
                 };
               }
             }
@@ -303,10 +304,9 @@ export default function ReportExport({ sessionId }) {
                   cellData.signature.length > 100
                 ) {
                   try {
-                    // Make signature smaller - use less than half the cell width/height
-                    const width = Math.min(data.cell.width - 2, 18); // Max 18mm
-                    const height = Math.min(data.cell.height - 2, 6); // Max 6mm
-                    // Center the signature in the cell
+                    // Make signature VERY small
+                    const width = Math.min(data.cell.width - 2, 12);
+                    const height = Math.min(data.cell.height - 2, 5);
                     const offsetX = (data.cell.width - width) / 2;
                     const offsetY = (data.cell.height - height) / 2;
                     doc.addImage(
@@ -319,10 +319,9 @@ export default function ReportExport({ sessionId }) {
                     );
                   } catch (imgError) {
                     console.warn("Could not add signature image:", imgError);
-                    // Fallback: draw a checkmark
-                    doc.setFontSize(8);
+                    doc.setFontSize(6);
                     doc.setTextColor(26, 58, 173);
-                    doc.text("✓", data.cell.x + 4, data.cell.y + 6);
+                    doc.text("✓", data.cell.x + 4, data.cell.y + 5);
                   }
                 }
               }
@@ -362,7 +361,7 @@ export default function ReportExport({ sessionId }) {
           body: sessionData,
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 7 },
+          styles: { fontSize: 6 },
         });
       }
 
@@ -393,7 +392,7 @@ export default function ReportExport({ sessionId }) {
           body: galleryData,
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 7 },
+          styles: { fontSize: 6 },
         });
       }
 
