@@ -293,6 +293,7 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
 });
 
 // POST /api/golden-monday/:sessionId/attendance
+// POST /api/golden-monday/:sessionId/attendance
 router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   try {
     const {
@@ -310,6 +311,10 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
     console.log("  signatureType:", signatureType);
     console.log("  hasSignature:", !!signature);
     console.log("  signature length:", signature?.length || 0);
+    console.log(
+      "  signature preview:",
+      signature ? signature.substring(0, 100) + "..." : "null",
+    );
 
     if (!userId) {
       console.log("❌ [ATTENDANCE] Missing userId");
@@ -339,8 +344,18 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       console.log("📝 [ATTENDANCE] Updating existing record");
       attendance.attended = true;
       attendance.checkedInAt = new Date();
-      if (signature) attendance.signature = signature;
-      if (signatureType) attendance.signatureType = signatureType;
+      // ✅ IMPORTANT: Save signature even if it's a string
+      if (signature && signature.length > 0) {
+        attendance.signature = signature;
+        attendance.signatureType = signatureType || "draw";
+        console.log(
+          "✅ [ATTENDANCE] Signature saved (length:",
+          signature.length,
+          ")",
+        );
+      } else {
+        console.log("⚠️ [ATTENDANCE] No signature provided");
+      }
       if (signatureText) attendance.signatureText = signatureText;
       if (feedback) attendance.feedback = feedback;
       if (rating) attendance.rating = rating;
@@ -365,8 +380,16 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       });
       await attendance.save();
       console.log("✅ [ATTENDANCE] New attendance created:", attendance._id);
+      if (attendance.signature) {
+        console.log(
+          "✅ [ATTENDANCE] Signature saved (length:",
+          attendance.signature.length,
+          ")",
+        );
+      }
     }
 
+    // Also update session attendees
     const existingAttendee = session.attendees.find(
       (a) => a.user.toString() === userId,
     );

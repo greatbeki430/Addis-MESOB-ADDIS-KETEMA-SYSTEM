@@ -162,24 +162,25 @@ export default function SignatureModal({
   }, []);
 
   const handleConfirm = useCallback(() => {
+    console.log("📝 [SIGNATURE MODAL] Confirm clicked");
+    console.log("📝 [SIGNATURE MODAL] hasSignature:", !!signatureData);
     console.log(
-      "📝 [SIGNATURE MODAL] Confirm clicked, hasSignature:",
-      !!signatureData,
-    );
-    console.log(
-      "📝 [SIGNATURE MODAL] Signature length:",
+      "📝 [SIGNATURE MODAL] signatureData length:",
       signatureData?.length || 0,
     );
+
     if (signatureData) {
       console.log(
+        "📝 [SIGNATURE MODAL] Signature is data URL:",
+        signatureData.startsWith("data:image"),
+      );
+      console.log(
         "📝 [SIGNATURE MODAL] Signature preview:",
-        signatureData.substring(0, 50) + "...",
+        signatureData.substring(0, 80) + "...",
       );
       onConfirm(signatureData);
     } else {
-      console.log(
-        "📝 [SIGNATURE MODAL] No signature data - confirming without signature",
-      );
+      console.log("📝 [SIGNATURE MODAL] No signature - confirming without");
       onConfirm(null);
     }
   }, [signatureData, onConfirm]);
