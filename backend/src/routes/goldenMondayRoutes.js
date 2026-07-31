@@ -28,6 +28,7 @@ const GoldenMondaySession = require("../models/GoldenMondaySession");
 const GoldenMondayPresenter = require("../models/GoldenMondayPresenter");
 const GoldenMondayAttendance = require("../models/GoldenMondayAttendance");
 const GoldenMondayGallery = require("../models/GoldenMondayGallery");
+const GoldenMondayFolder = require("../models/GoldenMondayFolder"); // ✅ NEW
 const User = require("../models/User");
 
 // ── Sessions ────────────────────────────────────────────────
@@ -204,7 +205,7 @@ router.get("/pillars", protect, anyRole, async (req, res) => {
 router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   try {
     console.log("📊 [GET ATTENDANCE] Session ID:", req.params.sessionId);
-    
+
     const attendance = await GoldenMondayAttendance.find({
       session: req.params.sessionId,
     })
@@ -216,16 +217,27 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       isEligible: true,
     }).select("user name email department");
 
-    console.log("📊 [GET ATTENDANCE] Found", allEmployees.length, "employees in roster");
-    console.log("📊 [GET ATTENDANCE] Found", attendance.length, "attendance records");
+    console.log(
+      "📊 [GET ATTENDANCE] Found",
+      allEmployees.length,
+      "employees in roster",
+    );
+    console.log(
+      "📊 [GET ATTENDANCE] Found",
+      attendance.length,
+      "attendance records",
+    );
 
     // Build report with all employees
     const report = allEmployees.map((emp) => {
       // Find if this employee has an attendance record
       const record = attendance.find(
-        (a) => a.user && emp.user && a.user._id.toString() === emp.user._id.toString(),
+        (a) =>
+          a.user &&
+          emp.user &&
+          a.user._id.toString() === emp.user._id.toString(),
       );
-      
+
       return {
         user: emp.user,
         userId: emp.user?._id || emp._id,
@@ -360,9 +372,9 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   } catch (error) {
     console.error("❌ [POST ATTENDANCE] Error:", error);
     console.error("❌ [POST ATTENDANCE] Stack:", error.stack);
-    res.status(500).json({ 
+    res.status(500).json({
       error: error.message,
-      stack: process.env.NODE_ENV === "development" ? error.stack : undefined
+      stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
     });
   }
 });
@@ -432,16 +444,118 @@ router.post(
 );
 
 // ──────────────────────────────────────────────────────────────
+// 📁 GALLERY FOLDERS  (✅ NEW — Ethiopian Date + Topic grouping)
+//
+// GalleryUploader.jsx already calls createFolder() before uploading, and
+// GalleryGrid.jsx already calls getFolders() at the gallery root — these
+// two routes are what was missing on the backend to make both work.
+// ──────────────────────────────────────────────────────────────
+
+// GET /api/golden-monday/gallery/folders
+router.get("/gallery/folders", protect, anyRole, async (req, res) => {
+  try {
+    const { category, limit = 20, page = 1 } = req.query;
+    const filter = {};
+    if (category && category !== "all") filter.category = category;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [folders, total] = await Promise.all([
+      GoldenMondayFolder.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      GoldenMondayFolder.countDocuments(filter),
+    ]);
+
+    // Shaped to match exactly what GalleryItem.jsx reads for a folder:
+    // item.title, item.coverPhoto, item.count (and item.url is absent,
+    // which is how GalleryItem/GalleryGrid distinguish "folder" from "photo").
+    const shaped = folders.map((f) => ({
+      _id: f._id,
+      title: f.name,
+      topic: f.topic,
+      ethiopianDate: f.ethiopianDate,
+      category: f.category,
+      coverPhoto: f.coverPhoto,
+      count: f.count,
+      createdAt: f.createdAt,
+    }));
+
+    res.json({
+      folders: shaped,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.max(1, Math.ceil(total / parseInt(limit))),
+      },
+    });
+  } catch (error) {
+    console.error("❌ [GET GALLERY FOLDERS] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/golden-monday/gallery/folders
+// Idempotent find-or-create, matching what GalleryUploader.jsx already
+// assumes: either the success path returns a usable folderId, or (on a
+// race where two uploads create "the same" folder at once) the duplicate
+// path still resolves to the winning folder's ID rather than erroring out.
+router.post("/gallery/folders", protect, leaderOrAdmin, async (req, res) => {
+  try {
+    const { name, ethiopianDate, topic, category } = req.body;
+
+    if (!name || !topic) {
+      return res.status(400).json({ error: "name and topic are required" });
+    }
+
+    let folder = await GoldenMondayFolder.findOne({ name: name.trim() });
+
+    if (!folder) {
+      try {
+        folder = await GoldenMondayFolder.create({
+          name: name.trim(),
+          ethiopianDate: ethiopianDate || "",
+          topic: topic.trim(),
+          category: category || "other",
+          createdBy: req.user._id,
+          createdByName: req.user.name,
+        });
+      } catch (createError) {
+        // Unique-index race: someone else created the same-named folder
+        // between our findOne() and create() calls. Fetch and use theirs.
+        if (createError.code === 11000) {
+          folder = await GoldenMondayFolder.findOne({ name: name.trim() });
+        } else {
+          throw createError;
+        }
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      folderId: folder._id,
+      folder,
+    });
+  } catch (error) {
+    console.error("❌ [CREATE FOLDER] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
 // GALLERY ROUTES
 // ──────────────────────────────────────────────────────────────
 
 // GET /api/golden-monday/gallery
 router.get("/gallery", protect, anyRole, async (req, res) => {
   try {
-    const { category, session, limit = 50, page = 1 } = req.query;
+    const { category, session, folderId, limit = 50, page = 1 } = req.query;
     const filter = {};
     if (category) filter.category = category;
     if (session) filter.session = session;
+    if (folderId) filter.folder = folderId; // ✅ NEW — powers "inside a folder" view
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -480,6 +594,7 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
       category,
       tags,
       sessionId,
+      folderId, // ✅ NEW
       photoDate,
     } = req.body;
 
@@ -503,6 +618,7 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
 
     const galleryPhoto = new GoldenMondayGallery({
       session: sessionId || null,
+      folder: folderId || null, // ✅ NEW
       title: title || "",
       description: description || "",
       caption: caption || "",
@@ -522,6 +638,14 @@ router.post("/gallery", protect, leaderOrAdmin, async (req, res) => {
     });
 
     await galleryPhoto.save();
+
+    // ✅ NEW: keep the folder's denormalized cover photo + count in sync
+    if (folderId) {
+      await GoldenMondayFolder.findByIdAndUpdate(folderId, {
+        $inc: { count: 1 },
+        $set: { coverPhoto: thumbnailResult.secure_url },
+      });
+    }
 
     if (sessionId) {
       const session = await GoldenMondaySession.findById(sessionId);
@@ -561,7 +685,27 @@ router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
       await cloudinary.uploader.destroy(photo.thumbnailPublicId);
     }
 
+    const folderId = photo.folder; // capture before deleteOne()
     await photo.deleteOne();
+
+    // ✅ NEW: keep the folder's count/cover in sync; remove the folder
+    // once it's empty so the folder grid never shows a ghost 0-photo
+    // folder.
+    if (folderId) {
+      const folder = await GoldenMondayFolder.findById(folderId);
+      if (folder) {
+        folder.count = Math.max(0, folder.count - 1);
+        if (folder.count === 0) {
+          await folder.deleteOne();
+        } else {
+          const latest = await GoldenMondayGallery.findOne({
+            folder: folderId,
+          }).sort({ createdAt: -1 });
+          folder.coverPhoto = latest?.thumbnailUrl || "";
+          await folder.save();
+        }
+      }
+    }
 
     res.json({ success: true, message: "Photo deleted successfully" });
   } catch (error) {
@@ -592,19 +736,19 @@ router.get("/debug/roster", protect, async (req, res) => {
     const roster = await GoldenMondayPresenter.find()
       .populate("user", "name email _id")
       .lean();
-    
+
     console.log("🔍 [DEBUG] Roster count:", roster.length);
-    res.json({ 
-      count: roster.length, 
-      roster: roster.map(r => ({
+    res.json({
+      count: roster.length,
+      roster: roster.map((r) => ({
         id: r._id,
         userId: r.user?._id,
         userName: r.user?.name,
         email: r.user?.email,
         name: r.name,
         department: r.department,
-        isEligible: r.isEligible
-      }))
+        isEligible: r.isEligible,
+      })),
     });
   } catch (error) {
     console.error("❌ [DEBUG ROSTER] Error:", error);
@@ -615,15 +759,18 @@ router.get("/debug/roster", protect, async (req, res) => {
 // DEBUG: Check attendance data for a session
 router.get("/debug/attendance/:sessionId", protect, async (req, res) => {
   try {
-    console.log("🔍 [DEBUG] Fetching attendance for session:", req.params.sessionId);
+    console.log(
+      "🔍 [DEBUG] Fetching attendance for session:",
+      req.params.sessionId,
+    );
     const attendance = await GoldenMondayAttendance.find({
       session: req.params.sessionId,
     }).populate("user", "name email _id");
-    
+
     console.log("🔍 [DEBUG] Attendance count:", attendance.length);
-    res.json({ 
-      count: attendance.length, 
-      attendance: attendance.map(a => ({
+    res.json({
+      count: attendance.length,
+      attendance: attendance.map((a) => ({
         id: a._id,
         userId: a.user?._id,
         userName: a.user?.name,
@@ -631,8 +778,8 @@ router.get("/debug/attendance/:sessionId", protect, async (req, res) => {
         attended: a.attended,
         signature: a.signature ? "✅ Has signature" : "❌ No signature",
         signatureType: a.signatureType,
-        checkedInAt: a.checkedInAt
-      }))
+        checkedInAt: a.checkedInAt,
+      })),
     });
   } catch (error) {
     console.error("❌ [DEBUG ATTENDANCE] Error:", error);
@@ -646,14 +793,14 @@ router.get("/debug/users", protect, async (req, res) => {
     console.log("🔍 [DEBUG] Fetching all users...");
     const users = await User.find().select("name email role _id");
     console.log("🔍 [DEBUG] Users count:", users.length);
-    res.json({ 
-      count: users.length, 
-      users: users.map(u => ({
+    res.json({
+      count: users.length,
+      users: users.map((u) => ({
         id: u._id,
         name: u.name,
         email: u.email,
-        role: u.role
-      }))
+        role: u.role,
+      })),
     });
   } catch (error) {
     console.error("❌ [DEBUG USERS] Error:", error);

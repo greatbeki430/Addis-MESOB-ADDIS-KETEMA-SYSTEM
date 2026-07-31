@@ -339,6 +339,13 @@ export const goldenMondayAPI = {
   deleteGalleryPhoto: (photoId) =>
     api.delete(`/golden-monday/gallery/${photoId}`),
 
+  // ✅ NEW — GET /api/golden-monday/gallery/folders - list folders
+  // (grouped by Ethiopian date + topic)
+  getFolders: (params) => api.get("/golden-monday/gallery/folders", { params }),
+
+  // ✅ NEW — POST /api/golden-monday/gallery/folders - find-or-create a folder
+  createFolder: (data) => api.post("/golden-monday/gallery/folders", data),
+
   // ──────────────────────────────────────────────────────────────
   // 🎥 RECORDINGS MANAGEMENT
   // ──────────────────────────────────────────────────────────────
