@@ -2,12 +2,10 @@
 // One-time migration script: converts old date+topic folders to the new
 // two-level weekly model. Run via: node backend/src/scripts/migrateGoldenMondayFolders.js
 
-const path = require("path");
-// Load .env from the root directory (3 levels up from backend/src/scripts)
-require("dotenv").config({ path: path.resolve(__dirname, "../../../.env") });
+// Simple dotenv load - let it find .env automatically
+require("dotenv").config();
 
 const mongoose = require("mongoose");
-// ✅ CORRECT PATHS - from src/scripts/, go up to src/, then into models/
 const GoldenMondayFolder = require("../models/GoldenMondayFolder");
 const GoldenMondayGallery = require("../models/GoldenMondayGallery");
 const {
@@ -22,11 +20,30 @@ const MONGODB_URI = process.env.MONGO_URI;
 if (!MONGODB_URI) {
   console.error("❌ MONGO_URI not set in .env");
   console.error("📁 Current directory:", __dirname);
-  console.error("📁 .env path:", path.resolve(__dirname, "../../../.env"));
+  console.error(
+    "🔍 Checking if .env exists at:",
+    require("path").resolve(__dirname, "../../../.env"),
+  );
+  const fs = require("fs");
+  const envPath = require("path").resolve(__dirname, "../../../.env");
+  if (fs.existsSync(envPath)) {
+    console.log("✅ .env file exists at:", envPath);
+    console.log("📄 Reading .env content...");
+    const envContent = fs.readFileSync(envPath, "utf8");
+    console.log(
+      "📄 .env contains MONGO_URI:",
+      envContent.includes("MONGO_URI") ? "✅ Yes" : "❌ No",
+    );
+  } else {
+    console.log("❌ .env file NOT found at:", envPath);
+  }
   process.exit(1);
 }
 
 console.log("📡 Connecting to MongoDB...");
+console.log(
+  `📡 Using MONGO_URI: ${MONGODB_URI.replace(/\/\/.*@/, "//****:****@")}`,
+);
 
 const migrate = async () => {
   console.log("🔄 Starting Golden Monday folder migration...");
