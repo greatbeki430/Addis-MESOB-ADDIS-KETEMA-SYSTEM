@@ -281,7 +281,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   }, [getCategoryLabel, loadGallery, onRefresh]);
 
   // ─── AI & Upload Logic ──
-  // ─── AI & Upload Logic ──
   const analyzeAndCategorizePhoto = useCallback(
     async (imageData) => {
       try {
@@ -295,7 +294,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         return { category: "other", confidence: 0 };
       }
     },
-    [sessionId], // ✅ sessionId is a dependency
+    [sessionId],
   );
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -321,8 +320,18 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         setIsAIAnalyzing(false);
       }
     },
-    [analyzeAndCategorizePhoto], // ✅ Fixed: Now depends on analyzeAndCategorizePhoto
+    [analyzeAndCategorizePhoto],
   );
+
+  // ✅ Helper: Convert file to base64 (moved BEFORE processUploadQueue)
+  const fileToBase64 = useCallback((file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }, []);
 
   // Handle multiple file selection (Kickstarts the Uploader modal)
   const handleFileSelect = (e) => {
@@ -354,87 +363,124 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     e.target.value = "";
   };
 
-  // Process upload queue (Triggered from the Modal after topic input)
-  const processUploadQueue = async (folderId, topic) => {
-    if (uploading || uploadQueue.length === 0) return;
-    setUploading(true);
+  // ✅ Professional parallel upload processing with concurrency control
+  const processUploadQueue = useCallback(
+    async (folderId, topic) => {
+      if (uploading || uploadQueue.length === 0) return;
+      setUploading(true);
 
-    let processed = 0;
-    for (const item of uploadQueue) {
-      try {
-        setUploadQueue((prev) =>
-          prev.map((q) =>
-            q.id === item.id ? { ...q, status: "uploading", progress: 10 } : q,
-          ),
-        );
+      const CONCURRENCY_LIMIT = 3; // Upload 3 files at a time
+      const queue = [...uploadQueue];
+      let processed = 0;
+      let failed = 0;
 
-        const imageData = await fileToBase64(item.file);
-        setUploadQueue((prev) =>
-          prev.map((q) => (q.id === item.id ? { ...q, progress: 30 } : q)),
-        );
-
-        // ✅ Resolved via a function return value, not a reassigned `let`.
-        const wasAutoDetected = !item.category;
-        const detectedCategory = await resolveUploadCategory(item, imageData);
-
-        if (wasAutoDetected) {
+      // Helper to upload a single file
+      const uploadSingleFile = async (item) => {
+        try {
+          // Update status
           setUploadQueue((prev) =>
             prev.map((q) =>
               q.id === item.id
-                ? { ...q, progress: 50, aiCategory: detectedCategory }
+                ? { ...q, status: "uploading", progress: 10 }
                 : q,
             ),
           );
+
+          const imageData = await fileToBase64(item.file);
+
+          setUploadQueue((prev) =>
+            prev.map((q) => (q.id === item.id ? { ...q, progress: 30 } : q)),
+          );
+
+          // Get AI category if needed
+          const wasAutoDetected = !item.category;
+          const detectedCategory = await resolveUploadCategory(item, imageData);
+
+          if (wasAutoDetected) {
+            setUploadQueue((prev) =>
+              prev.map((q) =>
+                q.id === item.id
+                  ? { ...q, progress: 50, aiCategory: detectedCategory }
+                  : q,
+              ),
+            );
+          }
+
+          // Upload with progress tracking
+          await goldenMondayAPI.uploadGalleryPhoto({
+            image: imageData,
+            folderId: folderId,
+            category: detectedCategory,
+            sessionId: sessionId || undefined,
+            lang: language,
+          });
+
+          processed++;
+          setUploadQueue((prev) =>
+            prev.map((q) =>
+              q.id === item.id
+                ? { ...q, status: "completed", progress: 100 }
+                : q,
+            ),
+          );
+
+          // Remove from queue after delay
+          setTimeout(() => {
+            setUploadQueue((prev) => prev.filter((q) => q.id !== item.id));
+          }, 1500);
+
+          return { success: true, item };
+        } catch (error) {
+          console.error(`Upload error for ${item.file.name}:`, error);
+          failed++;
+          setUploadQueue((prev) =>
+            prev.map((q) =>
+              q.id === item.id ? { ...q, status: "error", progress: 0 } : q,
+            ),
+          );
+          return { success: false, item, error };
         }
+      };
 
-        await goldenMondayAPI.uploadGalleryPhoto({
-          image: imageData,
-          folderId: folderId, // Associate with the created folder
-          category: detectedCategory,
-          sessionId: sessionId || undefined,
-          lang: language,
-        });
-
-        processed++;
-        setUploadQueue((prev) =>
-          prev.map((q) =>
-            q.id === item.id ? { ...q, status: "completed", progress: 100 } : q,
-          ),
-        );
-        setTimeout(() => {
-          setUploadQueue((prev) => prev.filter((q) => q.id !== item.id));
-        }, 1500);
-      } catch (error) {
-        console.error("Upload error:", error);
-        setUploadQueue((prev) =>
-          prev.map((q) => (q.id === item.id ? { ...q, status: "error" } : q)),
-        );
+      // ✅ Process files in parallel with concurrency limit
+      const chunks = [];
+      for (let i = 0; i < queue.length; i += CONCURRENCY_LIMIT) {
+        chunks.push(queue.slice(i, i + CONCURRENCY_LIMIT));
       }
-    }
 
-    if (processed > 0) {
-      showToast(
-        `Successfully uploaded ${processed} image(s) to "${topic}"`,
-        "success",
-      );
-      await loadGallery();
-      if (onRefresh) onRefresh();
-    }
-    setUploading(false);
-  };
+      for (const chunk of chunks) {
+        await Promise.all(chunk.map((item) => uploadSingleFile(item)));
+      }
+
+      // Final summary
+      if (processed > 0) {
+        const message = `Successfully uploaded ${processed} image(s) to "${topic}"`;
+        if (failed > 0) {
+          showToast(`${message} (${failed} failed)`, "warning");
+        } else {
+          showToast(message, "success");
+        }
+        await loadGallery();
+        if (onRefresh) onRefresh();
+      }
+
+      setUploading(false);
+    },
+    [
+      uploadQueue,
+      uploading,
+      resolveUploadCategory,
+      fileToBase64,
+      sessionId,
+      language,
+      loadGallery,
+      onRefresh,
+    ],
+  );
 
   // Remove a file from queue
   const removeFromQueue = (id) => {
     setUploadQueue((prev) => prev.filter((q) => q.id !== id));
-  };
-
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
   };
 
   // ─── Delete Modal Logic ──
