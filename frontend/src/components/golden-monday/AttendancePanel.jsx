@@ -83,14 +83,30 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
     if (onRefresh) onRefresh();
   };
 
-  // ✅ UPDATED: Handle signature from modal
+  // ✅ UPDATED: Handle signature from modal with debug logging
   const handleSignAttendance = async (userId, signatureData) => {
+    // 🔍 DEBUG: Log the signature data being sent
+    console.log("📝 [SIGNATURE] Sending signature for user:", userId);
+    console.log("📝 [SIGNATURE] Signature length:", signatureData?.length || 0);
+    console.log("📝 [SIGNATURE] Signature type:", typeof signatureData);
+    console.log(
+      "📝 [SIGNATURE] Signature preview:",
+      signatureData?.substring(0, 100) + "...",
+    );
+    console.log(
+      "📝 [SIGNATURE] Is valid data URL:",
+      signatureData?.startsWith("data:image") || false,
+    );
+
     try {
-      await goldenMondayAPI.recordAttendance(sessionId, {
+      const payload = {
         userId,
         signature: signatureData,
         signatureType: signatureData ? "draw" : "none",
-      });
+      };
+      console.log("📝 [SIGNATURE] Full payload:", payload);
+
+      await goldenMondayAPI.recordAttendance(sessionId, payload);
       showToast(
         t.attendanceRecorded || "Attendance recorded successfully!",
         "success",
@@ -100,7 +116,7 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
       await loadAttendance();
       if (onRefresh) onRefresh();
     } catch (error) {
-      console.error("Failed to record attendance:", error);
+      console.error("❌ [SIGNATURE] Failed to record attendance:", error);
       showToast(
         t.failedToRecordAttendance || "Failed to record attendance",
         "error",
