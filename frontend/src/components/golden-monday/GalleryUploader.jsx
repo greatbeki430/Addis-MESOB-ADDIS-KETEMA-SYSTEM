@@ -68,7 +68,6 @@ export default function GalleryUploader({
   category,
   uploadQueue,
   onUploadComplete,
-  uploading,
 }) {
   const [uploadTopic, setUploadTopic] = useState("");
   const [isCreating, setIsCreating] = useState(false);
@@ -77,7 +76,7 @@ export default function GalleryUploader({
 
   const handleUpload = async () => {
     if (uploadQueue.length === 0) {
-      showToast("Please select at least one photo", "error");
+      showToast("Please select at least one file", "error");
       return;
     }
     if (!uploadTopic.trim()) {
@@ -86,10 +85,12 @@ export default function GalleryUploader({
     }
 
     setIsCreating(true);
-    const dateStr = getEthiopianDateString();
-    const folderName = `${dateStr} - ${uploadTopic}`;
 
     try {
+      // Get the week folder (the backend will handle find-or-create)
+      const dateStr = getEthiopianDateString();
+      const folderName = `${dateStr} - ${uploadTopic}`;
+
       let folderId = null;
       try {
         const folderRes = await goldenMondayAPI.createFolder({
@@ -113,11 +114,14 @@ export default function GalleryUploader({
         throw new Error("Failed to create folder");
       }
 
-      // ✅ Start the upload process with parallel processing
+      // ✅ CLOSE MODAL IMMEDIATELY after folder creation
+      // The upload progress will continue in the background via the queue
+      onClose();
+
+      // Start the upload process
       await onUploadComplete(folderId, uploadTopic);
 
       setUploadTopic("");
-      // Don't close immediately - let uploads finish
     } catch (error) {
       console.error("Folder creation failed:", error);
       showToast("Failed to create folder. Please try again.", "error");
@@ -126,10 +130,10 @@ export default function GalleryUploader({
     }
   };
 
-  // ✅ Allow closing only if not uploading
+  // ✅ Allow closing only if not currently creating
   const handleClose = () => {
-    if (uploading) {
-      showToast("Please wait for uploads to complete", "warning");
+    if (isCreating) {
+      showToast("Please wait for folder creation to complete", "warning");
       return;
     }
     setUploadTopic("");
@@ -182,7 +186,7 @@ export default function GalleryUploader({
           placeholder="Ex: Leadership Training - Team A"
           value={uploadTopic}
           onChange={(e) => setUploadTopic(e.target.value)}
-          disabled={uploading}
+          disabled={isCreating}
           style={{
             width: "100%",
             padding: "10px 12px",
@@ -190,14 +194,14 @@ export default function GalleryUploader({
             border: `1px solid ${C.border}`,
             marginBottom: 16,
             fontSize: 14,
-            background: uploading ? "#f5f5f5" : "white",
+            background: isCreating ? "#f5f5f5" : "white",
           }}
           autoFocus
         />
 
         <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
           {uploadQueue.length} file(s) selected for upload.
-          {uploading && (
+          {isCreating && (
             <span style={{ marginLeft: 8, color: C.primary }}>
               <FiLoader
                 size={14}
@@ -206,7 +210,7 @@ export default function GalleryUploader({
                   display: "inline-block",
                 }}
               />
-              Uploading...
+              Creating folder...
             </span>
           )}
         </div>
@@ -214,21 +218,21 @@ export default function GalleryUploader({
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button
             onClick={handleClose}
-            disabled={uploading}
+            disabled={isCreating}
             style={{
               padding: "8px 16px",
               background: "transparent",
               border: `1px solid ${C.border}`,
               borderRadius: 6,
-              cursor: uploading ? "not-allowed" : "pointer",
-              opacity: uploading ? 0.5 : 1,
+              cursor: isCreating ? "not-allowed" : "pointer",
+              opacity: isCreating ? 0.5 : 1,
             }}
           >
             Cancel
           </button>
           <button
             onClick={handleUpload}
-            disabled={!uploadTopic.trim() || isCreating || uploading}
+            disabled={!uploadTopic.trim() || isCreating}
             style={{
               padding: "8px 20px",
               background: C.primary,
@@ -236,11 +240,9 @@ export default function GalleryUploader({
               border: "none",
               borderRadius: 6,
               cursor:
-                !uploadTopic.trim() || isCreating || uploading
-                  ? "not-allowed"
-                  : "pointer",
+                !uploadTopic.trim() || isCreating ? "not-allowed" : "pointer",
               fontWeight: 600,
-              opacity: !uploadTopic.trim() || isCreating || uploading ? 0.6 : 1,
+              opacity: !uploadTopic.trim() || isCreating ? 0.6 : 1,
               display: "flex",
               alignItems: "center",
               gap: 6,
@@ -253,14 +255,6 @@ export default function GalleryUploader({
                   style={{ animation: "spin 1s linear infinite" }}
                 />
                 Creating...
-              </>
-            ) : uploading ? (
-              <>
-                <FiLoader
-                  size={16}
-                  style={{ animation: "spin 1s linear infinite" }}
-                />
-                Uploading...
               </>
             ) : (
               <>

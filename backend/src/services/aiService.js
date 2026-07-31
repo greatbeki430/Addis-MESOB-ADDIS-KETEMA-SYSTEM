@@ -1025,6 +1025,68 @@ Under 250 words. Plain text, no markdown.`;
 };
 
 // ============================================================
+// 16. GOLDEN MONDAY — GALLERY DOCUMENT CATEGORIZATION (text-based)
+// Used for PDFs/Word docs, where vision isn't an option. Routes through
+// the full Gemini → Groq → Cohere → DeepSeek text chain, since none of
+// this needs vision capability.
+// ============================================================
+const categorizeGalleryDocumentText = async (
+  extractedText,
+  existingCategoryNames = [],
+) => {
+  const categoryList =
+    existingCategoryNames.length > 0
+      ? existingCategoryNames.join(", ")
+      : "flag-raising, presentation, group-photo, attendees, event, other";
+
+  const prompt = `This text was extracted from a document uploaded to the Golden Monday
+staff event gallery at Addis MESOB.
+
+Existing categories: ${categoryList}
+
+Document text (may be truncated):
+"""
+${extractedText.slice(0, 3000)}
+"""
+
+Decide which existing category best fits. If none fit reasonably well,
+propose one new short category name (2-4 words) instead.
+
+Return ONLY valid JSON (no markdown fences):
+{
+  "category": "best existing category, or your proposed new name if none fit",
+  "isNewCategory": true or false,
+  "confidence": 0.0 to 1.0,
+  "summary": "one sentence describing the document"
+}`;
+
+  try {
+    const text = await generateText(prompt);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      return {
+        category: "other",
+        isNewCategory: false,
+        confidence: 0.3,
+        summary: "",
+      };
+    }
+    return JSON.parse(jsonMatch[0]);
+  } catch (err) {
+    console.error(
+      "[aiService] Gallery document categorization failed:",
+      err.message,
+    );
+    return {
+      category: "other",
+      isNewCategory: false,
+      confidence: 0,
+      summary: "AI categorization unavailable.",
+    };
+  }
+};
+
+// ============================================================
 // 10. CITIZEN COMPLAINT CATEGORIZER
 // ============================================================
 const categorizeComplaint = async (complaintText) => {
@@ -1225,4 +1287,5 @@ module.exports = {
   generateGoldenMondayRecap,
   generateGoldenMondayTopics,
   generatePresentationTopicIdeas,
+  categorizeGalleryDocumentText,
 };

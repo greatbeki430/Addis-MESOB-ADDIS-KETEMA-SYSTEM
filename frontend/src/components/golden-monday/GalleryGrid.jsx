@@ -338,14 +338,89 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
-    const validFiles = files.filter((file) => {
-      if (!file.type.startsWith("image/")) return false;
-      if (file.size > 10 * 1024 * 1024) return false;
-      return true;
-    });
+    // Define allowed types and their size limits
+    const allowedTypes = {
+      image: { mimes: ["image/"], maxSize: 10 * 1024 * 1024, label: "Images" },
+      pdf: {
+        mimes: ["application/pdf"],
+        maxSize: 10 * 1024 * 1024,
+        label: "PDFs",
+      },
+      presentation: {
+        mimes: [
+          "application/vnd.ms-powerpoint",
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ],
+        maxSize: 10 * 1024 * 1024,
+        label: "Presentations",
+      },
+      document: {
+        mimes: [
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
+        maxSize: 10 * 1024 * 1024,
+        label: "Documents",
+      },
+      video: { mimes: ["video/"], maxSize: 100 * 1024 * 1024, label: "Videos" },
+    };
+
+    const validFiles = [];
+    const rejectedFiles = [];
+
+    for (const file of files) {
+      let matchedType = null;
+      let matchedMime = false;
+
+      // Check which type family this file belongs to
+      for (const [typeKey, typeConfig] of Object.entries(allowedTypes)) {
+        if (
+          typeConfig.mimes.some(
+            (mime) =>
+              file.type.startsWith(mime.replace("*", "")) || file.type === mime,
+          )
+        ) {
+          matchedType = typeKey;
+          matchedMime = true;
+          break;
+        }
+      }
+
+      if (!matchedMime) {
+        rejectedFiles.push({
+          name: file.name,
+          reason: `Unsupported file type: ${file.type || "unknown"}`,
+        });
+        continue;
+      }
+
+      const typeConfig = allowedTypes[matchedType];
+      if (file.size > typeConfig.maxSize) {
+        rejectedFiles.push({
+          name: file.name,
+          reason: `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB, max ${(typeConfig.maxSize / 1024 / 1024).toFixed(0)}MB)`,
+        });
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    // Show rejection messages
+    if (rejectedFiles.length > 0) {
+      const messages = rejectedFiles.map((f) => `❌ ${f.name}: ${f.reason}`);
+      showToast(
+        `${rejectedFiles.length} file(s) rejected:\n${messages.join("\n")}`,
+        "warning",
+        { duration: 5000 },
+      );
+    }
 
     if (validFiles.length === 0) {
-      showToast("Please select valid image files under 10MB", "warning");
+      if (rejectedFiles.length === 0) {
+        showToast("No valid files selected", "warning");
+      }
+      e.target.value = "";
       return;
     }
 
@@ -587,16 +662,13 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       {/* Uploader Modal Component */}
       <GalleryUploader
         isOpen={isUploadModalOpen}
-        // onClose={() => setIsUploadModalOpen(false)}
         onClose={() => {
           setIsUploadModalOpen(false);
-          setUploadQueue([]); // ✅ clear the queue so Cancel doesn't leave a stale progress panel
+          setUploadQueue([]);
         }}
         category={category}
         uploadQueue={uploadQueue}
-        setUploadQueue={setUploadQueue}
         onUploadComplete={processUploadQueue}
-        uploading={uploading}
       />
 
       {/* Folder Back Navigation */}
@@ -722,7 +794,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 )}
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/*,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,video/*"
                   multiple
                   onChange={handleFileSelect}
                   style={{ display: "none" }}
