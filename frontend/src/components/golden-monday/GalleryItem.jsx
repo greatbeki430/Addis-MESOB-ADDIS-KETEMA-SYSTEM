@@ -6,7 +6,6 @@ import {
   FiFileText,
   FiVideo,
   FiImage,
-  FiFilePdf,
 } from "react-icons/fi";
 import { C } from "../../styles/theme";
 
@@ -15,12 +14,13 @@ const getFileTypeIcon = (fileType) => {
     case "image":
       return <FiImage size={20} />;
     case "pdf":
-      return <FiFilePdf size={20} />;
+      return <FiFile size={20} style={{ color: "#e74c3c" }} />;
     case "video":
       return <FiVideo size={20} />;
     case "presentation":
+      return <FiFileText size={20} style={{ color: "#f39c12" }} />;
     case "document":
-      return <FiFileText size={20} />;
+      return <FiFileText size={20} style={{ color: "#3498db" }} />;
     default:
       return <FiFile size={20} />;
   }
