@@ -4,8 +4,7 @@ import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
 import { C } from "../../styles/theme";
 import { FiCalendar } from "react-icons/fi";
-import dateAndTime from "date-and-time";
-
+import * as dateAndTime from "date-and-time";
 export default function GalleryUploader({
   isOpen,
   onClose,
