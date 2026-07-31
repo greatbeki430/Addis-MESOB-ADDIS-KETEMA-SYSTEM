@@ -1,6 +1,6 @@
 // backend/src/scripts/migrateGoldenMondayFolders.js
 // One-time migration script: converts old date+topic folders to the new
-// two-level weekly model. Run via: node backend/src/scripts/migrateGoldenMondayFolders.js
+// two-level weekly model.
 
 // Simple dotenv load - let it find .env automatically
 require("dotenv").config();
@@ -8,6 +8,7 @@ require("dotenv").config();
 const mongoose = require("mongoose");
 const GoldenMondayFolder = require("../models/GoldenMondayFolder");
 const GoldenMondayGallery = require("../models/GoldenMondayGallery");
+const User = require("../models/User");
 const {
   mondayOf,
   getOrCreateWeekFolder,
@@ -19,41 +20,29 @@ const MONGODB_URI = process.env.MONGO_URI;
 
 if (!MONGODB_URI) {
   console.error("❌ MONGO_URI not set in .env");
-  console.error("📁 Current directory:", __dirname);
-  console.error(
-    "🔍 Checking if .env exists at:",
-    require("path").resolve(__dirname, "../../../.env"),
-  );
-  const fs = require("fs");
-  const envPath = require("path").resolve(__dirname, "../../../.env");
-  if (fs.existsSync(envPath)) {
-    console.log("✅ .env file exists at:", envPath);
-    console.log("📄 Reading .env content...");
-    const envContent = fs.readFileSync(envPath, "utf8");
-    console.log(
-      "📄 .env contains MONGO_URI:",
-      envContent.includes("MONGO_URI") ? "✅ Yes" : "❌ No",
-    );
-  } else {
-    console.log("❌ .env file NOT found at:", envPath);
-  }
   process.exit(1);
 }
 
 console.log("📡 Connecting to MongoDB...");
-console.log(
-  `📡 Using MONGO_URI: ${MONGODB_URI.replace(/\/\/.*@/, "//****:****@")}`,
-);
 
 const migrate = async () => {
   console.log("🔄 Starting Golden Monday folder migration...");
 
   try {
-    await mongoose.connect(MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    });
+    await mongoose.connect(MONGODB_URI);
     console.log("✅ Connected to MongoDB");
+
+    // Find a default admin user to use for folders without createdBy
+    const defaultUser = await User.findOne({ role: "admin" });
+    if (!defaultUser) {
+      console.error(
+        "❌ No admin user found. Please create an admin user first.",
+      );
+      process.exit(1);
+    }
+    console.log(
+      `👤 Using default user: ${defaultUser.name} (${defaultUser._id})`,
+    );
 
     // 1. Find all old-style folders (no folderType field)
     const oldFolders = await GoldenMondayFolder.find({
@@ -91,13 +80,17 @@ const migrate = async () => {
         const weekOf = mondayOf(referenceDate);
         console.log(`   📅 Week of: ${weekOf.toISOString().slice(0, 10)}`);
 
-        // 3. Get or create the week folder
+        // 3. Get or create the week folder - use default user if createdBy is null
+        const userId = oldFolder.createdBy || defaultUser._id;
+        const userName =
+          oldFolder.createdByName || defaultUser.name || "System";
+
         const weekFolder = await getOrCreateWeekFolder({
           uploadDate: referenceDate,
           topic: oldFolder.topic || "Golden Monday",
           weekOfEthiopianDate: oldFolder.ethiopianDate || "",
-          userId: oldFolder.createdBy,
-          userName: oldFolder.createdByName || "System",
+          userId: userId,
+          userName: userName,
         });
         console.log(`   📁 Week folder: ${weekFolder._id}`);
 
@@ -136,8 +129,8 @@ const migrate = async () => {
           const typeFolder = await getOrCreateTypeFolder({
             weekFolder,
             fileType,
-            userId: oldFolder.createdBy,
-            userName: oldFolder.createdByName || "System",
+            userId: userId,
+            userName: userName,
           });
 
           // Reassign photos to the new type folder
@@ -164,14 +157,15 @@ const migrate = async () => {
 
         migrated++;
         console.log(
-          `   ✅ Migrated folder: ${oldFolder.name} → Week ${weekFolder.weekOf.toISOString().slice(0, 10)}`,
+          `   ✅ Migrated folder: ${oldFolder.name || "Unnamed"} → Week ${weekFolder.weekOf.toISOString().slice(0, 10)}`,
         );
       } catch (err) {
         failed++;
         console.error(
-          `   ❌ Failed to migrate folder ${oldFolder.name}:`,
+          `   ❌ Failed to migrate folder ${oldFolder.name || "Unnamed"}:`,
           err.message,
         );
+        console.error(err.stack);
       }
     }
 
