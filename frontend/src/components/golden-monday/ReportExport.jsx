@@ -77,11 +77,25 @@ export default function ReportExport({ sessionId }) {
     switch (type) {
       case "attendance": {
         const attendanceRes = await goldenMondayAPI.getAttendance(sessionId);
+        // Ensure signature data is properly passed through
+        const attendanceData = attendanceRes.data.attendance || [];
+        // Log for debugging
+        console.log(
+          "📊 Attendance data with signatures:",
+          attendanceData.map((a) => ({
+            name: a.name,
+            hasSignature: !!a.signature,
+            signatureLength: a.signature ? a.signature.length : 0,
+            signaturePreview: a.signature
+              ? a.signature.substring(0, 50) + "..."
+              : "null",
+          })),
+        );
         return {
           title: gt("attendanceReport", "Attendance Report"),
           date: new Date().toISOString(),
           sessionId: sessionId,
-          attendance: attendanceRes.data.attendance || [],
+          attendance: attendanceData,
           stats: attendanceRes.data,
         };
       }
@@ -150,24 +164,18 @@ export default function ReportExport({ sessionId }) {
         doc.text(gt("attendanceReport", "Attendance Report"), 14, yPos);
         yPos += 6;
 
+        const total = data.attendance.length;
+        const present = data.attendance.filter((a) => a.attended).length;
+        const absentCount = total - present;
+        const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+
+        // Summary table with proper data
         const summaryData = [
           [ct("metric", "Metric"), ct("value", "Value")],
-          [
-            ct("total", "Total"),
-            data.stats?.totalEmployees || data.attendance.length,
-          ],
-          [gt("present", "Present"), data.stats?.attendedCount || 0],
-          [
-            gt("absent", "Absent"),
-            (data.stats?.totalEmployees || data.attendance.length) -
-              (data.stats?.attendedCount || 0),
-          ],
-          [
-            gt("attendanceRate", "Attendance Rate"),
-            data.stats?.totalEmployees > 0
-              ? `${Math.round((data.stats?.attendedCount / data.stats?.totalEmployees) * 100)}%`
-              : "0%",
-          ],
+          [ct("total", "Total"), total],
+          [gt("present", "Present"), present],
+          [gt("absent", "Absent"), absentCount],
+          [gt("attendanceRate", "Attendance Rate"), `${rate}%`],
         ];
 
         autoTable(doc, {
@@ -185,20 +193,20 @@ export default function ReportExport({ sessionId }) {
         doc.text(gt("detailedAttendance", "Detailed Attendance"), 14, yPos);
         yPos += 6;
 
-        // Filter attendance to only show present with signatures
+        // Filter attendance - FIX: renamed second 'absent' to 'absentEmployees'
         const presentWithSignatures = data.attendance.filter(
-          (a) => a.attended && a.signature,
+          (a) => a.attended && a.signature && a.signature.length > 100,
         );
         const presentWithoutSignature = data.attendance.filter(
-          (a) => a.attended && !a.signature,
+          (a) => a.attended && (!a.signature || a.signature.length <= 100),
         );
-        const absent = data.attendance.filter((a) => !a.attended);
+        const absentEmployees = data.attendance.filter((a) => !a.attended);
 
         // Combine: present with signatures first, then present without, then absent
         const sortedAttendance = [
           ...presentWithSignatures,
           ...presentWithoutSignature,
-          ...absent,
+          ...absentEmployees,
         ];
 
         // Check if any attendance has signatures
@@ -226,7 +234,7 @@ export default function ReportExport({ sessionId }) {
             : `❌ ${gt("absent", "Absent")}`;
 
           // For present with signature, we'll add a placeholder that will be replaced with image
-          if (a.attended && a.signature) {
+          if (a.attended && a.signature && a.signature.length > 100) {
             return [
               a.name || ct("unknown", "Unknown"),
               a.department || ct("na", "N/A"),
@@ -291,7 +299,9 @@ export default function ReportExport({ sessionId }) {
                 const cellData = rowData[4];
                 if (
                   typeof cellData === "object" &&
-                  cellData.content === "signature"
+                  cellData.content === "signature" &&
+                  cellData.signature &&
+                  cellData.signature.length > 100
                 ) {
                   try {
                     const x = data.cell.x + 2;
@@ -308,6 +318,10 @@ export default function ReportExport({ sessionId }) {
                     );
                   } catch (imgError) {
                     console.warn("Could not add signature image:", imgError);
+                    // Fallback: draw text
+                    doc.setFontSize(6);
+                    doc.setTextColor(100, 100, 100);
+                    doc.text("✓ Signed", data.cell.x + 4, data.cell.y + 8);
                   }
                 }
               }
@@ -429,7 +443,7 @@ export default function ReportExport({ sessionId }) {
             a.department || ct("na", "N/A"),
             a.email || ct("na", "N/A"),
             a.attended ? gt("present", "Present") : gt("absent", "Absent"),
-            a.signature
+            a.signature && a.signature.length > 100
               ? gt("signed", "Signed")
               : gt("notSigned", "Not Signed"),
             a.checkedInAt
@@ -448,26 +462,20 @@ export default function ReportExport({ sessionId }) {
         );
 
         // Stats sheet
-        if (data.stats) {
-          const statsRows = [
-            [ct("metric", "Metric"), ct("value", "Value")],
-            [ct("total", "Total"), data.stats.totalEmployees || 0],
-            [gt("present", "Present"), data.stats.attendedCount || 0],
-            [
-              gt("absent", "Absent"),
-              (data.stats.totalEmployees || 0) -
-                (data.stats.attendedCount || 0),
-            ],
-            [
-              gt("attendanceRate", "Attendance Rate"),
-              data.stats.totalEmployees > 0
-                ? `${Math.round((data.stats.attendedCount / data.stats.totalEmployees) * 100)}%`
-                : "0%",
-            ],
-          ];
-          const statsWs = XLSX.utils.aoa_to_sheet(statsRows);
-          XLSX.utils.book_append_sheet(wb, statsWs, "Stats");
-        }
+        const total = data.attendance.length;
+        const present = data.attendance.filter((a) => a.attended).length;
+        const absentCount = total - present;
+        const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+
+        const statsRows = [
+          [ct("metric", "Metric"), ct("value", "Value")],
+          [ct("total", "Total"), total],
+          [gt("present", "Present"), present],
+          [gt("absent", "Absent"), absentCount],
+          [gt("attendanceRate", "Attendance Rate"), `${rate}%`],
+        ];
+        const statsWs = XLSX.utils.aoa_to_sheet(statsRows);
+        XLSX.utils.book_append_sheet(wb, statsWs, "Stats");
       }
 
       // Sessions data
@@ -582,7 +590,7 @@ export default function ReportExport({ sessionId }) {
       if (data.attendance) {
         const total = data.attendance.length;
         const present = data.attendance.filter((a) => a.attended).length;
-        const absent = total - present;
+        const absentCount = total - present;
         const rate = total > 0 ? Math.round((present / total) * 100) : 0;
 
         htmlContent += `
@@ -591,7 +599,7 @@ export default function ReportExport({ sessionId }) {
             <table>
               <tr><td><strong>${ct("total", "Total")}:</strong></td><td>${total}</td></tr>
               <tr><td><strong>${gt("present", "Present")}:</strong></td><td>${present}</td></tr>
-              <tr><td><strong>${gt("absent", "Absent")}:</strong></td><td>${absent}</td></tr>
+              <tr><td><strong>${gt("absent", "Absent")}:</strong></td><td>${absentCount}</td></tr>
               <tr><td><strong>${gt("attendanceRate", "Attendance Rate")}:</strong></td><td>${rate}%</td></tr>
             </table>
           </div>
@@ -614,9 +622,9 @@ export default function ReportExport({ sessionId }) {
             ? `✅ ${gt("present", "Present")}`
             : `❌ ${gt("absent", "Absent")}`;
 
-          // Signature column: show image if exists, otherwise text - fixed ESLint warning
+          // Signature column: show image if exists, otherwise text
           const signatureHtml =
-            a.attended && a.signature
+            a.attended && a.signature && a.signature.length > 100
               ? `<img src="${a.signature}" class="signature-img" alt="Signature" />`
               : a.attended && !a.signature
                 ? "✗ Not signed"
