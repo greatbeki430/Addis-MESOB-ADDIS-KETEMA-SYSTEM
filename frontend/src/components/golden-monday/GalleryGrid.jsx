@@ -541,7 +541,11 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       {/* Uploader Modal Component */}
       <GalleryUploader
         isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
+        // onClose={() => setIsUploadModalOpen(false)}
+        onClose={() => {
+          setIsUploadModalOpen(false);
+          setUploadQueue([]); // ✅ clear the queue so Cancel doesn't leave a stale progress panel
+        }}
         category={category}
         uploadQueue={uploadQueue}
         setUploadQueue={setUploadQueue}
@@ -653,13 +657,17 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                   opacity: uploading ? 0.6 : 1,
                 }}
               >
-                {uploading || uploadQueue.length > 0 ? (
+                {uploading ? (
                   <>
                     <FiLoader
                       size={14}
                       style={{ animation: "spin 1s linear infinite" }}
                     />{" "}
                     {isAIAnalyzing ? "AI Analyzing..." : "Uploading..."}
+                  </>
+                ) : uploadQueue.length > 0 ? (
+                  <>
+                    <FiClock size={14} /> Awaiting details…
                   </>
                 ) : (
                   <>

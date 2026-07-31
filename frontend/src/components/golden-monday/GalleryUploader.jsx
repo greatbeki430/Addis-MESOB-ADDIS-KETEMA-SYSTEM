@@ -4,44 +4,99 @@ import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
 import { C } from "../../styles/theme";
 import { FiCalendar } from "react-icons/fi";
-import * as dateAndTime from "date-and-time";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ Ethiopian calendar conversion (Gregorian → Ethiopian)
+// Ported from dailyReport.js so both places compute the SAME date, instead
+// of this file using date-and-time's plain Gregorian formatter under a
+// misleading "Ethiopian" function name.
+// ─────────────────────────────────────────────────────────────────────────────
+const ETHIOPIAN_MONTHS_AM = [
+  "መስከረም",
+  "ጥቅምት",
+  "ህዳር",
+  "ታህሳስ",
+  "ጥር",
+  "የካቲት",
+  "መጋቢት",
+  "ሚያዝያ",
+  "ግንቦት",
+  "ሰኔ",
+  "ሐምሌ",
+  "ነሐሴ",
+  "ጳጉሜ",
+];
+
+const JDN_EPOCH_OFFSET_AMETE_MIHRET = 1723856;
+
+function gregorianToJDN(year, month, day) {
+  const a = Math.floor((14 - month) / 12);
+  const y = year + 4800 - a;
+  const m = month + 12 * a - 3;
+  return (
+    day +
+    Math.floor((153 * m + 2) / 5) +
+    365 * y +
+    Math.floor(y / 4) -
+    Math.floor(y / 100) +
+    Math.floor(y / 400) -
+    32045
+  );
+}
+
+function toEthiopianDate(date = new Date()) {
+  const jdn = gregorianToJDN(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    date.getDate(),
+  );
+  const offsetDays = jdn - JDN_EPOCH_OFFSET_AMETE_MIHRET;
+  const r = offsetDays % 1461;
+  const n = (r % 365) + 365 * Math.floor(r / 1460);
+  const year =
+    4 * Math.floor(offsetDays / 1461) +
+    Math.floor(r / 365) -
+    Math.floor(r / 1460);
+  const month = Math.floor(n / 30) + 1;
+  const day = (n % 30) + 1;
+  return { year, month, day };
+}
+
+function formatEthiopianDateAmharic(date = new Date()) {
+  const { year, day, month } = toEthiopianDate(date);
+  const monthName = ETHIOPIAN_MONTHS_AM[month - 1];
+  return `${monthName} ${day} ቀን ${year} ዓ.ም`;
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default function GalleryUploader({
   isOpen,
   onClose,
   category,
+  uploadQueue,
   onUploadComplete,
 }) {
-  const [uploadFiles, setUploadFiles] = useState([]);
   const [uploadTopic, setUploadTopic] = useState("");
-  const [uploading, setUploading] = useState(false);
+  const [creatingFolder, setCreatingFolder] = useState(false);
 
-  const getEthiopianDateString = () => {
-    const now = new Date();
-    // Ensure your server-side also uses the same Ethiopian date conversion
-    return dateAndTime.format(now, "MMMM D, YYYY");
-  };
-
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
+  // ✅ Now returns a genuine Ethiopian-calendar date, e.g. "ሐምሌ 23 ቀን 2018 ዓ.ም"
+  const getEthiopianDateString = () => formatEthiopianDateAmharic(new Date());
 
   const handleUpload = async () => {
-    if (uploadFiles.length === 0 || !uploadTopic.trim()) {
+    if (uploadQueue.length === 0) {
+      showToast("Please select at least one photo", "error");
+      return;
+    }
+    if (!uploadTopic.trim()) {
       showToast("Please enter a topic for this session", "error");
       return;
     }
 
-    setUploading(true);
+    setCreatingFolder(true);
     const dateStr = getEthiopianDateString();
     const folderName = `${dateStr} - ${uploadTopic}`;
 
     try {
-      // 1. Create Folder via API
       let folderId = null;
       try {
         const folderRes = await goldenMondayAPI.createFolder({
@@ -52,7 +107,6 @@ export default function GalleryUploader({
         });
         folderId = folderRes.data.folderId;
       } catch (error) {
-        // If folder exists, backend should return existing ID
         if (error.response?.data?.folderId) {
           folderId = error.response.data.folderId;
         } else {
@@ -60,31 +114,15 @@ export default function GalleryUploader({
         }
       }
 
-      // 2. Upload Images
-      let uploadedCount = 0;
-      for (const file of uploadFiles) {
-        const imageData = await fileToBase64(file);
-        await goldenMondayAPI.uploadGalleryPhoto({
-          image: imageData,
-          folderId: folderId,
-          category: category !== "all" ? category : null,
-        });
-        uploadedCount++;
-      }
+      await onUploadComplete(folderId, uploadTopic);
 
-      showToast(
-        `Successfully uploaded ${uploadedCount} images to "${folderName}"`,
-        "success",
-      );
       setUploadTopic("");
-      setUploadFiles([]);
-      onUploadComplete();
       onClose();
     } catch (error) {
-      console.error("Upload failed:", error);
-      showToast("Failed to upload images. Please try again.", "error");
+      console.error("Folder creation failed:", error);
+      showToast("Failed to create folder. Please try again.", "error");
     } finally {
-      setUploading(false);
+      setCreatingFolder(false);
     }
   };
 
@@ -146,13 +184,12 @@ export default function GalleryUploader({
         />
 
         <div style={{ fontSize: 12, color: "#666", marginBottom: 16 }}>
-          {uploadFiles.length} file(s) selected for upload.
+          {uploadQueue.length} file(s) selected for upload.
         </div>
 
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
           <button
             onClick={() => {
-              setUploadFiles([]);
               setUploadTopic("");
               onClose();
             }}
@@ -168,7 +205,7 @@ export default function GalleryUploader({
           </button>
           <button
             onClick={handleUpload}
-            disabled={!uploadTopic.trim() || uploading}
+            disabled={!uploadTopic.trim() || creatingFolder}
             style={{
               padding: "8px 20px",
               background: C.primary,
@@ -177,10 +214,10 @@ export default function GalleryUploader({
               borderRadius: 6,
               cursor: "pointer",
               fontWeight: 600,
-              opacity: !uploadTopic.trim() || uploading ? 0.6 : 1,
+              opacity: !uploadTopic.trim() || creatingFolder ? 0.6 : 1,
             }}
           >
-            {uploading ? "Uploading..." : "Upload & Create"}
+            {creatingFolder ? "Creating..." : "Upload & Create"}
           </button>
         </div>
       </div>
