@@ -26,6 +26,7 @@ import {
   FiCalendar,
   FiArrowLeft,
   FiFolder,
+  FiFilter,
 } from "react-icons/fi";
 
 // Import our new separate components
@@ -155,7 +156,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   const closeClearAllModal = () =>
     setClearAllModal({ isOpen: false, category: "all" });
 
-  // ── Data Fetching (Folders vs. Photos) ──
+  // ── Data Fetching (Folders vs. Photos with Category Support) ──
   const loadGallery = useCallback(async () => {
     try {
       setLoading(true);
@@ -164,25 +165,31 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         limit: 20,
         lang: language,
       };
-      if (category !== "all") params.category = category;
-      if (sessionId) params.session = sessionId;
 
-      let endpoint = "getFolders"; // Default view fetches folders
-
-      // If inside a folder, fetch specific photos
+      // Case 1: We're inside a folder - show files with category filter
       if (currentFolder) {
         params.folderId = currentFolder._id;
-        endpoint = "getGallery";
-      }
-
-      const response = await goldenMondayAPI[endpoint](params);
-
-      // Handle response structure (Folders vs Photos)
-      if (currentFolder) {
+        if (category !== "all") params.category = category;
+        const response = await goldenMondayAPI.getGallery(params);
         setItems(response.data.photos || []);
-      } else {
-        setItems(response.data.folders || []);
+        setTotalPages(response.data.pagination?.pages || 1);
+        return;
       }
+
+      // Case 2: Category filter is active at top level - show all files matching category
+      if (category !== "all") {
+        params.category = category;
+        if (sessionId) params.session = sessionId;
+        const response = await goldenMondayAPI.getGallery(params);
+        setItems(response.data.photos || []);
+        setTotalPages(response.data.pagination?.pages || 1);
+        return;
+      }
+
+      // Case 3: Default - show folders at top level
+      if (sessionId) params.session = sessionId;
+      const response = await goldenMondayAPI.getFolders(params);
+      setItems(response.data.folders || []);
       setTotalPages(response.data.pagination?.pages || 1);
     } catch (error) {
       console.error("Failed to load gallery:", error);
@@ -685,6 +692,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             onClick={() => {
               setCurrentFolder(null);
               setPage(1);
+              setCategory("all");
             }}
             style={{
               display: "flex",
@@ -709,6 +717,67 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             />{" "}
             {currentFolder.title}
           </span>
+        </div>
+      )}
+
+      {/* Category Filter Context Indicator */}
+      {(category !== "all" || currentFolder) && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          {category !== "all" && (
+            <span
+              style={{
+                fontSize: 12,
+                color: C.primary,
+                background: C.primary + "11",
+                padding: "4px 12px",
+                borderRadius: 16,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <FiFilter size={14} />
+              Filtering: {getCategoryLabel(category)}
+              <button
+                onClick={() => {
+                  setCategory("all");
+                  setPage(1);
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: C.primary,
+                  cursor: "pointer",
+                  padding: "2px 4px",
+                  display: "flex",
+                  alignItems: "center",
+                }}
+              >
+                <FiX size={14} />
+              </button>
+            </span>
+          )}
+          {currentFolder && (
+            <span
+              style={{
+                fontSize: 12,
+                color: C.muted,
+                background: C.bg,
+                padding: "4px 12px",
+                borderRadius: 16,
+              }}
+            >
+              📁 {currentFolder.title}
+            </span>
+          )}
         </div>
       )}
 
@@ -1239,8 +1308,12 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           </div>
           <p style={{ fontSize: 16, marginBottom: 4 }}>
             {currentFolder
-              ? "No photos in this folder"
-              : t.noPhotos || "No folders yet"}
+              ? category !== "all"
+                ? `No ${getCategoryLabel(category)} files in this folder`
+                : "No photos in this folder"
+              : category !== "all"
+                ? `No ${getCategoryLabel(category)} files found`
+                : t.noPhotos || "No folders yet"}
           </p>
           <p style={{ fontSize: 13, color: "#999" }}>
             {isAdmin
