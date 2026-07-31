@@ -180,46 +180,142 @@ export default function ReportExport({ sessionId }) {
 
         yPos = doc.lastAutoTable.finalY + 8;
 
-        // Detailed Attendance Table
+        // Detailed Attendance Table with Signature Images
         doc.setFontSize(12);
         doc.text(gt("detailedAttendance", "Detailed Attendance"), 14, yPos);
         yPos += 6;
 
-        const tableData = data.attendance.map((a) => [
-          a.name || ct("unknown", "Unknown"),
-          a.department || ct("na", "N/A"),
-          a.email || ct("na", "N/A"),
-          a.attended
-            ? `✅ ${gt("present", "Present")}`
-            : `❌ ${gt("absent", "Absent")}`,
-          a.signature
-            ? `✓ ${gt("signed", "Signed")}`
-            : `✗ ${gt("notSigned", "Not Signed")}`,
-        ]);
+        // Filter attendance to only show present with signatures
+        const presentWithSignatures = data.attendance.filter(
+          (a) => a.attended && a.signature,
+        );
+        const presentWithoutSignature = data.attendance.filter(
+          (a) => a.attended && !a.signature,
+        );
+        const absent = data.attendance.filter((a) => !a.attended);
 
+        // Combine: present with signatures first, then present without, then absent
+        const sortedAttendance = [
+          ...presentWithSignatures,
+          ...presentWithoutSignature,
+          ...absent,
+        ];
+
+        // Check if any attendance has signatures
+        const hasSignatures = presentWithSignatures.length > 0;
+
+        // Table headers
+        const headers = [
+          ct("name", "Name"),
+          ct("department", "Department"),
+          ct("email", "Email"),
+          ct("status", "Status"),
+          gt("signature", "Signature"),
+        ];
+
+        // Column widths
+        const colWidths = [30, 30, 45, 25, 40];
+
+        // Row height for signatures (larger for signature images)
+        const signatureRowHeight = hasSignatures ? 15 : 10;
+
+        // Build table data
+        const tableData = sortedAttendance.map((a) => {
+          const status = a.attended
+            ? `✅ ${gt("present", "Present")}`
+            : `❌ ${gt("absent", "Absent")}`;
+
+          // For present with signature, we'll add a placeholder that will be replaced with image
+          if (a.attended && a.signature) {
+            return [
+              a.name || ct("unknown", "Unknown"),
+              a.department || ct("na", "N/A"),
+              a.email || ct("na", "N/A"),
+              status,
+              { content: "signature", signature: a.signature },
+            ];
+          } else {
+            return [
+              a.name || ct("unknown", "Unknown"),
+              a.department || ct("na", "N/A"),
+              a.email || ct("na", "N/A"),
+              status,
+              a.attended ? "✗ Not signed" : "—",
+            ];
+          }
+        });
+
+        // Generate the table with autoTable
         autoTable(doc, {
           startY: yPos,
-          head: [
-            [
-              ct("name", "Name"),
-              ct("department", "Department"),
-              ct("email", "Email"),
-              ct("status", "Status"),
-              gt("signature", "Signature"),
-            ],
-          ],
-          body: tableData,
+          head: [headers],
+          body: tableData.map((row) =>
+            row.map((cell) =>
+              typeof cell === "object" && cell.content === "signature"
+                ? { content: " ", styles: { cellWidth: colWidths[4] } }
+                : cell,
+            ),
+          ),
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 8 },
+          styles: { fontSize: 8, cellPadding: 2 },
           columnStyles: {
-            0: { cellWidth: 30 },
-            1: { cellWidth: 30 },
-            2: { cellWidth: 45 },
-            3: { cellWidth: 25 },
-            4: { cellWidth: 25 },
+            0: { cellWidth: colWidths[0] },
+            1: { cellWidth: colWidths[1] },
+            2: { cellWidth: colWidths[2] },
+            3: { cellWidth: colWidths[3] },
+            4: { cellWidth: colWidths[4] },
+          },
+          rowHeight: signatureRowHeight,
+          didParseCell: function (data) {
+            // Check if this cell should contain a signature
+            const rowData = data.row.raw;
+            if (rowData && Array.isArray(rowData) && data.column.index === 4) {
+              const cellData = rowData[4];
+              if (
+                typeof cellData === "object" &&
+                cellData.content === "signature"
+              ) {
+                data.cell.styles = {
+                  cellWidth: colWidths[4],
+                  minCellHeight: 14,
+                };
+              }
+            }
+          },
+          didDrawCell: function (data) {
+            // Draw signature image in the signature column
+            if (data.column.index === 4) {
+              const rowData = data.row.raw;
+              if (rowData && Array.isArray(rowData)) {
+                const cellData = rowData[4];
+                if (
+                  typeof cellData === "object" &&
+                  cellData.content === "signature"
+                ) {
+                  try {
+                    const x = data.cell.x + 2;
+                    const y = data.cell.y + 2;
+                    const width = data.cell.width - 4;
+                    const height = data.cell.height - 4;
+                    doc.addImage(
+                      cellData.signature,
+                      "PNG",
+                      x,
+                      y,
+                      width,
+                      height,
+                    );
+                  } catch (imgError) {
+                    console.warn("Could not add signature image:", imgError);
+                  }
+                }
+              }
+            }
           },
         });
+
+        yPos = doc.lastAutoTable.finalY + 8;
       }
 
       // Sessions Report
@@ -321,7 +417,7 @@ export default function ReportExport({ sessionId }) {
             ct("department", "Department"),
             ct("email", "Email"),
             gt("attended", "Attended"),
-            gt("signature", "Signature"),
+            gt("signatureStatus", "Signature Status"),
             gt("checkedInAt", "Checked In At"),
             ct("feedback", "Feedback"),
             ct("rating", "Rating"),
@@ -471,6 +567,7 @@ export default function ReportExport({ sessionId }) {
             .summary-box { background: #f0f4f8; padding: 15px; border-radius: 8px; margin: 10px 0; }
             .badge-present { color: green; font-weight: bold; }
             .badge-absent { color: red; font-weight: bold; }
+            .signature-img { max-width: 80px; max-height: 30px; }
           </style>
         </head>
         <body>
@@ -512,13 +609,26 @@ export default function ReportExport({ sessionId }) {
         `;
 
         data.attendance.forEach((a) => {
+          const statusClass = a.attended ? "badge-present" : "badge-absent";
+          const statusText = a.attended
+            ? `✅ ${gt("present", "Present")}`
+            : `❌ ${gt("absent", "Absent")}`;
+
+          // Signature column: show image if exists, otherwise text - fixed ESLint warning
+          const signatureHtml =
+            a.attended && a.signature
+              ? `<img src="${a.signature}" class="signature-img" alt="Signature" />`
+              : a.attended && !a.signature
+                ? "✗ Not signed"
+                : "—";
+
           htmlContent += `
             <tr>
               <td>${a.name || ct("unknown", "Unknown")}</td>
               <td>${a.department || ct("na", "N/A")}</td>
               <td>${a.email || ct("na", "N/A")}</td>
-              <td class="${a.attended ? "badge-present" : "badge-absent"}">${a.attended ? `✅ ${gt("present", "Present")}` : `❌ ${gt("absent", "Absent")}`}</td>
-              <td>${a.signature ? `✓ ${gt("signed", "Signed")}` : `✗ ${gt("notSigned", "Not Signed")}`}</td>
+              <td class="${statusClass}">${statusText}</td>
+              <td>${signatureHtml}</td>
               <td>${a.checkedInAt ? new Date(a.checkedInAt).toLocaleString() : ct("na", "N/A")}</td>
             </tr>
           `;
