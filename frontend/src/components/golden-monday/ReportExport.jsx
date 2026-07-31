@@ -193,7 +193,7 @@ export default function ReportExport({ sessionId }) {
         doc.text(gt("detailedAttendance", "Detailed Attendance"), 14, yPos);
         yPos += 6;
 
-        // Filter attendance - FIX: renamed second 'absent' to 'absentEmployees'
+        // Filter attendance
         const presentWithSignatures = data.attendance.filter(
           (a) => a.attended && a.signature && a.signature.length > 100,
         );
@@ -221,11 +221,11 @@ export default function ReportExport({ sessionId }) {
           gt("signature", "Signature"),
         ];
 
-        // Column widths
-        const colWidths = [30, 30, 45, 25, 40];
+        // Column widths - REDUCED signature column width
+        const colWidths = [35, 30, 45, 25, 25]; // Signature column reduced from 40 to 25
 
-        // Row height for signatures (larger for signature images)
-        const signatureRowHeight = hasSignatures ? 15 : 10;
+        // Row height for signatures (smaller)
+        const signatureRowHeight = hasSignatures ? 10 : 8;
 
         // Build table data
         const tableData = sortedAttendance.map((a) => {
@@ -248,7 +248,7 @@ export default function ReportExport({ sessionId }) {
               a.department || ct("na", "N/A"),
               a.email || ct("na", "N/A"),
               status,
-              a.attended ? "✗ Not signed" : "—",
+              a.attended ? "✗" : "—",
             ];
           }
         });
@@ -266,7 +266,7 @@ export default function ReportExport({ sessionId }) {
           ),
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 8, cellPadding: 2 },
+          styles: { fontSize: 7, cellPadding: 1.5 },
           columnStyles: {
             0: { cellWidth: colWidths[0] },
             1: { cellWidth: colWidths[1] },
@@ -276,7 +276,6 @@ export default function ReportExport({ sessionId }) {
           },
           rowHeight: signatureRowHeight,
           didParseCell: function (data) {
-            // Check if this cell should contain a signature
             const rowData = data.row.raw;
             if (rowData && Array.isArray(rowData) && data.column.index === 4) {
               const cellData = rowData[4];
@@ -286,13 +285,13 @@ export default function ReportExport({ sessionId }) {
               ) {
                 data.cell.styles = {
                   cellWidth: colWidths[4],
-                  minCellHeight: 14,
+                  minCellHeight: 8,
                 };
               }
             }
           },
           didDrawCell: function (data) {
-            // Draw signature image in the signature column
+            // Draw signature image in the signature column - SCALED DOWN
             if (data.column.index === 4) {
               const rowData = data.row.raw;
               if (rowData && Array.isArray(rowData)) {
@@ -304,24 +303,26 @@ export default function ReportExport({ sessionId }) {
                   cellData.signature.length > 100
                 ) {
                   try {
-                    const x = data.cell.x + 2;
-                    const y = data.cell.y + 2;
-                    const width = data.cell.width - 4;
-                    const height = data.cell.height - 4;
+                    // Make signature smaller - use less than half the cell width/height
+                    const width = Math.min(data.cell.width - 2, 18); // Max 18mm
+                    const height = Math.min(data.cell.height - 2, 6); // Max 6mm
+                    // Center the signature in the cell
+                    const offsetX = (data.cell.width - width) / 2;
+                    const offsetY = (data.cell.height - height) / 2;
                     doc.addImage(
                       cellData.signature,
                       "PNG",
-                      x,
-                      y,
+                      data.cell.x + offsetX,
+                      data.cell.y + offsetY,
                       width,
                       height,
                     );
                   } catch (imgError) {
                     console.warn("Could not add signature image:", imgError);
-                    // Fallback: draw text
-                    doc.setFontSize(6);
-                    doc.setTextColor(100, 100, 100);
-                    doc.text("✓ Signed", data.cell.x + 4, data.cell.y + 8);
+                    // Fallback: draw a checkmark
+                    doc.setFontSize(8);
+                    doc.setTextColor(26, 58, 173);
+                    doc.text("✓", data.cell.x + 4, data.cell.y + 6);
                   }
                 }
               }
@@ -361,7 +362,7 @@ export default function ReportExport({ sessionId }) {
           body: sessionData,
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 8 },
+          styles: { fontSize: 7 },
         });
       }
 
@@ -392,7 +393,7 @@ export default function ReportExport({ sessionId }) {
           body: galleryData,
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 8 },
+          styles: { fontSize: 7 },
         });
       }
 
