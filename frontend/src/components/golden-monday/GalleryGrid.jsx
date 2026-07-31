@@ -529,7 +529,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
 
       // Final summary
       if (processed > 0) {
-        const message = `Successfully uploaded ${processed} image(s) to "${topic}"`;
+        const message = `Successfully uploaded ${processed} file(s) to "${topic}"`;
         if (failed > 0) {
           showToast(`${message} (${failed} failed)`, "warning");
         } else {
@@ -659,12 +659,12 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   // ─── Render ──
   return (
     <div style={{ fontFamily: F.sans }}>
-      {/* Uploader Modal Component */}
+      {/* Uploader Modal Component - FIXED */}
       <GalleryUploader
         isOpen={isUploadModalOpen}
         onClose={() => {
           setIsUploadModalOpen(false);
-          setUploadQueue([]);
+          // Don't clear the queue here - let it show progress in the main UI
         }}
         category={category}
         uploadQueue={uploadQueue}
