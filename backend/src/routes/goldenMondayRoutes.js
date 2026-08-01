@@ -3,6 +3,9 @@
 const express = require("express");
 const router = express.Router();
 const { protect, anyRole, leaderOrAdmin } = require("../middleware/auth");
+const GoldenMondayExperience = require("../models/GoldenMondayExperience");
+const GoldenMondayResult = require("../models/GoldenMondayResult");
+const { suggestTagsFromText } = require("../services/tagSuggestionService");
 
 const {
   getSessions,
@@ -1235,6 +1238,481 @@ router.post("/:sessionId/slides", protect, leaderOrAdmin, async (req, res) => {
     res.json({ success: true, session });
   } catch (error) {
     console.error("❌ [POST SLIDES] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// ✅ NEW — EXPERIENCES SHARED (Kirkpatrick Levels 1-2)
+// ──────────────────────────────────────────────────────────────
+
+// GET /api/golden-monday/experiences
+router.get("/experiences", protect, anyRole, async (req, res) => {
+  try {
+    const { session, tag, limit = 30, page = 1 } = req.query;
+    const filter = {};
+    if (session) filter.session = session;
+    if (tag) filter.tags = tag;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [experiences, total] = await Promise.all([
+      GoldenMondayExperience.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate("session", "title date"),
+      GoldenMondayExperience.countDocuments(filter),
+    ]);
+
+    res.json({
+      experiences,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.max(1, Math.ceil(total / parseInt(limit))),
+      },
+    });
+  } catch (error) {
+    console.error("❌ [GET EXPERIENCES] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/golden-monday/experiences
+router.post("/experiences", protect, anyRole, async (req, res) => {
+  try {
+    const { session, whatILearned, relevanceRating, wouldRecommend, tags } =
+      req.body;
+
+    if (!whatILearned || !whatILearned.trim()) {
+      return res.status(400).json({ error: "whatILearned is required" });
+    }
+
+    const aiSuggestedTags = await suggestTagsFromText(whatILearned);
+
+    const experience = await GoldenMondayExperience.create({
+      session: session || null,
+      user: req.user._id,
+      userName: req.user.name,
+      department: req.user.department || "",
+      whatILearned: whatILearned.trim(),
+      relevanceRating: relevanceRating || 5,
+      wouldRecommend: wouldRecommend !== false,
+      tags: Array.isArray(tags) ? tags : [],
+      aiSuggestedTags,
+    });
+
+    res.status(201).json({ success: true, experience });
+  } catch (error) {
+    console.error("❌ [POST EXPERIENCE] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/golden-monday/experiences/:id/endorse
+router.post("/experiences/:id/endorse", protect, anyRole, async (req, res) => {
+  try {
+    const experience = await GoldenMondayExperience.findById(req.params.id);
+    if (!experience) {
+      return res.status(404).json({ error: "Experience not found" });
+    }
+
+    const uid = req.user._id.toString();
+    const alreadyEndorsed = experience.endorsedBy.some(
+      (id) => id.toString() === uid,
+    );
+
+    if (alreadyEndorsed) {
+      experience.endorsedBy = experience.endorsedBy.filter(
+        (id) => id.toString() !== uid,
+      );
+    } else {
+      experience.endorsedBy.push(req.user._id);
+    }
+
+    await experience.save();
+    res.json({
+      success: true,
+      endorsed: !alreadyEndorsed,
+      endorsementCount: experience.endorsedBy.length,
+    });
+  } catch (error) {
+    console.error("❌ [ENDORSE EXPERIENCE] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/golden-monday/experiences/:id
+router.delete("/experiences/:id", protect, anyRole, async (req, res) => {
+  try {
+    const experience = await GoldenMondayExperience.findById(req.params.id);
+    if (!experience) {
+      return res.status(404).json({ error: "Experience not found" });
+    }
+
+    const isOwner = experience.user.toString() === req.user._id.toString();
+    const isPrivileged = ["admin", "superadmin", "leader"].includes(
+      req.user.role,
+    );
+    if (!isOwner && !isPrivileged) {
+      return res.status(403).json({ error: "Not authorized to delete this" });
+    }
+
+    await experience.deleteOne();
+    res.json({ success: true });
+  } catch (error) {
+    console.error("❌ [DELETE EXPERIENCE] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// ✅ NEW — RESULTS GAINED (Kirkpatrick Levels 3-4)
+// ──────────────────────────────────────────────────────────────
+
+// GET /api/golden-monday/results
+router.get("/results", protect, anyRole, async (req, res) => {
+  try {
+    const { session, category, limit = 30, page = 1 } = req.query;
+    const filter = {};
+    if (session) filter.session = session;
+    if (category && category !== "all") filter.outcomeCategory = category;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [results, total] = await Promise.all([
+      GoldenMondayResult.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate("session", "title date")
+        .populate("experience", "whatILearned"),
+      GoldenMondayResult.countDocuments(filter),
+    ]);
+
+    res.json({
+      results,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        pages: Math.max(1, Math.ceil(total / parseInt(limit))),
+      },
+    });
+  } catch (error) {
+    console.error("❌ [GET RESULTS] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/golden-monday/results
+router.post("/results", protect, anyRole, async (req, res) => {
+  try {
+    const {
+      session,
+      experience,
+      whatIApplied,
+      measurableOutcome,
+      outcomeCategory,
+      timeframe,
+      tags,
+    } = req.body;
+
+    if (!whatIApplied || !whatIApplied.trim()) {
+      return res.status(400).json({ error: "whatIApplied is required" });
+    }
+
+    const aiSuggestedTags = await suggestTagsFromText(
+      `${whatIApplied} ${measurableOutcome || ""}`,
+    );
+
+    const result = await GoldenMondayResult.create({
+      session: session || null,
+      experience: experience || null,
+      user: req.user._id,
+      userName: req.user.name,
+      department: req.user.department || "",
+      whatIApplied: whatIApplied.trim(),
+      measurableOutcome: (measurableOutcome || "").trim(),
+      outcomeCategory: outcomeCategory || "other",
+      timeframe: timeframe || "within-month",
+      tags: Array.isArray(tags) ? tags : [],
+      aiSuggestedTags,
+    });
+
+    res.status(201).json({ success: true, result });
+  } catch (error) {
+    console.error("❌ [POST RESULT] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// POST /api/golden-monday/results/:id/endorse
+router.post("/results/:id/endorse", protect, anyRole, async (req, res) => {
+  try {
+    const result = await GoldenMondayResult.findById(req.params.id);
+    if (!result) {
+      return res.status(404).json({ error: "Result not found" });
+    }
+
+    const uid = req.user._id.toString();
+    const alreadyEndorsed = result.endorsedBy.some(
+      (id) => id.toString() === uid,
+    );
+
+    if (alreadyEndorsed) {
+      result.endorsedBy = result.endorsedBy.filter(
+        (id) => id.toString() !== uid,
+      );
+    } else {
+      result.endorsedBy.push(req.user._id);
+    }
+
+    await result.save();
+    res.json({
+      success: true,
+      endorsed: !alreadyEndorsed,
+      endorsementCount: result.endorsedBy.length,
+    });
+  } catch (error) {
+    console.error("❌ [ENDORSE RESULT] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE /api/golden-monday/results/:id
+router.delete("/results/:id", protect, anyRole, async (req, res) => {
+  try {
+    const result = await GoldenMondayResult.findById(req.params.id);
+    if (!result) {
+      return res.status(404).json({ error: "Result not found" });
+    }
+
+    const isOwner = result.user.toString() === req.user._id.toString();
+    const isPrivileged = ["admin", "superadmin", "leader"].includes(
+      req.user.role,
+    );
+    if (!isOwner && !isPrivileged) {
+      return res.status(403).json({ error: "Not authorized to delete this" });
+    }
+
+    await result.deleteOne();
+    res.json({ success: true });
+  } catch (error) {
+    console.error("❌ [DELETE RESULT] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────
+// ✅ NEW — REPORTS
+// ──────────────────────────────────────────────────────────────
+
+// GET /api/golden-monday/reports/rotation
+router.get("/reports/rotation", protect, leaderOrAdmin, async (req, res) => {
+  try {
+    const [ranking, presentedSessions] = await Promise.all([
+      rotationService.previewRotation
+        ? rotationService.previewRotation()
+        : Promise.resolve([]),
+      GoldenMondaySession.find({ presenter: { $ne: null } })
+        .sort({ date: -1 })
+        .limit(200)
+        .populate("presenter", "name department"),
+    ]);
+
+    const history = presentedSessions.map((s) => ({
+      sessionId: s._id,
+      date: s.date,
+      presenterId: s.presenter?._id || null,
+      presenterName: s.presenterName || s.presenter?.name || "Unknown",
+      department: s.presenterDepartment || s.presenter?.department || "",
+      title: s.presentationTitle || s.title || "Untitled",
+      averageRating: s.averageRating || 0,
+    }));
+
+    const presentedCounts = {};
+    history.forEach((h) => {
+      const key = h.presenterId ? h.presenterId.toString() : h.presenterName;
+      presentedCounts[key] = (presentedCounts[key] || 0) + 1;
+    });
+
+    res.json({
+      ranking: Array.isArray(ranking) ? ranking : ranking?.ranking || [],
+      history,
+      presentedCounts,
+      generatedAt: new Date(),
+    });
+  } catch (error) {
+    console.error("❌ [ROTATION REPORT] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/golden-monday/reports/employee-performance
+router.get(
+  "/reports/employee-performance",
+  protect,
+  leaderOrAdmin,
+  async (req, res) => {
+    try {
+      const roster = await GoldenMondayPresenter.find().populate(
+        "user",
+        "name email department",
+      );
+
+      const performance = await Promise.all(
+        roster.map(async (r) => {
+          const userId = r.user?._id || r.user;
+
+          const [attendanceCount, experienceCount, resultCount] =
+            await Promise.all([
+              GoldenMondayAttendance.countDocuments({
+                user: userId,
+                attended: true,
+              }),
+              GoldenMondayExperience.countDocuments({ user: userId }),
+              GoldenMondayResult.countDocuments({ user: userId }),
+            ]);
+
+          return {
+            userId,
+            name: r.name,
+            email: r.email,
+            department: r.department || "",
+            isEligible: r.isEligible,
+            timesPresented: r.timesPresented || 0,
+            sessionsAttended: attendanceCount,
+            experiencesShared: experienceCount,
+            resultsLogged: resultCount,
+            engagementScore:
+              (r.timesPresented || 0) * 5 +
+              resultCount * 3 +
+              attendanceCount * 1 +
+              experienceCount * 1,
+          };
+        }),
+      );
+
+      performance.sort((a, b) => b.engagementScore - a.engagementScore);
+
+      res.json({ performance, generatedAt: new Date() });
+    } catch (error) {
+      console.error("❌ [EMPLOYEE PERFORMANCE REPORT] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// GET /api/golden-monday/reports/dashboard
+router.get("/reports/dashboard", protect, leaderOrAdmin, async (req, res) => {
+  try {
+    const [
+      totalSessions,
+      totalPresenters,
+      totalExperiences,
+      totalResults,
+      resultsByCategory,
+      recentExperiences,
+      recentResults,
+      allExperiencesForTags,
+    ] = await Promise.all([
+      GoldenMondaySession.countDocuments(),
+      GoldenMondayPresenter.countDocuments({ isEligible: true }),
+      GoldenMondayExperience.countDocuments(),
+      GoldenMondayResult.countDocuments(),
+      GoldenMondayResult.aggregate([
+        { $group: { _id: "$outcomeCategory", count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+      GoldenMondayExperience.find().sort({ createdAt: -1 }).limit(5),
+      GoldenMondayResult.find().sort({ createdAt: -1 }).limit(5),
+      GoldenMondayExperience.find().select("tags aiSuggestedTags"),
+    ]);
+
+    const tagFreq = {};
+    allExperiencesForTags.forEach((doc) => {
+      [...(doc.tags || []), ...(doc.aiSuggestedTags || [])].forEach((tag) => {
+        tagFreq[tag] = (tagFreq[tag] || 0) + 1;
+      });
+    });
+    const topTags = Object.entries(tagFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([tag, count]) => ({ tag, count }));
+
+    const recommendCount = await GoldenMondayExperience.countDocuments({
+      wouldRecommend: true,
+    });
+    const recommendRate =
+      totalExperiences > 0
+        ? Math.round((recommendCount / totalExperiences) * 100)
+        : null;
+
+    res.json({
+      totals: {
+        sessions: totalSessions,
+        presenters: totalPresenters,
+        experiences: totalExperiences,
+        results: totalResults,
+      },
+      resultsByCategory,
+      topTags,
+      recommendRate,
+      recentExperiences,
+      recentResults,
+      generatedAt: new Date(),
+    });
+  } catch (error) {
+    console.error("❌ [DASHBOARD REPORT] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/golden-monday/reports/ai-insights
+router.get("/reports/ai-insights", protect, leaderOrAdmin, async (req, res) => {
+  try {
+    const experiences = await GoldenMondayExperience.find()
+      .sort({ createdAt: -1 })
+      .limit(100);
+    const results = await GoldenMondayResult.find()
+      .sort({ createdAt: -1 })
+      .limit(100);
+
+    const tagFreq = {};
+    [...experiences, ...results].forEach((doc) => {
+      [...(doc.tags || []), ...(doc.aiSuggestedTags || [])].forEach((tag) => {
+        tagFreq[tag] = (tagFreq[tag] || 0) + 1;
+      });
+    });
+    const themes = Object.entries(tagFreq)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([theme, mentions]) => ({ theme, mentions }));
+
+    const avgRelevance =
+      experiences.length > 0
+        ? experiences.reduce((sum, e) => sum + (e.relevanceRating || 0), 0) /
+          experiences.length
+        : null;
+
+    const outcomeCategoryCounts = {};
+    results.forEach((r) => {
+      outcomeCategoryCounts[r.outcomeCategory] =
+        (outcomeCategoryCounts[r.outcomeCategory] || 0) + 1;
+    });
+
+    res.json({
+      themes,
+      avgRelevance: avgRelevance ? Math.round(avgRelevance * 10) / 10 : null,
+      outcomeCategoryCounts,
+      sampleSize: { experiences: experiences.length, results: results.length },
+      generatedAt: new Date(),
+    });
+  } catch (error) {
+    console.error("❌ [AI INSIGHTS REPORT] Error:", error);
     res.status(500).json({ error: error.message });
   }
 });

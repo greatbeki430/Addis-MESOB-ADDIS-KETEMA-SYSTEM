@@ -16,6 +16,7 @@ import GoldenMondayRotationPanel from "../components/golden-monday/GoldenMondayR
 import AttendancePanel from "../components/golden-monday/AttendancePanel";
 import GalleryGrid from "../components/golden-monday/GalleryGrid";
 import ReportExport from "../components/golden-monday/ReportExport";
+import ExperiencesAndResults from "../components/golden-monday/ExperiencesAndResults";
 import {
   FiSunrise,
   FiUsers,
@@ -47,6 +48,7 @@ import {
   FiCamera,
   FiFileText,
   FiClipboard,
+  FiMessageCircle,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
@@ -1065,6 +1067,11 @@ export default function GoldenMonday() {
         id: "reports",
         label: t.tabReports || "Reports",
         icon: <FiFileText size={16} />,
+      },
+      {
+        id: "experience-result",
+        label: "Experiences & Results",
+        icon: <FiMessageCircle size={16} />,
       },
     ],
     [t],
@@ -2381,6 +2388,12 @@ export default function GoldenMonday() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === "experience-result" && (
+          <div>
+            <ExperiencesAndResults sessionId={selectedSessionId} />
           </div>
         )}
 
