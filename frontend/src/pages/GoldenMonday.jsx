@@ -17,6 +17,7 @@ import AttendancePanel from "../components/golden-monday/AttendancePanel";
 import GalleryGrid from "../components/golden-monday/GalleryGrid";
 import ReportExport from "../components/golden-monday/ReportExport";
 import ExperiencesAndResults from "../components/golden-monday/ExperiencesAndResults";
+import PresenterSpotlight from "../components/golden-monday/PresenterSpotlight";
 import {
   FiSunrise,
   FiUsers,
@@ -1646,6 +1647,8 @@ export default function GoldenMonday() {
           t={t}
         />
       </section>
+      {/* ── PRESENTER SPOTLIGHT ── */}
+      <PresenterSpotlight onRefresh={refreshData} />
 
       {/* ── TAB NAVIGATION ── */}
       <section
