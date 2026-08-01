@@ -554,6 +554,13 @@ export const goldenMondayAPI = {
 
   // GET /api/golden-monday/reports/ai-insights - AI insights report
   getAIInsightsReport: () => api.get("/golden-monday/reports/ai-insights"),
+
+  // ──────────────────────────────────────────────────────────────
+  // 👤 USER DETAILS (for Presenter Spotlight)
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/auth/users/:userId - Get user details including photo
+  getUserDetails: (userId) => api.get(`/auth/users/${userId}`),
 };
 
 // ✅ Helper: dataURL to Blob (add at the bottom of the file, before export default)
