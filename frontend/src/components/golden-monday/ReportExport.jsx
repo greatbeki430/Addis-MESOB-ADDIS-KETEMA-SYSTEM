@@ -185,6 +185,10 @@ export default function ReportExport({ sessionId }) {
       label: gt("galleryReport", "Gallery Report"),
       icon: <FiCamera size={14} />,
     },
+    { value: "experiences", label: "Experiences Shared" },
+    { value: "results", label: "Results Gained" },
+    { value: "employee-performance", label: "Employee Performance" },
+    { value: "dashboard-insights", label: "Dashboard & AI Insights" },
   ];
 
   const formatOptions = [
@@ -198,20 +202,7 @@ export default function ReportExport({ sessionId }) {
     switch (type) {
       case "attendance": {
         const attendanceRes = await goldenMondayAPI.getAttendance(sessionId);
-        // Ensure signature data is properly passed through
         const attendanceData = attendanceRes.data.attendance || [];
-        // Log for debugging
-        console.log(
-          "📊 Attendance data with signatures:",
-          attendanceData.map((a) => ({
-            name: a.name,
-            hasSignature: !!a.signature,
-            signatureLength: a.signature ? a.signature.length : 0,
-            signaturePreview: a.signature
-              ? a.signature.substring(0, 50) + "..."
-              : "null",
-          })),
-        );
         return {
           title: gt("attendanceReport", "Attendance Report"),
           date: new Date().toISOString(),
@@ -236,6 +227,50 @@ export default function ReportExport({ sessionId }) {
           date: new Date().toISOString(),
           total: galleryRes.data.photos.length,
           photos: galleryRes.data.photos,
+        };
+      }
+      case "experiences": {
+        const expRes = await goldenMondayAPI.getExperiences(
+          sessionId,
+          null,
+          1,
+          100,
+        );
+        return {
+          title: "Experiences Shared Report",
+          date: new Date().toISOString(),
+          total: expRes.data.experiences?.length || 0,
+          experiences: expRes.data.experiences || [],
+        };
+      }
+      case "results": {
+        const resRes = await goldenMondayAPI.getResults(
+          sessionId,
+          "all",
+          1,
+          100,
+        );
+        return {
+          title: "Results Gained Report",
+          date: new Date().toISOString(),
+          total: resRes.data.results?.length || 0,
+          results: resRes.data.results || [],
+        };
+      }
+      case "employee-performance": {
+        const perfRes = await goldenMondayAPI.getEmployeePerformanceReport();
+        return {
+          title: "Employee Performance Report",
+          date: new Date().toISOString(),
+          performance: perfRes.data.performance || [],
+        };
+      }
+      case "dashboard-insights": {
+        const insightRes = await goldenMondayAPI.getDashboardReport();
+        return {
+          title: "Dashboard & AI Insights",
+          date: new Date().toISOString(),
+          ...insightRes.data,
         };
       }
       default:
@@ -543,6 +578,66 @@ export default function ReportExport({ sessionId }) {
             ],
           ],
           body: galleryData,
+          theme: "striped",
+          headStyles: { fillColor: [26, 58, 173] },
+          styles: { ...baseTableStyles, fontSize: 8 },
+          didParseCell: makeDidParseCell(),
+        });
+      }
+
+      // Experiences Report
+      if (data.experiences) {
+        yPos = doc.lastAutoTable?.finalY + 8 || 35;
+        doc.setFontSize(12);
+        drawMixedScriptText(doc, "Experiences Shared", 14, yPos);
+        yPos += 6;
+
+        const expData = data.experiences.map((e) => [
+          e.userName || "Unknown",
+          e.department || "N/A",
+          e.whatILearned?.substring(0, 60) +
+            (e.whatILearned?.length > 60 ? "..." : ""),
+          `${e.relevanceRating}/5`,
+          e.wouldRecommend ? "✅" : "❌",
+          new Date(e.createdAt).toLocaleDateString(),
+        ]);
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [
+            ["Name", "Dept", "What I Learned", "Rating", "Recommend", "Date"],
+          ],
+          body: expData,
+          theme: "striped",
+          headStyles: { fillColor: [26, 58, 173] },
+          styles: { ...baseTableStyles, fontSize: 8 },
+          didParseCell: makeDidParseCell(),
+        });
+      }
+
+      // Results Report
+      if (data.results) {
+        yPos = doc.lastAutoTable?.finalY + 8 || 35;
+        doc.setFontSize(12);
+        drawMixedScriptText(doc, "Results Gained", 14, yPos);
+        yPos += 6;
+
+        const resData = data.results.map((r) => [
+          r.userName || "Unknown",
+          r.department || "N/A",
+          r.whatIApplied?.substring(0, 50) +
+            (r.whatIApplied?.length > 50 ? "..." : ""),
+          r.measurableOutcome || "N/A",
+          r.outcomeCategory || "Other",
+          new Date(r.createdAt).toLocaleDateString(),
+        ]);
+
+        autoTable(doc, {
+          startY: yPos,
+          head: [
+            ["Name", "Dept", "What I Applied", "Outcome", "Category", "Date"],
+          ],
+          body: resData,
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
           styles: { ...baseTableStyles, fontSize: 8 },
@@ -907,6 +1002,7 @@ export default function ReportExport({ sessionId }) {
         case "word":
           success = exportAsWord(data, filename);
           break;
+
         default:
           throw new Error(`Unknown format: ${exportFormat}`);
       }
