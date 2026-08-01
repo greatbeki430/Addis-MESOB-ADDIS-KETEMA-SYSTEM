@@ -140,15 +140,20 @@ export default function ReportExport({ sessionId }) {
   const [reportType, setReportType] = useState("attendance");
   const [exportFormat, setExportFormat] = useState("pdf");
 
-  // Translation helper for Golden Monday keys
+  // ✅ Force Amharic for all report translations
+  const REPORT_LANG = "am";
+
+  // const reportLang = language || 'am';
+
+  // Translation helper for Golden Monday keys - forced to Amharic
   const gt = (key, fallback = key) => {
-    const value = t(`goldenMonday.${key}`);
+    const value = t(`goldenMonday.${key}`, { lng: REPORT_LANG });
     return value === `goldenMonday.${key}` ? fallback : value;
   };
 
-  // Translation helper for common keys
+  // Translation helper for common keys - forced to Amharic
   const ct = (key, fallback = key) => {
-    const value = t(`common.${key}`);
+    const value = t(`common.${key}`, { lng: REPORT_LANG });
     return value === `common.${key}` ? fallback : value;
   };
 
