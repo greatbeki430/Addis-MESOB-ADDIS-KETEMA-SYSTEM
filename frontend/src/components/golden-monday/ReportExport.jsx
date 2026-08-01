@@ -275,12 +275,20 @@ export default function ReportExport({ sessionId }) {
           styles: { fontSize: 9, cellPadding: 3 },
           tableWidth: pageWidth - 28,
           margin: { left: 14, right: 14 },
+          // columnStyles: {
+          //   0: { cellWidth: colWidths[0] },
+          //   1: { cellWidth: colWidths[1] },
+          //   2: { cellWidth: colWidths[2] },
+          //   3: { cellWidth: colWidths[3] },
+          //   4: { cellWidth: colWidths[4] },
+          // },
           columnStyles: {
-            0: { cellWidth: colWidths[0] },
-            1: { cellWidth: colWidths[1] },
-            2: { cellWidth: colWidths[2] },
-            3: { cellWidth: colWidths[3] },
-            4: { cellWidth: colWidths[4] },
+            // Columns 0-3 left as 'auto' (the default) so they scale up and
+            // fill the remaining table width, same as the summary table above —
+            // that's what was making this table stop short of the page edge.
+            4: { cellWidth: colWidths[4] }, // signature column stays fixed —
+            // didParseCell/didDrawCell size the signature image off this exact
+            // value, so it can't be left to auto-size.
           },
           rowHeight: signatureRowHeight,
           didParseCell: function (data) {
