@@ -18,15 +18,15 @@ import {
 // Generate consistent particle positions (no Math.random during render)
 const generateParticles = () => {
   const particles = [];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 20; i++) {
     particles.push({
       id: i,
-      size: 2 + (i % 6),
-      opacity: 0.1 + ((i * 7) % 30) / 100,
-      left: (i * 3.3) % 100,
-      top: (i * 7.7) % 100,
-      duration: 5 + (i % 10),
-      delay: (i * 0.3) % 5,
+      size: 2 + (i % 4),
+      opacity: 0.1 + ((i * 7) % 20) / 100,
+      left: (i * 5) % 100,
+      top: (i * 10) % 100,
+      duration: 5 + (i % 8),
+      delay: (i * 0.4) % 4,
     });
   }
   return particles;
@@ -106,7 +106,7 @@ export default function PresenterSpotlight({ onRefresh }) {
     setTimeRemaining({ days, hours, minutes, seconds });
   }, []);
 
-  // Load data on mount - using isInitialLoad ref to prevent double execution
+  // Load data on mount
   useEffect(() => {
     isMounted.current = true;
 
@@ -115,10 +115,8 @@ export default function PresenterSpotlight({ onRefresh }) {
       loadPresenter();
       calculateTimeRemaining();
 
-      // Start timer
       timerRef.current = setInterval(calculateTimeRemaining, 1000);
 
-      // Show particles after a delay
       const particleTimer = setTimeout(() => {
         if (isMounted.current) setShowParticles(true);
       }, 500);
@@ -137,7 +135,7 @@ export default function PresenterSpotlight({ onRefresh }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle refresh from parent - using a flag to prevent unnecessary calls
+  // Handle refresh from parent
   const prevRefreshRef = useRef(onRefresh);
 
   useEffect(() => {
@@ -153,18 +151,18 @@ export default function PresenterSpotlight({ onRefresh }) {
       <div
         style={{
           background: `linear-gradient(135deg, ${C.dark}, ${C.primary})`,
-          borderRadius: 20,
-          padding: "40px",
+          borderRadius: 16,
+          padding: "30px 20px",
           textAlign: "center",
-          minHeight: "200px",
+          minHeight: "150px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
-        <div style={{ color: "#fff", fontSize: 18 }}>
-          <FiClock size={30} style={{ animation: "spin 1s linear infinite" }} />
-          <p style={{ marginTop: 12 }}>Loading presenter...</p>
+        <div style={{ color: "#fff", fontSize: 16 }}>
+          <FiClock size={24} style={{ animation: "spin 1s linear infinite" }} />
+          <p style={{ marginTop: 10, fontSize: 14 }}>Loading presenter...</p>
         </div>
       </div>
     );
@@ -175,17 +173,17 @@ export default function PresenterSpotlight({ onRefresh }) {
       <div
         style={{
           background: `linear-gradient(135deg, ${C.dark}, ${C.primary})`,
-          borderRadius: 20,
-          padding: "40px",
+          borderRadius: 16,
+          padding: "30px 20px",
           textAlign: "center",
         }}
       >
-        <div style={{ color: "#fff", fontSize: 16 }}>
-          <FiUsers size={40} style={{ opacity: 0.5 }} />
-          <p style={{ marginTop: 12 }}>
+        <div style={{ color: "#fff", fontSize: 14 }}>
+          <FiUsers size={32} style={{ opacity: 0.5 }} />
+          <p style={{ marginTop: 10 }}>
             No presenter assigned for this week yet.
           </p>
-          <p style={{ fontSize: 14, opacity: 0.7 }}>
+          <p style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
             Check back on Monday at 2:00 PM!
           </p>
         </div>
@@ -198,10 +196,10 @@ export default function PresenterSpotlight({ onRefresh }) {
       style={{
         position: "relative",
         overflow: "hidden",
-        borderRadius: 20,
-        marginBottom: 32,
+        borderRadius: 16,
+        marginBottom: 24,
         background: `linear-gradient(135deg, ${C.dark} 0%, ${C.primary} 50%, #1a1a4e 100%)`,
-        boxShadow: "0 20px 60px rgba(26, 58, 173, 0.3)",
+        boxShadow: "0 8px 32px rgba(26, 58, 173, 0.25)",
       }}
     >
       {/* ── Animated Particles Background ── */}
@@ -239,9 +237,9 @@ export default function PresenterSpotlight({ onRefresh }) {
         style={{
           position: "absolute",
           top: "-50%",
-          right: "-10%",
-          width: "400px",
-          height: "400px",
+          right: "-20%",
+          width: "250px",
+          height: "250px",
           borderRadius: "50%",
           background: `radial-gradient(circle, ${C.gold}22, transparent 70%)`,
           animation: "pulse-ring 4s ease-in-out infinite",
@@ -254,337 +252,394 @@ export default function PresenterSpotlight({ onRefresh }) {
         style={{
           position: "relative",
           zIndex: 1,
-          padding: "clamp(24px, 4vw, 40px)",
-          display: "grid",
-          gridTemplateColumns: "auto 1fr",
-          gap: "clamp(20px, 3vw, 40px)",
-          alignItems: "center",
+          padding: "20px 16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
         }}
       >
-        {/* ── Presenter Photo ── */}
+        {/* ── Top Section: Photo + Info ── */}
         <div
           style={{
-            position: "relative",
-            width: "clamp(80px, 10vw, 140px)",
-            height: "clamp(80px, 10vw, 140px)",
-            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
           }}
         >
-          {/* Animated border ring */}
-          <div
-            style={{
-              position: "absolute",
-              inset: "-4px",
-              borderRadius: "50%",
-              background: `conic-gradient(from 0deg, ${C.gold}, ${C.goldLight}, ${C.gold}, ${C.goldLight}, ${C.gold})`,
-              animation: "spin-slow 8s linear infinite",
-              opacity: 0.6,
-            }}
-          />
-          <div
-            style={{
-              position: "absolute",
-              inset: "-8px",
-              borderRadius: "50%",
-              background: `conic-gradient(from 180deg, ${C.primary}, ${C.gold}, ${C.primary})`,
-              animation: "spin-slow 12s linear infinite reverse",
-              opacity: 0.3,
-            }}
-          />
-
-          {/* Photo */}
+          {/* ── Presenter Photo ── */}
           <div
             style={{
               position: "relative",
-              width: "100%",
-              height: "100%",
-              borderRadius: "50%",
-              overflow: "hidden",
-              border: `3px solid ${C.gold}`,
-              boxShadow: "0 0 30px rgba(245, 197, 24, 0.2)",
+              width: "64px",
+              height: "64px",
+              flexShrink: 0,
             }}
           >
-            {presenter.profilePhotoUrl ? (
-              <img
-                src={presenter.profilePhotoUrl}
-                alt={presenter.name}
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                }}
-              />
-            ) : (
-              <div
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  background: `linear-gradient(135deg, ${C.primary}, ${C.dark})`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#fff",
-                  fontSize: "clamp(32px, 4vw, 56px)",
-                  fontWeight: 700,
-                }}
-              >
-                {presenter.name?.charAt(0) || "?"}
-              </div>
-            )}
-
-            {/* Gold corner badge */}
+            {/* Animated border ring */}
             <div
               style={{
                 position: "absolute",
-                bottom: 0,
-                right: 0,
-                background: C.gold,
-                color: C.dark,
-                width: "clamp(24px, 3vw, 36px)",
-                height: "clamp(24px, 3vw, 36px)",
+                inset: "-3px",
                 borderRadius: "50%",
+                background: `conic-gradient(from 0deg, ${C.gold}, ${C.goldLight}, ${C.gold}, ${C.goldLight}, ${C.gold})`,
+                animation: "spin-slow 8s linear infinite",
+                opacity: 0.6,
+              }}
+            />
+
+            {/* Photo */}
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                borderRadius: "50%",
+                overflow: "hidden",
+                border: `2px solid ${C.gold}`,
+                boxShadow: "0 0 20px rgba(245, 197, 24, 0.15)",
+              }}
+            >
+              {presenter.profilePhotoUrl ? (
+                <img
+                  src={presenter.profilePhotoUrl}
+                  alt={presenter.name}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    background: `linear-gradient(135deg, ${C.primary}, ${C.dark})`,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                    fontSize: "24px",
+                    fontWeight: 700,
+                  }}
+                >
+                  {presenter.name?.charAt(0) || "?"}
+                </div>
+              )}
+
+              {/* Gold corner badge */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: -2,
+                  right: -2,
+                  background: C.gold,
+                  color: C.dark,
+                  width: "20px",
+                  height: "20px",
+                  borderRadius: "50%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: `2px solid ${C.dark}`,
+                  fontSize: "10px",
+                }}
+              >
+                <FiStar size="10px" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Presenter Info ── */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Badge - Week of */}
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                background: `${C.gold}22`,
+                border: `1px solid ${C.gold}44`,
+                borderRadius: 999,
+                padding: "2px 10px",
+                fontSize: 9,
+                fontWeight: 600,
+                color: C.goldLight,
+                marginBottom: 4,
+              }}
+            >
+              <FiCalendar size={10} />
+              {t.thisWeekPresenter || "This Week's Presenter"}
+            </div>
+
+            {/* Name */}
+            <h2
+              style={{
+                margin: 0,
+                fontSize: "16px",
+                fontWeight: 700,
+                fontFamily: F.serif,
+                color: "#fff",
+                lineHeight: 1.2,
+              }}
+            >
+              {presenter.name}
+            </h2>
+
+            {/* Department & Position */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
+                fontSize: "12px",
+                color: "#c9d0f0",
+                marginTop: 2,
+              }}
+            >
+              {presenter.department && (
+                <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                  <FiBriefcase size="12px" />
+                  {presenter.department}
+                </span>
+              )}
+              {presenter.position && (
+                <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                  <FiUser size="12px" />
+                  {presenter.position}
+                </span>
+              )}
+            </div>
+
+            {/* Presentation Title */}
+            {presenter.presentationTitle && (
+              <div
+                style={{
+                  display: "inline-block",
+                  background: `${C.gold}11`,
+                  border: `1px solid ${C.gold}33`,
+                  borderRadius: 6,
+                  padding: "2px 10px",
+                  fontSize: "11px",
+                  color: C.goldLight,
+                  marginTop: 4,
+                  fontStyle: "italic",
+                  maxWidth: "100%",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                "{presenter.presentationTitle}"
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Countdown Timer ── */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: "12px",
+            padding: "8px 0",
+            borderTop: `1px solid rgba(255,255,255,0.06)`,
+            borderBottom: `1px solid rgba(255,255,255,0.06)`,
+          }}
+        >
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                fontSize: "18px",
+                fontWeight: 700,
+                color: C.gold,
+                fontFamily: F.serif,
+                lineHeight: 1.2,
+              }}
+            >
+              {String(timeRemaining.days).padStart(2, "0")}
+            </div>
+            <div
+              style={{
+                fontSize: 8,
+                color: "#a9b3e0",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
+              Days
+            </div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                fontSize: "18px",
+                fontWeight: 700,
+                color: C.gold,
+                fontFamily: F.serif,
+                lineHeight: 1.2,
+              }}
+            >
+              {String(timeRemaining.hours).padStart(2, "0")}
+            </div>
+            <div
+              style={{
+                fontSize: 8,
+                color: "#a9b3e0",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
+              Hours
+            </div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                fontSize: "18px",
+                fontWeight: 700,
+                color: C.gold,
+                fontFamily: F.serif,
+                lineHeight: 1.2,
+              }}
+            >
+              {String(timeRemaining.minutes).padStart(2, "0")}
+            </div>
+            <div
+              style={{
+                fontSize: 8,
+                color: "#a9b3e0",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
+              Min
+            </div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div
+              style={{
+                fontSize: "18px",
+                fontWeight: 700,
+                color: C.gold,
+                fontFamily: F.serif,
+                lineHeight: 1.2,
+              }}
+            >
+              {String(timeRemaining.seconds).padStart(2, "0")}
+            </div>
+            <div
+              style={{
+                fontSize: 8,
+                color: "#a9b3e0",
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
+              Sec
+            </div>
+          </div>
+        </div>
+
+        {/* ── Achievement Badges Row ── */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-around",
+            gap: 4,
+            paddingTop: 4,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: "50%",
+                background: `${C.gold}22`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                border: `2px solid ${C.dark}`,
-                fontSize: "clamp(10px, 1.2vw, 14px)",
+                color: C.gold,
               }}
             >
-              <FiStar size="clamp(12px, 1.5vw, 18px)" />
+              <FiStar size="12px" />
+            </div>
+            <div>
+              <div style={{ fontSize: 8, color: "#a9b3e0" }}>Presented</div>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: "#fff",
+                  lineHeight: 1.2,
+                }}
+              >
+                {presenter.timesPresented || 0}x
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* ── Presenter Info ── */}
-        <div style={{ color: "#fff" }}>
-          {/* Badge - Week of */}
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              background: `${C.gold}22`,
-              border: `1px solid ${C.gold}55`,
-              borderRadius: 999,
-              padding: "4px 14px",
-              fontSize: 11,
-              fontWeight: 600,
-              color: C.goldLight,
-              marginBottom: 10,
-            }}
-          >
-            <FiCalendar size={13} />
-            {t.thisWeekPresenter || "This Week's Presenter"}
-          </div>
-
-          {/* Name */}
-          <h2
-            style={{
-              margin: "0 0 4px",
-              fontSize: "clamp(20px, 2.8vw, 32px)",
-              fontWeight: 800,
-              fontFamily: F.serif,
-              color: "#fff",
-            }}
-          >
-            {presenter.name}
-          </h2>
-
-          {/* Department & Position */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 12,
-              flexWrap: "wrap",
-              marginBottom: 8,
-              fontSize: "clamp(13px, 1.2vw, 15px)",
-              color: "#c9d0f0",
-            }}
-          >
-            {presenter.department && (
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <FiBriefcase size={14} />
-                {presenter.department}
-              </span>
-            )}
-            {presenter.position && (
-              <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <FiUser size={14} />
-                {presenter.position}
-              </span>
-            )}
-          </div>
-
-          {/* Presentation Title */}
-          {presenter.presentationTitle && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div
               style={{
-                display: "inline-block",
-                background: `${C.gold}11`,
-                border: `1px solid ${C.gold}44`,
-                borderRadius: 8,
-                padding: "6px 14px",
-                fontSize: "clamp(13px, 1.2vw, 15px)",
-                color: C.goldLight,
-                marginBottom: 12,
-                fontStyle: "italic",
+                width: 24,
+                height: 24,
+                borderRadius: "50%",
+                background: `${C.gold}22`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: C.gold,
               }}
             >
-              "{presenter.presentationTitle}"
+              <FiThumbsUp size="12px" />
             </div>
-          )}
-
-          {/* Countdown Timer */}
-          <div
-            style={{
-              display: "flex",
-              gap: "clamp(12px, 2vw, 24px)",
-              marginTop: 4,
-            }}
-          >
-            <div style={{ textAlign: "center" }}>
+            <div>
+              <div style={{ fontSize: 8, color: "#a9b3e0" }}>Endorsements</div>
               <div
                 style={{
-                  fontSize: "clamp(18px, 2.2vw, 28px)",
+                  fontSize: 13,
                   fontWeight: 700,
-                  color: C.gold,
-                  fontFamily: F.serif,
+                  color: "#fff",
+                  lineHeight: 1.2,
                 }}
               >
-                {String(timeRemaining.days).padStart(2, "0")}
+                {presenter.endorsementCount || 0}
               </div>
-              <div style={{ fontSize: 10, color: "#a9b3e0" }}>Days</div>
             </div>
-            <div style={{ textAlign: "center" }}>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: "50%",
+                background: `${C.gold}22`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: C.gold,
+              }}
+            >
+              <FiTrendingUp size="12px" />
+            </div>
+            <div>
+              <div style={{ fontSize: 8, color: "#a9b3e0" }}>Rating</div>
               <div
                 style={{
-                  fontSize: "clamp(18px, 2.2vw, 28px)",
+                  fontSize: 13,
                   fontWeight: 700,
-                  color: C.gold,
-                  fontFamily: F.serif,
+                  color: "#fff",
+                  lineHeight: 1.2,
                 }}
               >
-                {String(timeRemaining.hours).padStart(2, "0")}
+                {presenter.averageRating
+                  ? `${presenter.averageRating.toFixed(1)}★`
+                  : "N/A"}
               </div>
-              <div style={{ fontSize: 10, color: "#a9b3e0" }}>Hours</div>
-            </div>
-            <div style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  fontSize: "clamp(18px, 2.2vw, 28px)",
-                  fontWeight: 700,
-                  color: C.gold,
-                  fontFamily: F.serif,
-                }}
-              >
-                {String(timeRemaining.minutes).padStart(2, "0")}
-              </div>
-              <div style={{ fontSize: 10, color: "#a9b3e0" }}>Min</div>
-            </div>
-            <div style={{ textAlign: "center" }}>
-              <div
-                style={{
-                  fontSize: "clamp(18px, 2.2vw, 28px)",
-                  fontWeight: 700,
-                  color: C.gold,
-                  fontFamily: F.serif,
-                }}
-              >
-                {String(timeRemaining.seconds).padStart(2, "0")}
-              </div>
-              <div style={{ fontSize: 10, color: "#a9b3e0" }}>Sec</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Achievement Badges Row ── */}
-      <div
-        style={{
-          position: "relative",
-          zIndex: 1,
-          display: "flex",
-          gap: "clamp(16px, 2vw, 30px)",
-          padding: "clamp(12px, 2vw, 20px) clamp(20px, 4vw, 40px)",
-          borderTop: `1px solid rgba(255,255,255,0.06)`,
-          background: "rgba(0,0,0,0.2)",
-          flexWrap: "wrap",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              background: `${C.gold}22`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: C.gold,
-            }}
-          >
-            <FiStar size={14} />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "#a9b3e0" }}>
-              {t.timesPresented || "Times Presented"}
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>
-              {presenter.timesPresented || 0}x
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              background: `${C.gold}22`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: C.gold,
-            }}
-          >
-            <FiThumbsUp size={14} />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "#a9b3e0" }}>
-              {t.endorsements || "Endorsements"}
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>
-              {presenter.endorsementCount || 0}
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div
-            style={{
-              width: 32,
-              height: 32,
-              borderRadius: "50%",
-              background: `${C.gold}22`,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: C.gold,
-            }}
-          >
-            <FiTrendingUp size={14} />
-          </div>
-          <div>
-            <div style={{ fontSize: 11, color: "#a9b3e0" }}>
-              {t.avgRating || "Avg Rating"}
-            </div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>
-              {presenter.averageRating
-                ? `${presenter.averageRating.toFixed(1)} ★`
-                : "N/A"}
             </div>
           </div>
         </div>
@@ -597,7 +652,7 @@ export default function PresenterSpotlight({ onRefresh }) {
         }
         @keyframes float {
           0%, 100% { transform: translateY(0px) scale(1); }
-          50% { transform: translateY(-20px) scale(1.1); }
+          50% { transform: translateY(-12px) scale(1.05); }
         }
         @keyframes pulse-ring {
           0%, 100% { transform: scale(1); opacity: 0.5; }
@@ -606,6 +661,11 @@ export default function PresenterSpotlight({ onRefresh }) {
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @media (max-width: 400px) {
+          .presenter-title {
+            font-size: 10px;
+          }
         }
       `}</style>
     </div>
