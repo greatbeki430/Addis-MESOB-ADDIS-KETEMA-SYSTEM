@@ -19,6 +19,64 @@ import {
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 
+// ── Ethiopian calendar conversion (same math as GalleryUploader.jsx) ──
+const ETHIOPIAN_MONTHS_AM = [
+  "መስከረም",
+  "ጥቅምት",
+  "ህዳር",
+  "ታህሳስ",
+  "ጥር",
+  "የካቲት",
+  "መጋቢት",
+  "ሚያዝያ",
+  "ግንቦት",
+  "ሰኔ",
+  "ሐምሌ",
+  "ነሐሴ",
+  "ጳጉሜ",
+];
+
+const JDN_EPOCH_OFFSET_AMETE_MIHRET = 1723856;
+
+function gregorianToJDN(year, month, day) {
+  const a = Math.floor((14 - month) / 12);
+  const y = year + 4800 - a;
+  const m = month + 12 * a - 3;
+  return (
+    day +
+    Math.floor((153 * m + 2) / 5) +
+    365 * y +
+    Math.floor(y / 4) -
+    Math.floor(y / 100) +
+    Math.floor(y / 400) -
+    32045
+  );
+}
+
+function toEthiopianDate(date = new Date()) {
+  const jdn = gregorianToJDN(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    date.getDate(),
+  );
+  const offsetDays = jdn - JDN_EPOCH_OFFSET_AMETE_MIHRET;
+  const r = offsetDays % 1461;
+  const n = (r % 365) + 365 * Math.floor(r / 1460);
+  const year =
+    4 * Math.floor(offsetDays / 1461) +
+    Math.floor(r / 365) -
+    Math.floor(r / 1460);
+  const month = Math.floor(n / 30) + 1;
+  const day = (n % 30) + 1;
+  return { year, month, day };
+}
+
+function formatEthiopianDateAmharic(date = new Date()) {
+  const { year, day, month } = toEthiopianDate(date);
+  const monthName = ETHIOPIAN_MONTHS_AM[month - 1];
+  return `${monthName} ${day} ቀን ${year} ዓ.ም`;
+}
+
 export default function ReportExport({ sessionId }) {
   const { t } = useLanguage();
   const [exporting, setExporting] = useState(false);
@@ -146,11 +204,15 @@ export default function ReportExport({ sessionId }) {
         align: "center",
       });
 
-      // Subtitle / Date
+      // Subtitle / Date — Ethiopian (Amharic) date first, Gregorian alongside it
+      const generatedDate = new Date(data.date);
+      const ethiopianDateStr = formatEthiopianDateAmharic(generatedDate);
+      const gregorianDateStr = generatedDate.toLocaleString();
+
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
       doc.text(
-        `${ct("generated", "Generated")}: ${new Date(data.date).toLocaleString()}`,
+        `${ct("generated", "Generated")}: ${ethiopianDateStr}  |  ${gregorianDateStr}`,
         pageWidth / 2,
         28,
         { align: "center" },
@@ -237,7 +299,6 @@ export default function ReportExport({ sessionId }) {
           const status = a.attended
             ? `✅ ${gt("present", "Present")}`
             : `❌ ${gt("absent", "Absent")}`;
-
           // For present with signature, we'll add a placeholder that will be replaced with image
           if (a.attended && a.signature && a.signature.length > 100) {
             return [
@@ -435,10 +496,20 @@ export default function ReportExport({ sessionId }) {
   const exportAsExcel = (data, filename) => {
     try {
       const wb = XLSX.utils.book_new();
+      // Ethiopian + Gregorian date, reused across every sheet below
+      const generatedDate = new Date(data.date);
+      const ethiopianDateStr = formatEthiopianDateAmharic(generatedDate);
+      const gregorianDateStr = generatedDate.toLocaleString();
+      const generatedRow = [
+        ct("generated", "Generated"),
+        `${ethiopianDateStr} | ${gregorianDateStr}`,
+      ];
 
       // Attendance data
       if (data.attendance) {
         const attendanceRows = [
+          generatedRow,
+          [],
           [
             ct("name", "Name"),
             ct("department", "Department"),
@@ -494,6 +565,8 @@ export default function ReportExport({ sessionId }) {
       // Sessions data
       if (data.sessions) {
         const sessionRows = [
+          generatedRow,
+          [],
           [
             ct("title", "Title"),
             ct("date", "Date"),
@@ -523,6 +596,8 @@ export default function ReportExport({ sessionId }) {
       // Gallery data
       if (data.photos) {
         const galleryRows = [
+          generatedRow,
+          [],
           [
             ct("title", "Title"),
             gt("category", "Category"),
@@ -594,7 +669,7 @@ export default function ReportExport({ sessionId }) {
         <body>
           <div class="header">
             <h1>${data.title || gt("reportTitle", "Report")}</h1>
-            <p><strong>${ct("generated", "Generated")}:</strong> ${new Date(data.date).toLocaleString()}</p>
+            <p><strong>${ct("generated", "Generated")}:</strong> ${formatEthiopianDateAmharic(new Date(data.date))} | ${new Date(data.date).toLocaleString()}</p>
             <p><strong>${gt("reportType", "Report Type")}:</strong> ${reportType}</p>
           </div>
       `;
@@ -676,7 +751,7 @@ export default function ReportExport({ sessionId }) {
           htmlContent += `
             <tr>
               <td>${s.presentationTitle || s.title || gt("untitled", "Untitled")}</td>
-              <td>${new Date(s.date).toLocaleDateString()}</td>
+              <td>${formatEthiopianDateAmharic(new Date(s.date))} | ${new Date(s.date).toLocaleDateString()}</td>
               <td>${s.presenterName || ct("na", "N/A")}</td>
               <td>${s.averageRating ? `${s.averageRating.toFixed(1)} ★` : ct("na", "N/A")}</td>
               <td>${s.status || ct("unknown", "Unknown")}</td>
