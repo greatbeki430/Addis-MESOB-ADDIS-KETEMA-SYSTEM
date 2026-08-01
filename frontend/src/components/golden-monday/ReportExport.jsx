@@ -6,6 +6,9 @@ import { C, F } from "../../styles/theme";
 import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
+import { createPDF } from "../../utils/pdf/pdfEngine";
+import { FONT_NAMES } from "../../utils/pdf/fontLoader";
+import { isAmharic } from "../../utils/pdf/language";
 import {
   FiDownload,
   FiFileText,
@@ -75,6 +78,60 @@ function formatEthiopianDateAmharic(date = new Date()) {
   const { year, day, month } = toEthiopianDate(date);
   const monthName = ETHIOPIAN_MONTHS_AM[month - 1];
   return `${monthName} ${day} ቀን ${year} ዓ.ም`;
+}
+
+// ── Mixed-script text drawing (same approach as dailyReport.js) ──
+// jsPDF can't render Amharic + Latin in one string with a single font, so
+// this splits the string into script runs and switches font per run.
+const AMHARIC_CHAR_RE = /[\u1200-\u137F]/;
+const SCRIPT_RUN_RE = /[\u1200-\u137F]+|[^\u1200-\u137F]+/g;
+
+function splitIntoScriptRuns(text) {
+  const str = String(text ?? "");
+  const runs = str.match(SCRIPT_RUN_RE) || [str];
+  return runs.map((run) => ({
+    text: run,
+    isAmharic: AMHARIC_CHAR_RE.test(run),
+  }));
+}
+
+function setFontForRun(doc, isAmharicRun, bold) {
+  const style = bold ? "bold" : "normal";
+  try {
+    if (isAmharicRun) {
+      doc.setFont(
+        doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica",
+        style,
+      );
+    } else {
+      doc.setFont(doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica", style);
+    }
+  } catch (error) {
+    console.warn("Font fallback while drawing mixed text:", error.message);
+    doc.setFont("helvetica", style);
+  }
+}
+
+function drawMixedScriptText(doc, text, x, y, opts = {}) {
+  const { align = "left", bold = false } = opts;
+  const runs = splitIntoScriptRuns(text);
+  const widths = runs.map((run) => {
+    setFontForRun(doc, run.isAmharic, bold);
+    return doc.getTextWidth(run.text);
+  });
+  const totalWidth = widths.reduce((sum, w) => sum + w, 0);
+
+  let startX = x;
+  if (align === "center") startX = x - totalWidth / 2;
+  else if (align === "right") startX = x - totalWidth;
+
+  let cursorX = startX;
+  runs.forEach((run, i) => {
+    setFontForRun(doc, run.isAmharic, bold);
+    doc.text(run.text, cursorX, y, { align: "left" });
+    cursorX += widths[i];
+  });
+  return totalWidth;
 }
 
 export default function ReportExport({ sessionId }) {
@@ -189,20 +246,26 @@ export default function ReportExport({ sessionId }) {
   // ─── Export as PDF ──────────────────────────────────────────
   const exportAsPDF = async (data, filename) => {
     try {
-      // Dynamic import for PDF libraries
-      const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default;
 
-      // Use LANDSCAPE orientation for more width
-      const doc = new jsPDF("l", "mm", "a4");
+      // ✅ Uses your existing PDFEngine — fonts are already loaded here
+      const engine = createPDF({ orientation: "landscape", theme: "report" });
+      const doc = engine.getDoc();
       const pageWidth = doc.internal.pageSize.getWidth();
 
       // Title
       doc.setFontSize(18);
       doc.setTextColor(26, 58, 173);
-      doc.text(data.title || gt("reportTitle", "Report"), pageWidth / 2, 20, {
-        align: "center",
-      });
+      drawMixedScriptText(
+        doc,
+        data.title || gt("reportTitle", "Report"),
+        pageWidth / 2,
+        20,
+        {
+          align: "center",
+          bold: true,
+        },
+      );
 
       // Subtitle / Date — Ethiopian (Amharic) date first, Gregorian alongside it
       const generatedDate = new Date(data.date);
@@ -211,7 +274,8 @@ export default function ReportExport({ sessionId }) {
 
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
-      doc.text(
+      drawMixedScriptText(
+        doc,
         `${ct("generated", "Generated")}: ${ethiopianDateStr}  |  ${gregorianDateStr}`,
         pageWidth / 2,
         28,
@@ -220,11 +284,34 @@ export default function ReportExport({ sessionId }) {
 
       let yPos = 35;
 
+      // Shared per-cell font switcher for every table below
+      const makeDidParseCell = (extra) => (cellData) => {
+        const raw =
+          typeof cellData.cell.raw === "string" ? cellData.cell.raw : "";
+        cellData.cell.styles.font = isAmharic(raw)
+          ? doc.__hasEthiopicFont
+            ? FONT_NAMES.ethiopic
+            : "helvetica"
+          : doc.__hasLatinFont
+            ? FONT_NAMES.latin
+            : "helvetica";
+        if (extra) extra(cellData);
+      };
+
+      const baseTableStyles = {
+        font: doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica",
+      };
+
       // Attendance Report
       if (data.attendance) {
         doc.setFontSize(12);
         doc.setTextColor(0, 0, 0);
-        doc.text(gt("attendanceReport", "Attendance Report"), 14, yPos);
+        drawMixedScriptText(
+          doc,
+          gt("attendanceReport", "Attendance Report"),
+          14,
+          yPos,
+        );
         yPos += 6;
 
         const total = data.attendance.length;
@@ -232,7 +319,6 @@ export default function ReportExport({ sessionId }) {
         const absentCount = total - present;
         const rate = total > 0 ? Math.round((present / total) * 100) : 0;
 
-        // Summary table with proper data
         const summaryData = [
           [ct("metric", "Metric"), ct("value", "Value")],
           [ct("total", "Total"), total],
@@ -247,16 +333,21 @@ export default function ReportExport({ sessionId }) {
           body: summaryData.slice(1),
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
+          styles: baseTableStyles,
+          didParseCell: makeDidParseCell(),
         });
 
         yPos = doc.lastAutoTable.finalY + 8;
 
-        // Detailed Attendance Table with Signature Images
         doc.setFontSize(12);
-        doc.text(gt("detailedAttendance", "Detailed Attendance"), 14, yPos);
+        drawMixedScriptText(
+          doc,
+          gt("detailedAttendance", "Detailed Attendance"),
+          14,
+          yPos,
+        );
         yPos += 6;
 
-        // Filter attendance
         const presentWithSignatures = data.attendance.filter(
           (a) => a.attended && a.signature && a.signature.length > 100,
         );
@@ -264,18 +355,13 @@ export default function ReportExport({ sessionId }) {
           (a) => a.attended && (!a.signature || a.signature.length <= 100),
         );
         const absentEmployees = data.attendance.filter((a) => !a.attended);
-
-        // Combine: present with signatures first, then present without, then absent
         const sortedAttendance = [
           ...presentWithSignatures,
           ...presentWithoutSignature,
           ...absentEmployees,
         ];
-
-        // Check if any attendance has signatures
         const hasSignatures = presentWithSignatures.length > 0;
 
-        // Table headers - shorter names to save space
         const headers = [
           ct("name", "Name"),
           ct("dept", "Dept"),
@@ -284,22 +370,13 @@ export default function ReportExport({ sessionId }) {
           gt("sig", "Sig"),
         ];
 
-        // Column widths - proportioned to fill the full landscape page width
-        // (297mm page - 14mm margin each side = 269mm usable)
-        // const colWidths = [45, 35, 90, 40, 25];
-        // Only the signature column needs a fixed width — everything else
-        // auto-scales to fill the table.
         const colWidths = [null, null, null, null, 25];
-
-        // Row height for signatures
         const signatureRowHeight = hasSignatures ? 9 : 7;
 
-        // Build table data
         const tableData = sortedAttendance.map((a) => {
           const status = a.attended
             ? `✅ ${gt("present", "Present")}`
             : `❌ ${gt("absent", "Absent")}`;
-          // For present with signature, we'll add a placeholder that will be replaced with image
           if (a.attended && a.signature && a.signature.length > 100) {
             return [
               a.name || ct("unknown", "Unknown"),
@@ -308,18 +385,16 @@ export default function ReportExport({ sessionId }) {
               status,
               { content: "signature", signature: a.signature },
             ];
-          } else {
-            return [
-              a.name || ct("unknown", "Unknown"),
-              a.department || ct("na", "N/A"),
-              a.email || ct("na", "N/A"),
-              status,
-              a.attended ? "✗" : "—",
-            ];
           }
+          return [
+            a.name || ct("unknown", "Unknown"),
+            a.department || ct("na", "N/A"),
+            a.email || ct("na", "N/A"),
+            status,
+            a.attended ? "✗" : "—",
+          ];
         });
 
-        // Generate the table with autoTable
         autoTable(doc, {
           startY: yPos,
           head: [headers],
@@ -336,41 +411,28 @@ export default function ReportExport({ sessionId }) {
           ),
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 9, cellPadding: 3 },
+          styles: { ...baseTableStyles, fontSize: 9, cellPadding: 3 },
           tableWidth: pageWidth - 28,
           margin: { left: 14, right: 14 },
-          // columnStyles: {
-          //   0: { cellWidth: colWidths[0] },
-          //   1: { cellWidth: colWidths[1] },
-          //   2: { cellWidth: colWidths[2] },
-          //   3: { cellWidth: colWidths[3] },
-          //   4: { cellWidth: colWidths[4] },
-          // },
-          columnStyles: {
-            // Columns 0-3 left as 'auto' (the default) so they scale up and
-            // fill the remaining table width, same as the summary table above —
-            // that's what was making this table stop short of the page edge.
-            4: { cellWidth: colWidths[4] }, // signature column stays fixed —
-            // didParseCell/didDrawCell size the signature image off this exact
-            // value, so it can't be left to auto-size.
-          },
+          columnStyles: { 4: { cellWidth: colWidths[4] } },
           rowHeight: signatureRowHeight,
-          didParseCell: function (data) {
-            const rowData = data.row.raw;
-            if (rowData && Array.isArray(rowData) && data.column.index === 4) {
-              const cellData = rowData[4];
-              if (typeof cellData === "object" && cellData.signature) {
-                data.cell.styles = {
-                  cellWidth: colWidths[4],
-                  minCellHeight: 7,
-                };
+          didParseCell: makeDidParseCell((cellData) => {
+            const rowData = cellData.row.raw;
+            if (
+              rowData &&
+              Array.isArray(rowData) &&
+              cellData.column.index === 4
+            ) {
+              const sig = rowData[4];
+              if (typeof sig === "object" && sig.signature) {
+                cellData.cell.styles.cellWidth = colWidths[4];
+                cellData.cell.styles.minCellHeight = 7;
               }
             }
-          },
-          didDrawCell: function (data) {
-            // Draw signature image in the signature column
-            if (data.column.index === 4) {
-              const rowData = data.row.raw;
+          }),
+          didDrawCell: function (tableData) {
+            if (tableData.column.index === 4) {
+              const rowData = tableData.row.raw;
               if (rowData && Array.isArray(rowData)) {
                 const cellData = rowData[4];
                 if (
@@ -379,15 +441,15 @@ export default function ReportExport({ sessionId }) {
                   cellData.signature.length > 100
                 ) {
                   try {
-                    const width = Math.min(data.cell.width - 2, 12);
-                    const height = Math.min(data.cell.height - 2, 5);
-                    const offsetX = (data.cell.width - width) / 2;
-                    const offsetY = (data.cell.height - height) / 2;
+                    const width = Math.min(tableData.cell.width - 2, 12);
+                    const height = Math.min(tableData.cell.height - 2, 5);
+                    const offsetX = (tableData.cell.width - width) / 2;
+                    const offsetY = (tableData.cell.height - height) / 2;
                     doc.addImage(
                       cellData.signature,
                       "PNG",
-                      data.cell.x + offsetX,
-                      data.cell.y + offsetY,
+                      tableData.cell.x + offsetX,
+                      tableData.cell.y + offsetY,
                       width,
                       height,
                     );
@@ -395,7 +457,7 @@ export default function ReportExport({ sessionId }) {
                     console.warn("Could not add signature image:", imgError);
                     doc.setFontSize(6);
                     doc.setTextColor(26, 58, 173);
-                    doc.text("✓", data.cell.x + 4, data.cell.y + 5);
+                    doc.text("✓", tableData.cell.x + 4, tableData.cell.y + 5);
                   }
                 }
               }
@@ -410,7 +472,12 @@ export default function ReportExport({ sessionId }) {
       if (data.sessions) {
         yPos = doc.lastAutoTable?.finalY + 8 || 35;
         doc.setFontSize(12);
-        doc.text(gt("sessionsReport", "Sessions Report"), 14, yPos);
+        drawMixedScriptText(
+          doc,
+          gt("sessionsReport", "Sessions Report"),
+          14,
+          yPos,
+        );
         yPos += 6;
 
         const sessionData = data.sessions.map((s) => [
@@ -435,7 +502,8 @@ export default function ReportExport({ sessionId }) {
           body: sessionData,
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 6 },
+          styles: { ...baseTableStyles, fontSize: 8 },
+          didParseCell: makeDidParseCell(),
         });
       }
 
@@ -443,7 +511,12 @@ export default function ReportExport({ sessionId }) {
       if (data.photos) {
         yPos = doc.lastAutoTable?.finalY + 8 || 35;
         doc.setFontSize(12);
-        doc.text(gt("galleryReport", "Gallery Report"), 14, yPos);
+        drawMixedScriptText(
+          doc,
+          gt("galleryReport", "Gallery Report"),
+          14,
+          yPos,
+        );
         yPos += 6;
 
         const galleryData = data.photos.map((p) => [
@@ -466,7 +539,8 @@ export default function ReportExport({ sessionId }) {
           body: galleryData,
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 6 },
+          styles: { ...baseTableStyles, fontSize: 8 },
+          didParseCell: makeDidParseCell(),
         });
       }
 
@@ -476,7 +550,8 @@ export default function ReportExport({ sessionId }) {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        doc.text(
+        drawMixedScriptText(
+          doc,
           `${ct("page", "Page")} ${i} ${ct("of", "of")} ${pageCount}`,
           pageWidth / 2,
           doc.internal.pageSize.getHeight() - 10,
@@ -484,7 +559,7 @@ export default function ReportExport({ sessionId }) {
         );
       }
 
-      doc.save(filename);
+      engine.save(filename);
       return true;
     } catch (error) {
       console.error("PDF export error:", error);
