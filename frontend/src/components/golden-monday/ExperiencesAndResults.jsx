@@ -1,11 +1,9 @@
 // src/components/golden-monday/ExperiencesAndResults.jsx
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { C, F } from "../../styles/theme";
 import { useAuth } from "../../hooks/useAuth";
-import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
-import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
 import {
   FiThumbsUp,
   FiMessageCircle,
@@ -36,15 +34,12 @@ const TIMEFRAMES = [
 
 export default function ExperiencesAndResults({ sessionId }) {
   const { user } = useAuth();
-  const { language } = useLanguage();
-  const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
+  // Removed unused useLanguage entirely
 
   const [activeTab, setActiveTab] = useState("experience");
   const [loading, setLoading] = useState(true);
   const [experiences, setExperiences] = useState([]);
   const [results, setResults] = useState([]);
-  const [paginationExp, setPaginationExp] = useState({ page: 1, total: 0 });
-  const [paginationRes, setPaginationRes] = useState({ page: 1, total: 0 });
 
   // Form states
   const [showForm, setShowForm] = useState(false);
@@ -59,28 +54,53 @@ export default function ExperiencesAndResults({ sessionId }) {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // Use ref to prevent double execution on mount
+  const isMounted = useRef(true);
+  const isInitialLoad = useRef(true);
+
   const loadData = useCallback(async () => {
+    if (!isMounted.current) return;
+
     setLoading(true);
     try {
       const [expRes, resRes] = await Promise.all([
         goldenMondayAPI.getExperiences(sessionId, null, 1, 20),
         goldenMondayAPI.getResults(sessionId, "all", 1, 20),
       ]);
-      setExperiences(expRes.data.experiences || []);
-      setPaginationExp(expRes.data.pagination || { page: 1, total: 0 });
-      setResults(resRes.data.results || []);
-      setPaginationRes(resRes.data.pagination || { page: 1, total: 0 });
+      if (isMounted.current) {
+        setExperiences(expRes.data.experiences || []);
+        setResults(resRes.data.results || []);
+      }
     } catch (err) {
       console.error("Failed to load experiences/results:", err);
-      showToast("Failed to load data", "error");
+      if (isMounted.current) {
+        showToast("Failed to load data", "error");
+      }
     } finally {
-      setLoading(false);
+      if (isMounted.current) {
+        setLoading(false);
+      }
     }
   }, [sessionId]);
 
+  // Clean mount on unmount
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    isMounted.current = true;
+    isInitialLoad.current = true;
+
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  // Load data only on mount, not on every render
+  useEffect(() => {
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      loadData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleEndorse = async (type, id) => {
     try {
@@ -89,10 +109,11 @@ export default function ExperiencesAndResults({ sessionId }) {
           ? await goldenMondayAPI.endorseExperience(id)
           : await goldenMondayAPI.endorseResult(id);
       if (response.data.success) {
-        loadData();
+        await loadData();
         showToast("Endorsement updated!", "success");
       }
     } catch (err) {
+      console.error("Failed to endorse:", err);
       showToast("Failed to endorse", "error");
     }
   };
@@ -103,9 +124,10 @@ export default function ExperiencesAndResults({ sessionId }) {
       type === "experience"
         ? await goldenMondayAPI.deleteExperience(id)
         : await goldenMondayAPI.deleteResult(id);
-      loadData();
+      await loadData();
       showToast("Deleted successfully", "success");
     } catch (err) {
+      console.error("Failed to delete:", err);
       showToast("Failed to delete", "error");
     }
   };
@@ -135,8 +157,9 @@ export default function ExperiencesAndResults({ sessionId }) {
         outcomeCategory: "other",
         timeframe: "within-month",
       });
-      loadData();
+      await loadData();
     } catch (err) {
+      console.error("Failed to submit:", err);
       showToast("Failed to submit", "error");
     } finally {
       setSubmitting(false);
