@@ -40,8 +40,6 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDepartment, setFilterDepartment] = useState("all");
   const [departments, setDepartments] = useState([]);
-  const [mySignature, setMySignature] = useState(null);
-  const [signingFor, setSigningFor] = useState(null);
   const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [signingEmployee, setSigningEmployee] = useState(null);
 
@@ -121,8 +119,6 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
         t.attendanceRecorded || "Attendance recorded successfully!",
         "success",
       );
-      setMySignature(null);
-      setSigningFor(null);
       await loadAttendance();
       if (onRefresh) onRefresh();
     } catch (error) {
@@ -158,14 +154,14 @@ export default function AttendancePanel({ sessionId, onRefresh }) {
   useEffect(() => {
     if (
       isCurrentUserUnsigned &&
-      !signingFor &&
-      !mySignature &&
+      !showSignatureModal &&
       !hasAutoOpened.current
     ) {
       hasAutoOpened.current = true;
-      setSigningFor(currentUserAttendance.user?._id);
+      setSigningEmployee(currentUserAttendance);
+      setShowSignatureModal(true);
     }
-  }, [isCurrentUserUnsigned, signingFor, mySignature, currentUserAttendance]);
+  }, [isCurrentUserUnsigned, showSignatureModal, currentUserAttendance]);
 
   // Group employees by department and position
   const groupEmployees = (employees) => {
