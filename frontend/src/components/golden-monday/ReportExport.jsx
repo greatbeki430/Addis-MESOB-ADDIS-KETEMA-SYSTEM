@@ -237,7 +237,7 @@ export default function ReportExport({ sessionId }) {
           100,
         );
         return {
-          title: "Experiences Shared Report",
+          title: "የተጋሩ ተሞክሮዎች ሪፖርት",
           date: new Date().toISOString(),
           total: expRes.data.experiences?.length || 0,
           experiences: expRes.data.experiences || [],
