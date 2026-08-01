@@ -136,6 +136,7 @@ function drawMixedScriptText(doc, text, x, y, opts = {}) {
 
 export default function ReportExport({ sessionId }) {
   const { t } = useLanguage();
+  // const { t, language, setLanguage } = useLanguage();
   const [exporting, setExporting] = useState(false);
   const [reportType, setReportType] = useState("attendance");
   const [exportFormat, setExportFormat] = useState("pdf");
