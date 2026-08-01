@@ -261,7 +261,11 @@ export default function ReportExport({ sessionId }) {
           body: tableData.map((row) =>
             row.map((cell) =>
               typeof cell === "object" && cell.content === "signature"
-                ? { content: " ", styles: { cellWidth: colWidths[4] } }
+                ? {
+                    content: " ",
+                    signature: cell.signature,
+                    styles: { cellWidth: colWidths[4] },
+                  } // ✅ signature preserved
                 : cell,
             ),
           ),
@@ -280,10 +284,8 @@ export default function ReportExport({ sessionId }) {
             const rowData = data.row.raw;
             if (rowData && Array.isArray(rowData) && data.column.index === 4) {
               const cellData = rowData[4];
-              if (
-                typeof cellData === "object" &&
-                cellData.content === "signature"
-              ) {
+              if (typeof cellData === "object" && cellData.signature) {
+                // ✅ check signature, not content
                 data.cell.styles = {
                   cellWidth: colWidths[4],
                   minCellHeight: 7,
@@ -292,19 +294,16 @@ export default function ReportExport({ sessionId }) {
             }
           },
           didDrawCell: function (data) {
-            // Draw signature image in the signature column - SCALED DOWN
             if (data.column.index === 4) {
               const rowData = data.row.raw;
               if (rowData && Array.isArray(rowData)) {
                 const cellData = rowData[4];
                 if (
                   typeof cellData === "object" &&
-                  cellData.content === "signature" &&
-                  cellData.signature &&
+                  cellData.signature && // ✅ check signature, not content
                   cellData.signature.length > 100
                 ) {
                   try {
-                    // Make signature VERY small
                     const width = Math.min(data.cell.width - 2, 12);
                     const height = Math.min(data.cell.height - 2, 5);
                     const offsetX = (data.cell.width - width) / 2;
