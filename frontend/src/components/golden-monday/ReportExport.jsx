@@ -224,7 +224,10 @@ export default function ReportExport({ sessionId }) {
 
         // Column widths - proportioned to fill the full landscape page width
         // (297mm page - 14mm margin each side = 269mm usable)
-        const colWidths = [45, 35, 90, 40, 25];
+        // const colWidths = [45, 35, 90, 40, 25];
+        // Only the signature column needs a fixed width — everything else
+        // auto-scales to fill the table.
+        const colWidths = [null, null, null, null, 25];
 
         // Row height for signatures
         const signatureRowHeight = hasSignatures ? 9 : 7;
