@@ -498,6 +498,62 @@ export const goldenMondayAPI = {
       data: { reason },
       withCredentials: true,
     }),
+
+  // ──────────────────────────────────────────────────────────────
+  // ✅ EXPERIENCES & RESULTS (New features)
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/golden-monday/experiences - Get experiences
+  getExperiences: (sessionId, tag, page = 1, limit = 20) => {
+    const params = new URLSearchParams({ page, limit });
+    if (sessionId) params.append("session", sessionId);
+    if (tag) params.append("tag", tag);
+    return api.get(`/golden-monday/experiences?${params.toString()}`);
+  },
+
+  // POST /api/golden-monday/experiences - Create an experience
+  createExperience: (data) => api.post("/golden-monday/experiences", data),
+
+  // POST /api/golden-monday/experiences/:id/endorse - Toggle endorsement
+  endorseExperience: (id) =>
+    api.post(`/golden-monday/experiences/${id}/endorse`),
+
+  // DELETE /api/golden-monday/experiences/:id - Delete an experience
+  deleteExperience: (id) => api.delete(`/golden-monday/experiences/${id}`),
+
+  // GET /api/golden-monday/results - Get results
+  getResults: (sessionId, category, page = 1, limit = 20) => {
+    const params = new URLSearchParams({ page, limit });
+    if (sessionId) params.append("session", sessionId);
+    if (category && category !== "all") params.append("category", category);
+    return api.get(`/golden-monday/results?${params.toString()}`);
+  },
+
+  // POST /api/golden-monday/results - Create a result
+  createResult: (data) => api.post("/golden-monday/results", data),
+
+  // POST /api/golden-monday/results/:id/endorse - Toggle endorsement
+  endorseResult: (id) => api.post(`/golden-monday/results/${id}/endorse`),
+
+  // DELETE /api/golden-monday/results/:id - Delete a result
+  deleteResult: (id) => api.delete(`/golden-monday/results/${id}`),
+
+  // ──────────────────────────────────────────────────────────────
+  // ✅ REPORTS (New features)
+  // ──────────────────────────────────────────────────────────────
+
+  // GET /api/golden-monday/reports/rotation - Rotation report
+  getRotationReport: () => api.get("/golden-monday/reports/rotation"),
+
+  // GET /api/golden-monday/reports/employee-performance - Employee performance report
+  getEmployeePerformanceReport: () =>
+    api.get("/golden-monday/reports/employee-performance"),
+
+  // GET /api/golden-monday/reports/dashboard - Dashboard report
+  getDashboardReport: () => api.get("/golden-monday/reports/dashboard"),
+
+  // GET /api/golden-monday/reports/ai-insights - AI insights report
+  getAIInsightsReport: () => api.get("/golden-monday/reports/ai-insights"),
 };
 
 // ✅ Helper: dataURL to Blob (add at the bottom of the file, before export default)
