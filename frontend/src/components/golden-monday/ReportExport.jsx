@@ -251,7 +251,7 @@ export default function ReportExport({ sessionId }) {
           100,
         );
         return {
-          title: "Results Gained Report",
+          title: "የተገኙ ውጤቶች ሪፖርት",
           date: new Date().toISOString(),
           total: resRes.data.results?.length || 0,
           results: resRes.data.results || [],
