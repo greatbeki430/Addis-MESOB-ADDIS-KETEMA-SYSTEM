@@ -222,10 +222,11 @@ export default function ReportExport({ sessionId }) {
           gt("sig", "Sig"),
         ];
 
-        // Column widths - MUCH REDUCED for landscape
-        const colWidths = [30, 25, 50, 20, 18];
+        // Column widths - proportioned to fill the full landscape page width
+        // (297mm page - 14mm margin each side = 269mm usable)
+        const colWidths = [45, 35, 90, 40, 25];
 
-        // Row height for signatures (smaller)
+        // Row height for signatures
         const signatureRowHeight = hasSignatures ? 9 : 7;
 
         // Build table data
@@ -265,13 +266,15 @@ export default function ReportExport({ sessionId }) {
                     content: " ",
                     signature: cell.signature,
                     styles: { cellWidth: colWidths[4] },
-                  } // ✅ signature preserved
+                  }
                 : cell,
             ),
           ),
           theme: "striped",
           headStyles: { fillColor: [26, 58, 173] },
-          styles: { fontSize: 6, cellPadding: 1 },
+          styles: { fontSize: 9, cellPadding: 3 },
+          tableWidth: pageWidth - 28,
+          margin: { left: 14, right: 14 },
           columnStyles: {
             0: { cellWidth: colWidths[0] },
             1: { cellWidth: colWidths[1] },
@@ -285,7 +288,6 @@ export default function ReportExport({ sessionId }) {
             if (rowData && Array.isArray(rowData) && data.column.index === 4) {
               const cellData = rowData[4];
               if (typeof cellData === "object" && cellData.signature) {
-                // ✅ check signature, not content
                 data.cell.styles = {
                   cellWidth: colWidths[4],
                   minCellHeight: 7,
@@ -294,13 +296,14 @@ export default function ReportExport({ sessionId }) {
             }
           },
           didDrawCell: function (data) {
+            // Draw signature image in the signature column
             if (data.column.index === 4) {
               const rowData = data.row.raw;
               if (rowData && Array.isArray(rowData)) {
                 const cellData = rowData[4];
                 if (
                   typeof cellData === "object" &&
-                  cellData.signature && // ✅ check signature, not content
+                  cellData.signature &&
                   cellData.signature.length > 100
                 ) {
                   try {
