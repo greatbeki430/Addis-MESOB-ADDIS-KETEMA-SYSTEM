@@ -1,11 +1,13 @@
 // backend/src/routes/userRoutes.js
 const express = require("express");
-const { protect, adminOrSuperAdmin } = require("../middleware/auth");
+const { protect, adminOrSuperAdmin, anyRole } = require("../middleware/auth");
 const User = require("../models/User");
 
 const router = express.Router();
 
-// Get all users (admin/superadmin only)
+// ──────────────────────────────────────────────────────────────
+// 👤 GET ALL USERS - Admin/SuperAdmin only
+// ──────────────────────────────────────────────────────────────
 router.get("/", protect, adminOrSuperAdmin, async (req, res) => {
   try {
     const users = await User.find().select("-password");
@@ -15,18 +17,26 @@ router.get("/", protect, adminOrSuperAdmin, async (req, res) => {
   }
 });
 
-// Get single user
-router.get("/:id", protect, adminOrSuperAdmin, async (req, res) => {
+// ──────────────────────────────────────────────────────────────
+// 👤 GET SINGLE USER - Any authenticated user can view
+// (Used by PresenterSpotlight to show presenter details)
+// ──────────────────────────────────────────────────────────────
+router.get("/:id", protect, anyRole, async (req, res) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
     res.json(user);
   } catch (error) {
+    console.error("Error fetching user:", error);
     res.status(500).json({ message: error.message });
   }
 });
 
-// Update user
+// ──────────────────────────────────────────────────────────────
+// ✏️ UPDATE USER - Admin/SuperAdmin only
+// ──────────────────────────────────────────────────────────────
 router.put("/:id", protect, adminOrSuperAdmin, async (req, res) => {
   try {
     const { name, email, role, phone } = req.body;
@@ -57,7 +67,9 @@ router.put("/:id", protect, adminOrSuperAdmin, async (req, res) => {
   }
 });
 
-// Delete user (superadmin only)
+// ──────────────────────────────────────────────────────────────
+// 🗑️ DELETE USER - SuperAdmin only
+// ──────────────────────────────────────────────────────────────
 router.delete("/:id", protect, adminOrSuperAdmin, async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
