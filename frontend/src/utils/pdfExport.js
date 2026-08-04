@@ -570,7 +570,7 @@ const setSmartFont = (doc, text, bold = false) => {
   }
 };
 
-// ✅ Export Evaluation Report to PDF (Amharic-safe + signatures)
+// ✅ Export Evaluation Report to PDF (Amharic-safe + signatures - ONE TABLE)
 export const exportEvaluationReportToPDF = (
   scores,
   members,
@@ -627,13 +627,13 @@ export const exportEvaluationReportToPDF = (
     doc.text(`Evaluation Date: ${getEthiopianDate()}`, margin, yPos);
     yPos += 12;
 
-    // ─── TEAM MEMBERS SUMMARY TABLE ──────────────────────────
+    // ─── SINGLE COMPREHENSIVE TABLE ──────────────────────────
     doc.setFillColor(26, 107, 74);
     doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    setSmartFont(doc, "Team Members Summary", true);
-    doc.text("Team Members Summary", margin + 2, yPos);
+    setSmartFont(doc, "Team Performance Summary", true);
+    doc.text("Team Performance Summary", margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
@@ -644,58 +644,189 @@ export const exportEvaluationReportToPDF = (
 
     const sortedMembers = [...memberTotals].sort((a, b) => b.total - a.total);
 
-    autoTable(doc, {
-      startY: yPos,
-      head: [["#", "Member Name", "Total Score (0-100)", "Rank"]],
-      body: sortedMembers.map((m, idx) => [
+    // ── Build table data with ALL columns in ONE table ──
+    const tableHeaders = [
+      "#",
+      "Member Name",
+      "Score",
+      "Rank",
+      "Signature",
+      "Status",
+    ];
+
+    const tableBody = sortedMembers.map((m, idx) => {
+      const rank =
+        idx === 0
+          ? "🥇 1st"
+          : idx === 1
+            ? "🥈 2nd"
+            : idx === 2
+              ? "🥉 3rd"
+              : `#${idx + 1}`;
+
+      // Check if this member has a signature
+      const signatureData = signatures?.[m.name] || null;
+      const hasSignature =
+        signatureData && signatureData.startsWith("data:image");
+
+      // ✅ Get comment for this member
+      const memberIndex = members.indexOf(m.name);
+      const comment = comments?.[memberIndex] || "";
+
+      // ✅ Use comment in status
+      let statusText;
+      if (hasSignature) {
+        statusText = "✅ Signed";
+      } else if (comment) {
+        statusText = "📝 Comment";
+      } else {
+        statusText = "⏳ Pending";
+      }
+
+      return [
         idx + 1,
         encodeText(m.name),
         m.total,
-        idx === 0
-          ? "1st"
-          : idx === 1
-            ? "2nd"
-            : idx === 2
-              ? "3rd"
-              : `#${idx + 1}`,
-      ]),
+        rank,
+        hasSignature
+          ? { content: "signature", signature: signatureData }
+          : "✗ Not signed",
+        statusText,
+      ];
+    });
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [tableHeaders],
+      body: tableBody,
       margin: { left: margin, right: margin },
       theme: "striped",
-      headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
-      bodyStyles: { fontSize: 10 },
-      styles: { font: FONT_NAMES.ethiopic },
-      didParseCell: (data) => {
-        const cellText = String(data.cell.raw ?? "");
-        if (!isAmharic(cellText)) {
-          data.cell.styles.font = FONT_NAMES.latin;
+      headStyles: {
+        fillColor: [26, 107, 74],
+        textColor: [255, 255, 255],
+        fontSize: 9,
+        font: FONT_NAMES.latin,
+      },
+      bodyStyles: { fontSize: 8 },
+      columnStyles: {
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 45 },
+        2: { cellWidth: 20, halign: "center" },
+        3: { cellWidth: 25, halign: "center" },
+        4: { cellWidth: 35, halign: "center", minCellHeight: 10 },
+        5: { cellWidth: 25, halign: "center" },
+      },
+      rowHeight: 12,
+      styles: {
+        font: FONT_NAMES.ethiopic,
+      },
+      didParseCell: (cellData) => {
+        const raw =
+          typeof cellData.cell.raw === "string" ? cellData.cell.raw : "";
+        cellData.cell.styles.font = isAmharic(raw)
+          ? FONT_NAMES.ethiopic
+          : FONT_NAMES.latin;
+
+        // Check for signature cell (column index 4)
+        if (cellData.column.index === 4) {
+          const rowData = cellData.row.raw;
+          if (rowData && Array.isArray(rowData)) {
+            const cell = rowData[4];
+            if (
+              typeof cell === "object" &&
+              cell &&
+              cell.content === "signature"
+            ) {
+              cellData.cell.styles.cellWidth = 35;
+              cellData.cell.styles.minCellHeight = 10;
+            }
+          }
+        }
+      },
+      didDrawCell: (tableData) => {
+        // Draw signature in column 4
+        if (tableData.column.index === 4) {
+          const rowData = tableData.row.raw;
+          if (rowData && Array.isArray(rowData)) {
+            const cellData = rowData[4];
+            if (
+              typeof cellData === "object" &&
+              cellData &&
+              cellData.signature
+            ) {
+              try {
+                const width = Math.min(tableData.cell.width - 4, 28);
+                const height = Math.min(tableData.cell.height - 4, 12);
+                const offsetX = (tableData.cell.width - width) / 2;
+                const offsetY = (tableData.cell.height - height) / 2;
+                doc.addImage(
+                  cellData.signature,
+                  "PNG",
+                  tableData.cell.x + offsetX,
+                  tableData.cell.y + offsetY,
+                  width,
+                  height,
+                );
+              } catch (imgError) {
+                console.warn("Could not add signature image:", imgError);
+                doc.setFontSize(6);
+                doc.setTextColor(26, 107, 74);
+                doc.text("✓", tableData.cell.x + 4, tableData.cell.y + 5);
+              }
+            }
+          }
         }
       },
     });
 
     yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
 
-    // ─── BEST PERFORMER ──────────────────────────────────────
+    // ─── BEST PERFORMER ANNOUNCEMENT ──────────────────────
     if (bestPerformer) {
-      const bpText = `Best Performer: ${encodeText(bestPerformer)}`;
+      const bpText = `🏆 Best Performer: ${encodeText(bestPerformer)}`;
       doc.setFontSize(12);
       setSmartFont(doc, bpText, true);
       doc.setTextColor(26, 107, 74);
       doc.text(bpText, margin, yPos);
-      doc.setTextColor(0, 0, 0);
-      yPos += 10;
+      yPos += 8;
+
+      // Show average score
+      const avgScore =
+        sortedMembers.length > 0
+          ? Math.round(
+              sortedMembers.reduce((sum, m) => sum + m.total, 0) /
+                sortedMembers.length,
+            )
+          : 0;
+      const avgText = `📊 Average Score: ${avgScore} / 100`;
+      doc.setFontSize(10);
+      setSmartFont(doc, avgText, false);
+      doc.setTextColor(60, 60, 60);
+      doc.text(avgText, margin, yPos);
+      yPos += 12;
     }
 
-    // ─── COMMENTS SECTION ────────────────────────────────────
+    // ─── COMMENTS / FEEDBACK SECTION (paragraph style) ──
     if (comments && Object.keys(comments).length > 0) {
       const hasComments = Object.values(comments).some(
         (c) => c && c.trim() !== "",
       );
 
       if (hasComments) {
+        if (yPos > 230) {
+          doc.addPage();
+          yPos = margin;
+        }
+
         doc.setFontSize(14);
         setSmartFont(doc, "Individual Feedback & Comments", true);
         doc.text("Individual Feedback & Comments", margin, yPos);
         yPos += 10;
+
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.3);
+        doc.line(margin, yPos, pageWidth - margin, yPos);
+        yPos += 8;
 
         const memberList = members.filter((m) => m.trim() !== "");
         memberList.forEach((member, idx) => {
@@ -707,33 +838,33 @@ export const exportEvaluationReportToPDF = (
           }
 
           const memberLabel = `${encodeText(member)}:`;
-          doc.setFontSize(11);
+          doc.setFontSize(10);
           setSmartFont(doc, memberLabel, true);
           doc.setTextColor(26, 107, 74);
           doc.text(memberLabel, margin, yPos);
-          yPos += 6;
+          yPos += 5;
 
-          doc.setFontSize(10);
+          doc.setFontSize(9);
           setSmartFont(doc, comment, false);
           doc.setTextColor(50, 50, 50);
           const splitComment = doc.splitTextToSize(
             encodeText(comment),
             pageWidth - margin * 2 - 5,
           );
-          doc.text(splitComment, margin + 3, yPos);
-          yPos += splitComment.length * 5 + 8;
+          doc.text(splitComment, margin + 4, yPos);
+          yPos += splitComment.length * 4.5 + 6;
 
           if (idx < memberList.length - 1) {
-            doc.setDrawColor(200, 200, 200);
-            doc.setLineWidth(0.3);
-            doc.line(margin, yPos - 4, pageWidth - margin, yPos - 4);
-            yPos += 4;
+            doc.setDrawColor(220, 220, 220);
+            doc.setLineWidth(0.2);
+            doc.line(margin + 4, yPos - 3, pageWidth - margin - 4, yPos - 3);
+            yPos += 2;
           }
         });
       }
     }
 
-    // ─── AI NARRATIVE SECTION ──────────────────────────────
+    // ─── AI NARRATIVE SECTION (paragraph style) ────────────
     if (includeAINarrative && aiNarrative) {
       if (yPos > 220) {
         doc.addPage();
@@ -793,118 +924,26 @@ export const exportEvaluationReportToPDF = (
       yPos += 8;
     }
 
-    // ─── DIGITAL SIGNATURES SECTION ─────────────────────────
-    // ✅ FIXED: Signature column within the table, just like Golden Monday
-    const signatureEntries = Object.entries(signatures || {}).filter(
-      ([, data]) =>
-        data && typeof data === "string" && data.startsWith("data:image"),
-    );
-
-    if (signatureEntries.length > 0) {
-      if (yPos > 220) {
-        doc.addPage();
-        yPos = margin;
-      }
-
-      doc.setFontSize(14);
-      setSmartFont(doc, "Digital Signatures", true);
-      doc.setTextColor(0, 0, 0);
-      doc.text("Digital Signatures", margin, yPos);
-      yPos += 10;
-
-      // ── Build signature table (like Golden Monday) ──
-      const sigHeaders = ["#", "Name", "Signature", "Status"];
-      const sigTableData = signatureEntries.map(([name, dataUrl], idx) => [
-        idx + 1,
-        encodeText(name),
-        { content: "signature", signature: dataUrl },
-        "✅ Signed",
-      ]);
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [sigHeaders],
-        body: sigTableData,
-        margin: { left: margin, right: margin },
-        theme: "striped",
-        headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
-        bodyStyles: { fontSize: 9 },
-        columnStyles: {
-          2: { cellWidth: 40, minCellHeight: 10 },
-        },
-        rowHeight: 12,
-        didParseCell: (cellData) => {
-          const raw =
-            typeof cellData.cell.raw === "string" ? cellData.cell.raw : "";
-          cellData.cell.styles.font = isAmharic(raw)
-            ? FONT_NAMES.ethiopic
-            : FONT_NAMES.latin;
-
-          // Check for signature cell
-          if (cellData.column.index === 2) {
-            const rowData = cellData.row.raw;
-            if (rowData && Array.isArray(rowData)) {
-              const cell = rowData[2];
-              if (
-                typeof cell === "object" &&
-                cell &&
-                cell.content === "signature"
-              ) {
-                cellData.cell.styles.cellWidth = 40;
-                cellData.cell.styles.minCellHeight = 10;
-              }
-            }
-          }
-        },
-        didDrawCell: (tableData) => {
-          // Draw signature in column 2
-          if (tableData.column.index === 2) {
-            const rowData = tableData.row.raw;
-            if (rowData && Array.isArray(rowData)) {
-              const cellData = rowData[2];
-              if (
-                typeof cellData === "object" &&
-                cellData &&
-                cellData.signature
-              ) {
-                try {
-                  const width = Math.min(tableData.cell.width - 4, 30);
-                  const height = Math.min(tableData.cell.height - 4, 14);
-                  const offsetX = (tableData.cell.width - width) / 2;
-                  const offsetY = (tableData.cell.height - height) / 2;
-                  doc.addImage(
-                    cellData.signature,
-                    "PNG",
-                    tableData.cell.x + offsetX,
-                    tableData.cell.y + offsetY,
-                    width,
-                    height,
-                  );
-                } catch (imgError) {
-                  console.warn("Could not add signature image:", imgError);
-                  doc.setFontSize(6);
-                  doc.setTextColor(26, 107, 74);
-                  doc.text("✓", tableData.cell.x + 4, tableData.cell.y + 5);
-                }
-              }
-            }
-          }
-        },
-      });
-
-      yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
-    }
-
     // ─── FOOTER ──────────────────────────────────────────────
-    doc.setFontSize(8);
-    setSmartFont(doc, "footer", false);
-    doc.setTextColor(150, 150, 150);
-    doc.text(
-      `Generated by Addis MESOB One-Stop Service Center - ${getEthiopianDate()}`,
-      pageWidth / 2,
-      doc.internal.pageSize.getHeight() - 10,
-      { align: "center" },
-    );
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      setSmartFont(doc, "footer", false);
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        `Generated by Addis MESOB One-Stop Service Center - ${getEthiopianDate()}`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: "center" },
+      );
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        pageWidth - margin,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: "right" },
+      );
+    }
 
     doc.save(`evaluation_report_${getEthiopianDate().replace(/\//g, "-")}.pdf`);
     console.log("✅ Evaluation Report PDF generated successfully!");
