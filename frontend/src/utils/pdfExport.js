@@ -555,8 +555,8 @@ export const exportDailyReportToPDF = (rows, date, t) => {
   }
 };
 
-// ✅ Export Evaluation Report to PDF (with Comments Support)
-// ✅ Helper: pick the right embedded font for whatever script the text uses
+// Export Evaluation Report to PDF (with Comments Support)
+// Helper: pick the right embedded font for whatever script the text uses
 // FIXED: previously switched to a mismatched "-Bold" family name while
 // hardcoding the style to "normal" (the same bug as dailyReport.js's
 // setSmartFont). FONT_NAMES.ethiopic/latin now resolve to the one
@@ -669,16 +669,16 @@ export const exportEvaluationReportToPDF = (
       const hasSignature =
         signatureData && signatureData.startsWith("data:image");
 
-      // ✅ Get comment for this member
+      // Get comment for this member
       const memberIndex = members.indexOf(m.name);
       const comment = comments?.[memberIndex] || "";
 
-      // ✅ Use comment in status
+      // Status text
       let statusText;
       if (hasSignature) {
         statusText = "✅ Signed";
       } else if (comment) {
-        statusText = "📝 Comment";
+        statusText = "📝 Has Comment";
       } else {
         statusText = "⏳ Pending";
       }
@@ -688,9 +688,10 @@ export const exportEvaluationReportToPDF = (
         encodeText(m.name),
         m.total,
         rank,
+        // ✅ For signature column: either the image or text
         hasSignature
           ? { content: "signature", signature: signatureData }
-          : "✗ Not signed",
+          : "✗ Not Signed",
         statusText,
       ];
     });
@@ -706,19 +707,24 @@ export const exportEvaluationReportToPDF = (
         textColor: [255, 255, 255],
         fontSize: 9,
         font: FONT_NAMES.latin,
+        halign: "center",
       },
-      bodyStyles: { fontSize: 8 },
+      bodyStyles: {
+        fontSize: 8,
+        halign: "center",
+      },
       columnStyles: {
-        0: { cellWidth: 10, halign: "center" },
-        1: { cellWidth: 45 },
-        2: { cellWidth: 20, halign: "center" },
+        0: { cellWidth: 12, halign: "center" },
+        1: { cellWidth: 50, halign: "left" },
+        2: { cellWidth: 18, halign: "center" },
         3: { cellWidth: 25, halign: "center" },
-        4: { cellWidth: 35, halign: "center", minCellHeight: 10 },
-        5: { cellWidth: 25, halign: "center" },
+        4: { cellWidth: 35, halign: "center", minCellHeight: 12 },
+        5: { cellWidth: 30, halign: "center" },
       },
-      rowHeight: 12,
+      rowHeight: 14,
       styles: {
         font: FONT_NAMES.ethiopic,
+        overflow: "linebreak",
       },
       didParseCell: (cellData) => {
         const raw =
@@ -727,7 +733,7 @@ export const exportEvaluationReportToPDF = (
           ? FONT_NAMES.ethiopic
           : FONT_NAMES.latin;
 
-        // Check for signature cell (column index 4)
+        // ✅ Signature column (index 4) - ensure it's properly sized
         if (cellData.column.index === 4) {
           const rowData = cellData.row.raw;
           if (rowData && Array.isArray(rowData)) {
@@ -738,13 +744,17 @@ export const exportEvaluationReportToPDF = (
               cell.content === "signature"
             ) {
               cellData.cell.styles.cellWidth = 35;
-              cellData.cell.styles.minCellHeight = 10;
+              cellData.cell.styles.minCellHeight = 12;
+              cellData.cell.styles.halign = "center";
+            } else {
+              // Text in signature column should be centered
+              cellData.cell.styles.halign = "center";
             }
           }
         }
       },
       didDrawCell: (tableData) => {
-        // Draw signature in column 4
+        // ✅ Draw signature in column 4 (only if it's a signature object)
         if (tableData.column.index === 4) {
           const rowData = tableData.row.raw;
           if (rowData && Array.isArray(rowData)) {
@@ -755,23 +765,36 @@ export const exportEvaluationReportToPDF = (
               cellData.signature
             ) {
               try {
-                const width = Math.min(tableData.cell.width - 4, 28);
-                const height = Math.min(tableData.cell.height - 4, 12);
-                const offsetX = (tableData.cell.width - width) / 2;
-                const offsetY = (tableData.cell.height - height) / 2;
+                // ✅ Clean signature area - draw only the image
+                const cellWidth = tableData.cell.width;
+                const cellHeight = tableData.cell.height;
+
+                // Calculate image size (leave padding)
+                const imgWidth = Math.min(cellWidth - 8, 28);
+                const imgHeight = Math.min(cellHeight - 8, 12);
+                const offsetX = (cellWidth - imgWidth) / 2;
+                const offsetY = (cellHeight - imgHeight) / 2;
+
                 doc.addImage(
                   cellData.signature,
                   "PNG",
                   tableData.cell.x + offsetX,
                   tableData.cell.y + offsetY,
-                  width,
-                  height,
+                  imgWidth,
+                  imgHeight,
                 );
               } catch (imgError) {
                 console.warn("Could not add signature image:", imgError);
-                doc.setFontSize(6);
+                // Fallback: show a checkmark
+                doc.setFontSize(8);
                 doc.setTextColor(26, 107, 74);
-                doc.text("✓", tableData.cell.x + 4, tableData.cell.y + 5);
+                doc.setFont(FONT_NAMES.latin, "bold");
+                doc.text(
+                  "✓",
+                  tableData.cell.x + tableData.cell.width / 2,
+                  tableData.cell.y + 8,
+                  { align: "center" },
+                );
               }
             }
           }
