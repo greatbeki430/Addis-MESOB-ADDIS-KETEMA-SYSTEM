@@ -571,7 +571,6 @@ const setSmartFont = (doc, text, bold = false) => {
 };
 
 // Export Evaluation Report to PDF (Amharic-safe + signatures - ONE TABLE)
-// Export Evaluation Report to PDF (Amharic-safe + signatures - ONE TABLE)
 export const exportEvaluationReportToPDF = (
   scores,
   members,
@@ -592,49 +591,66 @@ export const exportEvaluationReportToPDF = (
     }
 
     const doc = new jsPDF({
-      orientation: "landscape", // ✅ Changed to landscape for more width
+      orientation: "landscape",
       unit: "mm",
       format: "a4",
     });
 
-    // ✅ Embed the real Unicode/Ethiopic fonts into this document
     loadFonts(doc);
 
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 10; // ✅ Reduced margin for more space
+    const margin = 10;
     let yPos = margin;
 
-    // ─── HEADER ──────────────────────────────────────────────
-    const title = encodeText(t.evaluation?.title || "Evaluation Report");
+    // ─── AMHARIC HEADER ──────────────────────────────────────
+    // Title in Amharic
+    const amharicTitle = "የሥራ አፈጻጸም ሪፖርት";
     doc.setFontSize(18);
-    setSmartFont(doc, title, true);
-    doc.text(title, pageWidth / 2, yPos, { align: "center" });
+    setSmartFont(doc, amharicTitle, true);
+    doc.text(amharicTitle, pageWidth / 2, yPos, { align: "center" });
     yPos += 8;
 
-    const subtitle = encodeText(t.evaluation?.subtitle || "");
+    // Subtitle in Amharic
+    const amharicSubtitle = "የአዲስ አበባ ከተማ አስተዳደር · የህዝብ አገልግሎት ቢሮ";
     doc.setFontSize(10);
-    setSmartFont(doc, subtitle, false);
-    doc.text(subtitle, pageWidth / 2, yPos, { align: "center" });
+    setSmartFont(doc, amharicSubtitle, false);
+    doc.text(amharicSubtitle, pageWidth / 2, yPos, { align: "center" });
+    yPos += 6;
+
+    // English subtitle
+    const englishSubtitle =
+      "Addis Ababa City Administration · Public Service Bureau";
+    doc.setFontSize(9);
+    setSmartFont(doc, englishSubtitle, false);
+    doc.text(englishSubtitle, pageWidth / 2, yPos, { align: "center" });
     yPos += 10;
 
+    // Divider line
     doc.setDrawColor(26, 107, 74);
     doc.setLineWidth(0.5);
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 8;
 
-    // Evaluation Date
+    // ─── EVALUATION DATE ──────────────────────────────────────
     doc.setFontSize(11);
-    setSmartFont(doc, "Evaluation Date", true);
-    doc.text(`Evaluation Date: ${getEthiopianDate()}`, margin, yPos);
-    yPos += 12;
+    setSmartFont(doc, "የሪፖርት ቀን", true);
+    doc.text(`የሪፖርት ቀን: ${getEthiopianDate()}`, margin, yPos);
+    yPos += 10;
+
+    // ─── BRANCH NAME ──────────────────────────────────────────
+    doc.setFontSize(10);
+    setSmartFont(doc, "ቅርንጫፍ", false);
+    const branchName = t?.evaluation?.branchName || "አዲስ ከተማ ቅርንጫፍ";
+    doc.text(`ቅርንጫፍ: ${branchName}`, margin, yPos);
+    yPos += 10;
 
     // ─── SINGLE COMPREHENSIVE TABLE ──────────────────────────
     doc.setFillColor(26, 107, 74);
     doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    setSmartFont(doc, "Team Performance Summary", true);
-    doc.text("Team Performance Summary", margin + 2, yPos);
+    setSmartFont(doc, "የቡድን አፈጻጸም ማጠቃለያ", true);
+    doc.text("የቡድን አፈጻጸም ማጠቃለያ", margin + 2, yPos);
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
@@ -645,43 +661,32 @@ export const exportEvaluationReportToPDF = (
 
     const sortedMembers = [...memberTotals].sort((a, b) => b.total - a.total);
 
-    // ── Build table data with ALL columns in ONE table ──
-    const tableHeaders = [
-      "#",
-      "Member Name",
-      "Score",
-      "Rank",
-      "Signature",
-      "Status",
-    ];
+    const tableHeaders = ["#", "የአባል ስም", "ውጤት", "ደረጃ", "ፊርማ", "ሁኔታ"];
 
     const tableBody = sortedMembers.map((m, idx) => {
       const rank =
         idx === 0
-          ? "🥇 1st"
+          ? "🥇 1ኛ"
           : idx === 1
-            ? "🥈 2nd"
+            ? "🥈 2ኛ"
             : idx === 2
-              ? "🥉 3rd"
+              ? "🥉 3ኛ"
               : `#${idx + 1}`;
 
-      // Check if this member has a signature
       const signatureData = signatures?.[m.name] || null;
       const hasSignature =
         signatureData && signatureData.startsWith("data:image");
 
-      // Get comment for this member
       const memberIndex = members.indexOf(m.name);
       const comment = comments?.[memberIndex] || "";
 
-      // Status text
       let statusText;
       if (hasSignature) {
-        statusText = "✅ Signed";
+        statusText = "✅ ተፈርሟል";
       } else if (comment) {
-        statusText = "📝 Has Comment";
+        statusText = "📝 አስተያየት";
       } else {
-        statusText = "⏳ Pending";
+        statusText = "⏳ በመጠበቅ ላይ";
       }
 
       return [
@@ -689,10 +694,9 @@ export const exportEvaluationReportToPDF = (
         encodeText(m.name),
         m.total,
         rank,
-        // ✅ For signature column: ONLY the image if signed, otherwise "✗ Not Signed"
         hasSignature
           ? { content: "signature", signature: signatureData }
-          : "✗ Not Signed",
+          : "✗ አልተፈረመም",
         statusText,
       ];
     });
@@ -707,7 +711,7 @@ export const exportEvaluationReportToPDF = (
         fillColor: [26, 107, 74],
         textColor: [255, 255, 255],
         fontSize: 9,
-        font: FONT_NAMES.latin,
+        font: FONT_NAMES.ethiopic,
         halign: "center",
       },
       bodyStyles: {
@@ -715,12 +719,12 @@ export const exportEvaluationReportToPDF = (
         halign: "center",
       },
       columnStyles: {
-        0: { cellWidth: 12, halign: "center" }, // #
-        1: { cellWidth: 92, halign: "left" }, // Name
-        2: { cellWidth: 28, halign: "center" }, // Score
-        3: { cellWidth: 35, halign: "center" }, // Rank
-        4: { cellWidth: 60, halign: "center", minCellHeight: 14 }, // Signature
-        5: { cellWidth: 50, halign: "center" }, // Status
+        0: { cellWidth: 12, halign: "center" },
+        1: { cellWidth: 92, halign: "left" },
+        2: { cellWidth: 28, halign: "center" },
+        3: { cellWidth: 35, halign: "center" },
+        4: { cellWidth: 60, halign: "center", minCellHeight: 14 },
+        5: { cellWidth: 50, halign: "center" },
       },
       rowHeight: 16,
       styles: {
@@ -798,16 +802,15 @@ export const exportEvaluationReportToPDF = (
 
     yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
 
-    // ─── BEST PERFORMER ANNOUNCEMENT ──────────────────────
+    // ─── BEST PERFORMER ──────────────────────────────────────
     if (bestPerformer) {
-      const bpText = `🏆 Best Performer: ${encodeText(bestPerformer)}`;
+      const bpText = `🏆 ምርጥ አፈጻጸም: ${encodeText(bestPerformer)}`;
       doc.setFontSize(12);
       setSmartFont(doc, bpText, true);
       doc.setTextColor(26, 107, 74);
       doc.text(bpText, margin, yPos);
       yPos += 8;
 
-      // Show average score
       const avgScore =
         sortedMembers.length > 0
           ? Math.round(
@@ -815,7 +818,7 @@ export const exportEvaluationReportToPDF = (
                 sortedMembers.length,
             )
           : 0;
-      const avgText = `📊 Average Score: ${avgScore} / 100`;
+      const avgText = `📊 አማካይ ውጤት: ${avgScore} / 100`;
       doc.setFontSize(10);
       setSmartFont(doc, avgText, false);
       doc.setTextColor(60, 60, 60);
@@ -823,7 +826,7 @@ export const exportEvaluationReportToPDF = (
       yPos += 12;
     }
 
-    // ─── COMMENTS / FEEDBACK SECTION (paragraph style) ──
+    // ─── COMMENTS ─────────────────────────────────────────────
     if (comments && Object.keys(comments).length > 0) {
       const hasComments = Object.values(comments).some(
         (c) => c && c.trim() !== "",
@@ -836,8 +839,8 @@ export const exportEvaluationReportToPDF = (
         }
 
         doc.setFontSize(14);
-        setSmartFont(doc, "Individual Feedback & Comments", true);
-        doc.text("Individual Feedback & Comments", margin, yPos);
+        setSmartFont(doc, "የግለሰብ አስተያየቶች", true);
+        doc.text("የግለሰብ አስተያየቶች", margin, yPos);
         yPos += 10;
 
         doc.setDrawColor(200, 200, 200);
@@ -847,7 +850,7 @@ export const exportEvaluationReportToPDF = (
 
         const memberList = members.filter((m) => m.trim() !== "");
         memberList.forEach((member, idx) => {
-          const comment = comments[idx] || "No comment provided";
+          const comment = comments[idx] || "ምንም አስተያየት የለም";
 
           if (yPos > 180) {
             doc.addPage();
@@ -881,7 +884,7 @@ export const exportEvaluationReportToPDF = (
       }
     }
 
-    // ─── AI NARRATIVE SECTION (paragraph style) ────────────
+    // ─── AI NARRATIVE ─────────────────────────────────────────
     if (includeAINarrative && aiNarrative) {
       if (yPos > 180) {
         doc.addPage();
@@ -889,9 +892,9 @@ export const exportEvaluationReportToPDF = (
       }
 
       doc.setFontSize(14);
-      setSmartFont(doc, "AI Evaluation Narrative", true);
+      setSmartFont(doc, "AI የአፈጻጸም ትንተና", true);
       doc.setTextColor(0, 0, 0);
-      doc.text("AI Evaluation Narrative", margin, yPos);
+      doc.text("AI የአፈጻጸም ትንተና", margin, yPos);
       yPos += 10;
 
       doc.setDrawColor(200, 200, 200);
@@ -922,7 +925,7 @@ export const exportEvaluationReportToPDF = (
       );
 
       const estimatedHeight = splitNarrative.length * 5 + 20;
-      if (yPos + estimatedHeight > doc.internal.pageSize.getHeight() - 20) {
+      if (yPos + estimatedHeight > doc.internal.pageSize.getHeight() - 30) {
         doc.addPage();
         yPos = margin;
       }
@@ -933,11 +936,7 @@ export const exportEvaluationReportToPDF = (
       doc.setFontSize(8);
       setSmartFont(doc, "footer", false);
       doc.setTextColor(150, 150, 150);
-      doc.text(
-        "This narrative was generated by AI based on evaluation data.",
-        margin,
-        yPos,
-      );
+      doc.text("ይህ ትንተና በAI የተፈጠረ ነው", margin, yPos);
       yPos += 8;
     }
 
@@ -945,19 +944,42 @@ export const exportEvaluationReportToPDF = (
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+
+      // Amharic footer - left side
       doc.setFontSize(8);
       setSmartFont(doc, "footer", false);
-      doc.setTextColor(150, 150, 150);
+      doc.setTextColor(100, 100, 100);
+
+      // Left footer: Amharic
+      const amharicFooter = `ሪፖርት የተዘጋጀው በ: አዲስ መሶብ አንድ ማቆሚያ አገልግሎት ማዕከል - አዲስ ከተማ ቅርንጫፍ`;
+      doc.text(amharicFooter, margin, doc.internal.pageSize.getHeight() - 10);
+
+      // Right footer: Date in Amharic
+      const amharicDate = getEthiopianDate();
+      setSmartFont(doc, amharicDate, false);
       doc.text(
-        `Generated by Addis MESOB One-Stop Service Center - ${getEthiopianDate()}`,
-        pageWidth / 2,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: "center" },
-      );
-      doc.text(
-        `Page ${i} of ${pageCount}`,
+        amharicDate,
         pageWidth - margin,
         doc.internal.pageSize.getHeight() - 10,
+        { align: "right" },
+      );
+
+      // English footer - bottom (below Amharic)
+      const englishFooter = `Reported by: Addis MESOB One-Stop Service Center - Addis Ketema Branch - ${amharicDate}`;
+      setSmartFont(doc, englishFooter, false);
+      doc.text(
+        englishFooter,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 5,
+        { align: "center" },
+      );
+
+      // Page number - right side (just above the footer)
+      setSmartFont(doc, `ገጽ ${i} / ${pageCount}`, false);
+      doc.text(
+        `ገጽ ${i} / ${pageCount}`,
+        pageWidth - margin,
+        doc.internal.pageSize.getHeight() - 15,
         { align: "right" },
       );
     }
