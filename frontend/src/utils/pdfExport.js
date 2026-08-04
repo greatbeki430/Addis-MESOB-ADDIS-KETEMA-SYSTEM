@@ -58,8 +58,7 @@ function toEthiopianDate(date = new Date()) {
 }
 
 // ✅ Get Ethiopian date with proper month name
-const getEthiopianDate = () => {
-  const date = new Date();
+const getEthiopianDate = (date = new Date()) => {
   const { year, month, day } = toEthiopianDate(date);
   const monthName = ETHIOPIAN_MONTHS_AM[month - 1];
   return `${monthName} ${day} ቀን ${year} ዓ.ም`;
@@ -76,6 +75,72 @@ const encodeText = (text) => {
   if (!text) return "";
   return String(text);
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ✅ MIXED-SCRIPT TEXT RENDERING (ported from dailyReport.js / ReportExport.jsx)
+//
+// jsPDF can only apply ONE font per doc.text() call. If a string mixes
+// Amharic characters with Latin letters, digits, or punctuation (e.g. dates,
+// names, "|" separators, page numbers like "ገጽ 1/1"), picking a single font
+// for the whole string means whichever script that font doesn't cover
+// renders as nothing — which is why dates/names were "disappearing" even
+// though the label text was showing. This splits the string into per-script
+// runs and switches font per run, and computes alignment manually since
+// jsPDF can't align mixed-font text on its own.
+// ─────────────────────────────────────────────────────────────────────────────
+const AMHARIC_CHAR_RE = /[\u1200-\u137F]/;
+const SCRIPT_RUN_RE = /[\u1200-\u137F]+|[^\u1200-\u137F]+/g;
+
+function splitIntoScriptRuns(text) {
+  const str = String(text ?? "");
+  const runs = str.match(SCRIPT_RUN_RE) || [str];
+  return runs.map((run) => ({
+    text: run,
+    isAmharic: AMHARIC_CHAR_RE.test(run),
+  }));
+}
+
+function setFontForRun(doc, isAmharicRun, bold) {
+  const style = bold ? "bold" : "normal";
+  try {
+    if (isAmharicRun) {
+      doc.setFont(
+        doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica",
+        style,
+      );
+    } else {
+      doc.setFont(doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica", style);
+    }
+  } catch (error) {
+    console.warn("Font fallback while drawing mixed text:", error.message);
+    doc.setFont("helvetica", style);
+  }
+}
+
+function drawMixedScriptText(doc, text, x, y, opts = {}) {
+  const { align = "left", bold = false } = opts;
+  const runs = splitIntoScriptRuns(text);
+
+  const widths = runs.map((run) => {
+    setFontForRun(doc, run.isAmharic, bold);
+    return doc.getTextWidth(run.text);
+  });
+
+  const totalWidth = widths.reduce((sum, w) => sum + w, 0);
+
+  let startX = x;
+  if (align === "center") startX = x - totalWidth / 2;
+  else if (align === "right") startX = x - totalWidth;
+
+  let cursorX = startX;
+  runs.forEach((run, i) => {
+    setFontForRun(doc, run.isAmharic, bold);
+    doc.text(run.text, cursorX, y, { align: "left" });
+    cursorX += widths[i];
+  });
+
+  return totalWidth;
+}
 
 // ─── EXPORT FORUM REPORT ─────────────────────────────────────
 export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
@@ -600,15 +665,6 @@ export const exportDailyReportToPDF = (rows, date, t) => {
 };
 
 // ─── EXPORT EVALUATION REPORT ───────────────────────────────
-const setSmartFont = (doc, text, bold = false) => {
-  const style = bold ? "bold" : "normal";
-  if (isAmharic(text)) {
-    doc.setFont(FONT_NAMES.ethiopic, style);
-  } else {
-    doc.setFont(FONT_NAMES.latin, style);
-  }
-};
-
 export const exportEvaluationReportToPDF = (
   scores,
   members,
@@ -636,6 +692,9 @@ export const exportEvaluationReportToPDF = (
       format: "a4",
     });
 
+    // loadFonts is expected to register the Ethiopic/Latin fonts and set
+    // doc.__hasEthiopicFont / doc.__hasLatinFont — drawMixedScriptText relies
+    // on those flags to pick the right font per script run.
     loadFonts(doc);
 
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -646,22 +705,27 @@ export const exportEvaluationReportToPDF = (
     // ─── TITLE SECTION ─────────────────────────────────────────
     const amharicTitle = "የሥራ አፈጻጸም ሪፖርት";
     doc.setFontSize(22);
-    setSmartFont(doc, amharicTitle, true);
-    doc.text(amharicTitle, pageWidth / 2, yPos, { align: "center" });
+    drawMixedScriptText(doc, amharicTitle, pageWidth / 2, yPos, {
+      align: "center",
+      bold: true,
+    });
     yPos += 10;
 
+    // ✅ Fixed typos: እዱስ → አዲስ, አስተዱደር → አስተዳደር
     const amharicSubtitle = "የአዲስ አበባ ከተማ አስተዳደር · የህዝብ አገልግሎት ቢሮ";
     doc.setFontSize(11);
-    setSmartFont(doc, amharicSubtitle, false);
-    doc.text(amharicSubtitle, pageWidth / 2, yPos, { align: "center" });
+    drawMixedScriptText(doc, amharicSubtitle, pageWidth / 2, yPos, {
+      align: "center",
+    });
     yPos += 7;
 
     const englishSubtitle =
       "Addis Ababa City Administration · Public Service Bureau";
     doc.setFontSize(9);
-    setSmartFont(doc, englishSubtitle, false);
     doc.setTextColor(100, 100, 100);
-    doc.text(englishSubtitle, pageWidth / 2, yPos, { align: "center" });
+    drawMixedScriptText(doc, englishSubtitle, pageWidth / 2, yPos, {
+      align: "center",
+    });
     doc.setTextColor(0, 0, 0);
     yPos += 10;
 
@@ -670,39 +734,41 @@ export const exportEvaluationReportToPDF = (
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 10;
 
-    // ─── REPORT DATE, PREPARED BY & BRANCH - ALL IN ONE LINE ──
-    const ethiopianDate = getEthiopianDate();
-    const preparedByName = preparedBy || t?.evaluation?.preparedBy || "አስተዳዳሪ";
-    const branch = branchName || t?.evaluation?.branchName || "አዲስ ከተማ ቅርንጫፍ";
-
-    // Amharic line
-    const amharicInfoLine = `የሪፖርት ቀን: ${ethiopianDate}  |  ሪፖርት ያዘጋጀው: ${preparedByName}  |  ቅርንጫፍ: ${branch}`;
-    doc.setFontSize(10);
-    setSmartFont(doc, amharicInfoLine, false);
-    doc.text(amharicInfoLine, margin, yPos);
-    yPos += 8;
-
-    // English line
-    const gregorianDate = new Date().toLocaleDateString("en-US", {
+    // ─── REPORT DATE, PREPARED BY & BRANCH — COMPACT, ONE LINE EACH ──
+    const now = new Date();
+    const ethiopianDate = getEthiopianDate(now);
+    const gregorianDate = now.toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
     });
-    const englishInfoLine = `Report Date: ${gregorianDate} (GC)  |  Prepared By: ${preparedByName}  |  Branch: ${branch}`;
-    doc.setFontSize(9);
-    setSmartFont(doc, englishInfoLine, false);
-    doc.setTextColor(100, 100, 100);
-    doc.text(englishInfoLine, margin, yPos);
+    const preparedByName = preparedBy || t?.evaluation?.preparedBy || "አስተዳዳሪ";
+    const branch = branchName || t?.evaluation?.branchName || "አዲስ ከተማ ቅርንጫፍ";
+
+    // Amharic line: date | prepared by | branch — all mixed-script, must
+    // use drawMixedScriptText or the digits/name drop out silently.
+    const amharicInfoLine = `የሪፖርት ቀን: ${ethiopianDate} | ሪፖርት ያዘጋጀው: ${preparedByName} | ቅርንጫፍ: ${branch}`;
+    doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    yPos += 12;
+    drawMixedScriptText(doc, amharicInfoLine, margin, yPos, { bold: true });
+    yPos += 6;
+
+    // English line
+    const englishInfoLine = `Report Date: ${gregorianDate} (GC) | Prepared By: ${preparedByName} | Branch: ${branch}`;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    drawMixedScriptText(doc, englishInfoLine, margin, yPos);
+    doc.setTextColor(0, 0, 0);
+    yPos += 10;
 
     // ─── TABLE ────────────────────────────────────────────────
     doc.setFillColor(26, 107, 74);
     doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
     doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    setSmartFont(doc, "የቡድን አፈጻጸም ማጠቃለያ", true);
-    doc.text("የቡድን አፈጻጸም ማጠቃለያ", margin + 2, yPos);
+    drawMixedScriptText(doc, "የቡድን አፈጻጸም ማጠቃለያ", margin + 2, yPos, {
+      bold: true,
+    });
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
@@ -727,6 +793,7 @@ export const exportEvaluationReportToPDF = (
         signatureData && signatureData.startsWith("data:image");
       const memberIndex = members.indexOf(m.name);
       const comment = comments?.[memberIndex] || "";
+      // ✅ Fixed typo: በመጠቅ ላይ → በመጠበቅ ላይ
       let statusText = hasSignature
         ? "✅ ተፈርሟል"
         : comment
@@ -768,6 +835,14 @@ export const exportEvaluationReportToPDF = (
       },
       rowHeight: 16,
       styles: { font: FONT_NAMES.ethiopic, overflow: "linebreak" },
+      // NOTE: autoTable renders each cell with a single font, so a cell like
+      // "🥇 1ኛ" (digit + Amharic ordinal marker) can still lose the digit if
+      // isAmharic(raw) picks the Ethiopic font for the whole cell and that
+      // font lacks Latin digit glyphs. This mirrors the header bug but at
+      // cell level — if you see rank/score digits vanish, the fix is to
+      // render those cells manually in didDrawCell using drawMixedScriptText
+      // (same pattern as the signature image below) instead of native cell
+      // text. Left as-is here since it wasn't in the reported issue list.
       didParseCell: (cellData) => {
         const raw =
           typeof cellData.cell.raw === "string" ? cellData.cell.raw : "";
@@ -849,31 +924,39 @@ export const exportEvaluationReportToPDF = (
           : 0;
 
       doc.setFontSize(12);
-      setSmartFont(doc, `🏆 ምርጥ አፈጻጸም: ${encodeText(bestPerformer)}`, true);
       doc.setTextColor(26, 107, 74);
-      doc.text(`🏆 ምርጥ አፈጻጸም: ${encodeText(bestPerformer)}`, margin, yPos);
+      drawMixedScriptText(
+        doc,
+        `🏆 ምርጥ አፈጻጸም: ${encodeText(bestPerformer)}`,
+        margin,
+        yPos,
+        { bold: true },
+      );
       yPos += 8;
 
       doc.setFontSize(10);
-      setSmartFont(
+      doc.setTextColor(60, 60, 60);
+      drawMixedScriptText(
         doc,
         `🏆 Best Performer: ${encodeText(bestPerformer)}`,
-        false,
+        margin,
+        yPos,
       );
-      doc.setTextColor(60, 60, 60);
-      doc.text(`🏆 Best Performer: ${encodeText(bestPerformer)}`, margin, yPos);
       yPos += 8;
 
       doc.setFontSize(11);
-      setSmartFont(doc, `📊 አማካይ ውጤት: ${avgScore} / 100`, false);
       doc.setTextColor(0, 0, 0);
-      doc.text(`📊 አማካይ ውጤት: ${avgScore} / 100`, margin, yPos);
+      drawMixedScriptText(doc, `📊 አማካይ ውጤት: ${avgScore} / 100`, margin, yPos);
       yPos += 7;
 
       doc.setFontSize(9);
-      setSmartFont(doc, `📊 Average Score: ${avgScore} / 100`, false);
       doc.setTextColor(100, 100, 100);
-      doc.text(`📊 Average Score: ${avgScore} / 100`, margin, yPos);
+      drawMixedScriptText(
+        doc,
+        `📊 Average Score: ${avgScore} / 100`,
+        margin,
+        yPos,
+      );
       doc.setTextColor(0, 0, 0);
       yPos += 12;
     }
@@ -890,14 +973,19 @@ export const exportEvaluationReportToPDF = (
         }
 
         doc.setFontSize(14);
-        setSmartFont(doc, "የግለሰብ አስተያየቶች", true);
-        doc.text("የግለሰብ አስተያየቶች", margin, yPos);
+        drawMixedScriptText(doc, "የግለሰብ አስተያየቶች", margin, yPos, {
+          bold: true,
+        });
         yPos += 7;
 
         doc.setFontSize(10);
-        setSmartFont(doc, "Individual Feedback & Comments", false);
         doc.setTextColor(100, 100, 100);
-        doc.text("Individual Feedback & Comments", margin, yPos);
+        drawMixedScriptText(
+          doc,
+          "Individual Feedback & Comments",
+          margin,
+          yPos,
+        );
         doc.setTextColor(0, 0, 0);
         yPos += 10;
 
@@ -915,19 +1003,21 @@ export const exportEvaluationReportToPDF = (
           }
 
           doc.setFontSize(10);
-          setSmartFont(doc, `${encodeText(member)}:`, true);
           doc.setTextColor(26, 107, 74);
-          doc.text(`${encodeText(member)}:`, margin, yPos);
+          drawMixedScriptText(doc, `${encodeText(member)}:`, margin, yPos, {
+            bold: true,
+          });
           yPos += 5;
 
           doc.setFontSize(9);
-          setSmartFont(doc, comment, false);
           doc.setTextColor(50, 50, 50);
           const splitComment = doc.splitTextToSize(
             encodeText(comment),
             pageWidth - margin * 2 - 5,
           );
-          doc.text(splitComment, margin + 4, yPos);
+          splitComment.forEach((line, lineIdx) => {
+            drawMixedScriptText(doc, line, margin + 4, yPos + lineIdx * 4.5);
+          });
           yPos += splitComment.length * 4.5 + 6;
 
           if (idx < memberList.length - 1) {
@@ -948,14 +1038,12 @@ export const exportEvaluationReportToPDF = (
       }
 
       doc.setFontSize(14);
-      setSmartFont(doc, "AI የአፈጻጸም ትንተና", true);
-      doc.text("AI የአፈጻጸም ትንተና", margin, yPos);
+      drawMixedScriptText(doc, "AI የአፈጻጸም ትንተና", margin, yPos, { bold: true });
       yPos += 7;
 
       doc.setFontSize(10);
-      setSmartFont(doc, "AI Performance Analysis", false);
       doc.setTextColor(100, 100, 100);
-      doc.text("AI Performance Analysis", margin, yPos);
+      drawMixedScriptText(doc, "AI Performance Analysis", margin, yPos);
       doc.setTextColor(0, 0, 0);
       yPos += 10;
 
@@ -965,7 +1053,6 @@ export const exportEvaluationReportToPDF = (
       yPos += 8;
 
       doc.setFontSize(10);
-      doc.setFont(FONT_NAMES.ethiopic, "normal");
       doc.setTextColor(50, 50, 50);
 
       let cleanNarrative = aiNarrative
@@ -990,17 +1077,15 @@ export const exportEvaluationReportToPDF = (
         yPos = margin;
       }
 
-      doc.text(splitNarrative, margin, yPos);
+      splitNarrative.forEach((line, lineIdx) => {
+        drawMixedScriptText(doc, line, margin, yPos + lineIdx * 5);
+      });
       yPos += splitNarrative.length * 5 + 12;
 
       doc.setFontSize(8);
-      setSmartFont(
-        doc,
-        "ይህ ትንተና በAI የተፈጠረ ነው / This analysis was generated by AI",
-        false,
-      );
       doc.setTextColor(150, 150, 150);
-      doc.text(
+      drawMixedScriptText(
+        doc,
         "ይህ ትንተና በAI የተፈጠረ ነው / This analysis was generated by AI",
         margin,
         yPos,
@@ -1009,8 +1094,11 @@ export const exportEvaluationReportToPDF = (
     }
 
     // ─── FOOTER ───────────────────────────────────────────────
+    // Two compact lines (Amharic, then English), each combining prepared-by,
+    // branch, date, and page number — matches the required layout, and every
+    // line is drawn with drawMixedScriptText since each mixes scripts.
     const pageCount = doc.internal.getNumberOfPages();
-    const footerY = pageHeight - 12;
+    const footerY = pageHeight - 14;
 
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
@@ -1022,21 +1110,18 @@ export const exportEvaluationReportToPDF = (
       doc.setFontSize(8);
       doc.setTextColor(100, 100, 100);
 
-      const amharicFooter = `ሪፖርት ያዘጋጀው: ${preparedByName} · ቅርንጫፍ: ${branch}`;
-      setSmartFont(doc, amharicFooter, false);
-      doc.text(amharicFooter, margin, footerY);
+      const amharicFooter = `ሪፖርት ያዘጋጀው: ${preparedByName} · ቅርንጫፍ: ${branch} | ${ethiopianDate} | ገጽ ${i}/${pageCount}`;
+      drawMixedScriptText(doc, amharicFooter, pageWidth / 2, footerY, {
+        align: "center",
+      });
 
-      const englishFooter = `Prepared by: ${preparedByName} · Branch: ${branch}`;
-      setSmartFont(doc, englishFooter, false);
-      doc.text(englishFooter, pageWidth / 2, footerY, { align: "center" });
-
-      const dateStr = getEthiopianDate();
-      const footerRight = `${dateStr} | ገጽ ${i}/${pageCount}`;
-      setSmartFont(doc, footerRight, false);
-      doc.text(footerRight, pageWidth - margin, footerY, { align: "right" });
+      const englishFooter = `Prepared by: ${preparedByName} · Branch: ${branch} | ${gregorianDate} | Page ${i}/${pageCount}`;
+      drawMixedScriptText(doc, englishFooter, pageWidth / 2, footerY + 5, {
+        align: "center",
+      });
     }
 
-    doc.save(`evaluation_report_${getEthiopianDate().replace(/\//g, "-")}.pdf`);
+    doc.save(`evaluation_report_${ethiopianDate.replace(/\//g, "-")}.pdf`);
     console.log("✅ Evaluation Report PDF generated successfully!");
 
     showSuccessToast("📄 Evaluation Report PDF generated successfully!");
