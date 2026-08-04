@@ -458,7 +458,7 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
   }
 };
 
-// ✅ Export Daily Report to PDF
+// Export Daily Report to PDF
 export const exportDailyReportToPDF = (rows, date, t) => {
   try {
     console.log("📄 Generating Daily Report PDF...");
@@ -570,7 +570,8 @@ const setSmartFont = (doc, text, bold = false) => {
   }
 };
 
-// ✅ Export Evaluation Report to PDF (Amharic-safe + signatures - ONE TABLE)
+// Export Evaluation Report to PDF (Amharic-safe + signatures - ONE TABLE)
+// Export Evaluation Report to PDF (Amharic-safe + signatures - ONE TABLE)
 export const exportEvaluationReportToPDF = (
   scores,
   members,
@@ -591,7 +592,7 @@ export const exportEvaluationReportToPDF = (
     }
 
     const doc = new jsPDF({
-      orientation: "portrait",
+      orientation: "landscape", // ✅ Changed to landscape for more width
       unit: "mm",
       format: "a4",
     });
@@ -600,7 +601,7 @@ export const exportEvaluationReportToPDF = (
     loadFonts(doc);
 
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
+    const margin = 10; // ✅ Reduced margin for more space
     let yPos = margin;
 
     // ─── HEADER ──────────────────────────────────────────────
@@ -688,7 +689,7 @@ export const exportEvaluationReportToPDF = (
         encodeText(m.name),
         m.total,
         rank,
-        // ✅ For signature column: either the image or text
+        // ✅ For signature column: ONLY the image if signed, otherwise "✗ Not Signed"
         hasSignature
           ? { content: "signature", signature: signatureData }
           : "✗ Not Signed",
@@ -702,6 +703,7 @@ export const exportEvaluationReportToPDF = (
       body: tableBody,
       margin: { left: margin, right: margin },
       theme: "striped",
+      tableWidth: "auto", // ✅ Auto width to fill page
       headStyles: {
         fillColor: [26, 107, 74],
         textColor: [255, 255, 255],
@@ -714,14 +716,14 @@ export const exportEvaluationReportToPDF = (
         halign: "center",
       },
       columnStyles: {
-        0: { cellWidth: 12, halign: "center" },
-        1: { cellWidth: 50, halign: "left" },
-        2: { cellWidth: 18, halign: "center" },
-        3: { cellWidth: 25, halign: "center" },
-        4: { cellWidth: 35, halign: "center", minCellHeight: 12 },
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 60, halign: "left" }, // ✅ Wider name column
+        2: { cellWidth: 20, halign: "center" },
+        3: { cellWidth: 28, halign: "center" },
+        4: { cellWidth: 40, halign: "center", minCellHeight: 14 }, // ✅ Wider signature column
         5: { cellWidth: 30, halign: "center" },
       },
-      rowHeight: 14,
+      rowHeight: 16, // ✅ Taller rows for signatures
       styles: {
         font: FONT_NAMES.ethiopic,
         overflow: "linebreak",
@@ -743,9 +745,11 @@ export const exportEvaluationReportToPDF = (
               cell &&
               cell.content === "signature"
             ) {
-              cellData.cell.styles.cellWidth = 35;
-              cellData.cell.styles.minCellHeight = 12;
+              cellData.cell.styles.cellWidth = 40;
+              cellData.cell.styles.minCellHeight = 14;
               cellData.cell.styles.halign = "center";
+              // ✅ IMPORTANT: Clear any text in the cell
+              cellData.cell.text = [""];
             } else {
               // Text in signature column should be centered
               cellData.cell.styles.halign = "center";
@@ -770,8 +774,8 @@ export const exportEvaluationReportToPDF = (
                 const cellHeight = tableData.cell.height;
 
                 // Calculate image size (leave padding)
-                const imgWidth = Math.min(cellWidth - 8, 28);
-                const imgHeight = Math.min(cellHeight - 8, 12);
+                const imgWidth = Math.min(cellWidth - 8, 32);
+                const imgHeight = Math.min(cellHeight - 8, 14);
                 const offsetX = (cellWidth - imgWidth) / 2;
                 const offsetY = (cellHeight - imgHeight) / 2;
 
@@ -836,7 +840,7 @@ export const exportEvaluationReportToPDF = (
       );
 
       if (hasComments) {
-        if (yPos > 230) {
+        if (yPos > 160) {
           doc.addPage();
           yPos = margin;
         }
@@ -855,7 +859,7 @@ export const exportEvaluationReportToPDF = (
         memberList.forEach((member, idx) => {
           const comment = comments[idx] || "No comment provided";
 
-          if (yPos > 240) {
+          if (yPos > 180) {
             doc.addPage();
             yPos = margin;
           }
@@ -889,7 +893,7 @@ export const exportEvaluationReportToPDF = (
 
     // ─── AI NARRATIVE SECTION (paragraph style) ────────────
     if (includeAINarrative && aiNarrative) {
-      if (yPos > 220) {
+      if (yPos > 180) {
         doc.addPage();
         yPos = margin;
       }
