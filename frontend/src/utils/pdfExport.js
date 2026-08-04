@@ -703,7 +703,6 @@ export const exportEvaluationReportToPDF = (
       body: tableBody,
       margin: { left: margin, right: margin },
       theme: "striped",
-      tableWidth: pageWidth - margin * 2,
       headStyles: {
         fillColor: [26, 107, 74],
         textColor: [255, 255, 255],
@@ -716,14 +715,14 @@ export const exportEvaluationReportToPDF = (
         halign: "center",
       },
       columnStyles: {
-        0: { cellWidth: 10, halign: "center" },
-        1: { cellWidth: 60, halign: "left" }, // ✅ Wider name column
-        2: { cellWidth: 20, halign: "center" },
-        3: { cellWidth: 28, halign: "center" },
-        4: { cellWidth: 40, halign: "center", minCellHeight: 14 }, // ✅ Wider signature column
-        5: { cellWidth: 30, halign: "center" },
+        0: { cellWidth: 12, halign: "center" }, // #
+        1: { cellWidth: 92, halign: "left" }, // Name
+        2: { cellWidth: 28, halign: "center" }, // Score
+        3: { cellWidth: 35, halign: "center" }, // Rank
+        4: { cellWidth: 60, halign: "center", minCellHeight: 14 }, // Signature
+        5: { cellWidth: 50, halign: "center" }, // Status
       },
-      rowHeight: 16, // ✅ Taller rows for signatures
+      rowHeight: 16,
       styles: {
         font: FONT_NAMES.ethiopic,
         overflow: "linebreak",
@@ -735,7 +734,6 @@ export const exportEvaluationReportToPDF = (
           ? FONT_NAMES.ethiopic
           : FONT_NAMES.latin;
 
-        // ✅ Signature column (index 4) - ensure it's properly sized
         if (cellData.column.index === 4) {
           const rowData = cellData.row.raw;
           if (rowData && Array.isArray(rowData)) {
@@ -745,20 +743,17 @@ export const exportEvaluationReportToPDF = (
               cell &&
               cell.content === "signature"
             ) {
-              cellData.cell.styles.cellWidth = 40;
+              cellData.cell.styles.cellWidth = 60;
               cellData.cell.styles.minCellHeight = 14;
               cellData.cell.styles.halign = "center";
-              // ✅ IMPORTANT: Clear any text in the cell
               cellData.cell.text = [""];
             } else {
-              // Text in signature column should be centered
               cellData.cell.styles.halign = "center";
             }
           }
         }
       },
       didDrawCell: (tableData) => {
-        // ✅ Draw signature in column 4 (only if it's a signature object)
         if (tableData.column.index === 4) {
           const rowData = tableData.row.raw;
           if (rowData && Array.isArray(rowData)) {
@@ -769,16 +764,12 @@ export const exportEvaluationReportToPDF = (
               cellData.signature
             ) {
               try {
-                // ✅ Clean signature area - draw only the image
                 const cellWidth = tableData.cell.width;
                 const cellHeight = tableData.cell.height;
-
-                // Calculate image size (leave padding)
-                const imgWidth = Math.min(cellWidth - 8, 32);
+                const imgWidth = Math.min(cellWidth - 12, 45);
                 const imgHeight = Math.min(cellHeight - 8, 14);
                 const offsetX = (cellWidth - imgWidth) / 2;
                 const offsetY = (cellHeight - imgHeight) / 2;
-
                 doc.addImage(
                   cellData.signature,
                   "PNG",
@@ -789,7 +780,6 @@ export const exportEvaluationReportToPDF = (
                 );
               } catch (imgError) {
                 console.warn("Could not add signature image:", imgError);
-                // Fallback: show a checkmark
                 doc.setFontSize(8);
                 doc.setTextColor(26, 107, 74);
                 doc.setFont(FONT_NAMES.latin, "bold");
