@@ -91,6 +91,19 @@ export const evaluationTranslations = {
       rank1st: "1st",
       rank2nd: "2nd",
       rank3rd: "3rd",
+      aiNarrative: "AI Evaluation Narrative",
+      includeInReport: "Include in report",
+      aiNarrativeDesc:
+        "AI-generated analysis and recommendations based on the evaluation data",
+      trainingNeededDesc:
+        "Average score below 70. Consider additional training sessions.",
+      pointGap: "pt gap detected. Consider mentorship program.",
+      teamOptimizationDesc: "Large team ({count}). Consider sub-teams.",
+      excellentPerformanceDesc:
+        "Avg ({avg}) high. Consider recognition program.",
+      reviewCriteriaDesc: "Ensure consistent application across all members.",
+      aiInsightsDesc:
+        "Advanced AI analysis of team performance with recommendations",
     },
   },
   am: {
@@ -181,6 +194,15 @@ export const evaluationTranslations = {
       rank1st: "1ኛ",
       rank2nd: "2ኛ",
       rank3rd: "3ኛ",
+      aiNarrative: "የAI ምዘና ትረካ",
+      includeInReport: "በሪፖርቱ ውስጥ አካትት",
+      aiNarrativeDesc: "በAI የተፈጠረ ትንተና እና ምክሮች በምዘና መረጃ ላይ የተመሰረተ",
+      trainingNeededDesc: "አማካይ ውጤት ከ70 በታች ነው። ተጨማሪ የስልጠና ክፍለ ጊዜዎችን ያስቡበት።",
+      pointGap: "ነጥብ ክፍተት ተገኝቷል። የምክር ፕሮግራም ያስቡበት።",
+      teamOptimizationDesc: "ትልቅ ቡድን ({count})። ንዑስ ቡድኖችን ያስቡበት።",
+      excellentPerformanceDesc: "አማካይ ({avg}) ከፍ ያለ ነው። የእውቅና ፕሮግራም ያስቡበት።",
+      reviewCriteriaDesc: "በሁሉም አባላት ላይ ወጥነት ያለው አተገባበር ያረጋግጡ።",
+      aiInsightsDesc: "የተራቀቀ የAI ትንተና የቡድን አፈጻጸም ከምክሮች ጋር",
     },
   },
   om: {
@@ -275,6 +297,19 @@ export const evaluationTranslations = {
       rank1st: "1ffaa",
       rank2nd: "2ffaa",
       rank3rd: "3ffaa",
+      aiNarrative: "Seenaa Madaallii AI",
+      includeInReport: "Gabaasa keessatti dabali",
+      aiNarrativeDesc:
+        "Xiinxalli fi gorsi AI-n uumame daataa madaallii irratti hundaa'e",
+      trainingNeededDesc:
+        "Qabxiin giddugaleessaa 70 gadii. Leenjii dabalataa yaadi.",
+      pointGap: "Hir'ina qabxii argame. Sagantaa gorsa yaadi.",
+      teamOptimizationDesc: "Garee guddaa ({count}). Garee xixiqqaa yaadi.",
+      excellentPerformanceDesc:
+        "Giddugaleessaan ({avg}) ol'aanaa. Sagantaa beekumsaa yaadi.",
+      reviewCriteriaDesc:
+        "Miseensota hunda irratti fayyadamuu walqixxaa ta'uu mirkaneessi.",
+      aiInsightsDesc: "Xiinxalli AI kan fooyya'e raawwii garee fi gorsi wajjin",
     },
   },
 };
