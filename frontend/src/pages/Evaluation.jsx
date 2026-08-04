@@ -2817,6 +2817,9 @@ export default function Evaluation({ t, lang }) {
                   signatures,
                   includeAINarrative,
                   aiNarrativeContent,
+                  // ✅ ADD THESE TWO NEW PARAMETERS
+                  user?.name || "Administrator",
+                  t?.evaluation?.branchName || "አዲስ ከተማ ቅርንጫፍ",
                 );
               }}
             >

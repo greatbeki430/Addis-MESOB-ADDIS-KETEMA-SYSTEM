@@ -670,38 +670,30 @@ export const exportEvaluationReportToPDF = (
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 10;
 
-    // ─── REPORT DATE ──────────────────────────────────────────
+    // ─── REPORT DATE, PREPARED BY & BRANCH - ALL IN ONE LINE ──
     const ethiopianDate = getEthiopianDate();
-    doc.setFontSize(11);
-    setSmartFont(doc, "የሪፖርት ቀን (በኢትዮጵያ አቆጣጠር)", true);
-    doc.text(`የሪፖርት ቀን (በኢትዮጵያ አቆጣጠር): ${ethiopianDate}`, margin, yPos);
+    const preparedByName = preparedBy || t?.evaluation?.preparedBy || "አስተዳዳሪ";
+    const branch = branchName || t?.evaluation?.branchName || "አዲስ ከተማ ቅርንጫፍ";
+
+    // Amharic line
+    const amharicInfoLine = `የሪፖርት ቀን: ${ethiopianDate}  |  ሪፖርት ያዘጋጀው: ${preparedByName}  |  ቅርንጫፍ: ${branch}`;
+    doc.setFontSize(10);
+    setSmartFont(doc, amharicInfoLine, false);
+    doc.text(amharicInfoLine, margin, yPos);
     yPos += 8;
 
+    // English line
     const gregorianDate = new Date().toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",
     });
-    doc.setFontSize(10);
-    setSmartFont(doc, "Report Date (Gregorian Calendar)", false);
-    doc.text(
-      `Report Date (Gregorian Calendar): ${gregorianDate}`,
-      margin,
-      yPos,
-    );
-    yPos += 12;
-
-    // ─── PREPARED BY & BRANCH ────────────────────────────────
-    const preparedByName = preparedBy || t?.evaluation?.preparedBy || "አስተዳዳሪ";
-    doc.setFontSize(10);
-    setSmartFont(doc, "ሪፖርት ያዘጋጀው", true);
-    doc.text(`ሪፖርት ያዘጋጀው: ${preparedByName}`, margin, yPos);
-    yPos += 8;
-
-    const branch = branchName || t?.evaluation?.branchName || "አዲስ ከተማ ቅርንጫፍ";
-    doc.setFontSize(10);
-    setSmartFont(doc, "ቅርንጫፍ", false);
-    doc.text(`ቅርንጫፍ: ${branch}`, margin, yPos);
+    const englishInfoLine = `Report Date: ${gregorianDate} (GC)  |  Prepared By: ${preparedByName}  |  Branch: ${branch}`;
+    doc.setFontSize(9);
+    setSmartFont(doc, englishInfoLine, false);
+    doc.setTextColor(100, 100, 100);
+    doc.text(englishInfoLine, margin, yPos);
+    doc.setTextColor(0, 0, 0);
     yPos += 12;
 
     // ─── TABLE ────────────────────────────────────────────────
