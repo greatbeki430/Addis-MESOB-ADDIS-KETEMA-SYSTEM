@@ -579,8 +579,8 @@ export const exportEvaluationReportToPDF = (
   t,
   comments = {},
   signatures = {},
-  includeAINarrative = false, // ✅ ADD THIS
-  aiNarrative = "", // ✅ ADD THIS
+  includeAINarrative = false,
+  aiNarrative = "",
 ) => {
   try {
     console.log("📄 Generating Evaluation Report PDF...");
@@ -603,6 +603,7 @@ export const exportEvaluationReportToPDF = (
     const margin = 15;
     let yPos = margin;
 
+    // ─── HEADER ──────────────────────────────────────────────
     const title = encodeText(t.evaluation?.title || "Evaluation Report");
     doc.setFontSize(18);
     setSmartFont(doc, title, true);
@@ -626,7 +627,7 @@ export const exportEvaluationReportToPDF = (
     doc.text(`Evaluation Date: ${getEthiopianDate()}`, margin, yPos);
     yPos += 12;
 
-    // Team Members Summary Table
+    // ─── TEAM MEMBERS SUMMARY TABLE ──────────────────────────
     doc.setFillColor(26, 107, 74);
     doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
@@ -673,7 +674,7 @@ export const exportEvaluationReportToPDF = (
 
     yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
 
-    // Best Performer
+    // ─── BEST PERFORMER ──────────────────────────────────────
     if (bestPerformer) {
       const bpText = `Best Performer: ${encodeText(bestPerformer)}`;
       doc.setFontSize(12);
@@ -684,7 +685,7 @@ export const exportEvaluationReportToPDF = (
       yPos += 10;
     }
 
-    // Comments Section
+    // ─── COMMENTS SECTION ────────────────────────────────────
     if (comments && Object.keys(comments).length > 0) {
       const hasComments = Object.values(comments).some(
         (c) => c && c.trim() !== "",
@@ -732,7 +733,7 @@ export const exportEvaluationReportToPDF = (
       }
     }
 
-    // ✅ AI NARRATIVE SECTION - FIXED with proper encoding
+    // ─── AI NARRATIVE SECTION ──────────────────────────────
     if (includeAINarrative && aiNarrative) {
       if (yPos > 220) {
         doc.addPage();
@@ -751,13 +752,10 @@ export const exportEvaluationReportToPDF = (
       yPos += 8;
 
       doc.setFontSize(10);
-      // ✅ Force Ethiopic font for Amharic text (normal weight body copy)
       doc.setFont(FONT_NAMES.ethiopic, "normal");
       doc.setTextColor(50, 50, 50);
 
-      // ✅ Clean up the narrative
       let cleanNarrative = aiNarrative
-        // Remove any markdown artifacts
         .replace(/\*\*/g, "")
         .replace(/\*/g, "")
         .replace(/O- U/g, "")
@@ -768,16 +766,13 @@ export const exportEvaluationReportToPDF = (
         .replace(/\s{2,}/g, " ")
         .trim();
 
-      // ✅ Properly encode the text
       cleanNarrative = encodeText(cleanNarrative);
 
-      // Split the narrative into lines and wrap
       const splitNarrative = doc.splitTextToSize(
         cleanNarrative,
         pageWidth - margin * 2 - 5,
       );
 
-      // Check if we need a new page
       const estimatedHeight = splitNarrative.length * 5 + 20;
       if (yPos + estimatedHeight > doc.internal.pageSize.getHeight() - 20) {
         doc.addPage();
@@ -787,7 +782,6 @@ export const exportEvaluationReportToPDF = (
       doc.text(splitNarrative, margin, yPos);
       yPos += splitNarrative.length * 5 + 12;
 
-      // Add a footer note
       doc.setFontSize(8);
       setSmartFont(doc, "footer", false);
       doc.setTextColor(150, 150, 150);
@@ -799,7 +793,8 @@ export const exportEvaluationReportToPDF = (
       yPos += 8;
     }
 
-    // ✅ Digital Signatures Section
+    // ─── DIGITAL SIGNATURES SECTION ─────────────────────────
+    // ✅ FIXED: Signature column within the table, just like Golden Monday
     const signatureEntries = Object.entries(signatures || {}).filter(
       ([, data]) =>
         data && typeof data === "string" && data.startsWith("data:image"),
@@ -810,45 +805,97 @@ export const exportEvaluationReportToPDF = (
         doc.addPage();
         yPos = margin;
       }
+
       doc.setFontSize(14);
       setSmartFont(doc, "Digital Signatures", true);
       doc.setTextColor(0, 0, 0);
       doc.text("Digital Signatures", margin, yPos);
       yPos += 10;
 
-      const sigWidth = 55;
-      const sigHeight = 22;
-      let col = 0;
-      const startX = margin;
-      const colGap = sigWidth + 10;
+      // ── Build signature table (like Golden Monday) ──
+      const sigHeaders = ["#", "Name", "Signature", "Status"];
+      const sigTableData = signatureEntries.map(([name, dataUrl], idx) => [
+        idx + 1,
+        encodeText(name),
+        { content: "signature", signature: dataUrl },
+        "✅ Signed",
+      ]);
 
-      signatureEntries.forEach(([name, dataUrl]) => {
-        if (yPos > 250) {
-          doc.addPage();
-          yPos = margin;
-          col = 0;
-        }
-        const x = startX + col * colGap;
-        try {
-          doc.addImage(dataUrl, "PNG", x, yPos, sigWidth, sigHeight);
-        } catch (imgErr) {
-          console.warn("Could not embed signature for", name, imgErr);
-        }
-        doc.setFontSize(8);
-        setSmartFont(doc, name, false);
-        doc.setTextColor(80, 80, 80);
-        doc.text(encodeText(name), x, yPos + sigHeight + 4);
+      autoTable(doc, {
+        startY: yPos,
+        head: [sigHeaders],
+        body: sigTableData,
+        margin: { left: margin, right: margin },
+        theme: "striped",
+        headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
+        bodyStyles: { fontSize: 9 },
+        columnStyles: {
+          2: { cellWidth: 40, minCellHeight: 10 },
+        },
+        rowHeight: 12,
+        didParseCell: (cellData) => {
+          const raw =
+            typeof cellData.cell.raw === "string" ? cellData.cell.raw : "";
+          cellData.cell.styles.font = isAmharic(raw)
+            ? FONT_NAMES.ethiopic
+            : FONT_NAMES.latin;
 
-        col += 1;
-        if (col >= 3) {
-          col = 0;
-          yPos += sigHeight + 12;
-        }
+          // Check for signature cell
+          if (cellData.column.index === 2) {
+            const rowData = cellData.row.raw;
+            if (rowData && Array.isArray(rowData)) {
+              const cell = rowData[2];
+              if (
+                typeof cell === "object" &&
+                cell &&
+                cell.content === "signature"
+              ) {
+                cellData.cell.styles.cellWidth = 40;
+                cellData.cell.styles.minCellHeight = 10;
+              }
+            }
+          }
+        },
+        didDrawCell: (tableData) => {
+          // Draw signature in column 2
+          if (tableData.column.index === 2) {
+            const rowData = tableData.row.raw;
+            if (rowData && Array.isArray(rowData)) {
+              const cellData = rowData[2];
+              if (
+                typeof cellData === "object" &&
+                cellData &&
+                cellData.signature
+              ) {
+                try {
+                  const width = Math.min(tableData.cell.width - 4, 30);
+                  const height = Math.min(tableData.cell.height - 4, 14);
+                  const offsetX = (tableData.cell.width - width) / 2;
+                  const offsetY = (tableData.cell.height - height) / 2;
+                  doc.addImage(
+                    cellData.signature,
+                    "PNG",
+                    tableData.cell.x + offsetX,
+                    tableData.cell.y + offsetY,
+                    width,
+                    height,
+                  );
+                } catch (imgError) {
+                  console.warn("Could not add signature image:", imgError);
+                  doc.setFontSize(6);
+                  doc.setTextColor(26, 107, 74);
+                  doc.text("✓", tableData.cell.x + 4, tableData.cell.y + 5);
+                }
+              }
+            }
+          }
+        },
       });
-      yPos += sigHeight + 12;
+
+      yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
     }
 
-    // Footer
+    // ─── FOOTER ──────────────────────────────────────────────
     doc.setFontSize(8);
     setSmartFont(doc, "footer", false);
     doc.setTextColor(150, 150, 150);
