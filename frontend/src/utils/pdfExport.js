@@ -703,7 +703,7 @@ export const exportEvaluationReportToPDF = (
       body: tableBody,
       margin: { left: margin, right: margin },
       theme: "striped",
-      tableWidth: "auto", // ✅ Auto width to fill page
+      tableWidth: pageWidth - margin * 2,
       headStyles: {
         fillColor: [26, 107, 74],
         textColor: [255, 255, 255],
