@@ -1,4 +1,13 @@
 // src/context/LanguageContext.js
-import { createContext } from "react";
+import { createContext, useContext } from "react";
 
 export const LanguageContext = createContext();
+
+// Custom hook for easier consumption
+export const useLanguage = () => {
+  const context = useContext(LanguageContext);
+  if (!context) {
+    throw new Error("useLanguage must be used within a LanguageProvider");
+  }
+  return context;
+};

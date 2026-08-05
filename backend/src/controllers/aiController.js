@@ -96,32 +96,36 @@ const getDailyInsight = async (req, res) => {
 const getEvaluationSummary = async (req, res) => {
   try {
     let evaluationData = req.body.evaluationData;
+    let language = req.body.language || "am"; // ✅ Default to Amharic
 
+    // If evaluationId is provided, fetch from database
     if (!evaluationData && req.body.evaluationId) {
       const evaluation = await Evaluation.findById(req.body.evaluationId);
-      if (!evaluation)
+      if (!evaluation) {
         return res.status(404).json({ message: "Evaluation not found" });
+      }
       evaluationData = evaluation.toObject();
+      // Use language from request or from evaluation data
+      language = req.body.language || evaluationData.language || "am";
     }
 
     if (!evaluationData) {
-      return res
-        .status(400)
-        .json({ message: "Evaluation data or evaluationId required" });
+      return res.status(400).json({
+        message: "Evaluation data or evaluationId required",
+      });
     }
 
-    // ✅ Evaluation report PDFs in this system are Amharic-only, so the
-    // narrative should be too. Accept an explicit `language` either at the
-    // top level of the request body or nested in evaluationData, and
-    // default to Amharic when neither is provided — matching what
-    // pdfExport.js / ReportExport.jsx already assume everywhere else.
-    const language = req.body.language || evaluationData.language || "am";
-
+    // ✅ Ensure language is properly passed to the service
     const summary = await generateEvaluationSummary({
       ...evaluationData,
-      language,
+      language: language, // Explicitly pass the language
     });
-    res.json({ summary, generatedAt: new Date().toISOString() });
+
+    res.json({
+      summary,
+      language, // Return the language used
+      generatedAt: new Date().toISOString(),
+    });
   } catch (error) {
     handleAIError(res, error, "evaluation summary");
   }
@@ -426,5 +430,5 @@ module.exports = {
   getCategoryAndResponse,
   getTranslation,
   getReportTitle,
-  suggestEmployeeFields, // ✅ NEW: Export the new function
+  suggestEmployeeFields,
 };

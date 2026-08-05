@@ -1,6 +1,4 @@
-// frontend/src/components/ai/AIEvaluationHelper.jsx
-// AI-powered evaluation feedback generator
-
+// src/components/ai/AIEvaluationHelper.jsx
 import { useState } from "react";
 import { aiAPI } from "../../services/api";
 import { C } from "../../styles/theme";
@@ -8,6 +6,7 @@ import { C } from "../../styles/theme";
 const AIEvaluationHelper = ({
   evaluationData,
   onApplyFeedback,
+  language = "am", // ✅ Added with default
   className = "",
 }) => {
   const [loading, setLoading] = useState(false);
@@ -20,6 +19,7 @@ const AIEvaluationHelper = ({
       const response = await aiAPI.getEvaluationSummary({
         evaluationData: {
           ...evaluationData,
+          language: language, // ✅ Pass language
           generateDetailedFeedback: true,
         },
       });
@@ -28,6 +28,9 @@ const AIEvaluationHelper = ({
       setShowFeedback(true);
     } catch (error) {
       console.error("Failed to generate feedback:", error);
+      // Optionally show error feedback
+      setFeedback("❌ Failed to generate AI feedback. Please try again.");
+      setShowFeedback(true);
     } finally {
       setLoading(false);
     }

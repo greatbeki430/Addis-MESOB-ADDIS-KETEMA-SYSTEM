@@ -25,12 +25,15 @@ const mergeTranslations = () => {
 const translations = mergeTranslations();
 
 export const LanguageProvider = ({ children }) => {
+  // ✅ Default to Amharic (am)
   const [language, setLanguage] = useState(
     localStorage.getItem("app_lang") || "am",
   );
 
   useEffect(() => {
     localStorage.setItem("app_lang", language);
+    // ✅ Update document direction for RTL if needed
+    document.documentElement.lang = language;
   }, [language]);
 
   /**
