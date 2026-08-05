@@ -118,7 +118,7 @@ function setFontForRun(doc, isAmharicRun, bold) {
 }
 
 function drawMixedScriptText(doc, text, x, y, opts = {}) {
-  const { align = "left", bold = false } = opts;
+  const { align = "left", bold = false, maxWidth = null } = opts;
   const runs = splitIntoScriptRuns(text);
 
   const widths = runs.map((run) => {
@@ -128,6 +128,72 @@ function drawMixedScriptText(doc, text, x, y, opts = {}) {
 
   const totalWidth = widths.reduce((sum, w) => sum + w, 0);
 
+  // If justify is requested, we need to handle it differently
+  if (align === "justify" && maxWidth) {
+    // Split text into words and draw with spacing
+    const words = text.split(/\s+/);
+    const wordRuns = words.map((word) => ({
+      text: word,
+      runs: splitIntoScriptRuns(word),
+    }));
+
+    let currentLine = [];
+    let currentLineWidth = 0;
+    const lines = [];
+    const spaceWidth = doc.getTextWidth(" ");
+
+    for (const word of wordRuns) {
+      const wordWidth = word.runs.reduce((sum, run) => {
+        setFontForRun(doc, run.isAmharic, bold);
+        return sum + doc.getTextWidth(run.text);
+      }, 0);
+
+      if (currentLineWidth + wordWidth > maxWidth && currentLine.length > 0) {
+        lines.push(currentLine);
+        currentLine = [];
+        currentLineWidth = 0;
+      }
+      currentLine.push(word);
+      currentLineWidth += wordWidth + spaceWidth;
+    }
+    if (currentLine.length > 0) {
+      lines.push(currentLine);
+    }
+
+    // Draw justified lines
+    lines.forEach((line, lineIdx) => {
+      const lineY = y + lineIdx * 5;
+      const totalWordsWidth = line.reduce((sum, word) => {
+        const w = word.runs.reduce((s, run) => {
+          setFontForRun(doc, run.isAmharic, bold);
+          return s + doc.getTextWidth(run.text);
+        }, 0);
+        return sum + w;
+      }, 0);
+
+      const spaceCount = line.length - 1;
+      let extraSpace = 0;
+      if (spaceCount > 0) {
+        extraSpace = (maxWidth - totalWordsWidth) / spaceCount;
+      }
+
+      let cursorX = x;
+      line.forEach((word, idx) => {
+        word.runs.forEach((run) => {
+          setFontForRun(doc, run.isAmharic, bold);
+          doc.text(run.text, cursorX, lineY, { align: "left" });
+          cursorX += doc.getTextWidth(run.text);
+        });
+        if (idx < line.length - 1) {
+          cursorX += extraSpace + doc.getTextWidth(" ");
+        }
+      });
+    });
+
+    return lines.length * 5;
+  }
+
+  // Original behavior for left/center/right
   let startX = x;
   if (align === "center") startX = x - totalWidth / 2;
   else if (align === "right") startX = x - totalWidth;
@@ -971,6 +1037,7 @@ export const exportEvaluationReportToPDF = (
     }
 
     // ─── ANALYSIS & SUMMARY ───────────────────────────────────
+    // ─── ANALYSIS & SUMMARY ───────────────────────────────────
     if (includeAINarrative && aiNarrative) {
       let cleanNarrative = aiNarrative
         .replace(/\*\*/g, "")
@@ -983,7 +1050,6 @@ export const exportEvaluationReportToPDF = (
 
       cleanNarrative = encodeText(cleanNarrative);
 
-      // ✅ CRITICAL: Set Ethiopic font before splitting
       doc.setFont(FONT_NAMES.ethiopic, "normal");
       doc.setFontSize(10);
       const maxWidth = pageWidth - margin * 2 - 5;
@@ -1011,7 +1077,7 @@ export const exportEvaluationReportToPDF = (
       doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 8;
 
-      // Pagination
+      // ✅ Pagination with justified text
       let linesPerPage = Math.floor((pageHeight - yPos - 30) / 5);
       let lineIndex = 0;
 
@@ -1032,8 +1098,12 @@ export const exportEvaluationReportToPDF = (
           linesPerPage = Math.floor((pageHeight - yPos - 30) / 5);
         }
 
+        // ✅ FIX: Use justify alignment
         chunk.forEach((line, idx) => {
-          drawMixedScriptText(doc, line, margin, yPos + idx * 5);
+          drawMixedScriptText(doc, line, margin, yPos + idx * 5, {
+            align: "justify",
+            maxWidth: maxWidth,
+          });
         });
         yPos += chunkHeight + 6;
         lineIndex += chunkSize;
