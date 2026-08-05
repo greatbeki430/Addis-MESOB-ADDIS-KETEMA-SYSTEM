@@ -213,25 +213,44 @@ export const aiAPI = {
   getDailyInsight: (reportId, reportData) =>
     api.post("/ai/daily-insight", { reportId, reportData }),
 
-  // ✅ FIXED SIGNATURE: this used to be (evaluationId, evaluationData) —
-  // two positional args — but the only real caller, AIEvaluationHelper.jsx,
-  // has always called it as `getEvaluationSummary({ evaluationData: {...} })`,
-  // a single object. That mismatch meant the whole options object landed in
-  // the `evaluationId` slot and the real `evaluationData` went through as
-  // undefined, silently sending the wrong request body to the backend.
-  // Now it takes one options object, matching the actual call site, and
-  // defaults `language` to Amharic since evaluation report PDFs in this
-  // system are Amharic-only — pass `language: "en"` to override.
-  getEvaluationSummary: ({
-    evaluationId,
-    evaluationData,
-    language = "am",
-  } = {}) =>
-    api.post("/ai/evaluation-summary", {
+  // ✅ Accepts BOTH calling styles that exist in this codebase:
+  //   1) Object style — used by AIEvaluationHelper.jsx:
+  //        getEvaluationSummary({ evaluationData: {...} })
+  //   2) Positional style — used when wired through AISummary's generic
+  //      `fetchFn={aiAPI.getEvaluationSummary} args={[evaluationId, evaluationData]}`
+  //      pattern, which calls `fetchFn(...args)`:
+  //        getEvaluationSummary(evaluationId, evaluationData)
+  // A prior version of this function only handled style #1, which silently
+  // broke style #2 — both evaluationId and evaluationData came through as
+  // undefined, and the backend correctly rejected the request with
+  // "Evaluation data or evaluationId required". Detecting the shape of the
+  // first argument fixes both call sites without touching the callers.
+  getEvaluationSummary: (arg1, arg2) => {
+    let evaluationId;
+    let evaluationData;
+    let language = "am";
+
+    const isOptionsObject =
+      arg1 &&
+      typeof arg1 === "object" &&
+      !Array.isArray(arg1) &&
+      ("evaluationData" in arg1 ||
+        "evaluationId" in arg1 ||
+        "language" in arg1);
+
+    if (isOptionsObject) {
+      ({ evaluationId, evaluationData, language = "am" } = arg1);
+    } else {
+      evaluationId = arg1;
+      evaluationData = arg2;
+    }
+
+    return api.post("/ai/evaluation-summary", {
       evaluationId,
       evaluationData,
       language,
-    }),
+    });
+  },
 
   getDashboardDigest: (stats) => api.post("/ai/dashboard-digest", { stats }),
   getMeetingMinutes: (data) => api.post("/ai/meeting-minutes", data),
