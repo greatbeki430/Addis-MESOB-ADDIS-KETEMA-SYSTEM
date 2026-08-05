@@ -664,43 +664,59 @@ Write 3 complete paragraphs (not bullet points):
 1️⃣ Overall Team Performance Overview
    - Describe the overall performance of the team
    - Highlight key achievements and areas of strength
-   - Minimum 4 sentences
 
 2️⃣ Strengths and Best Performer Recognition
    - Recognize the best performer(s)
    - Describe specific strengths demonstrated
    - Explain what made the top performer successful
-   - Minimum 4 sentences
 
 3️⃣ Areas for Improvement and Recommendations
    - Identify areas needing improvement
    - Provide specific, actionable recommendations
    - Suggest resources or training that could help
-   - Minimum 4 sentences
 
-IMPORTANT: Generate ALL THREE paragraphs completely. Do not truncate or cut off the response.
-Total response should be between 200-300 words.`;
+IMPORTANT: Generate ALL THREE paragraphs completely, but keep each section
+concise — 2-3 sentences is enough. Do not pad for length.`;
 
-  // return generateText(prompt);
   // ✅ Use generateText which has timeout and retry logic
   let text = await generateText(prompt);
 
-  const endsCleanly = /[።፣.!?]["')\]]?\s*$/.test(text.trim());
-  if ((generateText.lastTruncated || !endsCleanly) && text.length > 50) {
+  // Only ። (Ethiopic full stop) and standard Latin terminators count as
+  // "sentence complete". ፣ (Ethiopic comma) is a clause pause, not an
+  // ending — treating it as one caused false "looks complete" reads.
+  const endsCleanly = (str) => /[።.!?]["')\]]?\s*$/.test(str.trim());
+
+  const MAX_CONTINUATION_ATTEMPTS = 3;
+  let attempts = 0;
+
+  while (
+    (generateText.lastTruncated || !endsCleanly(text)) &&
+    text.length > 50 &&
+    attempts < MAX_CONTINUATION_ATTEMPTS
+  ) {
+    attempts++;
     console.warn(
-      "[aiService] Evaluation summary appears truncated — requesting continuation",
+      `[aiService] Evaluation summary appears truncated (attempt ${attempts}/${MAX_CONTINUATION_ATTEMPTS}) — requesting continuation`,
     );
     try {
       const continuation = await generateText(
         `Continue this ${targetLanguage === "am" ? "Amharic" : "English"} text exactly from where it stopped, completing the sentence and finishing the remaining content naturally. Do not repeat anything already written and do not add a new introduction:\n\n"""${text}"""`,
       );
+      if (!continuation || continuation.trim().length === 0) break;
       text = `${text} ${continuation}`.trim();
     } catch (contErr) {
       console.warn(
-        "[aiService] Continuation attempt failed, returning original text:",
+        "[aiService] Continuation attempt failed, returning text so far:",
         contErr.message,
       );
+      break;
     }
+  }
+
+  if (attempts >= MAX_CONTINUATION_ATTEMPTS && !endsCleanly(text)) {
+    console.error(
+      "[aiService] ⚠️ Evaluation summary still incomplete after max continuation attempts",
+    );
   }
 
   return text;
