@@ -10,7 +10,7 @@ import { evaluationAPI } from "../services/api";
 import { aiAPI } from "../services/api";
 import { AISummary, AIEvaluationHelper } from "../components/ai";
 import { useToast } from "../hooks/useToast";
-import LanguageSelector from "../components/LanguageSelector";
+// import LanguageSelector from "../components/LanguageSelector";
 import { useLanguage } from "../context/LanguageContext";
 import {
   FiChevronDown,
@@ -862,7 +862,7 @@ export default function Evaluation({ t, lang }) {
           }}
         >
           {/* ✅ LANGUAGE SELECTOR */}
-          <LanguageSelector variant="default" />
+          {/* <LanguageSelector variant="default" /> */}
 
           <span
             style={{
