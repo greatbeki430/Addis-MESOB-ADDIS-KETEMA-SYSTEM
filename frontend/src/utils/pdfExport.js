@@ -778,7 +778,8 @@ export const exportEvaluationReportToPDF = (
     }));
     const sortedMembers = [...memberTotals].sort((a, b) => b.total - a.total);
 
-    const tableHeaders = ["#", "የአባል ስም", "ውጤት", "ደረጃ", "ፊርማ", "ሁኔታ"];
+    // ✅ Added "አስተያየት" column
+    const tableHeaders = ["#", "የአባል ስም", "ውጤት", "ደረጃ", "ፊርማ", "ሁኔታ", "አስተያየት"];
     const tableBody = sortedMembers.map((m, idx) => {
       const rank =
         idx === 0
@@ -793,7 +794,6 @@ export const exportEvaluationReportToPDF = (
         signatureData && signatureData.startsWith("data:image");
       const memberIndex = members.indexOf(m.name);
       const comment = comments?.[memberIndex] || "";
-      // ✅ Fixed typo: በመጠቅ ላይ → በመጠበቅ ላይ
       let statusText = hasSignature
         ? "✅ ተፈርሟል"
         : comment
@@ -808,6 +808,7 @@ export const exportEvaluationReportToPDF = (
           ? { content: "signature", signature: signatureData }
           : "✗ አልተፈረመም",
         statusText,
+        encodeText(comment), // ✅ feedback column
       ];
     });
 
@@ -825,31 +826,19 @@ export const exportEvaluationReportToPDF = (
         halign: "center",
       },
       bodyStyles: { fontSize: 8, halign: "center" },
-      // ✅ Widths scaled to sum EXACTLY to (pageWidth - margin*2) = 267mm on
-      // landscape A4. Previously every column had a fixed cellWidth and the
-      // six values summed to 277mm — 10mm wider than the printable area —
-      // so the table overflowed past the header bar/margins instead of
-      // lining up with it. tableWidth is also pinned explicitly below so
-      // this can't silently drift out of sync again.
       tableWidth: pageWidth - margin * 2,
+      // ✅ Updated column widths to accommodate the new feedback column
       columnStyles: {
-        0: { cellWidth: 12, halign: "center" },
-        1: { cellWidth: 89, halign: "left" },
-        2: { cellWidth: 27, halign: "center" },
-        3: { cellWidth: 34, halign: "center" },
-        4: { cellWidth: 58, halign: "center", minCellHeight: 14 },
-        5: { cellWidth: 47, halign: "center" },
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: 50, halign: "left" },
+        2: { cellWidth: 22, halign: "center" },
+        3: { cellWidth: 30, halign: "center" },
+        4: { cellWidth: 45, halign: "center", minCellHeight: 14 },
+        5: { cellWidth: 35, halign: "center" },
+        6: { cellWidth: 55, halign: "left", fontSize: 7 }, // feedback column
       },
       rowHeight: 16,
       styles: { font: FONT_NAMES.ethiopic, overflow: "linebreak" },
-      // NOTE: autoTable renders each cell with a single font, so a cell like
-      // "🥇 1ኛ" (digit + Amharic ordinal marker) can still lose the digit if
-      // isAmharic(raw) picks the Ethiopic font for the whole cell and that
-      // font lacks Latin digit glyphs. This mirrors the header bug but at
-      // cell level — if you see rank/score digits vanish, the fix is to
-      // render those cells manually in didDrawCell using drawMixedScriptText
-      // (same pattern as the signature image below) instead of native cell
-      // text. Left as-is here since it wasn't in the reported issue list.
       didParseCell: (cellData) => {
         const raw =
           typeof cellData.cell.raw === "string" ? cellData.cell.raw : "";
@@ -921,9 +910,6 @@ export const exportEvaluationReportToPDF = (
     yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
 
     // ─── BEST PERFORMER & STATS — card layout with footer-safe spacing ──
-    // FOOTER_RESERVED must stay in sync with the footer block's own height
-    // (separator + 2 lines + padding) so this card can never be drawn on
-    // top of the footer the way "ምርጥ አፈጻጸም" was overlapping it before.
     const FOOTER_RESERVED = 24;
 
     if (bestPerformer) {
@@ -937,8 +923,6 @@ export const exportEvaluationReportToPDF = (
 
       const cardH = 26;
 
-      // ✅ Page-break guard: if the card would land in the footer's
-      // reserved space, start a fresh page instead of overlapping it.
       if (yPos + cardH > pageHeight - FOOTER_RESERVED) {
         doc.addPage();
         yPos = margin;
@@ -948,13 +932,11 @@ export const exportEvaluationReportToPDF = (
       const cardY = yPos;
       const cardW = pageWidth - margin * 2;
 
-      // Card background + border
       doc.setFillColor(240, 247, 244);
       doc.setDrawColor(26, 107, 74);
       doc.setLineWidth(0.4);
       doc.roundedRect(cardX, cardY, cardW, cardH, 3, 3, "FD");
 
-      // Left side: trophy + winner name (Amharic, then English underneath)
       const textX = cardX + 8;
       doc.setFontSize(13);
       doc.setTextColor(26, 107, 74);
@@ -974,7 +956,6 @@ export const exportEvaluationReportToPDF = (
         cardY + 19,
       );
 
-      // Right side: average-score badge (Amharic, then English underneath)
       const badgeX = cardX + cardW - 8;
       doc.setFontSize(12);
       doc.setTextColor(26, 107, 74);
@@ -999,115 +980,9 @@ export const exportEvaluationReportToPDF = (
       yPos = cardY + cardH + 10;
     }
 
-    // ─── COMMENTS ─────────────────────────────────────────────
-    if (comments && Object.keys(comments).length > 0) {
-      const hasComments = Object.values(comments).some(
-        (c) => c && c.trim() !== "",
-      );
-      if (hasComments) {
-        if (yPos > 170) {
-          doc.addPage();
-          yPos = margin;
-        }
-
-        doc.setFontSize(14);
-        drawMixedScriptText(doc, "የግለሰብ አስተያየቶች", margin, yPos, {
-          bold: true,
-        });
-        yPos += 7;
-
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        drawMixedScriptText(
-          doc,
-          "Individual Feedback & Comments",
-          margin,
-          yPos,
-        );
-        doc.setTextColor(0, 0, 0);
-        yPos += 10;
-
-        doc.setDrawColor(200, 200, 200);
-        doc.setLineWidth(0.3);
-        doc.line(margin, yPos, pageWidth - margin, yPos);
-        yPos += 8;
-
-        const memberList = members.filter((m) => m.trim() !== "");
-        memberList.forEach((member, idx) => {
-          const comment = comments[idx] || "ምንም አስተያየት የለም";
-          if (yPos > 190) {
-            doc.addPage();
-            yPos = margin;
-          }
-
-          doc.setFontSize(10);
-          doc.setTextColor(26, 107, 74);
-          drawMixedScriptText(doc, `${encodeText(member)}:`, margin, yPos, {
-            bold: true,
-          });
-          yPos += 5;
-
-          doc.setFontSize(9);
-          doc.setTextColor(50, 50, 50);
-          const splitComment = doc.splitTextToSize(
-            encodeText(comment),
-            pageWidth - margin * 2 - 5,
-          );
-          splitComment.forEach((line, lineIdx) => {
-            drawMixedScriptText(doc, line, margin + 4, yPos + lineIdx * 4.5);
-          });
-          yPos += splitComment.length * 4.5 + 6;
-
-          if (idx < memberList.length - 1) {
-            doc.setDrawColor(220, 220, 220);
-            doc.setLineWidth(0.2);
-            doc.line(margin + 4, yPos - 3, pageWidth - margin - 4, yPos - 3);
-            yPos += 2;
-          }
-        });
-      }
-    }
-
     // ─── ANALYSIS & SUMMARY ───────────────────────────────────
-    // Renamed from "AI የአፈጻጸም ትንተና / AI Performance Analysis" — the section
-    // now reads as a normal report section rather than flagging itself as
-    // machine-generated, and the "የተፈጠረ በAI ነው / generated by AI" disclaimer
-    // that used to run under it has been removed entirely.
+    // ✅ This replaces the old simple text split with a multi-page safe version
     if (includeAINarrative && aiNarrative) {
-      if (yPos > 180) {
-        doc.addPage();
-        yPos = margin;
-      }
-
-      doc.setFontSize(14);
-      drawMixedScriptText(doc, "የአፈጻጸም ትንተና ማጠቃለያ", margin, yPos, {
-        bold: true,
-      });
-      yPos += 7;
-
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      drawMixedScriptText(doc, "Performance Analysis Summary", margin, yPos);
-      doc.setTextColor(0, 0, 0);
-      yPos += 10;
-
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.3);
-      doc.line(margin, yPos, pageWidth - margin, yPos);
-      yPos += 8;
-
-      doc.setFontSize(10);
-      doc.setTextColor(50, 50, 50);
-
-      // ✅ Removed the blind `.replace(/ma/g, "and")` (and the related
-      // "ma contributed" rule it was patched on top of) — it rewrote every
-      // "ma" substring in the text, corrupting real words and names:
-      //   "performance"  -> "perforandnce"
-      //   "maintaining"  -> "andintaining"
-      //   "Giramach"     -> "Giraandch"   (an actual person's name!)
-      // The remaining cleanups (markdown markers, stray "O-U" artifacts,
-      // "/n/points/" fragments, collapsing double spaces) are unaffected
-      // and still run.
       let cleanNarrative = aiNarrative
         .replace(/\*\*/g, "")
         .replace(/\*/g, "")
@@ -1118,26 +993,61 @@ export const exportEvaluationReportToPDF = (
         .trim();
 
       cleanNarrative = encodeText(cleanNarrative);
-      const splitNarrative = doc.splitTextToSize(
-        cleanNarrative,
-        pageWidth - margin * 2 - 5,
-      );
-      const estimatedHeight = splitNarrative.length * 5 + 20;
-      if (yPos + estimatedHeight > pageHeight - 30) {
+      const maxWidth = pageWidth - margin * 2 - 5;
+      const lines = doc.splitTextToSize(cleanNarrative, maxWidth);
+
+      if (lines.length === 0) return;
+
+      if (yPos + 20 > pageHeight - 40) {
         doc.addPage();
         yPos = margin;
       }
 
-      splitNarrative.forEach((line, lineIdx) => {
-        drawMixedScriptText(doc, line, margin, yPos + lineIdx * 5);
+      doc.setFontSize(14);
+      drawMixedScriptText(doc, "የአፈጻጸም ትንተና ማጠቃለያ", margin, yPos, {
+        bold: true,
       });
-      yPos += splitNarrative.length * 5 + 8;
+      yPos += 7;
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      drawMixedScriptText(doc, "Performance Analysis Summary", margin, yPos);
+      doc.setTextColor(0, 0, 0);
+      yPos += 10;
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 8;
+
+      // Pagination: write lines in chunks that fit per page
+      let linesPerPage = Math.floor((pageHeight - yPos - 30) / 5);
+      let lineIndex = 0;
+
+      while (lineIndex < lines.length) {
+        const remainingLines = lines.length - lineIndex;
+        const chunkSize = Math.min(remainingLines, linesPerPage);
+        const chunk = lines.slice(lineIndex, lineIndex + chunkSize);
+
+        const chunkHeight = chunk.length * 5 + 10;
+        if (yPos + chunkHeight > pageHeight - 30 && lineIndex > 0) {
+          doc.addPage();
+          yPos = margin;
+          doc.setFontSize(12);
+          drawMixedScriptText(doc, "የአፈጻጸም ትንተና ማጠቃለያ (ቀጣይ)", margin, yPos, {
+            bold: true,
+          });
+          yPos += 8;
+          linesPerPage = Math.floor((pageHeight - yPos - 30) / 5);
+        }
+
+        chunk.forEach((line, idx) => {
+          drawMixedScriptText(doc, line, margin, yPos + idx * 5);
+        });
+        yPos += chunkHeight + 6;
+        lineIndex += chunkSize;
+      }
     }
 
     // ─── FOOTER ───────────────────────────────────────────────
-    // Prepared-by / branch is already stated once, in the header on page 1
-    // — repeating it in the footer of every page was redundant. The footer
-    // now just carries the org name, date, and page number.
     const pageCount = doc.internal.getNumberOfPages();
     const footerY = pageHeight - 14;
 
