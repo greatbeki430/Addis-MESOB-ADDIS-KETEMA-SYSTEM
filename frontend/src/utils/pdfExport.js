@@ -692,9 +692,6 @@ export const exportEvaluationReportToPDF = (
       format: "a4",
     });
 
-    // loadFonts is expected to register the Ethiopic/Latin fonts and set
-    // doc.__hasEthiopicFont / doc.__hasLatinFont — drawMixedScriptText relies
-    // on those flags to pick the right font per script run.
     loadFonts(doc);
 
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -711,7 +708,6 @@ export const exportEvaluationReportToPDF = (
     });
     yPos += 10;
 
-    // ✅ Fixed typos: እዱስ → አዲስ, አስተዱደር → አስተዳደር
     const amharicSubtitle = "የአዲስ አበባ ከተማ አስተዳደር · የህዝብ አገልግሎት ቢሮ";
     doc.setFontSize(11);
     drawMixedScriptText(doc, amharicSubtitle, pageWidth / 2, yPos, {
@@ -734,7 +730,7 @@ export const exportEvaluationReportToPDF = (
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 10;
 
-    // ─── REPORT DATE, PREPARED BY & BRANCH — COMPACT, ONE LINE EACH ──
+    // ─── REPORT DATE, PREPARED BY & BRANCH ──────────────────
     const now = new Date();
     const ethiopianDate = getEthiopianDate(now);
     const gregorianDate = now.toLocaleDateString("en-US", {
@@ -745,15 +741,12 @@ export const exportEvaluationReportToPDF = (
     const preparedByName = preparedBy || t?.evaluation?.preparedBy || "አስተዳዳሪ";
     const branch = branchName || t?.evaluation?.branchName || "አዲስ ከተማ ቅርንጫፍ";
 
-    // Amharic line: date | prepared by | branch — all mixed-script, must
-    // use drawMixedScriptText or the digits/name drop out silently.
     const amharicInfoLine = `የሪፖርት ቀን: ${ethiopianDate} | ሪፖርት ያዘጋጀው: ${preparedByName} | ቅርንጫፍ: ${branch}`;
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
     drawMixedScriptText(doc, amharicInfoLine, margin, yPos, { bold: true });
     yPos += 6;
 
-    // English line
     const englishInfoLine = `Report Date: ${gregorianDate} (GC) | Prepared By: ${preparedByName} | Branch: ${branch}`;
     doc.setFontSize(9);
     doc.setTextColor(100, 100, 100);
@@ -778,7 +771,7 @@ export const exportEvaluationReportToPDF = (
     }));
     const sortedMembers = [...memberTotals].sort((a, b) => b.total - a.total);
 
-    // ✅ Added "አስተያየት" column
+    // ✅ Added "አስተያየት" column with adjusted widths
     const tableHeaders = ["#", "የአባል ስም", "ውጤት", "ደረጃ", "ፊርማ", "ሁኔታ", "አስተያየት"];
     const tableBody = sortedMembers.map((m, idx) => {
       const rank =
@@ -808,7 +801,7 @@ export const exportEvaluationReportToPDF = (
           ? { content: "signature", signature: signatureData }
           : "✗ አልተፈረመም",
         statusText,
-        encodeText(comment), // ✅ feedback column
+        encodeText(comment),
       ];
     });
 
@@ -827,15 +820,14 @@ export const exportEvaluationReportToPDF = (
       },
       bodyStyles: { fontSize: 8, halign: "center" },
       tableWidth: pageWidth - margin * 2,
-      // ✅ Updated column widths to accommodate the new feedback column
       columnStyles: {
         0: { cellWidth: 10, halign: "center" },
         1: { cellWidth: 50, halign: "left" },
-        2: { cellWidth: 22, halign: "center" },
+        2: { cellWidth: 20, halign: "center" },
         3: { cellWidth: 30, halign: "center" },
-        4: { cellWidth: 45, halign: "center", minCellHeight: 14 },
-        5: { cellWidth: 35, halign: "center" },
-        6: { cellWidth: 55, halign: "left", fontSize: 7 }, // feedback column
+        4: { cellWidth: 35, halign: "center", minCellHeight: 14 },
+        5: { cellWidth: 30, halign: "center" },
+        6: { cellWidth: 65, halign: "left", fontSize: 7 }, // wider feedback column
       },
       rowHeight: 16,
       styles: { font: FONT_NAMES.ethiopic, overflow: "linebreak" },
@@ -909,7 +901,7 @@ export const exportEvaluationReportToPDF = (
 
     yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
 
-    // ─── BEST PERFORMER & STATS — card layout with footer-safe spacing ──
+    // ─── BEST PERFORMER & STATS ──────────────────────────────
     const FOOTER_RESERVED = 24;
 
     if (bestPerformer) {
@@ -922,7 +914,6 @@ export const exportEvaluationReportToPDF = (
           : 0;
 
       const cardH = 26;
-
       if (yPos + cardH > pageHeight - FOOTER_RESERVED) {
         doc.addPage();
         yPos = margin;
@@ -981,7 +972,6 @@ export const exportEvaluationReportToPDF = (
     }
 
     // ─── ANALYSIS & SUMMARY ───────────────────────────────────
-    // ✅ This replaces the old simple text split with a multi-page safe version
     if (includeAINarrative && aiNarrative) {
       let cleanNarrative = aiNarrative
         .replace(/\*\*/g, "")
@@ -993,6 +983,10 @@ export const exportEvaluationReportToPDF = (
         .trim();
 
       cleanNarrative = encodeText(cleanNarrative);
+
+      // ✅ CRITICAL: Set Ethiopic font before splitting
+      doc.setFont(FONT_NAMES.ethiopic, "normal");
+      doc.setFontSize(10);
       const maxWidth = pageWidth - margin * 2 - 5;
       const lines = doc.splitTextToSize(cleanNarrative, maxWidth);
 
@@ -1018,7 +1012,7 @@ export const exportEvaluationReportToPDF = (
       doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 8;
 
-      // Pagination: write lines in chunks that fit per page
+      // Pagination
       let linesPerPage = Math.floor((pageHeight - yPos - 30) / 5);
       let lineIndex = 0;
 
@@ -1053,7 +1047,6 @@ export const exportEvaluationReportToPDF = (
 
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.3);
       doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
@@ -1074,7 +1067,6 @@ export const exportEvaluationReportToPDF = (
 
     doc.save(`evaluation_report_${ethiopianDate.replace(/\//g, "-")}.pdf`);
     console.log("✅ Evaluation Report PDF generated successfully!");
-
     showSuccessToast("📄 Evaluation Report PDF generated successfully!");
     return true;
   } catch (error) {
