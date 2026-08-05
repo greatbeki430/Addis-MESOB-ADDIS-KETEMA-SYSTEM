@@ -920,7 +920,12 @@ export const exportEvaluationReportToPDF = (
 
     yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
 
-    // ─── BEST PERFORMER & STATS ──────────────────────────────
+    // ─── BEST PERFORMER & STATS — card layout with footer-safe spacing ──
+    // FOOTER_RESERVED must stay in sync with the footer block's own height
+    // (separator + 2 lines + padding) so this card can never be drawn on
+    // top of the footer the way "ምርጥ አፈጻጸም" was overlapping it before.
+    const FOOTER_RESERVED = 24;
+
     if (bestPerformer) {
       const avgScore =
         sortedMembers.length > 0
@@ -930,42 +935,68 @@ export const exportEvaluationReportToPDF = (
             )
           : 0;
 
-      doc.setFontSize(12);
+      const cardH = 26;
+
+      // ✅ Page-break guard: if the card would land in the footer's
+      // reserved space, start a fresh page instead of overlapping it.
+      if (yPos + cardH > pageHeight - FOOTER_RESERVED) {
+        doc.addPage();
+        yPos = margin;
+      }
+
+      const cardX = margin;
+      const cardY = yPos;
+      const cardW = pageWidth - margin * 2;
+
+      // Card background + border
+      doc.setFillColor(240, 247, 244);
+      doc.setDrawColor(26, 107, 74);
+      doc.setLineWidth(0.4);
+      doc.roundedRect(cardX, cardY, cardW, cardH, 3, 3, "FD");
+
+      // Left side: trophy + winner name (Amharic, then English underneath)
+      const textX = cardX + 8;
+      doc.setFontSize(13);
       doc.setTextColor(26, 107, 74);
       drawMixedScriptText(
         doc,
         `🏆 ምርጥ አፈጻጸም: ${encodeText(bestPerformer)}`,
-        margin,
-        yPos,
+        textX,
+        cardY + 11,
         { bold: true },
       );
-      yPos += 8;
-
-      doc.setFontSize(10);
-      doc.setTextColor(60, 60, 60);
-      drawMixedScriptText(
-        doc,
-        `🏆 Best Performer: ${encodeText(bestPerformer)}`,
-        margin,
-        yPos,
-      );
-      yPos += 8;
-
-      doc.setFontSize(11);
-      doc.setTextColor(0, 0, 0);
-      drawMixedScriptText(doc, `📊 አማካይ ውጤት: ${avgScore} / 100`, margin, yPos);
-      yPos += 7;
-
       doc.setFontSize(9);
-      doc.setTextColor(100, 100, 100);
+      doc.setTextColor(110, 110, 110);
       drawMixedScriptText(
         doc,
-        `📊 Average Score: ${avgScore} / 100`,
-        margin,
-        yPos,
+        `Best Performer: ${encodeText(bestPerformer)}`,
+        textX,
+        cardY + 19,
       );
+
+      // Right side: average-score badge (Amharic, then English underneath)
+      const badgeX = cardX + cardW - 8;
+      doc.setFontSize(12);
+      doc.setTextColor(26, 107, 74);
+      drawMixedScriptText(
+        doc,
+        `📊 አማካይ ውጤት: ${avgScore} / 100`,
+        badgeX,
+        cardY + 11,
+        { align: "right", bold: true },
+      );
+      doc.setFontSize(9);
+      doc.setTextColor(110, 110, 110);
+      drawMixedScriptText(
+        doc,
+        `Average Score: ${avgScore} / 100`,
+        badgeX,
+        cardY + 19,
+        { align: "right" },
+      );
+
       doc.setTextColor(0, 0, 0);
-      yPos += 12;
+      yPos = cardY + cardH + 10;
     }
 
     // ─── COMMENTS ─────────────────────────────────────────────
