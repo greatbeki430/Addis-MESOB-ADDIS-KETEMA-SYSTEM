@@ -76,6 +76,7 @@ export const evaluationTranslations = {
         "Add your feedback, strengths, or areas for improvement...",
       signaturePlaceholder: "Draw or type your signature",
       typeNameToSign: "Type your name as signature...",
+      clickToSign: "Click to sign",
       signWithFinger: "✍️ Sign with your finger (touch) or type name below",
       signWithMouse: "✍️ Sign with mouse or type name below",
       signatureSaved: "✓ Signature saved",
@@ -182,6 +183,7 @@ export const evaluationTranslations = {
       addFeedbackPlaceholder: "አስተያየት፣ ጥንካሬዎችን ወይም መሻሻል የሚያስፈልጋቸውን ቦታዎች ያክሉ...",
       signaturePlaceholder: "ፊርማዎን ይሳሉ ወይም ይተይቡ",
       typeNameToSign: "ስምዎን እንደ ፊርማ ይተይቡ...",
+      clickToSign: "ለመፈረም ይጫኑ",
       signWithFinger: "✍️ በጣትዎ ይፈረሙ (ንክኪ) ወይም ስም ከታች ይተይቡ",
       signWithMouse: "✍️ በመዳፊት ይፈረሙ ወይም ስም ከታች ይተይቡ",
       signatureSaved: "✓ ፊርማ ተቀምጧል",
@@ -287,6 +289,7 @@ export const evaluationTranslations = {
       signaturePlaceholder:
         "Mallattoo keessan suubaadhaan ykn barreessaadhaan kaa'i",
       typeNameToSign: "Maqaa keessan mallattoo ta'ee barreessi...",
+      clickToSign: "Mallatteessuuf cuqaasaa",
       signWithFinger:
         "✍️ Qubaan mallatteessi (tuqaa) ykn maqaa gaditti barreessi",
       signWithMouse: "✍️ Mouse-n mallatteessi ykn maqaa gaditti barreessi",
