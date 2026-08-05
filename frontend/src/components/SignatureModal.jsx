@@ -29,7 +29,7 @@ export default function SignatureModal({
     typeof window !== "undefined" &&
     ("ontouchstart" in window || navigator.maxTouchPoints > 0);
 
-  // ─── Draw signature on canvas (used by both mount and updates) ───
+  // ─── Draw signature on canvas ───────────────────────────────
   const drawSignature = useCallback((dataUrl) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -60,9 +60,7 @@ export default function SignatureModal({
     }
   }, []);
 
-  // ─── Effect to update canvas when initialSignature changes ───
-  // Use useLayoutEffect to run before paint and avoid flicker.
-  // We wrap state updates in setTimeout to avoid synchronous cascading renders.
+  // ─── Effect to update canvas when initialSignature changes ──
   useLayoutEffect(() => {
     const timeoutId = setTimeout(() => {
       drawSignature(initialSignature);
@@ -70,10 +68,10 @@ export default function SignatureModal({
     return () => clearTimeout(timeoutId);
   }, [initialSignature, drawSignature]);
 
-  // ─── Cleanup on unmount ──────────────────────────────────────
+  // ─── Cleanup on unmount – FIXED (capture ref value) ────────
   useEffect(() => {
+    const canvas = canvasRef.current;
     return () => {
-      const canvas = canvasRef.current;
       if (canvas) {
         const ctx = canvas.getContext("2d");
         ctx.clearRect(0, 0, canvas.width, canvas.height);
