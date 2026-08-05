@@ -26,6 +26,9 @@ export const evaluationTranslations = {
       namePlaceholder: "Name",
       dateLabel: "Date:",
       signaturesTitle: "Digital Signatures",
+      // ✅ ADD THIS
+      signatureFor: "Signature for",
+      // ✅ ADD THIS
       aiInsights: "AI Evaluation Insights",
       aiPowered: "AI Powered",
       performanceDistribution: "Performance Distribution",
@@ -130,6 +133,9 @@ export const evaluationTranslations = {
       namePlaceholder: "ስም",
       dateLabel: "ቀን:",
       signaturesTitle: "ዲጂታል ፊርማዎች",
+      // ✅ ADD THIS
+      signatureFor: "ፊርማ ለ",
+      // ✅ ADD THIS
       aiInsights: "የAI ምዘና ግንዛቤዎች",
       aiPowered: "በAI የተጎላበተ",
       performanceDistribution: "የአፈጻጸም ስርጭት",
@@ -229,6 +235,9 @@ export const evaluationTranslations = {
       namePlaceholder: "Maqaa",
       dateLabel: "Guyyaa:",
       signaturesTitle: "Mallattoo Dijitaalaa",
+      // ✅ ADD THIS
+      signatureFor: "Mallattoo f",
+      // ✅ ADD THIS
       aiInsights: "Hubannoo Madaallii AI",
       aiPowered: "AI-n Hojjetame",
       performanceDistribution: "Rammoo Raawwii",
