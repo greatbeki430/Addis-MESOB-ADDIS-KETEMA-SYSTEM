@@ -4,6 +4,7 @@ import { C, F } from "../../styles/theme";
 import { useAuth } from "../../hooks/useAuth";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
+import ConfirmModal from "../common/ConfirmModal";
 import {
   FiThumbsUp,
   FiMessageCircle,
@@ -51,6 +52,13 @@ export default function ExperiencesAndResults({ sessionId }) {
     measurableOutcome: "",
     outcomeCategory: "other",
     timeframe: "within-month",
+  });
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    type: null,
+    id: null,
+    title: "",
+    message: "",
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -119,7 +127,17 @@ export default function ExperiencesAndResults({ sessionId }) {
   };
 
   const handleDelete = async (type, id) => {
-    if (!window.confirm("Are you sure you want to delete this?")) return;
+    setConfirmModal({
+      isOpen: true,
+      type,
+      id,
+      title: "Delete Confirmation",
+      message: `Are you sure you want to delete this ${type}? This action cannot be undone.`,
+    });
+  };
+
+  const confirmDelete = async () => {
+    const { type, id } = confirmModal;
     try {
       type === "experience"
         ? await goldenMondayAPI.deleteExperience(id)
@@ -129,6 +147,14 @@ export default function ExperiencesAndResults({ sessionId }) {
     } catch (err) {
       console.error("Failed to delete:", err);
       showToast("Failed to delete", "error");
+    } finally {
+      setConfirmModal({
+        isOpen: false,
+        type: null,
+        id: null,
+        title: "",
+        message: "",
+      });
     }
   };
 
@@ -280,7 +306,7 @@ export default function ExperiencesAndResults({ sessionId }) {
           {(user?._id === exp.user?._id ||
             ["admin", "superadmin", "leader"].includes(user?.role)) && (
             <button
-              onClick={() => handleDelete("experience", exp._id)}
+              onClick={() => handleDelete("experience", exp._id, exp.userName)}
               style={{
                 background: "none",
                 border: "none",
@@ -404,7 +430,7 @@ export default function ExperiencesAndResults({ sessionId }) {
           {(user?._id === res.user?._id ||
             ["admin", "superadmin", "leader"].includes(user?.role)) && (
             <button
-              onClick={() => handleDelete("result", res._id)}
+              onClick={() => handleDelete("result", res._id, res.userName)}
               style={{
                 background: "none",
                 border: "none",
@@ -767,6 +793,24 @@ export default function ExperiencesAndResults({ sessionId }) {
           No results logged yet. Start applying what you've learned!
         </p>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() =>
+          setConfirmModal({
+            isOpen: false,
+            type: null,
+            id: null,
+            title: "",
+            message: "",
+          })
+        }
+        onConfirm={confirmDelete}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText="Delete"
+        confirmColor="#dc2626"
+      />
     </div>
   );
 }

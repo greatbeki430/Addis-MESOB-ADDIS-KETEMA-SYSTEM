@@ -18,6 +18,7 @@ import GalleryGrid from "../components/golden-monday/GalleryGrid";
 import ReportExport from "../components/golden-monday/ReportExport";
 import ExperiencesAndResults from "../components/golden-monday/ExperiencesAndResults";
 import PresenterSpotlight from "../components/golden-monday/PresenterSpotlight";
+import ConfirmModal from "../components/common/ConfirmModal";
 import {
   FiSunrise,
   FiUsers,
@@ -1124,6 +1125,11 @@ export default function GoldenMonday() {
   const [allUsers, setAllUsers] = useState([]);
   const [userSearch, setUserSearch] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
+  const [removeConfirm, setRemoveConfirm] = useState({
+    isOpen: false,
+    userId: null,
+    name: "",
+  });
 
   // ── Photo Upload State ──
   const [photoFile, setPhotoFile] = useState(null);
@@ -1404,19 +1410,24 @@ export default function GoldenMonday() {
     }
   };
 
-  const handleRemoveEmployee = async (userId) => {
-    if (
-      !window.confirm(
-        t.confirmRemoveEmployee || "Remove this employee from rotation?",
-      )
-    )
-      return;
+  const handleRemoveEmployee = (userId, name = "") => {
+    setRemoveConfirm({
+      isOpen: true,
+      userId,
+      name,
+    });
+  };
+
+  // ✅ ADD THIS - Confirm remove function
+  const confirmRemoveEmployee = async () => {
     try {
-      await goldenMondayAPI.removeEmployee(userId);
+      await goldenMondayAPI.removeEmployee(removeConfirm.userId);
       showToast(t.employeeRemovedToast || "Employee removed", "success");
       await refreshData();
     } catch {
       showToast(t.failedRemoveEmployee || "Failed to remove employee", "error");
+    } finally {
+      setRemoveConfirm({ isOpen: false, userId: null, name: "" });
     }
   };
 
@@ -2371,7 +2382,10 @@ export default function GoldenMonday() {
                             {isSuperAdmin && (
                               <button
                                 onClick={() =>
-                                  handleRemoveEmployee(emp.user?._id || emp._id)
+                                  handleRemoveEmployee(
+                                    emp.user?._id || emp._id,
+                                    emp.name,
+                                  )
                                 }
                                 style={{
                                   ...btnStyle("#ef4444", "#fff"),
@@ -2645,6 +2659,19 @@ export default function GoldenMonday() {
         handlePhotoChange={handlePhotoChange}
         uploadingPhoto={uploadingPhoto}
         t={t}
+      />
+
+      {/* Remove Confirmation Modal */}
+      <ConfirmModal
+        isOpen={removeConfirm.isOpen}
+        onClose={() =>
+          setRemoveConfirm({ isOpen: false, userId: null, name: "" })
+        }
+        onConfirm={confirmRemoveEmployee}
+        title="Remove Employee"
+        message={`Are you sure you want to remove "${removeConfirm.name}" from the rotation?`}
+        confirmText="Remove"
+        confirmColor="#dc2626"
       />
     </div>
   );
