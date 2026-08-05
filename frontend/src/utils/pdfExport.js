@@ -825,13 +825,20 @@ export const exportEvaluationReportToPDF = (
         halign: "center",
       },
       bodyStyles: { fontSize: 8, halign: "center" },
+      // ✅ Widths scaled to sum EXACTLY to (pageWidth - margin*2) = 267mm on
+      // landscape A4. Previously every column had a fixed cellWidth and the
+      // six values summed to 277mm — 10mm wider than the printable area —
+      // so the table overflowed past the header bar/margins instead of
+      // lining up with it. tableWidth is also pinned explicitly below so
+      // this can't silently drift out of sync again.
+      tableWidth: pageWidth - margin * 2,
       columnStyles: {
         0: { cellWidth: 12, halign: "center" },
-        1: { cellWidth: 92, halign: "left" },
-        2: { cellWidth: 28, halign: "center" },
-        3: { cellWidth: 35, halign: "center" },
-        4: { cellWidth: 60, halign: "center", minCellHeight: 14 },
-        5: { cellWidth: 50, halign: "center" },
+        1: { cellWidth: 89, halign: "left" },
+        2: { cellWidth: 27, halign: "center" },
+        3: { cellWidth: 34, halign: "center" },
+        4: { cellWidth: 58, halign: "center", minCellHeight: 14 },
+        5: { cellWidth: 47, halign: "center" },
       },
       rowHeight: 16,
       styles: { font: FONT_NAMES.ethiopic, overflow: "linebreak" },
