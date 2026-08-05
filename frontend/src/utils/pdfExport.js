@@ -1037,7 +1037,6 @@ export const exportEvaluationReportToPDF = (
     }
 
     // ─── ANALYSIS & SUMMARY ───────────────────────────────────
-    // ─── ANALYSIS & SUMMARY ───────────────────────────────────
     if (includeAINarrative && aiNarrative) {
       let cleanNarrative = aiNarrative
         .replace(/\*\*/g, "")
@@ -1077,7 +1076,7 @@ export const exportEvaluationReportToPDF = (
       doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 8;
 
-      // ✅ Pagination with justified text
+      // ✅ Pagination with LEFT alignment (no justify)
       let linesPerPage = Math.floor((pageHeight - yPos - 30) / 5);
       let lineIndex = 0;
 
@@ -1098,18 +1097,16 @@ export const exportEvaluationReportToPDF = (
           linesPerPage = Math.floor((pageHeight - yPos - 30) / 5);
         }
 
-        // ✅ FIX: Use justify alignment
+        // ✅ Use drawMixedScriptText with left alignment
         chunk.forEach((line, idx) => {
           drawMixedScriptText(doc, line, margin, yPos + idx * 5, {
-            align: "justify",
-            maxWidth: maxWidth,
+            align: "left", // ✅ Changed from "justify" to "left"
           });
         });
         yPos += chunkHeight + 6;
         lineIndex += chunkSize;
       }
     }
-
     // ─── FOOTER ───────────────────────────────────────────────
     const pageCount = doc.internal.getNumberOfPages();
     const footerY = pageHeight - 14;
