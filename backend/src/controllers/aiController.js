@@ -131,6 +131,7 @@ const getEvaluationSummary = async (req, res) => {
       summary,
       language, // Return the language used
       generatedAt: new Date().toISOString(),
+      _provider: require("../services/aiService").generateText.lastProvider,
     });
   } catch (error) {
     handleAIError(res, error, "evaluation summary");
