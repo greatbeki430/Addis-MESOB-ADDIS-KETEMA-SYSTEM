@@ -121,6 +121,12 @@ const getEvaluationSummary = async (req, res) => {
       language: language, // Explicitly pass the language
     });
 
+    if (summary && summary.length < 100) {
+      console.warn(
+        `[aiController] ⚠️ AI response too short (${summary.length} chars). Possible truncation.`,
+      );
+    }
+
     res.json({
       summary,
       language, // Return the language used
