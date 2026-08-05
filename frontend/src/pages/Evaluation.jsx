@@ -10,6 +10,8 @@ import { evaluationAPI } from "../services/api";
 import { aiAPI } from "../services/api";
 import { AISummary, AIEvaluationHelper } from "../components/ai";
 import { useToast } from "../hooks/useToast";
+import LanguageSelector from "../components/LanguageSelector";
+import { useLanguage } from "../context/LanguageContext";
 import {
   FiChevronDown,
   FiUser,
@@ -287,7 +289,12 @@ const formatAINarrative = (text) => {
 };
 
 export default function Evaluation({ t, lang }) {
-  const safeT = t || {};
+  // ✅ Use language context
+  const { language: contextLang, t: contextT } = useLanguage();
+  // Use context language or props language (props take precedence)
+  const currentLang = lang || contextLang || "am";
+
+  const safeT = t || contextT || {};
   const te = safeT.evaluation || {};
   const safeCriteria = safeT.criteria || {};
 
@@ -672,7 +679,7 @@ export default function Evaluation({ t, lang }) {
         totalScores: totalScoresData,
         evaluatedBy: user?.name || user?.email || "Unknown",
         evaluatedAt: new Date().toISOString(),
-        language: lang || "en",
+        language: currentLang || "am",
         status: "submitted",
         bestPerformer: bestPerformerName,
         averageScore: averageScore,
@@ -807,8 +814,8 @@ export default function Evaluation({ t, lang }) {
   };
 
   // ─── Translation helpers ──────────────────────────────────
-  const teKey = (key, fallback) => t?.(`evaluation.${key}`) || fallback;
-  const tcKey = (key, fallback) => t?.(`common.${key}`) || fallback;
+  const teKey = (key, fallback) => safeT?.(`evaluation.${key}`) || fallback;
+  const tcKey = (key, fallback) => safeT?.(`common.${key}`) || fallback;
 
   return (
     <div
@@ -845,7 +852,18 @@ export default function Evaluation({ t, lang }) {
           <FiClipboard size={24} color={C.primary} />
           {teKey("title", "Peer Forum Evaluation")}
         </h1>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
+          {/* ✅ LANGUAGE SELECTOR */}
+          <LanguageSelector variant="default" />
+
           <span
             style={{
               background: C.primary,
@@ -2078,7 +2096,7 @@ export default function Evaluation({ t, lang }) {
                     <SignatureCanvas
                       onSave={(data) => handleSignatureSave("teamLeader", data)}
                       value={signatures.teamLeader}
-                      t={t}
+                      t={safeT}
                     />
                   </div>
 
@@ -2127,7 +2145,7 @@ export default function Evaluation({ t, lang }) {
                       <SignatureCanvas
                         onSave={(data) => handleSignatureSave(name, data)}
                         value={signatures[name]}
-                        t={t}
+                        t={safeT}
                       />
                     </div>
                   ))}
@@ -2321,15 +2339,7 @@ export default function Evaluation({ t, lang }) {
                     }),
                   }}
                   onApplyFeedback={(feedback) => {
-                    showToast(
-                      teKey(
-                        "aiFeedbackGenerated",
-                        "AI feedback generated successfully!",
-                      ),
-                      "success",
-                    );
-                    console.log("AI Feedback:", feedback);
-
+                    // Apply AI feedback to each member's comment
                     if (feedback && feedback.individualFeedback) {
                       feedback.individualFeedback.forEach((item) => {
                         const memberIndex = members.findIndex(
@@ -2345,22 +2355,30 @@ export default function Evaluation({ t, lang }) {
                         }
                       });
                       showToast(
-                        (
-                          teKey(
-                            "aiFeedbackApplied",
-                            "✅ Applied AI feedback for {count} member(s)",
-                          ) || "✅ Applied AI feedback for {count} member(s)"
+                        teKey(
+                          "aiFeedbackApplied",
+                          "✅ Applied AI feedback for {count} member(s)",
                         ).replace(
                           "{count}",
                           feedback.individualFeedback.length,
                         ),
                         "success",
                       );
+                    } else {
+                      showToast(
+                        teKey(
+                          "aiFeedbackGenerated",
+                          "AI feedback generated successfully!",
+                        ),
+                        "success",
+                      );
+                      console.log("AI Feedback:", feedback);
                     }
                   }}
+                  language={currentLang} // ✅ Pass the selected language
                 />
 
-                {/* Enhanced AI Performance Insights - Responsive */}
+                {/* ✅ Enhanced AI Performance Insights - Responsive Cards */}
                 {sortedMembers.length > 0 && (
                   <div style={{ marginTop: "20px" }}>
                     <div
@@ -2812,14 +2830,13 @@ export default function Evaluation({ t, lang }) {
                   members.filter((m) => m.trim() !== ""),
                   (m) => total(m),
                   bestPerformerName,
-                  t,
+                  safeT,
                   comments,
                   signatures,
                   includeAINarrative,
                   aiNarrativeContent,
-                  // ✅ ADD THESE TWO NEW PARAMETERS
                   user?.name || "Administrator",
-                  t?.evaluation?.branchName || "አዲስ ከተማ ቅርንጫፍ",
+                  safeT?.evaluation?.branchName || "አዲስ ከተማ ቅርንጫፍ",
                 );
               }}
             >
@@ -2910,7 +2927,13 @@ export default function Evaluation({ t, lang }) {
 
               {includeAINarrative && (
                 <AISummary
-                  fetchFn={(id) => aiAPI.getEvaluationSummary(id, null)}
+                  fetchFn={async (id) => {
+                    // ✅ Pass the current language to the AI API
+                    return aiAPI.getEvaluationSummary({
+                      evaluationId: id,
+                      language: currentLang,
+                    });
+                  }}
                   args={[evaluationId]}
                   label={teKey("aiNarrative", "AI Evaluation Narrative")}
                   formatResult={formatAINarrative}

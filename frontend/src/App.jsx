@@ -22,7 +22,8 @@ import { setToastFunction } from "./utils/toastHelper";
 import { ToastContainer } from "./components/ui/Modal";
 import { useToast } from "./hooks/useToast";
 import { LanguageProvider } from "./context/LanguageProvider";
-import { useLanguage } from "./hooks/useLanguage";
+// import { useLanguage } from "./hooks/useLanguage";
+import { useLanguage } from "./context/LanguageContext";
 import AdminServiceManager from "./pages/admin/AdminServiceManager";
 
 // AI Feature imports
