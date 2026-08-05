@@ -821,13 +821,13 @@ export const exportEvaluationReportToPDF = (
       bodyStyles: { fontSize: 8, halign: "center" },
       tableWidth: pageWidth - margin * 2,
       columnStyles: {
-        0: { cellWidth: 10, halign: "center" },
-        1: { cellWidth: 50, halign: "left" },
-        2: { cellWidth: 20, halign: "center" },
-        3: { cellWidth: 30, halign: "center" },
-        4: { cellWidth: 35, halign: "center", minCellHeight: 14 },
-        5: { cellWidth: 30, halign: "center" },
-        6: { cellWidth: 65, halign: "left", fontSize: 7 }, // wider feedback column
+        0: { cellWidth: 12, halign: "center" }, // # column
+        1: { cellWidth: 65, halign: "left" }, // Name column
+        2: { cellWidth: 22, halign: "center" }, // Score column
+        3: { cellWidth: 28, halign: "center" }, // Rank column
+        4: { cellWidth: 40, halign: "center", minCellHeight: 14 }, // Signature column
+        5: { cellWidth: 30, halign: "center" }, // Status column
+        6: { cellWidth: 80, halign: "left", fontSize: 7 }, // Feedback column
       },
       rowHeight: 16,
       styles: { font: FONT_NAMES.ethiopic, overflow: "linebreak" },
