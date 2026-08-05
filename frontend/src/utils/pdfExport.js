@@ -785,8 +785,8 @@ export const exportEvaluationReportToPDF = (
       const signatureData = signatures?.[m.name] || null;
       const hasSignature =
         signatureData && signatureData.startsWith("data:image");
-      const memberIndex = members.indexOf(m.name);
-      const comment = comments?.[memberIndex] || "";
+      // ✅ FIX: use m.name as key, not index
+      const comment = comments?.[m.name] || "";
       let statusText = hasSignature
         ? "✅ ተፈርሟል"
         : comment
