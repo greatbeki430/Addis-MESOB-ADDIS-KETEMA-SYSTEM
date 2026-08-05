@@ -18,6 +18,10 @@ export default function SignatureModal({
   subtitle = "",
   initialSignature = null,
   required = true,
+  clickToSignText = "Click to sign",
+  typeToSignText = "Or type your name to sign",
+  touchToSignText = "Touch to sign", // ✅ new
+  signedText = "Signed", // optional
 }) {
   const canvasRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -68,9 +72,9 @@ export default function SignatureModal({
     return () => clearTimeout(timeoutId);
   }, [initialSignature, drawSignature]);
 
-  // ─── Cleanup on unmount – FIXED (capture ref value) ────────
+  // ─── Cleanup on unmount ──────────────────────────────────────
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const canvas = canvasRef.current; // ✅ capture ref value
     return () => {
       if (canvas) {
         const ctx = canvas.getContext("2d");
@@ -209,6 +213,7 @@ export default function SignatureModal({
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Close button */}
         <button
           onClick={onClose}
           style={{
@@ -236,6 +241,7 @@ export default function SignatureModal({
           <FiX size={24} />
         </button>
 
+        {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 20 }}>
           <div
             style={{
@@ -271,6 +277,7 @@ export default function SignatureModal({
           )}
         </div>
 
+        {/* Canvas */}
         <div
           style={{
             position: "relative",
@@ -316,7 +323,7 @@ export default function SignatureModal({
               }}
             >
               <FiPenTool size={20} style={{ marginRight: 10, opacity: 0.5 }} />
-              {isTouchDevice ? "Touch to sign" : "Click to sign"}
+              {isTouchDevice ? touchToSignText : clickToSignText}
             </div>
           )}
           {hasSignature && (
@@ -336,7 +343,7 @@ export default function SignatureModal({
                 gap: 6,
               }}
             >
-              <FiCheck size={14} /> Signed
+              <FiCheck size={14} /> {signedText}
             </div>
           )}
           {hasSignature && (
@@ -370,6 +377,7 @@ export default function SignatureModal({
           )}
         </div>
 
+        {/* Text input */}
         <div style={{ marginBottom: 16 }}>
           <input
             type="text"
@@ -396,10 +404,11 @@ export default function SignatureModal({
                 : C.border;
               e.currentTarget.style.boxShadow = "none";
             }}
-            placeholder="Or type your name to sign"
+            placeholder={typeToSignText}
           />
         </div>
 
+        {/* Buttons */}
         <div
           style={{
             display: "flex",
