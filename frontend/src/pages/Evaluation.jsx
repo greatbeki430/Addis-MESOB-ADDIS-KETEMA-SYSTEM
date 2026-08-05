@@ -2650,6 +2650,7 @@ export default function Evaluation({ t, lang }) {
             </button>
 
             {/* Export button */}
+            {/* Export button */}
             <button
               style={{
                 background: "#dc2626",
@@ -2671,13 +2672,22 @@ export default function Evaluation({ t, lang }) {
               onClick={() => {
                 const bestPerformerName =
                   sortedMembers.length > 0 ? sortedMembers[0].name : null;
+
+                // ✅ Build comments object keyed by member name
+                const commentsByName = {};
+                members.forEach((m, idx) => {
+                  if (m.trim()) {
+                    commentsByName[m] = comments[idx] || "";
+                  }
+                });
+
                 exportEvaluationReportToPDF(
                   scores,
                   members.filter((m) => m.trim() !== ""),
                   (m) => total(m),
                   bestPerformerName,
                   safeT,
-                  comments,
+                  commentsByName, // ✅ Pass the transformed object
                   signatures,
                   includeAINarrative,
                   aiNarrativeContent,
@@ -2690,13 +2700,6 @@ export default function Evaluation({ t, lang }) {
               <span className="export-text">
                 {teKey("export", "Export PDF")}
               </span>
-              <style>{`
-                @media (max-width: 480px) {
-                  .export-text {
-                    display: none !important;
-                  }
-                }
-              `}</style>
             </button>
 
             <button
