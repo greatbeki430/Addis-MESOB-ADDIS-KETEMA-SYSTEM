@@ -12,6 +12,7 @@ import { AISummary, AIEvaluationHelper } from "../components/ai";
 import { useToast } from "../hooks/useToast";
 // import LanguageSelector from "../components/LanguageSelector";
 import { useLanguage } from "../context/LanguageContext";
+import SignatureModal from "../components/SignatureModal";
 import {
   FiChevronDown,
   FiUser,
@@ -42,204 +43,6 @@ import {
   FiEye,
   FiTrash2,
 } from "react-icons/fi";
-
-// ─── Signature Canvas Component ──────────────────────────────
-const SignatureCanvas = ({ onSave, value, t }) => {
-  const canvasRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [hasSignature, setHasSignature] = useState(false);
-  const [isTouchDevice] = useState(
-    () =>
-      typeof window !== "undefined" &&
-      ("ontouchstart" in window || navigator.maxTouchPoints > 0),
-  );
-  const [textSignature, setTextSignature] = useState("");
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext("2d");
-    ctx.strokeStyle = "#1a3aad";
-    ctx.lineWidth = 2.5;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-
-    if (value) {
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0);
-        setHasSignature(true);
-      };
-      img.src = value;
-    }
-  }, [value]);
-
-  const getCanvasCoords = (e) => {
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.clientX || e.touches?.[0]?.clientX || 0;
-    const clientY = e.clientY || e.touches?.[0]?.clientY || 0;
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top,
-    };
-  };
-
-  const startDrawing = (e) => {
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const { x, y } = getCanvasCoords(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    setIsDrawing(true);
-  };
-
-  const draw = (e) => {
-    e.preventDefault();
-    if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const { x, y } = getCanvasCoords(e);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-    setHasSignature(true);
-  };
-
-  const stopDrawing = (e) => {
-    e.preventDefault();
-    setIsDrawing(false);
-    if (hasSignature && onSave) {
-      const canvas = canvasRef.current;
-      onSave(canvas.toDataURL("image/png"));
-    }
-  };
-
-  const clearSignature = () => {
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    setHasSignature(false);
-    if (onSave) onSave(null);
-    setTextSignature("");
-  };
-
-  const handleTextSignature = (e) => {
-    const value = e.target.value;
-    setTextSignature(value);
-    if (value.trim() && onSave) {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.font = "24px 'Noto Sans Ethiopic', serif";
-      ctx.fillStyle = "#1a3aad";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(value, canvas.width / 2, canvas.height / 2);
-      setHasSignature(true);
-      onSave(canvas.toDataURL("image/png"));
-    }
-  };
-
-  return (
-    <div style={{ position: "relative" }}>
-      <canvas
-        ref={canvasRef}
-        width={300}
-        height={100}
-        style={{
-          border: `2px dashed ${C.border}`,
-          borderRadius: 8,
-          width: "100%",
-          height: "100px",
-          cursor: "pointer",
-          touchAction: "none",
-          background: "#fafbfc",
-        }}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        onTouchStart={startDrawing}
-        onTouchMove={draw}
-        onTouchEnd={stopDrawing}
-        onTouchCancel={stopDrawing}
-      />
-
-      <div style={{ marginTop: 6 }}>
-        <input
-          type="text"
-          placeholder={
-            isTouchDevice
-              ? t?.("evaluation.typeNameToSign") ||
-                "Or type your name as signature..."
-              : t?.("evaluation.typeNameToSign") ||
-                "Type your name as signature..."
-          }
-          value={textSignature}
-          onChange={handleTextSignature}
-          style={{
-            width: "100%",
-            padding: "6px 10px",
-            border: `1px solid ${C.border}`,
-            borderRadius: 6,
-            fontSize: "12px",
-            fontFamily: F.sans,
-            outline: "none",
-            boxSizing: "border-box",
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = C.primary;
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.borderColor = C.border;
-          }}
-        />
-      </div>
-
-      {hasSignature && (
-        <button
-          onClick={clearSignature}
-          style={{
-            position: "absolute",
-            top: 4,
-            right: 4,
-            background: "#fee2e2",
-            border: "none",
-            borderRadius: "50%",
-            width: 24,
-            height: 24,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#dc2626",
-            fontSize: 12,
-          }}
-        >
-          <FiX size={14} />
-        </button>
-      )}
-      <div
-        style={{
-          fontSize: 10,
-          color: C.muted,
-          marginTop: 4,
-          textAlign: "center",
-        }}
-      >
-        {hasSignature
-          ? t?.("evaluation.signatureSaved") || "✓ Signature saved"
-          : isTouchDevice
-            ? t?.("evaluation.signWithFinger") ||
-              "✍️ Sign with your finger (touch) or type name below"
-            : t?.("evaluation.signWithMouse") ||
-              "✍️ Sign with mouse or type name below"}
-      </div>
-    </div>
-  );
-};
 
 // ─── Format AI Narrative - Removes markdown and formats nicely ──
 const formatAINarrative = (text) => {
@@ -315,6 +118,11 @@ export default function Evaluation({ t, lang }) {
   const [activeTab, setActiveTab] = useState("form"); // "form" | "history"
   const [savedEvaluations, setSavedEvaluations] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [signatureModal, setSignatureModal] = useState({
+    isOpen: false,
+    memberName: "",
+    onConfirm: null,
+  });
 
   const inputRefs = useRef({});
   const memberInputRefs = useRef([]);
@@ -373,6 +181,17 @@ export default function Evaluation({ t, lang }) {
     setEvaluationId(evalData._id);
     setActiveTab("form");
     showToast(te.loadSuccess || "Evaluation loaded successfully!", "success");
+  };
+
+  const openSignatureModal = (memberName) => {
+    setSignatureModal({
+      isOpen: true,
+      memberName,
+      onConfirm: (data) => {
+        handleSignatureSave(memberName, data);
+        setSignatureModal({ isOpen: false, memberName: "", onConfirm: null });
+      },
+    });
   };
 
   // ─── Delete an evaluation ──────────────────────────────────────
@@ -1964,7 +1783,7 @@ export default function Evaluation({ t, lang }) {
                 background: "linear-gradient(135deg, #fff, #fffdf0)",
               }}
             >
-              {/* Best Performer Announcement */}
+              {/* Best Performer Announcement (unchanged) */}
               <div
                 style={{
                   textAlign: "center",
@@ -2022,7 +1841,7 @@ export default function Evaluation({ t, lang }) {
                 </div>
               </div>
 
-              {/* Signature Grid with Canvas */}
+              {/* Clickable Signature Cards */}
               <div>
                 <div
                   style={{
@@ -2038,157 +1857,184 @@ export default function Evaluation({ t, lang }) {
                 >
                   <FiPenTool size={14} />
                   {teKey("signaturesTitle", "Digital Signatures")}
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      color: C.muted,
+                      fontWeight: 400,
+                    }}
+                  >
+                    ({teKey("clickToSign", "Click to sign")})
+                  </span>
                 </div>
+
                 <div
                   style={{
                     display: "grid",
                     gridTemplateColumns:
-                      "repeat(auto-fill, minmax(min(100%, 220px), 1fr))",
-                    gap: "clamp(12px, 3vw, 20px)",
+                      "repeat(auto-fill, minmax(min(100%, 180px), 1fr))",
+                    gap: "12px",
                   }}
                 >
-                  {/* Team Leader signature box */}
+                  {/* Team Leader card */}
                   <div
                     style={{
                       background: `linear-gradient(135deg, ${C.primary}10, ${C.gold}10)`,
-                      border: `1.5px solid ${C.primary}`,
+                      border: `2px solid ${C.primary}`,
                       borderRadius: 10,
-                      padding: "clamp(10px, 3vw, 16px)",
+                      padding: "12px 14px",
                       textAlign: "center",
+                      cursor: "pointer",
+                      transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                    }}
+                    onClick={() => openSignatureModal("teamLeader")}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = `0 4px 12px ${C.primary}44`;
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "none";
                     }}
                   >
                     <div
                       style={{
-                        fontSize: "clamp(10px, 2.5vw, 11px)",
+                        fontSize: "10px",
                         fontWeight: 700,
                         color: C.primary,
-                        fontFamily: F.sans,
-                        marginBottom: 8,
                         textTransform: "uppercase",
                         letterSpacing: 0.5,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: 4,
                       }}
                     >
-                      <FiStar size={12} />
+                      <FiStar size={12} style={{ marginRight: 4 }} />
                       {teKey("teamLeaderLabel", "Team Leader")}
                     </div>
-                    <input
-                      type="text"
-                      placeholder={teKey("namePlaceholder", "Name")}
-                      style={{
-                        width: "100%",
-                        border: `1px solid ${C.border}`,
-                        borderRadius: 6,
-                        padding: "6px 8px",
-                        fontSize: "clamp(11px, 2.5vw, 12px)",
-                        fontFamily: F.sans,
-                        marginBottom: 8,
-                        textAlign: "center",
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                      value={teamName}
-                      onChange={(e) => setTeamName(e.target.value)}
-                    />
-                    <SignatureCanvas
-                      onSave={(data) => handleSignatureSave("teamLeader", data)}
-                      value={signatures.teamLeader}
-                      t={safeT}
-                    />
-                  </div>
-
-                  {/* Member signature boxes */}
-                  {sortedMembers.slice(0, 5).map(({ name }, idx) => (
                     <div
-                      key={idx}
                       style={{
-                        background: C.cardBg,
-                        border: `1px solid ${C.border}`,
-                        borderRadius: 10,
-                        padding: "clamp(10px, 3vw, 16px)",
-                        textAlign: "center",
+                        fontSize: "13px",
+                        fontWeight: 700,
+                        color: C.dark,
+                        margin: "4px 0",
                       }}
                     >
-                      <div
-                        style={{
-                          fontSize: "clamp(10px, 2.5vw, 11px)",
-                          fontWeight: 600,
-                          color: C.muted,
-                          fontFamily: F.sans,
-                          marginBottom: 6,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.5,
-                        }}
-                      >
-                        {teKey("memberLabel", "Team Member")} {idx + 1}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: "clamp(11px, 2.5vw, 13px)",
-                          fontWeight: 700,
-                          color: C.dark,
-                          fontFamily: F.sans,
-                          marginBottom: 8,
-                          minHeight: 20,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 4,
-                        }}
-                      >
-                        <FiUser size={12} color={C.primary} />
-                        {name}
-                      </div>
-                      <SignatureCanvas
-                        onSave={(data) => handleSignatureSave(name, data)}
-                        value={signatures[name]}
-                        t={safeT}
-                      />
+                      {teamName || teKey("namePlaceholder", "Name")}
                     </div>
-                  ))}
-                </div>
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: signatures.teamLeader ? "#10b981" : "#f59e0b",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {signatures.teamLeader ? "✅ Signed" : "⏳ Not Signed"}
+                    </div>
+                  </div>
 
-                {/* Date row */}
-                <div
+                  {/* Member cards */}
+                  {sortedMembers.map(({ name }, idx) => {
+                    const isSigned = !!signatures[name];
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          background: C.cardBg,
+                          border: `2px solid ${isSigned ? C.primary : C.border}`,
+                          borderRadius: 10,
+                          padding: "12px 14px",
+                          textAlign: "center",
+                          cursor: "pointer",
+                          transition:
+                            "transform 0.2s ease, box-shadow 0.2s ease",
+                        }}
+                        onClick={() => openSignatureModal(name)}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow =
+                            "0 4px 12px rgba(0,0,0,0.08)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.transform = "translateY(0)";
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            color: C.muted,
+                            textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          {teKey("memberLabel", "Team Member")} {idx + 1}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            color: C.dark,
+                            margin: "4px 0",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 4,
+                          }}
+                        >
+                          <FiUser size={12} color={C.primary} />
+                          {name}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            color: isSigned ? "#10b981" : "#f59e0b",
+                          }}
+                        >
+                          {isSigned ? "✅ Signed" : "⏳ Not Signed"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Date row */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  marginTop: 16,
+                  gap: 8,
+                  alignItems: "center",
+                }}
+              >
+                <span
                   style={{
+                    fontSize: "clamp(11px, 3vw, 12px)",
+                    color: C.muted,
+                    fontFamily: F.sans,
+                    fontWeight: 600,
                     display: "flex",
-                    justifyContent: "flex-end",
-                    marginTop: 16,
-                    gap: 8,
                     alignItems: "center",
+                    gap: 4,
                   }}
                 >
-                  <span
-                    style={{
-                      fontSize: "clamp(11px, 3vw, 12px)",
-                      color: C.muted,
-                      fontFamily: F.sans,
-                      fontWeight: 600,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                    }}
-                  >
-                    <FiCalendar size={12} />
-                    {teKey("dateLabel", "Date:")}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: "clamp(11px, 3vw, 12px)",
-                      color: C.dark,
-                      fontFamily: F.sans,
-                      fontWeight: 700,
-                      borderBottom: `1px solid ${C.border}`,
-                      minWidth: 120,
-                      paddingBottom: 2,
-                    }}
-                  >
-                    {new Date().toLocaleDateString("en-GB")}
-                  </span>
-                </div>
+                  <FiCalendar size={12} />
+                  {teKey("dateLabel", "Date:")}
+                </span>
+                <span
+                  style={{
+                    fontSize: "clamp(11px, 3vw, 12px)",
+                    color: C.dark,
+                    fontFamily: F.sans,
+                    fontWeight: 700,
+                    borderBottom: `1px solid ${C.border}`,
+                    minWidth: 120,
+                    paddingBottom: 2,
+                  }}
+                >
+                  {new Date().toLocaleDateString("en-GB")}
+                </span>
               </div>
             </div>
           )}
@@ -2953,6 +2799,23 @@ export default function Evaluation({ t, lang }) {
           100% { transform: rotate(360deg); }
         }
       `}</style>
+
+      {/* Signature Modal */}
+      <SignatureModal
+        isOpen={signatureModal.isOpen}
+        onClose={() =>
+          setSignatureModal({ isOpen: false, memberName: "", onConfirm: null })
+        }
+        onConfirm={signatureModal.onConfirm}
+        title={teKey("signatureFor", "Signature for")}
+        subtitle={signatureModal.memberName}
+        initialSignature={
+          signatureModal.memberName === "teamLeader"
+            ? signatures.teamLeader
+            : signatures[signatureModal.memberName] || null
+        }
+        required={false} // Allow signing without a signature (optional)
+      />
     </div>
   );
 }
