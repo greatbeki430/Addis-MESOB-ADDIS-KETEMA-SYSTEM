@@ -120,6 +120,8 @@ export const evaluationTranslations = {
       untitledTeam: "Untitled Team",
       touchToSign: "Touch to sign",
       signedText: "Signed",
+      highestScore: "Highest Score",
+      lowestScore: "Lowest Score",
     },
   },
   am: {
@@ -235,6 +237,8 @@ export const evaluationTranslations = {
       untitledTeam: "ርዕስ የሌለው ቡድን",
       touchToSign: "ለመፈረም ይንኩ",
       signedText: "ተፈርሟል",
+      highestScore: "ከፍተኛ ውጤት",
+      lowestScore: "ዝቅተኛ ውጤት",
     },
   },
   om: {
@@ -359,6 +363,8 @@ export const evaluationTranslations = {
       untitledTeam: "Garee Matayaa",
       touchToSign: "Mallatteessuuf tuqi",
       signedText: "Mallatteeffame",
+      highestScore: "Qabxii Olaanaa",
+      lowestScore: "Qabxii Gad Aanaa",
     },
   },
 };
