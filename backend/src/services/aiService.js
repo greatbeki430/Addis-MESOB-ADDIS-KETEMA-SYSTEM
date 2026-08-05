@@ -20,7 +20,7 @@ const PROVIDERS = {
 // ============================================================
 // TIMEOUT CONFIGURATION
 // ============================================================
-const AI_TIMEOUT_MS = 60000; // 60 seconds
+const AI_TIMEOUT_MS = 120000; // 120 seconds — Amharic generation needs more headroom
 const VISION_TIMEOUT_MS = 30000; // 30 seconds for vision
 
 // ============================================================
@@ -268,7 +268,7 @@ const callGemini = async (
 
     const chat = geminiClient.chats.create({
       model: GEMINI_MODEL,
-      config: { systemInstruction },
+      config: { systemInstruction, maxOutputTokens: 2048 },
       history: geminiHistory,
     });
 
@@ -300,8 +300,10 @@ const callGroq = async (
         })),
         { role: "user", content: prompt },
       ],
+      // temperature: 0.7,
+      // max_tokens: 1024,
       temperature: 0.7,
-      max_tokens: 1024,
+      max_tokens: 2048,
     });
     return {
       text: response.choices[0]?.message?.content || "",
@@ -390,6 +392,7 @@ const callCohere = async (
   try {
     const response = await cohereClient.chat({
       model: COHERE_MODEL,
+      max_tokens: 2048,
       messages: [
         { role: "system", content: systemInstruction },
         ...history.map((m) => ({
@@ -434,7 +437,8 @@ const callDeepSeek = async (
           { role: "user", content: prompt },
         ],
         temperature: 0.7,
-        max_tokens: 1024,
+        // max_tokens: 1024,
+        max_tokens: 2048,
       }),
     });
 
