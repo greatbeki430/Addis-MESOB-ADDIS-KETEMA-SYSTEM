@@ -409,9 +409,11 @@ export default function Evaluation({ t, lang }) {
   };
 
   const updateComment = (index, comment) => {
-    const newComments = { ...comments };
-    newComments[index] = comment;
-    setComments(newComments);
+    console.log(`📝 Updating comment for ${members[index] || index}:`, comment);
+    setComments((prev) => ({
+      ...prev,
+      [index]: comment,
+    }));
   };
 
   // ─── Score management ──────────────────────────────────────
@@ -1702,9 +1704,14 @@ export default function Evaluation({ t, lang }) {
                             </label>
                             <textarea
                               value={comment || ""}
-                              onChange={(e) =>
-                                updateComment(index, e.target.value)
-                              }
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                console.log(
+                                  `✏️ Textarea changed for ${name}:`,
+                                  val,
+                                );
+                                updateComment(index, val);
+                              }}
                               placeholder={teKey(
                                 "addFeedbackPlaceholder",
                                 "Add your feedback, strengths, or areas for improvement...",
@@ -2673,13 +2680,18 @@ export default function Evaluation({ t, lang }) {
                 const bestPerformerName =
                   sortedMembers.length > 0 ? sortedMembers[0].name : null;
 
-                // ✅ Build comments object keyed by member name
+                // ✅ Build comments object from totals (which already has the comments)
                 const commentsByName = {};
-                members.forEach((m, idx) => {
-                  if (m.trim()) {
-                    commentsByName[m] = comments[idx] || "";
+                totals.forEach((m) => {
+                  if (m.name && m.name.trim()) {
+                    commentsByName[m.name] = m.comment || "";
                   }
                 });
+
+                console.log(
+                  "📝 commentsByName built from totals:",
+                  commentsByName,
+                );
 
                 exportEvaluationReportToPDF(
                   scores,
@@ -2687,7 +2699,7 @@ export default function Evaluation({ t, lang }) {
                   (m) => total(m),
                   bestPerformerName,
                   safeT,
-                  commentsByName, // ✅ Pass the transformed object
+                  commentsByName,
                   signatures,
                   includeAINarrative,
                   aiNarrativeContent,
