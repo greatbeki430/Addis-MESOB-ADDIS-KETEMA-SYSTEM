@@ -146,6 +146,7 @@ export const commonTranslations = {
       pendingApproval: "Pending Approval",
       submitted: "Submitted",
       draft: "Draft",
+      avg: "Average",
       published: "Published",
       archived: "Archived",
       restored: "Restored",
@@ -299,6 +300,7 @@ export const commonTranslations = {
       pendingApproval: "ፈቃድ በመጠባበቅ ላይ",
       submitted: "ተልኳል",
       draft: "ረቂቅ",
+      avg: "አማካይ",
       published: "ታትሟል",
       archived: "ተመዝግቧል",
       restored: "ተመልሷል",
@@ -454,6 +456,7 @@ export const commonTranslations = {
       draft: "Qopheessaa",
       published: "Maxxanfame",
       archived: "Kusame",
+      avg: "Giddugaleessa",
       restored: "Deebifame",
       // ✅ Added View Toggle Translations
       list: "Tarree",

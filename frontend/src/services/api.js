@@ -1,4 +1,3 @@
-// src/services/api.js
 import axios from "axios";
 
 // Get base URL from environment or default to localhost
@@ -213,8 +212,27 @@ export const reportAPI = {
 export const aiAPI = {
   getDailyInsight: (reportId, reportData) =>
     api.post("/ai/daily-insight", { reportId, reportData }),
-  getEvaluationSummary: (evaluationId, evaluationData) =>
-    api.post("/ai/evaluation-summary", { evaluationId, evaluationData }),
+
+  // ✅ FIXED SIGNATURE: this used to be (evaluationId, evaluationData) —
+  // two positional args — but the only real caller, AIEvaluationHelper.jsx,
+  // has always called it as `getEvaluationSummary({ evaluationData: {...} })`,
+  // a single object. That mismatch meant the whole options object landed in
+  // the `evaluationId` slot and the real `evaluationData` went through as
+  // undefined, silently sending the wrong request body to the backend.
+  // Now it takes one options object, matching the actual call site, and
+  // defaults `language` to Amharic since evaluation report PDFs in this
+  // system are Amharic-only — pass `language: "en"` to override.
+  getEvaluationSummary: ({
+    evaluationId,
+    evaluationData,
+    language = "am",
+  } = {}) =>
+    api.post("/ai/evaluation-summary", {
+      evaluationId,
+      evaluationData,
+      language,
+    }),
+
   getDashboardDigest: (stats) => api.post("/ai/dashboard-digest", { stats }),
   getMeetingMinutes: (data) => api.post("/ai/meeting-minutes", data),
   getServiceRecommendations: (query) =>

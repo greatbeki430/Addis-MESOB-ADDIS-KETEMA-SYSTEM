@@ -110,7 +110,17 @@ const getEvaluationSummary = async (req, res) => {
         .json({ message: "Evaluation data or evaluationId required" });
     }
 
-    const summary = await generateEvaluationSummary(evaluationData);
+    // ✅ Evaluation report PDFs in this system are Amharic-only, so the
+    // narrative should be too. Accept an explicit `language` either at the
+    // top level of the request body or nested in evaluationData, and
+    // default to Amharic when neither is provided — matching what
+    // pdfExport.js / ReportExport.jsx already assume everywhere else.
+    const language = req.body.language || evaluationData.language || "am";
+
+    const summary = await generateEvaluationSummary({
+      ...evaluationData,
+      language,
+    });
     res.json({ summary, generatedAt: new Date().toISOString() });
   } catch (error) {
     handleAIError(res, error, "evaluation summary");
