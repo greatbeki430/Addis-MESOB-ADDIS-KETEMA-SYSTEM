@@ -819,15 +819,14 @@ export const exportEvaluationReportToPDF = (
         halign: "center",
       },
       bodyStyles: { fontSize: 8, halign: "center" },
-      tableWidth: pageWidth - margin * 2,
       columnStyles: {
-        0: { cellWidth: 12, halign: "center" }, // # column
-        1: { cellWidth: 65, halign: "left" }, // Name column
-        2: { cellWidth: 22, halign: "center" }, // Score column
-        3: { cellWidth: 28, halign: "center" }, // Rank column
-        4: { cellWidth: 40, halign: "center", minCellHeight: 14 }, // Signature column
-        5: { cellWidth: 30, halign: "center" }, // Status column
-        6: { cellWidth: 80, halign: "left", fontSize: 7 }, // Feedback column
+        0: { cellWidth: 10, halign: "center" }, // # - fixed
+        1: { cellWidth: "auto", halign: "left" }, // Name - expands
+        2: { cellWidth: 18, halign: "center" }, // Score - fixed
+        3: { cellWidth: 22, halign: "center" }, // Rank - fixed
+        4: { cellWidth: 30, halign: "center", minCellHeight: 14 }, // Signature - fixed
+        5: { cellWidth: 22, halign: "center" }, // Status - fixed
+        6: { cellWidth: "auto", halign: "left", fontSize: 7 }, // Feedback - expands
       },
       rowHeight: 16,
       styles: { font: FONT_NAMES.ethiopic, overflow: "linebreak" },
@@ -846,7 +845,7 @@ export const exportEvaluationReportToPDF = (
               cell &&
               cell.content === "signature"
             ) {
-              cellData.cell.styles.cellWidth = 60;
+              cellData.cell.styles.cellWidth = 30;
               cellData.cell.styles.minCellHeight = 14;
               cellData.cell.styles.halign = "center";
               cellData.cell.text = [""];
@@ -869,8 +868,8 @@ export const exportEvaluationReportToPDF = (
               try {
                 const cellWidth = tableData.cell.width;
                 const cellHeight = tableData.cell.height;
-                const imgWidth = Math.min(cellWidth - 12, 45);
-                const imgHeight = Math.min(cellHeight - 8, 14);
+                const imgWidth = Math.min(cellWidth - 8, 25);
+                const imgHeight = Math.min(cellHeight - 8, 12);
                 const offsetX = (cellWidth - imgWidth) / 2;
                 const offsetY = (cellHeight - imgHeight) / 2;
                 doc.addImage(
