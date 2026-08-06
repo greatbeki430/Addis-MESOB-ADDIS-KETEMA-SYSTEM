@@ -58,6 +58,10 @@ export const dailyReportTranslations = {
       myTeam: "My Team",
       // ✅ Export button short text
       exportShort: "Export",
+      teamFeed: "Team Feed",
+      noTeamReports: "No Reports from Your Team",
+      teamFeedEmpty: "Your teammates haven't submitted any reports yet.",
+      beFirst: "Be the first to share your daily accomplishments!",
     },
   },
   am: {
@@ -115,6 +119,10 @@ export const dailyReportTranslations = {
       myTeam: "ቡድኔ",
       // ✅ Export button short text
       exportShort: "ላክ",
+      teamFeed: "የቡድን ምግብ",
+      noTeamReports: "ከቡድንዎ ምንም ሪፖርቶች የሉም",
+      teamFeedEmpty: "ቡድንዎ እስካሁን ምንም ሪፖርቶች አላስገቡም።",
+      beFirst: "ዕለታዊ ስኬቶችዎን ለማካፈል የመጀመሪያው ይሁኑ!",
     },
   },
   om: {
@@ -172,6 +180,10 @@ export const dailyReportTranslations = {
       myTeam: "Garee Koo",
       // ✅ Export button short text
       exportShort: "Ergi",
+      teamFeed: "Qabsoo Garee",
+      noTeamReports: "Gabaasni Garee Keessanii Hin Jiru",
+      teamFeedEmpty: "Miseensonni garee keessanii gabaasa hin galchine.",
+      beFirst: "Isaan jalqabaa ta'aa milkee guyyaa keessan qoodachuuf!",
     },
   },
 };
