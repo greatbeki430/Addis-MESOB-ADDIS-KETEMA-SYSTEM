@@ -2,11 +2,20 @@
 const express = require("express");
 const router = express.Router();
 const adminController = require("../controllers/adminController");
+const adminDataController = require("../controllers/adminDataController");
 const { protect, adminOrSuperAdmin } = require("../middleware/auth");
 
 // All routes require authentication and admin/superadmin role
 router.use(protect);
 router.use(adminOrSuperAdmin);
+
+// ── Admin Data Management (Evaluations / Daily Reports / Forum Reports) ──
+// These back the "Manage ..." admin pages, which previously called an
+// endpoint that didn't exist on the backend at all.
+router.get("/data/:dataType", adminDataController.getData);
+router.post("/data/:dataType/bulk-action", adminDataController.bulkAction);
+router.post("/data/:dataType/export", adminDataController.exportData);
+router.delete("/data/:dataType/:id", adminDataController.deleteItem);
 
 // ── Digital Attendance Routes ──
 router.get("/digital-attendance", adminController.getDigitalAttendances);

@@ -6,6 +6,7 @@ import { dailyReportAPI, serviceAPI } from "../services/api";
 import { useToast } from "../hooks/useToast";
 import { useAuth } from "../hooks/useAuth";
 import { generateDailyReportPDF } from "../utils/pdf/reports/dailyReport";
+import DailyReportFeed from "../components/DailyReportFeed";
 import { AISummary, AIReportAssistant } from "../components/ai";
 import { aiAPI } from "../services/api";
 import {
@@ -21,6 +22,7 @@ import {
   FiClock,
   FiTrash2,
   FiEye,
+  FiUsers,
 } from "react-icons/fi";
 
 export default function DailyReport({ t, lang }) {
@@ -34,6 +36,7 @@ export default function DailyReport({ t, lang }) {
   const tcm = useCallback((key, fb = "") => t?.(`common.${key}`) || fb, [t]);
 
   const [rows, setRows] = useState([]);
+  const [summary, setSummary] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -46,7 +49,7 @@ export default function DailyReport({ t, lang }) {
   const [pdfLanguage, setPdfLanguage] = useState("am");
 
   // ✅ New state for History
-  const [activeTab, setActiveTab] = useState("new"); // "new" | "history"
+  const [activeTab, setActiveTab] = useState("new"); // "new" | "history" | "feed"
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -112,17 +115,23 @@ export default function DailyReport({ t, lang }) {
     const loadData = async () => {
       try {
         setLoading(true);
-        const response = await dailyReportAPI.getByDate(date);
-        if (response.data && response.data.length > 0) {
-          setRows(response.data);
-          setSavedReportId(response.data[0]?._id || response.data?._id || null);
+        // ✅ Own full report for this date (entries + summary + id), not the
+        // old team-wide lookup that could load a teammate's draft.
+        const response = await dailyReportAPI.getMine(date);
+        const report = response.data?.data;
+        if (report && report.entries?.length > 0) {
+          setRows(report.entries);
+          setSummary(report.summary || "");
+          setSavedReportId(report._id || null);
         } else {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
+          setSummary("");
           setSavedReportId(null);
         }
       } catch (error) {
         if (error.response?.status === 404) {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
+          setSummary("");
           setSavedReportId(null);
         } else {
           console.error("Failed to load daily report:", error);
@@ -288,6 +297,7 @@ export default function DailyReport({ t, lang }) {
         date,
         entries,
         grandTotal,
+        summary,
         team: user?.team || null,
       });
       setSavedReportId(response?.data?._id || null);
@@ -314,6 +324,7 @@ export default function DailyReport({ t, lang }) {
     try {
       if (report.entries && report.entries.length > 0) {
         setRows(report.entries);
+        setSummary(report.summary || "");
         setDate(report.date || new Date().toISOString().split("T")[0]);
         setSavedReportId(report._id);
         setActiveTab("new");
@@ -923,6 +934,30 @@ export default function DailyReport({ t, lang }) {
             </span>
           )}
         </button>
+        <button
+          onClick={() => setActiveTab("feed")}
+          style={{
+            flex: 1,
+            padding: isMobile ? "8px 12px" : "10px 20px",
+            borderRadius: "8px",
+            border: "none",
+            background: activeTab === "feed" ? "#fff" : "transparent",
+            color: activeTab === "feed" ? "#0F172A" : "#64748B",
+            fontWeight: 600,
+            fontSize: isMobile ? "12px" : "13px",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            boxShadow:
+              activeTab === "feed" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+            transition: "all 0.2s",
+          }}
+        >
+          <FiUsers size={isMobile ? 14 : 16} />
+          {td("teamFeed", "Team Feed")}
+        </button>
       </div>
 
       {/* ─── NEW REPORT TAB ─────────────────────────────────────────────────── */}
@@ -946,6 +981,42 @@ export default function DailyReport({ t, lang }) {
               value={date}
               onChange={setDate}
               type="date"
+            />
+          </div>
+
+          {/* ✅ Daily reflection - this is what teammates actually read and
+              react to in the Team Feed; the service table alone is just
+              numbers. */}
+          <div style={{ ...card, marginBottom: "clamp(16px, 4vw, 20px)" }}>
+            <label
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: C.dark,
+                display: "block",
+                marginBottom: 8,
+              }}
+            >
+              {td("dailySummary", "How did today go? (visible to your team)")}
+            </label>
+            <textarea
+              value={summary}
+              onChange={(e) => setSummary(e.target.value)}
+              placeholder={td(
+                "dailySummaryPlaceholder",
+                "Share highlights, blockers, or anything your team should know...",
+              )}
+              rows={3}
+              maxLength={3000}
+              style={{
+                width: "100%",
+                padding: "10px 12px",
+                borderRadius: 8,
+                border: "1px solid #E2E8F0",
+                fontSize: 13.5,
+                fontFamily: F.sans,
+                resize: "vertical",
+              }}
             />
           </div>
 
@@ -1520,6 +1591,9 @@ export default function DailyReport({ t, lang }) {
             )}
           </div>
         </>
+      ) : activeTab === "feed" ? (
+        /* ─── TEAM FEED TAB ────────────────────────────────────────────────── */
+        <DailyReportFeed t={t} isMobile={isMobile} />
       ) : (
         /* ─── HISTORY TAB ──────────────────────────────────────────────────── */
         <div style={card}>

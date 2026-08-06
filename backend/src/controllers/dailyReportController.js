@@ -1,50 +1,94 @@
 // backend/controllers/dailyReportController.js
 const DailyReport = require("../models/DailyReport");
 
+const isAdminTier = (role) => role === "admin" || role === "superadmin";
+const isLeaderTier = (role) =>
+  role === "leader" || role === "admin" || role === "superadmin";
+
+const sameTeam = (userTeam, reportTeam) => {
+  if (!userTeam || !reportTeam) return false;
+  return userTeam.toString() === reportTeam.toString();
+};
+
+const REPORT_POPULATE = [
+  { path: "team", select: "name nameEn" },
+  { path: "createdBy", select: "name role position profilePhotoUrl" },
+  { path: "comments.user", select: "name role profilePhotoUrl" },
+];
+
+// ─── Create / upsert today's own report ─────────────────────────────────────
+// One report per person per day. If the caller already has a report for this
+// date it is updated in place instead of creating a second, colliding row.
 const createDailyReport = async (req, res) => {
   try {
-    // Calculate grand total from entries
     const entries = req.body.entries || req.body.data || [];
     const grandTotal = entries.reduce(
       (sum, entry) => sum + (entry.total || 0),
       0,
     );
+    const summary = req.body.summary || "";
+    const date = new Date(req.body.date);
+    const team = req.body.team || req.user?.team || null;
 
-    const reportData = {
-      date: req.body.date,
-      team: req.body.team || req.user?.team || null,
-      entries: entries,
-      grandTotal: grandTotal,
-      createdBy: req.user._id,
-    };
-
-    // Check if report exists for this date and team
     const existingReport = await DailyReport.findOne({
-      date: new Date(req.body.date),
-      team: reportData.team,
+      date,
+      createdBy: req.user._id,
     });
 
     if (existingReport) {
-      // Update existing report
       existingReport.entries = entries;
       existingReport.grandTotal = grandTotal;
+      existingReport.summary = summary;
+      if (team) existingReport.team = team;
       const updated = await existingReport.save();
+      await updated.populate(REPORT_POPULATE);
       return res.json(updated);
     }
 
-    const report = await DailyReport.create(reportData);
+    const report = await DailyReport.create({
+      date,
+      team,
+      entries,
+      grandTotal,
+      summary,
+      createdBy: req.user._id,
+    });
+    await report.populate(REPORT_POPULATE);
     res.status(201).json(report);
   } catch (error) {
+    // Duplicate key = a race where the report was created between the
+    // findOne and create above; retry as an update.
+    if (error.code === 11000) {
+      try {
+        const entries = req.body.entries || req.body.data || [];
+        const grandTotal = entries.reduce(
+          (sum, entry) => sum + (entry.total || 0),
+          0,
+        );
+        const existing = await DailyReport.findOneAndUpdate(
+          { date: new Date(req.body.date), createdBy: req.user._id },
+          {
+            entries,
+            grandTotal,
+            summary: req.body.summary || "",
+          },
+          { new: true },
+        ).populate(REPORT_POPULATE);
+        return res.json(existing);
+      } catch (retryError) {
+        return res.status(500).json({ message: retryError.message });
+      }
+    }
     res.status(500).json({ message: error.message });
   }
 };
 
+// ─── Admin/leader listing across a team or the whole org ───────────────────
 const getDailyReports = async (req, res) => {
   try {
     const { start, end, date, team } = req.query;
     const filter = {};
 
-    // If date is provided, use it directly
     if (date) {
       const startDate = new Date(date);
       startDate.setHours(0, 0, 0, 0);
@@ -55,13 +99,21 @@ const getDailyReports = async (req, res) => {
       filter.date = { $gte: new Date(start), $lte: new Date(end) };
     }
 
-    if (team) {
+    // Employees and leaders are scoped to their own team; only admins and
+    // superadmins can pull reports across every team.
+    if (!isAdminTier(req.user.role)) {
+      if (team && !sameTeam(req.user.team, team)) {
+        return res
+          .status(403)
+          .json({ message: "Not authorized to view this team's reports" });
+      }
+      filter.team = req.user.team;
+    } else if (team) {
       filter.team = team;
     }
 
     const reports = await DailyReport.find(filter)
-      .populate("team", "name nameEn")
-      .populate("createdBy", "name")
+      .populate(REPORT_POPULATE)
       .sort({ date: -1 });
 
     res.json(reports);
@@ -70,28 +122,20 @@ const getDailyReports = async (req, res) => {
   }
 };
 
-// Get report by date (returns entries directly for frontend)
+// ─── Get the CALLER's own report for a date (for the "New Report" form) ────
 const getReportByDate = async (req, res) => {
   try {
     const { date } = req.params;
-    const team = req.query.team || req.user?.team;
 
     const startDate = new Date(date);
     startDate.setHours(0, 0, 0, 0);
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    const filter = {
+    const report = await DailyReport.findOne({
       date: { $gte: startDate, $lte: endDate },
-    };
-
-    if (team) {
-      filter.team = team;
-    }
-
-    const report = await DailyReport.findOne(filter)
-      .populate("team", "name nameEn")
-      .populate("createdBy", "name");
+      createdBy: req.user._id,
+    }).populate(REPORT_POPULATE);
 
     if (!report) {
       return res.status(404).json({ message: "No report found for this date" });
@@ -103,26 +147,47 @@ const getReportByDate = async (req, res) => {
   }
 };
 
-// Delete report by date
-const deleteReportByDate = async (req, res) => {
+// ─── Get the CALLER's own full report for a date (form pre-fill, incl. summary) ──
+const getMyReportByDate = async (req, res) => {
   try {
     const { date } = req.params;
-    const team = req.query.team || req.user?.team;
 
     const startDate = new Date(date);
     startDate.setHours(0, 0, 0, 0);
     const endDate = new Date(date);
     endDate.setHours(23, 59, 59, 999);
 
-    const filter = {
+    const report = await DailyReport.findOne({
       date: { $gte: startDate, $lte: endDate },
-    };
+      createdBy: req.user._id,
+    }).populate(REPORT_POPULATE);
 
-    if (team) {
-      filter.team = team;
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No report found for this date" });
     }
 
-    const result = await DailyReport.deleteOne(filter);
+    res.status(200).json({ success: true, data: report });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ─── Delete the CALLER's own report for a date ──────────────────────────────
+const deleteReportByDate = async (req, res) => {
+  try {
+    const { date } = req.params;
+
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+
+    const result = await DailyReport.deleteOne({
+      date: { $gte: startDate, $lte: endDate },
+      createdBy: req.user._id,
+    });
 
     if (result.deletedCount === 0) {
       return res.status(404).json({ message: "No report found for this date" });
@@ -138,8 +203,8 @@ const deleteReportByDate = async (req, res) => {
 // Matches the manual paper process (Adis_ketema_Mesob_Daily_Report.xlsx),
 // which rolls daily entries into a weekly report ("ሳምንታዊ ሪፖርት ከ.../...")
 // and a fiscal-year-to-date cumulative total ("ከጷግሜ ... እስካሁን የተሰጡ አገልግሎቶች").
-// This was previously only possible by hand; the app only stored one
-// day at a time with no rollup view or endpoint.
+// Now correctly rolls up EVERY team member's entries for the range, not just
+// a single team-wide row.
 const getSummaryReport = async (req, res) => {
   try {
     const { start, end, team, fiscalYearStart } = req.query;
@@ -150,19 +215,28 @@ const getSummaryReport = async (req, res) => {
       });
     }
 
+    let scopedTeam = team;
+    if (!isAdminTier(req.user.role)) {
+      if (team && !sameTeam(req.user.team, team)) {
+        return res
+          .status(403)
+          .json({ message: "Not authorized to view this team's summary" });
+      }
+      scopedTeam = req.user.team;
+    }
+
     const startDate = new Date(start);
     startDate.setHours(0, 0, 0, 0);
     const endDate = new Date(end);
     endDate.setHours(23, 59, 59, 999);
 
     const filter = { date: { $gte: startDate, $lte: endDate } };
-    if (team) filter.team = team;
+    if (scopedTeam) filter.team = scopedTeam;
 
     const reports = await DailyReport.find(filter)
       .populate("team", "name nameEn")
       .sort({ date: 1 });
 
-    // Roll up entries by dept + service across every day in the range
     const byService = {};
     let weekMale = 0;
     let weekFemale = 0;
@@ -199,14 +273,12 @@ const getSummaryReport = async (req, res) => {
       services: Object.values(byService),
     };
 
-    // Optional fiscal-year-to-date cumulative total, matching the
-    // xlsx column "ከጷግሜ ... እስካሁን የተሰጡ አገልግሎቶች"
     let cumulative = null;
     if (fiscalYearStart) {
       const fyStart = new Date(fiscalYearStart);
       fyStart.setHours(0, 0, 0, 0);
       const fyFilter = { date: { $gte: fyStart, $lte: endDate } };
-      if (team) fyFilter.team = team;
+      if (scopedTeam) fyFilter.team = scopedTeam;
 
       const fyReports = await DailyReport.find(fyFilter);
       let fyMale = 0;
@@ -235,29 +307,24 @@ const getSummaryReport = async (req, res) => {
   }
 };
 
-// ─── ✅ NEW: Get user's report history ──────────────────────────────────────
+// ─── Get the CALLER's own report history ────────────────────────────────────
 const getUserHistory = async (req, res) => {
   try {
     const userId = req.user._id;
     const { limit = 100, skip = 0 } = req.query;
 
-    // Get all reports for this user, sorted by newest first
-    const reports = await DailyReport.find({
-      createdBy: userId,
-    })
-      .populate("team", "name nameEn")
+    const reports = await DailyReport.find({ createdBy: userId })
+      .populate(REPORT_POPULATE)
       .sort({ createdAt: -1 })
       .skip(parseInt(skip))
       .limit(parseInt(limit));
 
-    const total = await DailyReport.countDocuments({
-      createdBy: userId,
-    });
+    const total = await DailyReport.countDocuments({ createdBy: userId });
 
     res.status(200).json({
       success: true,
       count: reports.length,
-      total: total,
+      total,
       data: reports,
     });
   } catch (error) {
@@ -270,50 +337,102 @@ const getUserHistory = async (req, res) => {
   }
 };
 
-// ─── ✅ NEW: Get single report by ID ────────────────────────────────────────
+// ─── Team feed: everyone's reports for a team, so colleagues can see and
+// react to each other's daily reports (the actual point of this page) ──────
+const getTeamFeed = async (req, res) => {
+  try {
+    const { date, start, end, team, limit = 50, skip = 0 } = req.query;
+
+    let targetTeam = team || req.user.team;
+    if (!targetTeam) {
+      return res
+        .status(400)
+        .json({ message: "No team specified and you have no team assigned" });
+    }
+    if (!isAdminTier(req.user.role) && !sameTeam(req.user.team, targetTeam)) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to view this team's feed" });
+    }
+
+    const filter = { team: targetTeam };
+    if (date) {
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+      filter.date = { $gte: startDate, $lte: endDate };
+    } else if (start && end) {
+      filter.date = { $gte: new Date(start), $lte: new Date(end) };
+    }
+
+    const reports = await DailyReport.find(filter)
+      .populate(REPORT_POPULATE)
+      .sort({ date: -1, createdAt: -1 })
+      .skip(parseInt(skip))
+      .limit(parseInt(limit));
+
+    res
+      .status(200)
+      .json({ success: true, count: reports.length, data: reports });
+  } catch (error) {
+    console.error("❌ Error fetching team feed:", error);
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to fetch team feed",
+        error: error.message,
+      });
+  }
+};
+
+// ─── Get single report by ID ────────────────────────────────────────────────
+// Viewable by the owner, teammates on the same team, and any admin tier.
 const getReportById = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user._id;
 
-    const report = await DailyReport.findOne({
-      _id: id,
-      createdBy: userId,
-    })
-      .populate("team", "name nameEn")
-      .populate("createdBy", "name");
+    const report = await DailyReport.findById(id).populate(REPORT_POPULATE);
 
     if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    const isOwner =
+      report.createdBy?._id?.toString() === req.user._id.toString();
+    const isTeammate = sameTeam(req.user.team, report.team?._id || report.team);
+    if (!isOwner && !isTeammate && !isAdminTier(req.user.role)) {
       return res.status(404).json({
         success: false,
         message: "Report not found or you don't have permission to view it",
       });
     }
 
-    res.status(200).json({
-      success: true,
-      data: report,
-    });
+    res.status(200).json({ success: true, data: report });
   } catch (error) {
     console.error("❌ Error fetching report by ID:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch report",
-      error: error.message,
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to fetch report",
+        error: error.message,
+      });
   }
 };
 
-// ─── ✅ NEW: Update report by ID ────────────────────────────────────────────
+// ─── Update report by ID (owner only — this is someone's own daily log) ────
 const updateReportById = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user._id;
-    const { entries, date, team, grandTotal } = req.body;
+    const { entries, date, team, grandTotal, summary } = req.body;
 
     const report = await DailyReport.findOne({
       _id: id,
-      createdBy: userId,
+      createdBy: req.user._id,
     });
 
     if (!report) {
@@ -323,40 +442,48 @@ const updateReportById = async (req, res) => {
       });
     }
 
-    // Update fields
     if (entries) report.entries = entries;
     if (date) report.date = new Date(date);
     if (team) report.team = team;
     if (grandTotal !== undefined) report.grandTotal = grandTotal;
+    if (summary !== undefined) report.summary = summary;
 
     await report.save();
+    await report.populate(REPORT_POPULATE);
 
-    res.status(200).json({
-      success: true,
-      data: report,
-    });
+    res.status(200).json({ success: true, data: report });
   } catch (error) {
     console.error("❌ Error updating report:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update report",
-      error: error.message,
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to update report",
+        error: error.message,
+      });
   }
 };
 
-// ─── ✅ NEW: Delete report by ID ────────────────────────────────────────────
+// ─── Delete report by ID ────────────────────────────────────────────────────
+// Owner can always delete their own. A team leader/admin can also remove a
+// report from their team's feed (moderation), same as the admin data tools.
 const deleteReportById = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user._id;
 
-    const report = await DailyReport.findOne({
-      _id: id,
-      createdBy: userId,
-    });
-
+    const report = await DailyReport.findById(id);
     if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    const isOwner = report.createdBy?.toString() === req.user._id.toString();
+    const canModerate =
+      isAdminTier(req.user.role) ||
+      (req.user.role === "leader" && sameTeam(req.user.team, report.team));
+
+    if (!isOwner && !canModerate) {
       return res.status(404).json({
         success: false,
         message: "Report not found or you don't have permission to delete it",
@@ -365,17 +492,170 @@ const deleteReportById = async (req, res) => {
 
     await DailyReport.deleteOne({ _id: id });
 
-    res.status(200).json({
-      success: true,
-      message: "Report deleted successfully",
-    });
+    res
+      .status(200)
+      .json({ success: true, message: "Report deleted successfully" });
   } catch (error) {
     console.error("❌ Error deleting report:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete report",
-      error: error.message,
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to delete report",
+        error: error.message,
+      });
+  }
+};
+
+// ─── Comments: any teammate (or admin tier) can comment on a report ───────
+const addComment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { text } = req.body;
+
+    if (!text || !text.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Comment text is required" });
+    }
+
+    const report = await DailyReport.findById(id);
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    const isOwner = report.createdBy?.toString() === req.user._id.toString();
+    const isTeammate = sameTeam(req.user.team, report.team);
+    if (!isOwner && !isTeammate && !isAdminTier(req.user.role)) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Not authorized to comment on this report",
+        });
+    }
+
+    report.comments.push({ user: req.user._id, text: text.trim() });
+    await report.save();
+    await report.populate(REPORT_POPULATE);
+
+    res.status(201).json({ success: true, data: report });
+  } catch (error) {
+    console.error("❌ Error adding comment:", error);
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to add comment",
+        error: error.message,
+      });
+  }
+};
+
+const deleteComment = async (req, res) => {
+  try {
+    const { id, commentId } = req.params;
+
+    const report = await DailyReport.findById(id);
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    const comment = report.comments.id(commentId);
+    if (!comment) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Comment not found" });
+    }
+
+    const isCommentOwner = comment.user?.toString() === req.user._id.toString();
+    const isReportOwner =
+      report.createdBy?.toString() === req.user._id.toString();
+    const canModerate =
+      isAdminTier(req.user.role) ||
+      (req.user.role === "leader" && sameTeam(req.user.team, report.team));
+
+    if (!isCommentOwner && !isReportOwner && !canModerate) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Not authorized to delete this comment",
+        });
+    }
+
+    comment.deleteOne();
+    await report.save();
+    await report.populate(REPORT_POPULATE);
+
+    res.status(200).json({ success: true, data: report });
+  } catch (error) {
+    console.error("❌ Error deleting comment:", error);
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to delete comment",
+        error: error.message,
+      });
+  }
+};
+
+// ─── Reactions: one reaction per user per report, toggled on/off ──────────
+const toggleReaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const emoji = req.body.emoji || "👍";
+
+    const report = await DailyReport.findById(id);
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    const isOwner = report.createdBy?.toString() === req.user._id.toString();
+    const isTeammate = sameTeam(req.user.team, report.team);
+    if (!isOwner && !isTeammate && !isAdminTier(req.user.role)) {
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "Not authorized to react to this report",
+        });
+    }
+
+    const existingIndex = report.reactions.findIndex(
+      (r) => r.user.toString() === req.user._id.toString(),
+    );
+
+    if (existingIndex === -1) {
+      report.reactions.push({ user: req.user._id, emoji });
+    } else if (report.reactions[existingIndex].emoji === emoji) {
+      // Same emoji again = remove (un-react)
+      report.reactions.splice(existingIndex, 1);
+    } else {
+      // Different emoji = switch reaction
+      report.reactions[existingIndex].emoji = emoji;
+    }
+
+    await report.save();
+    await report.populate(REPORT_POPULATE);
+
+    res.status(200).json({ success: true, data: report });
+  } catch (error) {
+    console.error("❌ Error toggling reaction:", error);
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Failed to react to report",
+        error: error.message,
+      });
   }
 };
 
@@ -383,10 +663,15 @@ module.exports = {
   createDailyReport,
   getDailyReports,
   getReportByDate,
+  getMyReportByDate,
   deleteReportByDate,
   getSummaryReport,
   getUserHistory,
+  getTeamFeed,
   getReportById,
   updateReportById,
   deleteReportById,
+  addComment,
+  deleteComment,
+  toggleReaction,
 };

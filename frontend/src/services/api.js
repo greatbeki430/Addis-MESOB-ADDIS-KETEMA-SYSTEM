@@ -130,6 +130,8 @@ export const dailyReportAPI = {
   create: (data) => api.post("/daily-reports", data),
   getAll: (params) => api.get("/daily-reports", { params }),
   getByDate: (date) => api.get(`/daily-reports/date/${date}`),
+  // ✅ Full own-report object (incl. summary) for a date, used to pre-fill the form
+  getMine: (date) => api.get(`/daily-reports/mine/${date}`),
   deleteByDate: (date) => api.delete(`/daily-reports/date/${date}`),
   // ✅ ADD THIS - Get user's report history
   getUserHistory: () => api.get("/daily-reports/history"),
@@ -139,6 +141,14 @@ export const dailyReportAPI = {
   update: (id, data) => api.put(`/daily-reports/${id}`, data),
   // ✅ ADD THIS - Delete report by ID
   delete: (id) => api.delete(`/daily-reports/${id}`),
+  // ✅ Team feed - everyone's reports for a team, to see & react to each other's
+  getTeamFeed: (params) => api.get("/daily-reports/feed", { params }),
+  // ✅ Comments on a report
+  addComment: (id, text) => api.post(`/daily-reports/${id}/comments`, { text }),
+  deleteComment: (id, commentId) =>
+    api.delete(`/daily-reports/${id}/comments/${commentId}`),
+  // ✅ Toggle a reaction (like/heart/etc.) on a report
+  react: (id, emoji) => api.post(`/daily-reports/${id}/reactions`, { emoji }),
 };
 
 // ============================================================
