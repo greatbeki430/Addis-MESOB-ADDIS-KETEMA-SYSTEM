@@ -116,10 +116,10 @@ export default function DailyReport({ t, lang }) {
     const loadData = async () => {
       try {
         setLoading(true);
-        // ✅ Own full report for this date (entries + summary + id), not the
-        // old team-wide lookup that could load a teammate's draft.
         const response = await dailyReportAPI.getMine(date);
         const report = response.data?.data;
+
+        // ✅ Handle null response gracefully
         if (report && report.entries?.length > 0) {
           setRows(report.entries);
           setSummary(report.summary || "");
@@ -132,21 +132,17 @@ export default function DailyReport({ t, lang }) {
           setSavedReportId(null);
         }
       } catch (error) {
-        if (error.response?.status === 404) {
-          setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
-          setSummary("");
-          setSavedReportId(null);
-        } else {
-          console.error("Failed to load daily report:", error);
-          showToast(td("saveError", "Failed to load daily report"), "error");
-          setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
-        }
+        // ✅ Handle any error gracefully (including 404)
+        console.error("Failed to load daily report:", error);
+        setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
+        setSummary("");
+        setStatus("draft");
+        setSavedReportId(null);
       } finally {
         setLoading(false);
       }
     };
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
   // ─── Load history for current user ──────────────────────────────────────────
@@ -704,7 +700,7 @@ export default function DailyReport({ t, lang }) {
                       borderRadius: "99px",
                     }}
                   >
-                    {report.team || td("myTeam", "My Team")}
+                    {report.team?.name || td("myTeam", "My Team")}
                   </span>
                   {report.status && (
                     <span

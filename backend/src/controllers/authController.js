@@ -17,6 +17,7 @@ const createUserAccount = async ({
   profilePhotoPublicId,
   branch,
   position,
+  team, // ✅ Add team parameter
 }) => {
   const userExists = await User.findOne({ email });
   if (userExists) {
@@ -33,17 +34,26 @@ const createUserAccount = async ({
     phone,
     branch: branch || "Addis Ketema",
     position: position || "",
+    team: team || null, // ✅ Allow team assignment
     ...(telegramChatId ? { telegramChatId } : {}),
     ...(profilePhotoUrl ? { profilePhotoUrl } : {}),
     ...(profilePhotoPublicId ? { profilePhotoPublicId } : {}),
   });
+
+  // ✅ If team is assigned, add user to team members
+  if (team) {
+    await Team.findByIdAndUpdate(team, {
+      $addToSet: { members: user._id },
+    });
+  }
 
   return user;
 };
 
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role, phone, branch, position } = req.body;
+    const { name, email, password, role, phone, branch, position, team } =
+      req.body;
     const user = await createUserAccount({
       name,
       email,
@@ -52,6 +62,7 @@ const registerUser = async (req, res) => {
       phone,
       branch,
       position,
+      team, // ✅ Pass team
     });
 
     res.status(201).json({
@@ -62,6 +73,7 @@ const registerUser = async (req, res) => {
       profilePhotoUrl: user.profilePhotoUrl || "",
       branch: user.branch || "Addis Ketema",
       position: user.position || "",
+      team: user.team || null,
       token: generateToken(user._id),
     });
   } catch (error) {
