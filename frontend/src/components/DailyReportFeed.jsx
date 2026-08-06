@@ -19,7 +19,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
   const [commentInputs, setCommentInputs] = useState({});
   const [submitting, setSubmitting] = useState({});
   const [reacting, setReacting] = useState({});
-  const [filterType, setFilterType] = useState("all"); // ✅ ADDED: filter state
+  const [filterType, setFilterType] = useState("all");
   const intervalRef = useRef(null);
   const isMountedRef = useRef(true);
   const loadTriggeredRef = useRef(false);
@@ -73,7 +73,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
         setLoading(false);
       }
     }
-  }, [showToast, td, filterType]); // ✅ Added filterType as dependency
+  }, [showToast, td, filterType]);
 
   // Handle adding a comment
   const handleAddComment = useCallback(
@@ -86,7 +86,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
         await dailyReportAPI.addComment(reportId, text);
         setCommentInputs((prev) => ({ ...prev, [reportId]: "" }));
         showToast(td("commentAdded", "Comment added!"), "success");
-        await loadTeamFeed(); // Refresh to show new comment
+        await loadTeamFeed();
       } catch (error) {
         console.error("Failed to add comment:", error);
         showToast(td("commentError", "Failed to add comment"), "error");
@@ -103,7 +103,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
       try {
         setReacting((prev) => ({ ...prev, [`${reportId}-${emoji}`]: true }));
         await dailyReportAPI.react(reportId, emoji);
-        await loadTeamFeed(); // Refresh to show updated reactions
+        await loadTeamFeed();
       } catch (error) {
         console.error("Failed to toggle reaction:", error);
         showToast(td("reactionError", "Failed to update reaction"), "error");
@@ -114,13 +114,11 @@ const DailyReportFeed = ({ t, isMobile }) => {
     [loadTeamFeed, showToast, td],
   );
 
-  // ✅ Load feed on mount and set up auto-refresh - NO setState warning
+  // Load feed on mount and set up auto-refresh
   useEffect(() => {
     console.log("🎯 DailyReportFeed mounted - loading feed...");
     isMountedRef.current = true;
 
-    // Use setTimeout to move the state update out of the effect's synchronous flow
-    // This avoids the "setState in effect" warning
     const timer = setTimeout(() => {
       if (isMountedRef.current && !loadTriggeredRef.current) {
         loadTriggeredRef.current = true;
@@ -128,14 +126,12 @@ const DailyReportFeed = ({ t, isMobile }) => {
       }
     }, 0);
 
-    // Auto-refresh every 30 seconds
     intervalRef.current = setInterval(() => {
       if (isMountedRef.current) {
         loadTeamFeed();
       }
     }, 30000);
 
-    // Cleanup interval on unmount
     return () => {
       console.log("🔄 DailyReportFeed unmounting...");
       isMountedRef.current = false;
@@ -189,25 +185,40 @@ const DailyReportFeed = ({ t, isMobile }) => {
     [td],
   );
 
-  // Get initials from name
-  const getInitials = useCallback((firstName, lastName) => {
-    if (!firstName && !lastName) return "?";
-    return `${(firstName || "")[0]}${(lastName || "")[0]}`.toUpperCase();
+  // ✅ FIXED: Get initials from user name
+  const getInitials = useCallback((userData) => {
+    if (!userData) return "?";
+
+    // Use 'name' field from User model
+    if (userData.name) {
+      const nameParts = userData.name.trim().split(" ");
+      if (nameParts.length >= 2) {
+        return `${nameParts[0][0]}${nameParts[1][0]}`.toUpperCase();
+      }
+      return userData.name.substring(0, 2).toUpperCase();
+    }
+
+    // Fallback for firstName/lastName if they exist
+    if (userData.firstName || userData.lastName) {
+      return `${(userData.firstName || "")[0]}${(userData.lastName || "")[0]}`.toUpperCase();
+    }
+
+    return "?";
   }, []);
 
-  // Get full name
+  // ✅ FIXED: Get full name from user data
   const getFullName = useCallback((userData) => {
     if (!userData) return "Unknown User";
 
-    // ✅ Try firstName/lastName first (for some users)
+    // Use 'name' field from User model
+    if (userData.name) return userData.name;
+
+    // Fallback for firstName/lastName if they exist
     if (userData.firstName || userData.lastName) {
       const fullName =
         `${userData.firstName || ""} ${userData.lastName || ""}`.trim();
       if (fullName) return fullName;
     }
-
-    // ✅ Fallback to 'name' field (used in EmployeeManagement)
-    if (userData.name) return userData.name;
 
     return "Unknown User";
   }, []);
@@ -327,7 +338,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
             alignItems: isMobile ? "stretch" : "center",
           }}
         >
-          {/* Filter Buttons - Mobile Optimized */}
+          {/* Filter Buttons */}
           <div
             style={{
               display: "flex",
@@ -439,7 +450,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
                   gap: 10,
                 }}
               >
-                {/* Avatar */}
+                {/* Avatar - FIXED: pass full userData */}
                 <div
                   style={{
                     width: isMobile ? 36 : 40,
@@ -455,10 +466,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
                     flexShrink: 0,
                   }}
                 >
-                  {getInitials(
-                    report.userId?.firstName,
-                    report.userId?.lastName,
-                  )}
+                  {getInitials(report.userId)}
                 </div>
                 <div>
                   <div
