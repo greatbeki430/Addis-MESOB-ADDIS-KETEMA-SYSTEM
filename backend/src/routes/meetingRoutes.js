@@ -25,6 +25,9 @@ router.post("/", leaderOrAdmin, createMeeting);
 // GET /api/meetings/team/:teamId - Get meetings by team
 router.get("/team/:teamId", getMeetings);
 
+// GET /api/meetings - Get all meetings (with optional team query)
+router.get("/", getMeetings);
+
 // GET /api/meetings/:id - Get single meeting
 router.get("/:id", getMeetingById);
 

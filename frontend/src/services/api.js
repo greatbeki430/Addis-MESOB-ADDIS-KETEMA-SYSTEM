@@ -107,6 +107,7 @@ export const meetingAPI = {
   create: (data) => api.post("/meetings", data),
   getAll: () => api.get("/meetings"),
   getById: (id) => api.get(`/meetings/${id}`),
+  getByTeam: (teamId) => api.get(`/meetings/team/${teamId}`),
   update: (id, data) => api.put(`/meetings/${id}`, data),
   delete: (id) => api.delete(`/meetings/${id}`),
 };

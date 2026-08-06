@@ -32,13 +32,31 @@ const ForumReportFeed = ({ t, isMobile, teamId }) => {
 
   // Load forum reports for the team
   const loadForumFeed = useCallback(async () => {
-    if (!isMountedRef.current || !teamId) return;
+    if (!isMountedRef.current || !teamId) {
+      console.log("⚠️ No teamId provided, skipping feed load");
+      return;
+    }
 
     try {
       setLoading(true);
+      console.log(`🔄 Loading forum reports for team: ${teamId}`);
       const response = await meetingAPI.getByTeam(teamId);
-      const data = response.data || [];
+      console.log("📊 API Response:", response);
 
+      // Handle different response structures
+      let data = [];
+      if (Array.isArray(response?.data)) {
+        data = response.data;
+      } else if (response?.data?.data && Array.isArray(response.data.data)) {
+        data = response.data.data;
+      } else if (
+        response?.data?.meetings &&
+        Array.isArray(response.data.meetings)
+      ) {
+        data = response.data.meetings;
+      }
+
+      console.log(`✅ Loaded ${data.length} forum reports`);
       if (isMountedRef.current) {
         setReports(data);
       }
