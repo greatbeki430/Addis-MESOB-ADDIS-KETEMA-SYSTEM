@@ -625,6 +625,21 @@ function dataURLtoBlob(dataURL) {
 }
 
 // ============================================================
+// FEED API - Unified Feed (Daily + Forum Reports)
+// ============================================================
+export const feedAPI = {
+  // Get unified feed with filters
+  getFeed: (params = {}) => {
+    // params: { team, type, start, end, limit, skip }
+    // type: 'all' | 'daily' | 'forum'
+    return api.get("/feed", { params });
+  },
+
+  // Get single feed item
+  getFeedItem: (type, id) => api.get(`/feed/${type}/${id}`),
+};
+
+// ============================================================
 // DEFAULT EXPORT
 // ============================================================
 export default api;
