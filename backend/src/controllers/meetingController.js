@@ -115,10 +115,13 @@ const createMeeting = async (req, res) => {
 const getMeetings = async (req, res) => {
   try {
     const { teamId } = req.params;
+    const { team } = req.query;
 
     let filter = {};
     if (teamId) {
       filter.team = teamId;
+    } else if (team) {
+      filter.team = team;
     }
 
     const meetings = await Meeting.find(filter)
