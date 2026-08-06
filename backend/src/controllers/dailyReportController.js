@@ -1,4 +1,3 @@
-// backend/controllers/dailyReportController.js
 const DailyReport = require("../models/DailyReport");
 
 const isAdminTier = (role) => role === "admin" || role === "superadmin";
@@ -12,13 +11,17 @@ const sameTeam = (userTeam, reportTeam) => {
 
 const REPORT_POPULATE = [
   { path: "team", select: "name nameEn" },
-  { path: "createdBy", select: "name role position profilePhotoUrl" },
-  { path: "comments.user", select: "name role profilePhotoUrl" },
+  {
+    path: "createdBy",
+    select: "name role position profilePhotoUrl firstName lastName email",
+  },
+  {
+    path: "comments.user",
+    select: "name role profilePhotoUrl firstName lastName",
+  },
 ];
 
 // ─── Create / upsert today's own report ─────────────────────────────────────
-// One report per person per day. If the caller already has a report for this
-// date it is updated in place instead of creating a second, colliding row.
 const createDailyReport = async (req, res) => {
   try {
     const entries = req.body.entries || req.body.data || [];
@@ -29,6 +32,7 @@ const createDailyReport = async (req, res) => {
     const summary = req.body.summary || "";
     const date = new Date(req.body.date);
     const team = req.body.team || req.user?.team || null;
+    const status = req.body.status || "draft";
 
     const existingReport = await DailyReport.findOne({
       date,
@@ -39,6 +43,7 @@ const createDailyReport = async (req, res) => {
       existingReport.entries = entries;
       existingReport.grandTotal = grandTotal;
       existingReport.summary = summary;
+      existingReport.status = status;
       if (team) existingReport.team = team;
       const updated = await existingReport.save();
       await updated.populate(REPORT_POPULATE);
@@ -51,6 +56,7 @@ const createDailyReport = async (req, res) => {
       entries,
       grandTotal,
       summary,
+      status,
       createdBy: req.user._id,
     });
     await report.populate(REPORT_POPULATE);
@@ -71,6 +77,7 @@ const createDailyReport = async (req, res) => {
             entries,
             grandTotal,
             summary: req.body.summary || "",
+            status: req.body.status || "draft",
           },
           { new: true },
         ).populate(REPORT_POPULATE);
@@ -200,11 +207,6 @@ const deleteReportByDate = async (req, res) => {
 };
 
 // ─── Weekly / Cumulative Summary ───────────────────────────────
-// Matches the manual paper process (Adis_ketema_Mesob_Daily_Report.xlsx),
-// which rolls daily entries into a weekly report ("ሳምንታዊ ሪፖርት ከ.../...")
-// and a fiscal-year-to-date cumulative total ("ከጷግሜ ... እስካሁን የተሰጡ አገልግሎቶች").
-// Now correctly rolls up EVERY team member's entries for the range, not just
-// a single team-wide row.
 const getSummaryReport = async (req, res) => {
   try {
     const { start, end, team, fiscalYearStart } = req.query;
@@ -337,8 +339,7 @@ const getUserHistory = async (req, res) => {
   }
 };
 
-// ─── Team feed: everyone's reports for a team, so colleagues can see and
-// react to each other's daily reports (the actual point of this page) ──────
+// ─── Team feed: everyone's reports for a team ──────────────────────────────
 const getTeamFeed = async (req, res) => {
   try {
     const { date, start, end, team, limit = 50, skip = 0 } = req.query;
@@ -356,7 +357,15 @@ const getTeamFeed = async (req, res) => {
     }
 
     const filter = { team: targetTeam };
-    if (date) {
+
+    // By default, show today's reports
+    if (!date && !start && !end) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      filter.date = { $gte: today, $lt: tomorrow };
+    } else if (date) {
       const startDate = new Date(date);
       startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(date);
@@ -365,6 +374,9 @@ const getTeamFeed = async (req, res) => {
     } else if (start && end) {
       filter.date = { $gte: new Date(start), $lte: new Date(end) };
     }
+
+    // Only show submitted/approved reports in the feed
+    filter.status = { $in: ["submitted", "approved"] };
 
     const reports = await DailyReport.find(filter)
       .populate(REPORT_POPULATE)
@@ -377,18 +389,15 @@ const getTeamFeed = async (req, res) => {
       .json({ success: true, count: reports.length, data: reports });
   } catch (error) {
     console.error("❌ Error fetching team feed:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch team feed",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch team feed",
+      error: error.message,
+    });
   }
 };
 
 // ─── Get single report by ID ────────────────────────────────────────────────
-// Viewable by the owner, teammates on the same team, and any admin tier.
 const getReportById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -414,21 +423,19 @@ const getReportById = async (req, res) => {
     res.status(200).json({ success: true, data: report });
   } catch (error) {
     console.error("❌ Error fetching report by ID:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to fetch report",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch report",
+      error: error.message,
+    });
   }
 };
 
-// ─── Update report by ID (owner only — this is someone's own daily log) ────
+// ─── Update report by ID (owner only) ──────────────────────────────────────
 const updateReportById = async (req, res) => {
   try {
     const { id } = req.params;
-    const { entries, date, team, grandTotal, summary } = req.body;
+    const { entries, date, team, grandTotal, summary, status } = req.body;
 
     const report = await DailyReport.findOne({
       _id: id,
@@ -447,6 +454,7 @@ const updateReportById = async (req, res) => {
     if (team) report.team = team;
     if (grandTotal !== undefined) report.grandTotal = grandTotal;
     if (summary !== undefined) report.summary = summary;
+    if (status) report.status = status;
 
     await report.save();
     await report.populate(REPORT_POPULATE);
@@ -454,19 +462,15 @@ const updateReportById = async (req, res) => {
     res.status(200).json({ success: true, data: report });
   } catch (error) {
     console.error("❌ Error updating report:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to update report",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to update report",
+      error: error.message,
+    });
   }
 };
 
 // ─── Delete report by ID ────────────────────────────────────────────────────
-// Owner can always delete their own. A team leader/admin can also remove a
-// report from their team's feed (moderation), same as the admin data tools.
 const deleteReportById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -497,17 +501,15 @@ const deleteReportById = async (req, res) => {
       .json({ success: true, message: "Report deleted successfully" });
   } catch (error) {
     console.error("❌ Error deleting report:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to delete report",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete report",
+      error: error.message,
+    });
   }
 };
 
-// ─── Comments: any teammate (or admin tier) can comment on a report ───────
+// ─── Comments: any teammate can comment on a report ────────────────────────
 const addComment = async (req, res) => {
   try {
     const { id } = req.params;
@@ -529,28 +531,28 @@ const addComment = async (req, res) => {
     const isOwner = report.createdBy?.toString() === req.user._id.toString();
     const isTeammate = sameTeam(req.user.team, report.team);
     if (!isOwner && !isTeammate && !isAdminTier(req.user.role)) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not authorized to comment on this report",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to comment on this report",
+      });
     }
 
-    report.comments.push({ user: req.user._id, text: text.trim() });
+    report.comments.push({
+      user: req.user._id,
+      text: text.trim(),
+      createdAt: new Date(),
+    });
     await report.save();
     await report.populate(REPORT_POPULATE);
 
     res.status(201).json({ success: true, data: report });
   } catch (error) {
     console.error("❌ Error adding comment:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to add comment",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to add comment",
+      error: error.message,
+    });
   }
 };
 
@@ -580,12 +582,10 @@ const deleteComment = async (req, res) => {
       (req.user.role === "leader" && sameTeam(req.user.team, report.team));
 
     if (!isCommentOwner && !isReportOwner && !canModerate) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not authorized to delete this comment",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to delete this comment",
+      });
     }
 
     comment.deleteOne();
@@ -595,13 +595,11 @@ const deleteComment = async (req, res) => {
     res.status(200).json({ success: true, data: report });
   } catch (error) {
     console.error("❌ Error deleting comment:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to delete comment",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to delete comment",
+      error: error.message,
+    });
   }
 };
 
@@ -621,12 +619,10 @@ const toggleReaction = async (req, res) => {
     const isOwner = report.createdBy?.toString() === req.user._id.toString();
     const isTeammate = sameTeam(req.user.team, report.team);
     if (!isOwner && !isTeammate && !isAdminTier(req.user.role)) {
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "Not authorized to react to this report",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to react to this report",
+      });
     }
 
     const existingIndex = report.reactions.findIndex(
@@ -634,7 +630,11 @@ const toggleReaction = async (req, res) => {
     );
 
     if (existingIndex === -1) {
-      report.reactions.push({ user: req.user._id, emoji });
+      report.reactions.push({
+        user: req.user._id,
+        emoji,
+        createdAt: new Date(),
+      });
     } else if (report.reactions[existingIndex].emoji === emoji) {
       // Same emoji again = remove (un-react)
       report.reactions.splice(existingIndex, 1);
@@ -649,13 +649,11 @@ const toggleReaction = async (req, res) => {
     res.status(200).json({ success: true, data: report });
   } catch (error) {
     console.error("❌ Error toggling reaction:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Failed to react to report",
-        error: error.message,
-      });
+    res.status(500).json({
+      success: false,
+      message: "Failed to react to report",
+      error: error.message,
+    });
   }
 };
 
