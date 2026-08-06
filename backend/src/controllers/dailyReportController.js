@@ -345,11 +345,17 @@ const getTeamFeed = async (req, res) => {
     const { date, start, end, team, limit = 50, skip = 0 } = req.query;
 
     let targetTeam = team || req.user.team;
+
+    // ✅ Return empty array instead of 400 error
     if (!targetTeam) {
-      return res
-        .status(400)
-        .json({ message: "No team specified and you have no team assigned" });
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: [],
+        message: "No team assigned",
+      });
     }
+
     if (!isAdminTier(req.user.role) && !sameTeam(req.user.team, targetTeam)) {
       return res
         .status(403)
@@ -396,7 +402,6 @@ const getTeamFeed = async (req, res) => {
     });
   }
 };
-
 // ─── Get single report by ID ────────────────────────────────────────────────
 const getReportById = async (req, res) => {
   try {
