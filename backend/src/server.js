@@ -40,6 +40,7 @@ const registrationRoutes = require("./routes/registrationRoutes");
 // IMPORT TELEGRAM SERVICE FOR PERSISTENT MENU
 // =============================================
 const { setupPersistentMenu } = require("./services/telegramService");
+const feedRoutes = require("./routes/feedRoutes");
 
 const app = express();
 
@@ -159,6 +160,7 @@ app.use("/api/registrations", registrationRoutes);
 // Departments — NEW
 app.use("/api/departments", departmentRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/feed", feedRoutes);
 
 // =============================================
 // ✅ HEALTH CHECK
@@ -221,7 +223,9 @@ const startServer = async () => {
       console.log("ℹ️ The menu NEVER gets hidden as conversations grow");
     } catch (menuError) {
       console.error("❌ Failed to setup persistent menu:", menuError.message);
-      console.log("ℹ️ The bot will still work, but the menu button may not appear");
+      console.log(
+        "ℹ️ The bot will still work, but the menu button may not appear",
+      );
     }
 
     // =============================================
