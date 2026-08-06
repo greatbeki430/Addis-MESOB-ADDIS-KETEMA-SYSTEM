@@ -13,11 +13,11 @@ const REPORT_POPULATE = [
   { path: "team", select: "name nameEn" },
   {
     path: "createdBy",
-    select: "name role position profilePhotoUrl firstName lastName email",
+    select: "name firstName lastName email role position profilePhotoUrl",
   },
   {
     path: "comments.user",
-    select: "name role profilePhotoUrl firstName lastName",
+    select: "name firstName lastName email role profilePhotoUrl",
   },
 ];
 
