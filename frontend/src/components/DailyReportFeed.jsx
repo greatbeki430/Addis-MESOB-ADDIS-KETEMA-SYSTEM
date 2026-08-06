@@ -19,7 +19,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
   const [commentInputs, setCommentInputs] = useState({});
   const [submitting, setSubmitting] = useState({});
   const [reacting, setReacting] = useState({});
-  const [filterType, setFilterType] = useState("all");
+  const [filterType, setFilterType] = useState("all"); // ✅ ADDED: filter state
   const intervalRef = useRef(null);
   const isMountedRef = useRef(true);
   const loadTriggeredRef = useRef(false);
@@ -73,7 +73,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
         setLoading(false);
       }
     }
-  }, [showToast, td, filterType]);
+  }, [showToast, td, filterType]); // ✅ Added filterType as dependency
 
   // Handle adding a comment
   const handleAddComment = useCallback(
@@ -198,10 +198,14 @@ const DailyReportFeed = ({ t, isMobile }) => {
   // Get full name
   const getFullName = useCallback((userData) => {
     if (!userData) return "Unknown User";
-    return (
-      `${userData.firstName || ""} ${userData.lastName || ""}`.trim() ||
-      "Unknown User"
-    );
+    // Try firstName/lastName first, then fallback to name
+    if (userData.firstName || userData.lastName) {
+      return (
+        `${userData.firstName || ""} ${userData.lastName || ""}`.trim() ||
+        "Unknown User"
+      );
+    }
+    return userData.name || "Unknown User";
   }, []);
 
   // Memoize emojis array
@@ -274,13 +278,15 @@ const DailyReportFeed = ({ t, isMobile }) => {
         paddingBottom: "20px",
       }}
     >
-      {/* Feed header */}
+      {/* Feed header - Mobile Optimized */}
       <div
         style={{
           display: "flex",
+          flexDirection: isMobile ? "column" : "row",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: isMobile ? "stretch" : "center",
           marginBottom: "4px",
+          gap: isMobile ? "8px" : "0",
         }}
       >
         <div>
@@ -300,113 +306,90 @@ const DailyReportFeed = ({ t, isMobile }) => {
           </h3>
           <p
             style={{
-              fontSize: isMobile ? "12px" : "13px",
+              fontSize: isMobile ? "11px" : "13px",
               color: C.muted,
-              margin: "4px 0 0",
+              margin: "2px 0 0",
             }}
           >
             {reports.length} {td("reportsToday", "reports shared today")}
           </p>
         </div>
-        <button
-          onClick={loadTeamFeed}
-          style={{
-            background: "none",
-            border: `1px solid ${C.border}`,
-            borderRadius: 8,
-            padding: "6px 12px",
-            fontSize: isMobile ? "11px" : "12px",
-            cursor: "pointer",
-            color: C.muted,
-            display: "flex",
-            alignItems: "center",
-            gap: "4px",
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = C.primary;
-            e.currentTarget.style.color = C.primary;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = C.border;
-            e.currentTarget.style.color = C.muted;
-          }}
-        >
-          <FiClock size={14} />
-          {td("refresh", "Refresh")}
-        </button>
-        {/* Filter Buttons - ADD THIS SECTION */}
+
         <div
           style={{
             display: "flex",
-            gap: "4px",
-            flexWrap: "wrap",
-            marginTop: "4px",
+            flexDirection: isMobile ? "column" : "row",
+            gap: isMobile ? "6px" : "8px",
+            alignItems: isMobile ? "stretch" : "center",
           }}
         >
-          <button
-            onClick={() => setFilterType("all")}
+          {/* Filter Buttons - Mobile Optimized */}
+          <div
             style={{
-              padding: "4px 12px",
-              borderRadius: "16px",
-              border: `1px solid ${filterType === "all" ? C.primary : C.border}`,
-              background: filterType === "all" ? C.primary : "transparent",
-              color: filterType === "all" ? "#fff" : C.muted,
-              fontSize: "11px",
-              cursor: "pointer",
-              transition: "all 0.2s",
-              fontWeight: filterType === "all" ? 600 : 400,
+              display: "flex",
+              gap: "4px",
+              flexWrap: "wrap",
+              justifyContent: isMobile ? "center" : "flex-end",
             }}
           >
-            All
-          </button>
+            {["all", "today", "week", "month"].map((filter) => (
+              <button
+                key={filter}
+                onClick={() => setFilterType(filter)}
+                style={{
+                  padding: isMobile ? "5px 10px" : "4px 12px",
+                  borderRadius: "16px",
+                  border: `1px solid ${filterType === filter ? C.primary : C.border}`,
+                  background: filterType === filter ? C.primary : "transparent",
+                  color: filterType === filter ? "#fff" : C.muted,
+                  fontSize: isMobile ? "9px" : "11px",
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  fontWeight: filterType === filter ? 600 : 400,
+                  whiteSpace: "nowrap",
+                  flex: isMobile ? "1" : "0 1 auto",
+                  minWidth: isMobile ? "0" : "auto",
+                  textAlign: "center",
+                }}
+              >
+                {filter === "all" && td("filterAll", "All")}
+                {filter === "today" && td("filterToday", "Today")}
+                {filter === "week" && td("filterWeek", "Week")}
+                {filter === "month" && td("filterMonth", "Month")}
+              </button>
+            ))}
+          </div>
+
+          {/* Refresh Button */}
           <button
-            onClick={() => setFilterType("today")}
+            onClick={loadTeamFeed}
             style={{
-              padding: "4px 12px",
-              borderRadius: "16px",
-              border: `1px solid ${filterType === "today" ? C.primary : C.border}`,
-              background: filterType === "today" ? C.primary : "transparent",
-              color: filterType === "today" ? "#fff" : C.muted,
-              fontSize: "11px",
+              background: "none",
+              border: `1px solid ${C.border}`,
+              borderRadius: 8,
+              padding: isMobile ? "5px 10px" : "6px 12px",
+              fontSize: isMobile ? "10px" : "12px",
               cursor: "pointer",
+              color: C.muted,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "4px",
               transition: "all 0.2s",
-              fontWeight: filterType === "today" ? 600 : 400,
+              whiteSpace: "nowrap",
+              flex: isMobile ? "1" : "0 1 auto",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = C.primary;
+              e.currentTarget.style.color = C.primary;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+              e.currentTarget.style.color = C.muted;
             }}
           >
-            Today
-          </button>
-          <button
-            onClick={() => setFilterType("week")}
-            style={{
-              padding: "4px 12px",
-              borderRadius: "16px",
-              border: `1px solid ${filterType === "week" ? C.primary : C.border}`,
-              background: filterType === "week" ? C.primary : "transparent",
-              color: filterType === "week" ? "#fff" : C.muted,
-              fontSize: "11px",
-              cursor: "pointer",
-              transition: "all 0.2s",
-              fontWeight: filterType === "week" ? 600 : 400,
-            }}
-          >
-            Week
-          </button>
-          <button
-            onClick={() => setFilterType("month")}
-            style={{
-              padding: "4px 12px",
-              borderRadius: "16px",
-              border: `1px solid ${filterType === "month" ? C.primary : C.border}`,
-              background: filterType === "month" ? C.primary : "transparent",
-              color: filterType === "month" ? "#fff" : C.muted,
-              fontSize: "11px",
-              cursor: "pointer",
-              transition: "all 0.2s",
-              fontWeight: filterType === "month" ? 600 : 400,
-            }}
-          >
-            Month
+            <FiClock size={isMobile ? 12 : 14} />
+            {td("refresh", "Refresh")}
           </button>
         </div>
       </div>
