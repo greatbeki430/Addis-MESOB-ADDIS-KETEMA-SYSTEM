@@ -226,23 +226,12 @@ export default function Sidebar({
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const { user, isAdminOrSuperAdmin, isLeader, isEmployee } = useAuth();
-  const filteredNavItems = getFilteredNavItems(user?.role || "employee");
-
-  // Add Golden Monday to nav items if user is leader or above
-  const navItemsWithGoldenMonday = [...filteredNavItems];
-  if (user && (isLeader || isAdminOrSuperAdmin)) {
-    const hasGoldenMonday = navItemsWithGoldenMonday.some(
-      (item) => item.id === "golden-monday",
-    );
-    if (!hasGoldenMonday) {
-      navItemsWithGoldenMonday.push({
-        id: "golden-monday",
-        label: "Golden Monday",
-        icon: <FiSunrise size={18} />,
-        roles: ["leader", "admin", "superadmin"],
-      });
-    }
-  }
+  // ✅ Golden Monday (and every other feature) now comes straight from the
+  // central NAV_ITEMS role matrix in utils/roles.js — no more bolting it on
+  // separately for leader-and-up only.
+  const navItemsWithGoldenMonday = getFilteredNavItems(
+    user?.role || "employee",
+  );
 
   // ✅ FIX: Auto-expand forum when on forum page
   useEffect(() => {

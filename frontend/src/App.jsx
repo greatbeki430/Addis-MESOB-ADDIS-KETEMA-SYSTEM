@@ -428,16 +428,12 @@ function AuthenticatedApp() {
                 element={<Evaluation t={t} lang={language} />}
               />
 
-              {/* Daily Report - User facing (Team Leaders and above) */}
+              {/* Daily Report - every authenticated user logs & shares their
+                  own report; the page itself scopes what each role can see
+                  (own report, team feed, cross-team admin view). */}
               <Route
                 path="/report"
-                element={
-                  isLeaderOrAbove ? (
-                    <DailyReport t={t} lang={language} />
-                  ) : (
-                    <Navigate to="/dashboard" replace />
-                  )
-                }
+                element={<DailyReport t={t} lang={language} />}
               />
 
               {/* Services - User facing (Admins and Super Admins) */}

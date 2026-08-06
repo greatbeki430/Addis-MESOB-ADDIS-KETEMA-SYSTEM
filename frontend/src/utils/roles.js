@@ -79,8 +79,11 @@ export const NAV_ITEMS = [
   {
     id: "report",
     icon: "📄",
+    // ✅ Every employee logs and shares their own daily report — this used
+    // to be leader-and-up only, which defeated the point of a *daily*
+    // report (only team leaders could ever submit one).
     label: "Daily Report",
-    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     id: "services",
@@ -103,8 +106,13 @@ export const NAV_ITEMS = [
   {
     id: "golden-monday",
     icon: "🌅",
+    // ✅ Every employee can view sessions, join roster, mark attendance and
+    // post experiences/results (backend already allowed this for anyRole).
+    // Only session creation, roster management, and gallery uploads stay
+    // leader-and-up, enforced inside the page/API — not by hiding the whole
+    // feature from employees.
     label: "Golden Monday",
-    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
 
   // =============================================
