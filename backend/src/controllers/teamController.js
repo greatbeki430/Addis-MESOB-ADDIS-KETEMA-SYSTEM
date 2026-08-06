@@ -50,8 +50,8 @@ const getTeams = async (req, res) => {
 const getTeamById = async (req, res) => {
   try {
     const team = await Team.findById(req.params.id)
-      .populate("leader")
-      .populate("members");
+      .populate("leader", "name email profilePhotoUrl")
+      .populate("members", "name email");
     if (!team) return res.status(404).json({ message: "Team not found" });
     res.json(team);
   } catch (error) {
