@@ -142,7 +142,8 @@ export const dailyReportAPI = {
   // ✅ ADD THIS - Delete report by ID
   delete: (id) => api.delete(`/daily-reports/${id}`),
   // ✅ Team feed - everyone's reports for a team, to see & react to each other's
-  getTeamFeed: (params) => api.get("/daily-reports/feed", { params }),
+  // params: { filter: 'all' | 'today' | 'week' | 'month', date, start, end, limit, skip }
+  getTeamFeed: (params = {}) => api.get("/daily-reports/feed", { params }),
   // ✅ Comments on a report
   addComment: (id, text) => api.post(`/daily-reports/${id}/comments`, { text }),
   deleteComment: (id, commentId) =>

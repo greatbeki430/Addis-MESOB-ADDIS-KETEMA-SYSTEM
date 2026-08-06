@@ -19,6 +19,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
   const [commentInputs, setCommentInputs] = useState({});
   const [submitting, setSubmitting] = useState({});
   const [reacting, setReacting] = useState({});
+  const [filterType, setFilterType] = useState("all");
   const intervalRef = useRef(null);
   const isMountedRef = useRef(true);
   const loadTriggeredRef = useRef(false);
@@ -40,8 +41,10 @@ const DailyReportFeed = ({ t, isMobile }) => {
 
     try {
       setLoading(true);
-      console.log("🔄 Fetching team feed...");
-      const response = await dailyReportAPI.getTeamFeed();
+      console.log(`🔄 Fetching team feed with filter: ${filterType}...`);
+      const response = await dailyReportAPI.getTeamFeed({
+        filter: filterType,
+      });
 
       // Handle different response structures
       let feedData = [];
@@ -70,7 +73,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
         setLoading(false);
       }
     }
-  }, [showToast, td]);
+  }, [showToast, td, filterType]);
 
   // Handle adding a comment
   const handleAddComment = useCallback(
@@ -332,6 +335,80 @@ const DailyReportFeed = ({ t, isMobile }) => {
           <FiClock size={14} />
           {td("refresh", "Refresh")}
         </button>
+        {/* Filter Buttons - ADD THIS SECTION */}
+        <div
+          style={{
+            display: "flex",
+            gap: "4px",
+            flexWrap: "wrap",
+            marginTop: "4px",
+          }}
+        >
+          <button
+            onClick={() => setFilterType("all")}
+            style={{
+              padding: "4px 12px",
+              borderRadius: "16px",
+              border: `1px solid ${filterType === "all" ? C.primary : C.border}`,
+              background: filterType === "all" ? C.primary : "transparent",
+              color: filterType === "all" ? "#fff" : C.muted,
+              fontSize: "11px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              fontWeight: filterType === "all" ? 600 : 400,
+            }}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setFilterType("today")}
+            style={{
+              padding: "4px 12px",
+              borderRadius: "16px",
+              border: `1px solid ${filterType === "today" ? C.primary : C.border}`,
+              background: filterType === "today" ? C.primary : "transparent",
+              color: filterType === "today" ? "#fff" : C.muted,
+              fontSize: "11px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              fontWeight: filterType === "today" ? 600 : 400,
+            }}
+          >
+            Today
+          </button>
+          <button
+            onClick={() => setFilterType("week")}
+            style={{
+              padding: "4px 12px",
+              borderRadius: "16px",
+              border: `1px solid ${filterType === "week" ? C.primary : C.border}`,
+              background: filterType === "week" ? C.primary : "transparent",
+              color: filterType === "week" ? "#fff" : C.muted,
+              fontSize: "11px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              fontWeight: filterType === "week" ? 600 : 400,
+            }}
+          >
+            Week
+          </button>
+          <button
+            onClick={() => setFilterType("month")}
+            style={{
+              padding: "4px 12px",
+              borderRadius: "16px",
+              border: `1px solid ${filterType === "month" ? C.primary : C.border}`,
+              background: filterType === "month" ? C.primary : "transparent",
+              color: filterType === "month" ? "#fff" : C.muted,
+              fontSize: "11px",
+              cursor: "pointer",
+              transition: "all 0.2s",
+              fontWeight: filterType === "month" ? 600 : 400,
+            }}
+          >
+            Month
+          </button>
+        </div>
       </div>
 
       {/* Report cards */}

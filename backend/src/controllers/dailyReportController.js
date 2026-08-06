@@ -345,7 +345,15 @@ const getUserHistory = async (req, res) => {
 // ─── Team feed: everyone's reports for a team ──────────────────────────────
 const getTeamFeed = async (req, res) => {
   try {
-    const { date, start, end, team, limit = 50, skip = 0 } = req.query;
+    const {
+      date,
+      start,
+      end,
+      team,
+      limit = 50,
+      skip = 0,
+      filter = "all",
+    } = req.query;
 
     let targetTeam = team || req.user.team;
 
@@ -365,37 +373,68 @@ const getTeamFeed = async (req, res) => {
         .json({ message: "Not authorized to view this team's feed" });
     }
 
-    const filter = { team: targetTeam };
+    const queryFilter = { team: targetTeam };
 
-    // By default, show today's reports
-    if (!date && !start && !end) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      filter.date = { $gte: today, $lt: tomorrow };
-    } else if (date) {
+    // ✅ Apply date filter based on the 'filter' parameter
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+
+    // If date is explicitly provided, use it
+    if (date) {
       const startDate = new Date(date);
       startDate.setHours(0, 0, 0, 0);
       const endDate = new Date(date);
       endDate.setHours(23, 59, 59, 999);
-      filter.date = { $gte: startDate, $lte: endDate };
-    } else if (start && end) {
-      filter.date = { $gte: new Date(start), $lte: new Date(end) };
+      queryFilter.date = { $gte: startDate, $lte: endDate };
+    }
+    // If start and end are provided, use them
+    else if (start && end) {
+      queryFilter.date = { $gte: new Date(start), $lte: new Date(end) };
+    }
+    // Otherwise, use the filter parameter
+    else {
+      switch (filter) {
+        case "today":
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          queryFilter.date = { $gte: today, $lt: tomorrow };
+          break;
+
+        case "week":
+          const weekAgo = new Date(today);
+          weekAgo.setDate(weekAgo.getDate() - 7);
+          queryFilter.date = { $gte: weekAgo, $lte: now };
+          break;
+
+        case "month":
+          const monthAgo = new Date(today);
+          monthAgo.setDate(monthAgo.getDate() - 30);
+          queryFilter.date = { $gte: monthAgo, $lte: now };
+          break;
+
+        case "all":
+        default:
+          // ALL reports - no date filter
+          break;
+      }
     }
 
     // Only show submitted/approved reports in the feed
-    filter.status = { $in: ["submitted", "approved"] };
+    queryFilter.status = { $in: ["submitted", "approved"] };
 
-    const reports = await DailyReport.find(filter)
+    const reports = await DailyReport.find(queryFilter)
       .populate(REPORT_POPULATE)
       .sort({ date: -1, createdAt: -1 })
       .skip(parseInt(skip))
       .limit(parseInt(limit));
 
-    res
-      .status(200)
-      .json({ success: true, count: reports.length, data: reports });
+    res.status(200).json({
+      success: true,
+      count: reports.length,
+      data: reports,
+      filter: filter,
+    });
   } catch (error) {
     console.error("❌ Error fetching team feed:", error);
     res.status(500).json({
