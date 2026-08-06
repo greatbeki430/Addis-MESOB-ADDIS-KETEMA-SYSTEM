@@ -198,14 +198,18 @@ const DailyReportFeed = ({ t, isMobile }) => {
   // Get full name
   const getFullName = useCallback((userData) => {
     if (!userData) return "Unknown User";
-    // Try firstName/lastName first, then fallback to name
+
+    // ✅ Try firstName/lastName first (for some users)
     if (userData.firstName || userData.lastName) {
-      return (
-        `${userData.firstName || ""} ${userData.lastName || ""}`.trim() ||
-        "Unknown User"
-      );
+      const fullName =
+        `${userData.firstName || ""} ${userData.lastName || ""}`.trim();
+      if (fullName) return fullName;
     }
-    return userData.name || "Unknown User";
+
+    // ✅ Fallback to 'name' field (used in EmployeeManagement)
+    if (userData.name) return userData.name;
+
+    return "Unknown User";
   }, []);
 
   // Memoize emojis array
