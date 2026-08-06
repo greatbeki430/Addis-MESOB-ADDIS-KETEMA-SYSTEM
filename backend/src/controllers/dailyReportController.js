@@ -154,7 +154,7 @@ const getReportByDate = async (req, res) => {
   }
 };
 
-// ─── Get the CALLER's own full report for a date (form pre-fill, incl. summary) ──
+// ─── Get the CALLER's own full report for a date ──
 const getMyReportByDate = async (req, res) => {
   try {
     const { date } = req.params;
@@ -169,10 +169,13 @@ const getMyReportByDate = async (req, res) => {
       createdBy: req.user._id,
     }).populate(REPORT_POPULATE);
 
+    // ✅ Return 200 with null instead of 404
     if (!report) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No report found for this date" });
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No report found for this date",
+      });
     }
 
     res.status(200).json({ success: true, data: report });
