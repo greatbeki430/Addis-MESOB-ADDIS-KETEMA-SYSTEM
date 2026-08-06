@@ -63,6 +63,9 @@ export const dailyReportTranslations = {
       teamFeedEmpty: "Your teammates haven't submitted any reports yet.",
       beFirst: "Be the first to share your daily accomplishments!",
       feedLoadError: "Failed to load team feed",
+      dailySummary: "How did today go? (visible to your team)",
+      dailySummaryPlaceholder:
+        "Share highlights, blockers, or anything your team should know...",
     },
   },
   am: {
@@ -125,6 +128,9 @@ export const dailyReportTranslations = {
       teamFeedEmpty: "ቡድንዎ እስካሁን ምንም ሪፖርቶች አላስገቡም።",
       beFirst: "ዕለታዊ ስኬቶችዎን ለማካፈል የመጀመሪያው ይሁኑ!",
       feedLoadError: "የቡድን ምግብ ማግኘት አልተቻለም",
+      dailySummary: "ዛሬ እንዴት አለፈ? (ለቡድንዎ ይታያል)",
+      dailySummaryPlaceholder:
+        "የተሳኩ ነገሮች፣ ችግሮች፣ ወይም ቡድንዎ ሊያውቀው የሚገባ ማንኛውም ነገር ያጋሩ...",
     },
   },
   om: {
@@ -187,6 +193,9 @@ export const dailyReportTranslations = {
       teamFeedEmpty: "Miseensonni garee keessanii gabaasa hin galchine.",
       beFirst: "Isaan jalqabaa ta'aa milkee guyyaa keessan qoodachuuf!",
       feedLoadError: "Qabsoo garee fe'uun hin danda'amne",
+      dailySummary: "Har'aa akkamitti? (garee keessatti mul'ata)",
+      dailySummaryPlaceholder:
+        "Milkaa'ina, gufuulee, ykn wanti garee keessan beekuu qabu qoodadhaa...",
     },
   },
 };
