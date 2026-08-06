@@ -21,7 +21,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
   const [reacting, setReacting] = useState({});
   const intervalRef = useRef(null);
   const isMountedRef = useRef(true);
-  const initialLoadDoneRef = useRef(false);
+  const loadTriggeredRef = useRef(false);
 
   // Memoize translation functions to prevent re-renders
   const td = useCallback(
@@ -40,6 +40,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
 
     try {
       setLoading(true);
+      console.log("🔄 Fetching team feed...");
       const response = await dailyReportAPI.getTeamFeed();
 
       // Handle different response structures
@@ -54,6 +55,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
           : [];
       }
 
+      console.log(`✅ Feed loaded: ${feedData.length} reports`);
       if (isMountedRef.current) {
         setReports(feedData);
       }
@@ -109,22 +111,19 @@ const DailyReportFeed = ({ t, isMobile }) => {
     [loadTeamFeed, showToast, td],
   );
 
-  // Load feed on mount and set up auto-refresh
+  // ✅ Load feed on mount and set up auto-refresh - NO setState warning
   useEffect(() => {
+    console.log("🎯 DailyReportFeed mounted - loading feed...");
     isMountedRef.current = true;
 
-    // Use a ref to track if initial load has been done
+    // Use setTimeout to move the state update out of the effect's synchronous flow
     // This avoids the "setState in effect" warning
-    if (!initialLoadDoneRef.current) {
-      initialLoadDoneRef.current = true;
-      // Use a timeout to move the state update out of the effect's synchronous flow
-      const timer = setTimeout(() => {
-        if (isMountedRef.current) {
-          loadTeamFeed();
-        }
-      }, 0);
-      return () => clearTimeout(timer);
-    }
+    const timer = setTimeout(() => {
+      if (isMountedRef.current && !loadTriggeredRef.current) {
+        loadTriggeredRef.current = true;
+        loadTeamFeed();
+      }
+    }, 0);
 
     // Auto-refresh every 30 seconds
     intervalRef.current = setInterval(() => {
@@ -135,7 +134,9 @@ const DailyReportFeed = ({ t, isMobile }) => {
 
     // Cleanup interval on unmount
     return () => {
+      console.log("🔄 DailyReportFeed unmounting...");
       isMountedRef.current = false;
+      clearTimeout(timer);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
