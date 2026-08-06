@@ -37,6 +37,7 @@ export default function DailyReport({ t, lang }) {
 
   const [rows, setRows] = useState([]);
   const [summary, setSummary] = useState("");
+  const [status, setStatus] = useState("draft");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -122,10 +123,12 @@ export default function DailyReport({ t, lang }) {
         if (report && report.entries?.length > 0) {
           setRows(report.entries);
           setSummary(report.summary || "");
+          setStatus(report.status || "draft");
           setSavedReportId(report._id || null);
         } else {
           setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
           setSummary("");
+          setStatus("draft");
           setSavedReportId(null);
         }
       } catch (error) {
@@ -298,6 +301,7 @@ export default function DailyReport({ t, lang }) {
         entries,
         grandTotal,
         summary,
+        status: status || "draft",
         team: user?.team || null,
       });
       setSavedReportId(response?.data?._id || null);
@@ -319,13 +323,44 @@ export default function DailyReport({ t, lang }) {
     }
   };
 
+  // ─── Submit report for review ──────────────────────────────────────────────
+  const submitReportForReview = async () => {
+    if (!savedReportId) {
+      showToast(td("saveFirst", "Please save your report first"), "warning");
+      return;
+    }
+    try {
+      setSaving(true);
+      await dailyReportAPI.update(savedReportId, { status: "submitted" });
+      setStatus("submitted");
+      showToast(
+        td("submittedSuccess", "✅ Report submitted for review!"),
+        "success",
+      );
+      if (activeTab === "history") {
+        historyLoadedRef.current = false;
+        loadHistory();
+      }
+    } catch (error) {
+      console.error("Failed to submit report:", error);
+      showToast(td("submitError", "Failed to submit report"), "error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ─── Load a report from history ─────────────────────────────────────────────
   const loadReportFromHistory = (report) => {
     try {
       if (report.entries && report.entries.length > 0) {
         setRows(report.entries);
         setSummary(report.summary || "");
-        setDate(report.date || new Date().toISOString().split("T")[0]);
+        setStatus(report.status || "draft");
+        setDate(
+          report.date
+            ? new Date(report.date).toISOString().split("T")[0]
+            : new Date().toISOString().split("T")[0],
+        );
         setSavedReportId(report._id);
         setActiveTab("new");
         showToast(
@@ -671,6 +706,21 @@ export default function DailyReport({ t, lang }) {
                   >
                     {report.team || td("myTeam", "My Team")}
                   </span>
+                  {report.status && (
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        padding: "2px 8px",
+                        borderRadius: "99px",
+                        background:
+                          report.status === "submitted" ? "#DBEAFE" : "#F1F5F9",
+                        color:
+                          report.status === "submitted" ? "#2563EB" : "#64748B",
+                      }}
+                    >
+                      {report.status}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1518,6 +1568,54 @@ export default function DailyReport({ t, lang }) {
                       </>
                     )}
                   </button>
+                  {savedReportId && status !== "submitted" && (
+                    <button
+                      style={{
+                        background: saving ? "#94A3B8" : "#8B5CF6",
+                        color: "#fff",
+                        border: "none",
+                        padding: isMobile
+                          ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
+                          : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
+                        borderRadius: 10,
+                        fontSize: isMobile
+                          ? "clamp(12px, 3vw, 13px)"
+                          : "clamp(13px, 2.5vw, 14px)",
+                        fontWeight: 700,
+                        cursor: saving ? "not-allowed" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                        transition: "all 0.3s ease",
+                        opacity: saving ? 0.7 : 1,
+                        boxShadow: saving
+                          ? "none"
+                          : "0 4px 15px rgba(139,92,246,0.3)",
+                        flex: isMobile ? "1 1 auto" : "0 1 auto",
+                        minWidth: isMobile ? "auto" : "140px",
+                      }}
+                      onClick={submitReportForReview}
+                      disabled={saving}
+                    >
+                      {saving ? (
+                        <>
+                          <FiLoader
+                            size={16}
+                            style={{ animation: "spin 1s linear infinite" }}
+                          />
+                          {!isMobile && tcm("submitting", "Submitting...")}
+                        </>
+                      ) : (
+                        <>
+                          <FiFileText size={16} />
+                          {isMobile
+                            ? td("submit", "Submit")
+                            : td("submitForReview", "Submit for Review")}
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
 
                 {/* ✅ PDF Language Selector */}
