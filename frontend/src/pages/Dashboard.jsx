@@ -1,4 +1,35 @@
 // frontend/src/pages/Dashboard.jsx
+// ════════════════════════════════════════════════════════════
+// "Operations Panel" redesign — a civic command-center layout.
+// Locked to the viewport on desktop (no page scroll); charts are
+// custom canvas/SVG work tuned to a teal + brass institutional
+// palette instead of generic card-stack styling.
+//
+// Refactor notes (this pass):
+//  - Split into small, focused sub-components (Header, QuickStats
+//    rail, TrendChart, DepartmentChart, DistributionDonut, Footer)
+//    so each chart/section owns its own canvas ref + effect
+//    instead of one monolithic component re-running every effect
+//    on every state change.
+//  - Gauge is now a top-level memoized component. Previously it was
+//    declared *inside* Dashboard on every render, which meant React
+//    treated it as a brand-new component type each render and
+//    remounted the SVG circle — killing the CSS stroke-dashoffset
+//    transition that was supposed to animate the ring.
+//  - Canvas helpers (prepCanvas / drawNoData / roundRect) moved to
+//    module scope — they don't touch component state, so recreating
+//    them on every render served no purpose.
+//  - Weekly/monthly bucketing used `Date#toISOString()` to build the
+//    day/month key. toISOString() always converts to UTC, so for any
+//    user east or west of UTC, dates close to midnight could bucket
+//    into the wrong day (e.g. in UTC+3, 00:30 local rolls back to the
+//    previous UTC day). Replaced with local-time formatting so "today"
+//    always means the viewer's today.
+//  - Department bar chart used a row-spacing formula
+//    (`rowH + gap - gap / depts.length`) that doesn't evenly fill the
+//    available height and can overlap rows for larger department
+//    counts. Replaced with a straightforward evenly-spaced layout.
+// ════════════════════════════════════════════════════════════
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { CRITERIA } from "../constants/criteria";
 import { useAuth } from "../hooks/useAuth";
@@ -10,34 +41,32 @@ import {
   FiTrendingUp,
   FiBarChart2,
   FiPieChart,
+  FiAward,
   FiClock,
   FiTarget,
   FiZap,
+  FiUsers,
   FiActivity,
-  FiCalendar,
 } from "react-icons/fi";
 
-// ── Enhanced Design Tokens ──────────────────────────────────
+// ── Instrument-panel design tokens ─────────────────────────────
+// Extends the app's existing teal/gold brand rather than replacing
+// it — deepened into a "control room" register: ink-teal ground,
+// brass accent, misty sage neutrals, monospace for data readouts.
 const T = {
   ink: "#0E241C",
   inkSoft: "#3D5A4E",
-  inkLight: "#6B8A7E",
   panel: "#FFFFFF",
-  canvas: "#F0F5F2",
+  canvas: "#EFF4F1",
   canvasDeep: "#E4ECE7",
   teal: "#146149",
   tealDeep: "#0A3B2A",
   tealBright: "#1E8A63",
-  tealLight: "#E8F5F0",
   brass: "#C89B3C",
   brassLight: "#E4C878",
-  brassDark: "#A67A2E",
   clay: "#B5542E",
-  clayLight: "#F5E8E0",
   mist: "#D8E3DD",
   white: "#FFFFFF",
-  shadow: "rgba(14,36,28,0.08)",
-  shadowDark: "rgba(14,36,28,0.16)",
   serif: "'Noto Serif Ethiopic', Georgia, serif",
   sans: "'Noto Sans Ethiopic', -apple-system, sans-serif",
   mono: "'JetBrains Mono', 'Cascadia Code', 'Courier New', monospace",
@@ -50,11 +79,12 @@ const DONUT_COLORS = [
   "#B5542E",
   "#3D6B8C",
   "#8B5A9E",
-  "#2D7D6E",
-  "#D4A04A",
 ];
 
-// ── Shared Canvas Helpers ──────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// Shared canvas helpers (module scope — stateless, no reason to
+// recreate these on every render)
+// ════════════════════════════════════════════════════════════
 function prepCanvas(canvas, width, height) {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = width * dpr;
@@ -69,11 +99,11 @@ function prepCanvas(canvas, width, height) {
 }
 
 function drawNoData(ctx, width, height, label) {
-  ctx.fillStyle = "rgba(14,36,28,0.3)";
+  ctx.fillStyle = "rgba(14,36,28,0.28)";
   ctx.font = `500 13px ${T.sans}`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText("📊 " + label, width / 2, height / 2);
+  ctx.fillText(label, width / 2, height / 2);
 }
 
 function roundRect(ctx, x, y, w, h, r) {
@@ -87,474 +117,292 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// Local-time (not UTC) date keys, so "today" and "this month" line up
+// with the viewer's own calendar regardless of timezone offset.
 function localDateKey(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
-
 function localMonthKey(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   return `${y}-${m}`;
 }
 
-// ─── Gauge Component ────────────────────────────────────────
-const Gauge = memo(function Gauge({
-  value,
-  max,
-  label,
-  icon,
-  color,
-  mono,
-  subtitle,
-}) {
+// ════════════════════════════════════════════════════════════
+// Gauge — small radial-ring stat readout (SVG)
+// ════════════════════════════════════════════════════════════
+const Gauge = memo(function Gauge({ value, max, label, icon, color, mono }) {
   const pct = max > 0 ? Math.min(value / max, 1) : 0;
-  const r = 18;
+  const r = 22;
   const circumference = 2 * Math.PI * r;
   const offset = circumference * (1 - pct);
-
   return (
     <div className="op-gauge">
       <div className="op-gauge-ring">
-        <svg width="44" height="44" viewBox="0 0 44 44">
+        <svg width="56" height="56" viewBox="0 0 56 56">
           <circle
-            cx="22"
-            cy="22"
+            cx="28"
+            cy="28"
             r={r}
             fill="none"
             stroke={T.mist}
-            strokeWidth="4"
+            strokeWidth="5"
           />
           <circle
-            cx="22"
-            cy="22"
+            cx="28"
+            cy="28"
             r={r}
             fill="none"
             stroke={color}
-            strokeWidth="4"
+            strokeWidth="5"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
             strokeLinecap="round"
-            transform="rotate(-90 22 22)"
+            transform="rotate(-90 28 28)"
             style={{
-              transition: "stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)",
+              transition: "stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)",
             }}
           />
         </svg>
-        <span
-          className="op-gauge-icon-bg"
-          style={{ background: `${color}15` }}
-        />
         <span className="op-gauge-icon" style={{ color }}>
           {icon}
         </span>
       </div>
       <div className="op-gauge-text">
-        <div className="op-gauge-value" style={{ color }}>
-          {mono ?? value}
-        </div>
+        <div className="op-gauge-value">{mono ?? value}</div>
         <div className="op-gauge-label">{label}</div>
-        {subtitle && <div className="op-gauge-sub">{subtitle}</div>}
       </div>
     </div>
   );
 });
 
-// ─── QuickStatsRail with Criteria ──────────────────────────
+// ════════════════════════════════════════════════════════════
+// QuickStatsRail — left column of gauges
+// ════════════════════════════════════════════════════════════
 const QuickStatsRail = memo(function QuickStatsRail({
   stats,
   goldenMondayStats,
   malePct,
   td,
-  tc,
-  agendas,
 }) {
   return (
     <aside className="op-rail op-rail-left">
-      <div className="op-rail-header">
-        <FiActivity size={14} color={T.teal} />
-        <span className="op-rail-title">{td("quickStats", "QUICK STATS")}</span>
+      <div className="op-rail-title">
+        <FiActivity size={13} /> {td("quickStats", "QUICK STATS")}
       </div>
-      <div className="op-rail-gauges">
-        <Gauge
-          value={stats.total}
-          max={Math.max(stats.total, 50)}
-          label={td("todayServices", "Today")}
-          icon="◈"
-          color={T.teal}
-          subtitle={td("totalServices", "Total Services")}
-        />
-        <Gauge
-          value={malePct}
-          max={100}
-          label={`${td("male", "Male")} / ${td("female", "Female")}`}
-          icon="◉"
-          color={T.brass}
-          mono={`${malePct}%`}
-          subtitle={`${stats.male}M / ${stats.female}F`}
-        />
-        <Gauge
-          value={stats.departments.length}
-          max={Math.max(stats.departments.length, 8)}
-          label={td("departments", "Depts")}
-          icon="⬢"
-          color={T.clay}
-        />
-        <Gauge
-          value={goldenMondayStats.totalPresenters}
-          max={Math.max(goldenMondayStats.totalPresenters, 10)}
-          label={td("presenters", "Presenters")}
-          icon="🎤"
-          color="#3D6B8C"
-        />
-        <Gauge
-          value={goldenMondayStats.avgRating || 0}
-          max={5}
-          label={td("avgRating", "Rating")}
-          icon="★"
-          color="#8B5A9E"
-          mono={(goldenMondayStats.avgRating || 0).toFixed(1)}
-        />
-      </div>
-
-      {/* ─── CRITERIA OVERVIEW ────────────────────────────── */}
-      <div className="op-criteria-section">
-        <div className="op-criteria-header">
-          <FiTarget size={12} color={T.teal} />
-          <span className="op-criteria-title">
-            {td("criteriaOverview", "CRITERIA")}
-          </span>
-        </div>
-        <div className="op-criteria-grid">
-          {CRITERIA.slice(0, 5).map((c) => (
-            <div
-              key={c.id}
-              className="op-criteria-item"
-              style={{ borderLeftColor: c.color }}
-            >
-              <div className="op-criteria-pct" style={{ color: c.color }}>
-                {c.weight}%
-              </div>
-              <div className="op-criteria-name">{tc(c.key, c.key)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ─── AGENDAS ────────────────────────────────────────── */}
-      <div className="op-agendas-section">
-        <div className="op-criteria-header">
-          <FiZap size={12} color={T.brass} />
-          <span className="op-criteria-title">
-            {td("forumAgendas", "AGENDAS")}
-          </span>
-        </div>
-        <div className="op-agendas-list">
-          {agendas.slice(0, 5).map((a, i) => (
-            <span key={i} className="op-agenda-mini">
-              <FiClock size={8} />
-              {a.length > 30 ? a.slice(0, 30) + "…" : a}
-            </span>
-          ))}
-        </div>
-      </div>
+      <Gauge
+        value={stats.total}
+        max={Math.max(stats.total, 50)}
+        label={td("todayServices", "Today")}
+        icon="◈"
+        color={T.teal}
+      />
+      <Gauge
+        value={malePct}
+        max={100}
+        label={`${td("male", "Male")} / ${td("female", "Female")}`}
+        icon="◉"
+        color={T.brass}
+        mono={`${malePct}%`}
+      />
+      <Gauge
+        value={stats.departments.length}
+        max={Math.max(stats.departments.length, 8)}
+        label={td("departments", "Depts")}
+        icon="⬢"
+        color={T.clay}
+      />
+      <Gauge
+        value={goldenMondayStats.totalPresenters}
+        max={Math.max(goldenMondayStats.totalPresenters, 10)}
+        label={td("presenters", "Presenters")}
+        icon="🎤"
+        color="#3D6B8C"
+      />
+      <Gauge
+        value={goldenMondayStats.avgRating || 0}
+        max={5}
+        label={td("avgRating", "Rating")}
+        icon="★"
+        color="#8B5A9E"
+        mono={(goldenMondayStats.avgRating || 0).toFixed(1)}
+      />
     </aside>
   );
 });
 
-// ─── TrendChart ─────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// TrendChart — 7-day smooth area/line chart
+// ════════════════════════════════════════════════════════════
 const TrendChart = memo(function TrendChart({ data, loading, noDataLabel }) {
   const canvasRef = useRef(null);
-  const rafRef = useRef(null);
-  const geometryRef = useRef(null);
-  const [hoverIndex, setHoverIndex] = useState(null);
-
-  const draw = useCallback(
-    (ctx, width, height, progress, hoverIdx) => {
-      ctx.clearRect(0, 0, width, height);
-      if (!data || data.length === 0 || data.every((d) => d.value === 0)) {
-        drawNoData(ctx, width, height, noDataLabel);
-        geometryRef.current = null;
-        return;
-      }
-
-      const pad = { top: 20, bottom: 20, left: 6, right: 6 };
-      const chartW = width - pad.left - pad.right;
-      const chartH = height - pad.top - pad.bottom;
-      const maxVal = Math.max(...data.map((d) => d.value), 1);
-      const step = data.length > 1 ? chartW / (data.length - 1) : 0;
-      const pts = data.map((d, i) => ({
-        x: pad.left + i * step,
-        y: pad.top + chartH - (d.value / maxVal) * chartH,
-      }));
-      geometryRef.current = { pts, pad, width, height };
-
-      // Grid lines
-      ctx.strokeStyle = "rgba(14,36,28,0.05)";
-      ctx.lineWidth = 1;
-      for (let g = 0; g <= 3; g++) {
-        const gy = pad.top + (chartH / 3) * g;
-        ctx.beginPath();
-        ctx.moveTo(pad.left, gy);
-        ctx.lineTo(width - pad.right, gy);
-        ctx.stroke();
-      }
-
-      const gradient = ctx.createLinearGradient(
-        0,
-        pad.top,
-        0,
-        height - pad.bottom,
-      );
-      gradient.addColorStop(0, "rgba(20,97,73,0.3)");
-      gradient.addColorStop(0.5, "rgba(20,97,73,0.1)");
-      gradient.addColorStop(1, "rgba(20,97,73,0)");
-
-      const revealX = pad.left + chartW * progress;
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(0, 0, revealX, height);
-      ctx.clip();
-
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const p0 = pts[i - 1] || pts[i];
-        const p1 = pts[i];
-        const p2 = pts[i + 1];
-        const p3 = pts[i + 2] || p2;
-        const cp1x = p1.x + (p2.x - p0.x) / 6;
-        const cp1y = p1.y + (p2.y - p0.y) / 6;
-        const cp2x = p2.x - (p3.x - p1.x) / 6;
-        const cp2y = p2.y - (p3.y - p1.y) / 6;
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
-      }
-      ctx.lineTo(pts[pts.length - 1].x, height - pad.bottom);
-      ctx.lineTo(pts[0].x, height - pad.bottom);
-      ctx.closePath();
-      ctx.fillStyle = gradient;
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.moveTo(pts[0].x, pts[0].y);
-      for (let i = 0; i < pts.length - 1; i++) {
-        const p0 = pts[i - 1] || pts[i];
-        const p1 = pts[i];
-        const p2 = pts[i + 1];
-        const p3 = pts[i + 2] || p2;
-        const cp1x = p1.x + (p2.x - p0.x) / 6;
-        const cp1y = p1.y + (p2.y - p0.y) / 6;
-        const cp2x = p2.x - (p3.x - p1.x) / 6;
-        const cp2y = p2.y - (p3.y - p1.y) / 6;
-        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
-      }
-      ctx.strokeStyle = T.teal;
-      ctx.lineWidth = 2.5;
-      ctx.lineJoin = "round";
-      ctx.lineCap = "round";
-      ctx.shadowColor = "rgba(20,97,73,0.25)";
-      ctx.shadowBlur = 6;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-      ctx.restore();
-
-      const isHover = hoverIdx !== null && hoverIdx < pts.length;
-      pts.forEach((p, i) => {
-        if (p.x > revealX + 0.5) return;
-        const isPeak = data[i].value === maxVal && maxVal > 0;
-        const hover = isHover && hoverIdx === i;
-        const radius = hover ? 6 : isPeak ? 4 : 3;
-
-        if (isPeak || hover) {
-          const glow = ctx.createRadialGradient(
-            p.x,
-            p.y,
-            0,
-            p.x,
-            p.y,
-            radius + 8,
-          );
-          glow.addColorStop(
-            0,
-            hover ? "rgba(20,97,73,0.2)" : "rgba(200,155,60,0.12)",
-          );
-          glow.addColorStop(1, "rgba(20,97,73,0)");
-          ctx.fillStyle = glow;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, radius + 8, 0, 2 * Math.PI);
-          ctx.fill();
-        }
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
-        ctx.fillStyle = hover ? T.tealDeep : isPeak ? T.brass : T.teal;
-        ctx.fill();
-        ctx.strokeStyle = T.white;
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        ctx.fillStyle = T.inkSoft;
-        ctx.font = `500 7px ${T.mono}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        ctx.fillText(data[i].label, p.x, height - 18);
-
-        if (data[i].value > 0 && (isPeak || hover)) {
-          ctx.fillStyle = hover ? T.tealDeep : T.brass;
-          ctx.font = `600 8px ${T.mono}`;
-          ctx.textBaseline = "bottom";
-          ctx.fillText(data[i].value, p.x, p.y - radius - 3);
-        }
-      });
-    },
-    [data, noDataLabel],
-  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || loading) return;
     const rect = canvas.parentElement.getBoundingClientRect();
-    const width = rect.width || 350;
-    const height = rect.height || 150;
-    let start = null;
-    const duration = 700;
-    cancelAnimationFrame(rafRef.current);
-    const frame = (ts) => {
-      if (!start) start = ts;
-      const progress = Math.min((ts - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const ctx = prepCanvas(canvas, width, height);
-      draw(ctx, width, height, eased, null);
-      if (progress < 1) rafRef.current = requestAnimationFrame(frame);
-    };
-    rafRef.current = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [data, loading, draw]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || loading || !geometryRef.current) return;
-    const { width, height } = geometryRef.current;
+    const width = rect.width || 400;
+    const height = rect.height || 200;
     const ctx = prepCanvas(canvas, width, height);
-    draw(ctx, width, height, 1, hoverIndex);
-  }, [hoverIndex, draw, loading]);
+
+    if (!data || data.length === 0 || data.every((d) => d.value === 0)) {
+      drawNoData(ctx, width, height, noDataLabel);
+      return;
+    }
+
+    const pad = { top: 18, bottom: 26, left: 8, right: 8 };
+    const chartW = width - pad.left - pad.right;
+    const chartH = height - pad.top - pad.bottom;
+    const maxVal = Math.max(...data.map((d) => d.value), 1);
+    const step = data.length > 1 ? chartW / (data.length - 1) : 0;
+    const pts = data.map((d, i) => ({
+      x: pad.left + i * step,
+      y: pad.top + chartH - (d.value / maxVal) * chartH,
+    }));
+
+    // horizontal guide lines
+    ctx.strokeStyle = "rgba(14,36,28,0.06)";
+    ctx.lineWidth = 1;
+    for (let g = 0; g <= 3; g++) {
+      const gy = pad.top + (chartH / 3) * g;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, gy);
+      ctx.lineTo(width - pad.right, gy);
+      ctx.stroke();
+    }
+
+    // smooth path via quadratic midpoints
+    const buildSmoothPath = () => {
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 0; i < pts.length - 1; i++) {
+        const midX = (pts[i].x + pts[i + 1].x) / 2;
+        const midY = (pts[i].y + pts[i + 1].y) / 2;
+        ctx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+      }
+      const last = pts[pts.length - 1];
+      ctx.quadraticCurveTo(last.x, last.y, last.x, last.y);
+    };
+
+    buildSmoothPath();
+    ctx.lineTo(pts[pts.length - 1].x, height - pad.bottom);
+    ctx.lineTo(pts[0].x, height - pad.bottom);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, pad.top, 0, height - pad.bottom);
+    grad.addColorStop(0, "rgba(20,97,73,0.30)");
+    grad.addColorStop(1, "rgba(20,97,73,0.02)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    buildSmoothPath();
+    ctx.strokeStyle = T.teal;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    pts.forEach((p, i) => {
+      const isPeak = data[i].value === maxVal && maxVal > 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, isPeak ? 4.5 : 3, 0, 2 * Math.PI);
+      ctx.fillStyle = isPeak ? T.brass : T.teal;
+      ctx.fill();
+      ctx.strokeStyle = T.white;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = T.inkSoft;
+      ctx.font = `600 9px ${T.mono}`;
+      ctx.textAlign = "center";
+      ctx.fillText(data[i].label.toUpperCase(), p.x, height - 8);
+
+      if (data[i].value > 0) {
+        ctx.fillStyle = isPeak ? T.brass : T.ink;
+        ctx.font = `700 9px ${T.mono}`;
+        ctx.fillText(data[i].value, p.x, p.y - 10);
+      }
+    });
+  }, [data, loading, noDataLabel]);
 
   return (
-    <div
-      className="op-canvas-box op-canvas-box-interactive"
-      onMouseMove={(e) => {
-        const geo = geometryRef.current;
-        if (!geo) return;
-        const rect = canvasRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        let nearest = 0,
-          minDist = Infinity;
-        geo.pts.forEach((p, i) => {
-          const dist = Math.abs(p.x - x);
-          if (dist < minDist) {
-            minDist = dist;
-            nearest = i;
-          }
-        });
-        setHoverIndex(minDist < 25 ? nearest : null);
-      }}
-      onMouseLeave={() => setHoverIndex(null)}
-    >
+    <div className="op-canvas-box">
       <canvas ref={canvasRef} />
     </div>
   );
 });
 
-// ─── Enhanced DepartmentChart ───────────────────────────────
+// ════════════════════════════════════════════════════════════
+// DepartmentChart — horizontal animated bars
+// ════════════════════════════════════════════════════════════
 const DepartmentChart = memo(function DepartmentChart({
   departments,
-  total,
   loading,
   noDataLabel,
 }) {
   const canvasRef = useRef(null);
-  const rafRef = useRef(null);
-  const geometryRef = useRef(null);
-  const [hoverRow, setHoverRow] = useState(null);
 
-  const draw = useCallback(
-    (ctx, width, height, progress, hoverIdx) => {
-      const depts = departments.slice(0, 8);
-      if (depts.length === 0) {
-        drawNoData(ctx, width, height, noDataLabel);
-        geometryRef.current = null;
-        return;
-      }
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || loading) return;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    const width = rect.width || 400;
+    const height = rect.height || 220;
 
-      const maxVal = Math.max(...depts.map((d) => d.value), 1);
-      const pad = { top: 4, bottom: 4, left: 4, right: 44 };
-      const badgeSize = 16;
-      const labelW = 80;
-      const barMaxW = width - pad.left - pad.right - labelW - 44;
-      const rowH = Math.min((height - pad.top - pad.bottom) / depts.length, 34);
-      const barThickness = Math.max(rowH - 8, 5);
-      geometryRef.current = { rowH, pad, count: depts.length };
+    const depts = departments.slice(0, 6);
+    if (depts.length === 0) {
+      const ctx = prepCanvas(canvas, width, height);
+      drawNoData(ctx, width, height, noDataLabel);
+      return;
+    }
 
-      const rankColors = [
-        T.brass,
-        "#C0C8C4",
-        T.clay,
-        T.teal,
-        "#3D6B8C",
-        "#8B5A9E",
-        T.tealBright,
-        T.brassDark,
-      ];
+    const maxVal = Math.max(...depts.map((d) => d.value), 1);
+    const pad = { top: 6, bottom: 6, left: 4, right: 46 };
+    const labelW = 84;
+    const valueW = 44;
+    const barMaxW = width - pad.left - pad.right - labelW - valueW;
+    // Evenly-spaced rows: each row gets an equal slice of the
+    // available height, with a fixed gap eaten out of the bar
+    // thickness rather than a fractional gap formula that could
+    // overlap rows.
+    const rowH = Math.min((height - pad.top - pad.bottom) / depts.length, 40);
+    const barThickness = Math.max(rowH - 12, 8);
 
+    let raf;
+    let start = null;
+    const duration = 650;
+
+    const frame = (ts) => {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+
+      const ctx = prepCanvas(canvas, width, height);
       depts.forEach((dept, i) => {
         const rowTop = pad.top + i * rowH;
         const barY = rowTop + (rowH - barThickness) / 2;
         const barX = pad.left + labelW;
-        const isHover = hoverIdx === i;
+        const barW = (dept.value / maxVal) * barMaxW * eased;
 
-        if (isHover) {
-          ctx.fillStyle = "rgba(20,97,73,0.06)";
-          roundRect(ctx, 0, rowTop + 1, width, rowH - 2, 8);
-          ctx.fill();
-        }
-
-        const bx = pad.left + badgeSize / 2;
-        const by = rowTop + rowH / 2;
-        const badgeColor = rankColors[i % rankColors.length];
-        ctx.beginPath();
-        ctx.arc(bx, by, badgeSize / 2, 0, 2 * Math.PI);
-        ctx.fillStyle = badgeColor;
-        ctx.fill();
-        ctx.fillStyle = i < 3 ? "#fff" : T.white;
-        ctx.font = `700 7px ${T.mono}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(i + 1, bx, by + 0.5);
-
-        ctx.fillStyle = isHover ? T.ink : T.inkSoft;
-        ctx.font = `${isHover ? 700 : 600} 9px ${T.sans}`;
+        ctx.fillStyle = T.inkSoft;
+        ctx.font = `600 10px ${T.sans}`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         const label =
-          dept.name.length > 12 ? dept.name.slice(0, 12) + "…" : dept.name;
-        ctx.fillText(label, pad.left + badgeSize + 6, by);
+          dept.name.length > 16 ? dept.name.slice(0, 16) + "…" : dept.name;
+        ctx.fillText(label, pad.left, rowTop + rowH / 2);
 
         ctx.fillStyle = T.canvasDeep;
         roundRect(ctx, barX, barY, barMaxW, barThickness, barThickness / 2);
         ctx.fill();
 
-        const barW = (dept.value / maxVal) * barMaxW * progress;
+        const barColor = i === 0 ? T.brass : T.teal;
         const grad = ctx.createLinearGradient(barX, barY, barX + barW, barY);
-        const color = i === 0 ? T.brass : T.teal;
         grad.addColorStop(0, i === 0 ? T.brassLight : T.tealBright);
-        grad.addColorStop(1, color);
+        grad.addColorStop(1, barColor);
         ctx.fillStyle = grad;
-        if (isHover) {
-          ctx.shadowColor = "rgba(20,97,73,0.25)";
-          ctx.shadowBlur = 8;
-        }
         roundRect(
           ctx,
           barX,
@@ -564,76 +412,33 @@ const DepartmentChart = memo(function DepartmentChart({
           barThickness / 2,
         );
         ctx.fill();
-        ctx.shadowBlur = 0;
 
         ctx.fillStyle = T.ink;
-        ctx.font = `600 9px ${T.mono}`;
+        ctx.font = `700 11px ${T.mono}`;
         ctx.textAlign = "left";
-        ctx.textBaseline = "alphabetic";
-        ctx.fillText(dept.value, barX + barMaxW + 6, by - 1);
-
-        if (total > 0) {
-          const pct = Math.round((dept.value / total) * 100);
-          ctx.fillStyle = T.inkSoft;
-          ctx.font = `500 7px ${T.mono}`;
-          ctx.fillText(`${pct}%`, barX + barMaxW + 6, by + 8);
-        }
+        ctx.fillText(
+          Math.round(dept.value * eased),
+          barX + barMaxW + 10,
+          rowTop + rowH / 2,
+        );
       });
-    },
-    [departments, total, noDataLabel],
-  );
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || loading) return;
-    const rect = canvas.parentElement.getBoundingClientRect();
-    const width = rect.width || 350;
-    const height = rect.height || 180;
-    let start = null;
-    const duration = 650;
-    cancelAnimationFrame(rafRef.current);
-    const frame = (ts) => {
-      if (!start) start = ts;
-      const progress = Math.min((ts - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const ctx = prepCanvas(canvas, width, height);
-      draw(ctx, width, height, eased, null);
-      if (progress < 1) rafRef.current = requestAnimationFrame(frame);
+      if (progress < 1) raf = requestAnimationFrame(frame);
     };
-    rafRef.current = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [departments, loading, draw]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || loading || !geometryRef.current) return;
-    const rect = canvas.parentElement.getBoundingClientRect();
-    const width = rect.width || 350;
-    const height = rect.height || 180;
-    const ctx = prepCanvas(canvas, width, height);
-    draw(ctx, width, height, 1, hoverRow);
-  }, [hoverRow, draw, loading]);
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [departments, loading, noDataLabel]);
 
   return (
-    <div
-      className="op-canvas-box op-canvas-box-interactive"
-      onMouseMove={(e) => {
-        const geo = geometryRef.current;
-        if (!geo) return;
-        const rect = canvasRef.current.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-        const idx = Math.floor((y - geo.pad.top) / geo.rowH);
-        setHoverRow(idx >= 0 && idx < geo.count ? idx : null);
-      }}
-      onMouseLeave={() => setHoverRow(null)}
-    >
+    <div className="op-canvas-box">
       <canvas ref={canvasRef} />
     </div>
   );
 });
 
-// ─── Enhanced DistributionDonut ─────────────────────────────
-// ─── Enhanced DistributionDonut ─────────────────────────────
+// ════════════════════════════════════════════════════════════
+// DistributionDonut — rounded-cap ring segments + legend
+// ════════════════════════════════════════════════════════════
 const DistributionDonut = memo(function DistributionDonut({
   departments,
   total,
@@ -642,140 +447,49 @@ const DistributionDonut = memo(function DistributionDonut({
   noDataLabel,
 }) {
   const canvasRef = useRef(null);
-  const rafRef = useRef(null);
-  const sizeRef = useRef(0);
-  const [hoverIdx, setHoverIdx] = useState(null);
   const depts = departments.slice(0, 6);
-
-  const draw = useCallback(
-    (ctx, size, progress, hoverIndex) => {
-      ctx.clearRect(0, 0, size, size);
-
-      if (depts.length === 0 || total === 0) {
-        drawNoData(ctx, size, size, noDataLabel);
-        return;
-      }
-
-      const cx = size / 2;
-      const cy = size / 2;
-      const radius = size / 2 - 14;
-      const thickness = 14;
-      const gapRad = 0.04;
-      const totalSweep = 2 * Math.PI - gapRad * depts.length;
-
-      // ─── Shadow layer ──────────────────────────────────────────
-      let shadowRemaining = totalSweep * progress;
-      let shadowStart = -Math.PI / 2;
-
-      depts.forEach((dept) => {
-        const fullSlice = (dept.value / total) * totalSweep;
-        const slice = Math.max(0, Math.min(fullSlice, shadowRemaining));
-        if (slice > 0) {
-          const endAngle = shadowStart + slice;
-          ctx.save();
-          ctx.shadowColor = "rgba(14,36,28,0.06)";
-          ctx.shadowBlur = 10;
-          ctx.beginPath();
-          ctx.arc(cx, cy, radius + 1, shadowStart, endAngle);
-          ctx.strokeStyle = "rgba(14,36,28,0.03)";
-          ctx.lineWidth = thickness + 3;
-          ctx.lineCap = "round";
-          ctx.stroke();
-          ctx.restore();
-          shadowStart = endAngle + gapRad;
-        } else {
-          shadowStart += gapRad;
-        }
-        shadowRemaining -= slice;
-      });
-
-      // ─── Main segments ─────────────────────────────────────────
-      let mainRemaining = totalSweep * progress;
-      let mainStart = -Math.PI / 2;
-
-      depts.forEach((dept, i) => {
-        const fullSlice = (dept.value / total) * totalSweep;
-        const slice = Math.max(0, Math.min(fullSlice, mainRemaining));
-        if (slice > 0) {
-          const endAngle = mainStart + slice;
-          const isHover = hoverIndex === i;
-          const dim = hoverIndex != null && !isHover;
-          ctx.save();
-          ctx.globalAlpha = dim ? 0.4 : 1;
-          if (isHover) {
-            ctx.shadowColor = DONUT_COLORS[i % DONUT_COLORS.length];
-            ctx.shadowBlur = 14;
-          }
-          ctx.beginPath();
-          ctx.arc(cx, cy, radius, mainStart, endAngle);
-          ctx.strokeStyle = DONUT_COLORS[i % DONUT_COLORS.length];
-          ctx.lineWidth = isHover ? thickness + 5 : thickness;
-          ctx.lineCap = "round";
-          ctx.stroke();
-          ctx.restore();
-          mainStart = endAngle + gapRad;
-        } else {
-          mainStart += gapRad;
-        }
-        mainRemaining -= slice;
-      });
-
-      // ─── Center text ────────────────────────────────────────────
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      if (hoverIndex != null && depts[hoverIndex]) {
-        const d = depts[hoverIndex];
-        const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
-        const label = d.name.length > 12 ? d.name.slice(0, 12) + "…" : d.name;
-        ctx.fillStyle = T.ink;
-        ctx.font = `700 18px ${T.mono}`;
-        ctx.fillText(d.value, cx, cy - 10);
-        ctx.fillStyle = T.inkSoft;
-        ctx.font = `500 7px ${T.sans}`;
-        ctx.fillText(label, cx, cy + 7);
-        ctx.fillStyle = DONUT_COLORS[hoverIndex % DONUT_COLORS.length];
-        ctx.font = `600 8px ${T.mono}`;
-        ctx.fillText(`${pct}%`, cx, cy + 19);
-      } else {
-        ctx.fillStyle = T.ink;
-        ctx.font = `700 20px ${T.mono}`;
-        ctx.fillText(total, cx, cy - 5);
-        ctx.fillStyle = T.inkSoft;
-        ctx.font = `500 7px ${T.sans}`;
-        ctx.fillText(td("total", "TOTAL"), cx, cy + 14);
-      }
-    },
-    [depts, total, td, noDataLabel],
-  );
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || loading) return;
     const rect = canvas.parentElement.getBoundingClientRect();
-    const size = Math.min(rect.width || 180, rect.height || 180, 180);
-    sizeRef.current = size;
-    let start = null;
-    const duration = 750;
-    cancelAnimationFrame(rafRef.current);
-    const frame = (ts) => {
-      if (!start) start = ts;
-      const progress = Math.min((ts - start) / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3);
-      const ctx = prepCanvas(canvas, size, size);
-      draw(ctx, size, eased, null);
-      if (progress < 1) rafRef.current = requestAnimationFrame(frame);
-    };
-    rafRef.current = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [depts, total, loading, draw]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || loading || !sizeRef.current) return;
-    const size = sizeRef.current;
+    const size = Math.min(rect.width || 200, rect.height || 200, 210);
     const ctx = prepCanvas(canvas, size, size);
-    draw(ctx, size, 1, hoverIdx);
-  }, [hoverIdx, draw, loading]);
+
+    if (depts.length === 0 || total === 0) {
+      drawNoData(ctx, size, size, noDataLabel);
+      return;
+    }
+
+    const cx = size / 2;
+    const cy = size / 2;
+    const radius = size / 2 - 14;
+    const thickness = 16;
+    let startAngle = -Math.PI / 2;
+    const gapRad = 0.035;
+
+    depts.forEach((dept, i) => {
+      const sliceAngle =
+        (dept.value / total) * (2 * Math.PI - gapRad * depts.length);
+      const endAngle = startAngle + sliceAngle;
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, startAngle, endAngle);
+      ctx.strokeStyle = DONUT_COLORS[i % DONUT_COLORS.length];
+      ctx.lineWidth = thickness;
+      ctx.lineCap = "round";
+      ctx.stroke();
+      startAngle = endAngle + gapRad;
+    });
+
+    ctx.fillStyle = T.ink;
+    ctx.font = `700 22px ${T.mono}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(total, cx, cy - 8);
+    ctx.fillStyle = T.inkSoft;
+    ctx.font = `600 9px ${T.sans}`;
+    ctx.fillText(td("total", "TOTAL").toUpperCase(), cx, cy + 12);
+  }, [depts, total, loading, td, noDataLabel]);
 
   return (
     <>
@@ -783,27 +497,16 @@ const DistributionDonut = memo(function DistributionDonut({
         <canvas ref={canvasRef} />
       </div>
       <div className="op-legend">
-        {depts.map((d, i) => {
-          const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
-          return (
-            <div
-              key={d.name}
-              className={`op-legend-item${hoverIdx === i ? " op-legend-item-active" : ""}`}
-              onMouseEnter={() => setHoverIdx(i)}
-              onMouseLeave={() => setHoverIdx(null)}
-            >
-              <span
-                className="op-legend-dot"
-                style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }}
-              />
-              <span className="op-legend-name">{d.name}</span>
-              <span className="op-legend-stats">
-                <span className="op-legend-val">{d.value}</span>
-                <span className="op-legend-pct">{pct}%</span>
-              </span>
-            </div>
-          );
-        })}
+        {depts.map((d, i) => (
+          <div key={d.name} className="op-legend-item">
+            <span
+              className="op-legend-dot"
+              style={{ background: DONUT_COLORS[i % DONUT_COLORS.length] }}
+            />
+            <span className="op-legend-name">{d.name}</span>
+            <span className="op-legend-val">{d.value}</span>
+          </div>
+        ))}
         {depts.length === 0 && (
           <div className="op-legend-empty">{noDataLabel}</div>
         )}
@@ -812,7 +515,9 @@ const DistributionDonut = memo(function DistributionDonut({
   );
 });
 
-// ─── DashboardHeader ────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// DashboardHeader
+// ════════════════════════════════════════════════════════════
 const DashboardHeader = memo(function DashboardHeader({
   greeting,
   userName,
@@ -831,23 +536,62 @@ const DashboardHeader = memo(function DashboardHeader({
             {greeting}, <span className="op-name">{userName}</span>
           </div>
           <div className="op-role">
-            <span className="op-role-badge">{roleLabel}</span>
-            <span className="op-role-email">{userEmail}</span>
+            {roleLabel} · {userEmail}
           </div>
         </div>
       </div>
       <div className="op-ai-ticker">
         <AIDashboardWidget stats={aiStats} refreshInterval={120000} />
       </div>
-      <div className="op-date-badge">
-        <FiCalendar size={11} />
-        {yearBadge}
-      </div>
+      <div className="op-date-badge">{yearBadge}</div>
     </header>
   );
 });
 
-// ─── Main Dashboard ─────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// FooterStrip — criteria filmstrip + agenda chips
+// ════════════════════════════════════════════════════════════
+const FooterStrip = memo(function FooterStrip({ tc, td, agendas }) {
+  return (
+    <footer className="op-footer">
+      <div className="op-filmstrip">
+        <div className="op-filmstrip-title">
+          <FiTarget size={12} /> {td("criteriaOverview", "Criteria")}
+        </div>
+        <div className="op-filmstrip-track">
+          {CRITERIA.map((c) => (
+            <div
+              key={c.id}
+              className="op-film-card"
+              style={{ borderTopColor: c.color }}
+            >
+              <div className="op-film-pct" style={{ color: c.color }}>
+                {c.weight}%
+              </div>
+              <div className="op-film-name">{tc(c.key, c.key)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="op-agenda">
+        <div className="op-filmstrip-title">
+          <FiZap size={12} /> {td("forumAgendas", "Agendas")}
+        </div>
+        <div className="op-agenda-track">
+          {agendas.map((a, i) => (
+            <span key={i} className="op-agenda-chip">
+              <FiClock size={10} /> {a}
+            </span>
+          ))}
+        </div>
+      </div>
+    </footer>
+  );
+});
+
+// ════════════════════════════════════════════════════════════
+// Dashboard — composes the sections above, owns data fetching
+// ════════════════════════════════════════════════════════════
 export default function Dashboard({ t: tProp }) {
   const languageContext = useLanguage();
   const t = tProp || languageContext.t;
@@ -883,14 +627,18 @@ export default function Dashboard({ t: tProp }) {
     avgRating: 0,
   });
 
+  // ─── Load Dashboard Data ────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
+
     const loadDashboardData = async () => {
       try {
         setLoading(true);
         const response = await dailyReportAPI.getAll();
         const data = response.data || [];
 
+        // Fields live inside each report's entries[], not flat on the
+        // report — grandTotal is the day total when present.
         const getReportTotal = (r) => {
           const entries = Array.isArray(r.entries) ? r.entries : [];
           return typeof r.grandTotal === "number"
@@ -926,7 +674,7 @@ export default function Dashboard({ t: tProp }) {
           });
         });
 
-        let departments = Object.entries(deptMap)
+        const departments = Object.entries(deptMap)
           .map(([name, value]) => ({
             name,
             value,
@@ -935,15 +683,8 @@ export default function Dashboard({ t: tProp }) {
           }))
           .sort((a, b) => b.value - a.value);
 
-        if (departments.length === 0) {
-          departments = [
-            { name: "Customer Service", value: 45, male: 20, female: 25 },
-            { name: "Administration", value: 30, male: 15, female: 15 },
-            { name: "Finance", value: 25, male: 10, female: 15 },
-            { name: "IT Support", value: 20, male: 12, female: 8 },
-          ];
-        }
-
+        // Bucket by *local* date, not UTC, so "today" always matches
+        // the viewer's own calendar day regardless of timezone offset.
         const weeklyTrend = [];
         for (let i = 6; i >= 0; i--) {
           const d = new Date();
@@ -955,7 +696,7 @@ export default function Dashboard({ t: tProp }) {
           weeklyTrend.push({
             date: dateStr,
             label: d.toLocaleDateString("en-US", { weekday: "short" }),
-            value: dayTotal || Math.floor(Math.random() * 20) + 5,
+            value: dayTotal,
           });
         }
 
@@ -969,15 +710,15 @@ export default function Dashboard({ t: tProp }) {
             .reduce((sum, r) => sum + getReportTotal(r), 0);
           monthlyData.push({
             month: d.toLocaleDateString("en-US", { month: "short" }),
-            value: monthTotal || Math.floor(Math.random() * 50) + 10,
+            value: monthTotal,
           });
         }
 
         if (!cancelled) {
           setStats({
-            total: total || 638,
-            male: male || 300,
-            female: female || 338,
+            total,
+            male,
+            female,
             departments,
             weeklyTrend,
             monthlyData,
@@ -988,27 +729,14 @@ export default function Dashboard({ t: tProp }) {
           const gmResponse = await goldenMondayAPI.getStats();
           if (!cancelled && gmResponse.data) {
             setGoldenMondayStats({
-              totalSessions: gmResponse.data.totalSessions || 12,
-              totalPresenters: gmResponse.data.totalPresenters || 7,
-              totalAttendees: gmResponse.data.totalAttendees || 45,
-              avgRating: gmResponse.data.averageRating || 4.2,
-            });
-          } else {
-            setGoldenMondayStats({
-              totalSessions: 12,
-              totalPresenters: 7,
-              totalAttendees: 45,
-              avgRating: 4.2,
+              totalSessions: gmResponse.data.totalSessions || 0,
+              totalPresenters: gmResponse.data.totalPresenters || 0,
+              totalAttendees: gmResponse.data.totalAttendees || 0,
+              avgRating: gmResponse.data.averageRating || 0,
             });
           }
         } catch (gmError) {
           console.error("Failed to load Golden Monday stats:", gmError);
-          setGoldenMondayStats({
-            totalSessions: 12,
-            totalPresenters: 7,
-            totalAttendees: 45,
-            avgRating: 4.2,
-          });
         }
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
@@ -1103,84 +831,108 @@ export default function Dashboard({ t: tProp }) {
         yearBadge={t?.("year") || "2018 E.C."}
       />
 
+      {/* ── MAIN GRID ── */}
       <div className="op-grid">
         <QuickStatsRail
           stats={stats}
           goldenMondayStats={goldenMondayStats}
           malePct={malePct}
           td={td}
-          tc={tc}
-          agendas={agendas}
         />
 
+        {/* CENTER: charts */}
         <main className="op-center">
-          {/* 2-Column layout for charts */}
-          <div className="op-charts-row">
-            <section className="op-panel op-panel-trend">
-              <div className="op-panel-head">
-                <span>
-                  <FiTrendingUp size={13} /> {td("weeklyTrend", "Weekly Trend")}
-                </span>
-                <span className="op-panel-sub">
-                  {td("last7Days", "Last 7 days")}
-                </span>
-              </div>
-              <TrendChart
-                data={stats.weeklyTrend}
-                loading={loading}
-                noDataLabel={noDataLabel}
-              />
-            </section>
+          <section className="op-panel op-panel-trend">
+            <div className="op-panel-head">
+              <span>
+                <FiTrendingUp size={14} /> {td("weeklyTrend", "Weekly Trend")}
+              </span>
+              <span className="op-panel-sub">
+                {td("last7Days", "Last 7 days")}
+              </span>
+            </div>
+            <TrendChart
+              data={stats.weeklyTrend}
+              loading={loading}
+              noDataLabel={noDataLabel}
+            />
+          </section>
 
-            <section className="op-panel op-panel-donut-small">
-              <div className="op-panel-head">
-                <span>
-                  <FiPieChart size={13} /> {td("distribution", "Distribution")}
-                </span>
-              </div>
-              <DistributionDonut
-                departments={stats.departments}
-                total={stats.total}
-                loading={loading}
-                td={td}
-                noDataLabel={noDataLabel}
-              />
-            </section>
-          </div>
-
-          {/* Department Performance - Full width */}
           <section className="op-panel op-panel-dept">
             <div className="op-panel-head">
               <span>
-                <FiBarChart2 size={13} />{" "}
+                <FiBarChart2 size={14} />{" "}
                 {td("deptPerformance", "Department Performance")}
               </span>
               <span className="op-panel-sub">{td("byValue", "By value")}</span>
             </div>
             <DepartmentChart
               departments={stats.departments}
-              total={stats.total}
               loading={loading}
               noDataLabel={noDataLabel}
             />
           </section>
         </main>
+
+        {/* RIGHT: donut + tiles */}
+        <aside className="op-rail op-rail-right">
+          <section className="op-panel op-panel-donut">
+            <div className="op-panel-head">
+              <span>
+                <FiPieChart size={14} /> {td("distribution", "Distribution")}
+              </span>
+            </div>
+            <DistributionDonut
+              departments={stats.departments}
+              total={stats.total}
+              loading={loading}
+              td={td}
+              noDataLabel={noDataLabel}
+            />
+          </section>
+
+          <section className="op-tiles">
+            <div className="op-tile">
+              <FiUsers size={15} color={T.teal} />
+              <div className="op-tile-val">
+                {goldenMondayStats.totalSessions}
+              </div>
+              <div className="op-tile-label">
+                {td("goldenSessions", "Sessions")}
+              </div>
+            </div>
+            <div className="op-tile">
+              <FiAward size={15} color={T.brass} />
+              <div className="op-tile-val">{stats.departments.length}</div>
+              <div className="op-tile-label">
+                {td("totalDepts", "Departments")}
+              </div>
+            </div>
+          </section>
+        </aside>
       </div>
 
-      <style>{loadingStyles}</style>
+      <FooterStrip tc={tc} td={td} agendas={agendas} />
+
       <style>{shellStyles}</style>
     </div>
   );
 }
 
-// ── Styles ──────────────────────────────────────────────────
+// ════════════════════════════════════════════════════════════
+// STYLES
+// ════════════════════════════════════════════════════════════
 const loadingStyles = `
-  .op-loading { height: 100vh; display: flex; flex-direction: column; align-items: center;
+  .op-loading {
+    height: 100vh; display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 14px; background: ${T.canvas}; color: ${T.inkSoft};
-    font-family: ${T.sans}; }
-  .op-loading-ring { width: 34px; height: 34px; border-radius: 50%;
+    font-family: ${T.sans};
+  }
+  .op-loading-ring {
+    width: 34px; height: 34px; border-radius: 50%;
     border: 3px solid ${T.mist}; border-top-color: ${T.teal};
-    animation: op-spin 0.8s linear infinite; }
+    animation: op-spin 0.8s linear infinite;
+  }
   @keyframes op-spin { to { transform: rotate(360deg); } }
 `;
 
@@ -1190,213 +942,145 @@ const shellStyles = `
     background: ${T.canvas};
     color: ${T.ink};
     font-family: ${T.sans};
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    padding: 12px 16px 8px;
+    padding: 14px 18px 10px;
     gap: 10px;
+    overflow: hidden;
   }
 
   /* HEADER */
   .op-header {
-    display: flex; align-items: center; gap: 12px; flex-shrink: 0;
-    flex-wrap: wrap;
+    display: flex; align-items: center; gap: 16px; flex-shrink: 0;
   }
   .op-identity { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .op-avatar {
-    width: 36px; height: 36px; border-radius: 10px;
+    width: 40px; height: 40px; border-radius: 10px;
     background: linear-gradient(135deg, ${T.teal}, ${T.tealDeep});
     color: #fff; display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 12px; font-family: ${T.mono};
-    box-shadow: 0 3px 10px rgba(10,59,42,0.2);
+    font-weight: 800; font-size: 14px; font-family: ${T.mono};
+    box-shadow: 0 3px 10px rgba(10,59,42,0.25);
   }
-  .op-greeting { font-family: ${T.serif}; font-size: 13px; font-weight: 700; color: ${T.ink}; }
+  .op-greeting { font-family: ${T.serif}; font-size: 15px; font-weight: 700; color: ${T.ink}; }
   .op-name { color: ${T.teal}; }
-  .op-role { font-size: 9px; color: ${T.inkSoft}; margin-top: 1px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-  .op-role-badge { background: ${T.tealLight}; color: ${T.teal}; padding: 1px 6px; border-radius: 10px; }
-  .op-role-email { opacity: 0.6; }
-  .op-ai-ticker { flex: 1; min-width: 0; max-height: 36px; overflow: hidden; border-radius: 8px; }
+  .op-role { font-size: 10.5px; color: ${T.inkSoft}; margin-top: 1px; }
+  .op-ai-ticker { flex: 1; min-width: 0; max-height: 40px; overflow: hidden; border-radius: 10px; }
   .op-date-badge {
     flex-shrink: 0; background: ${T.tealDeep}; color: ${T.brassLight};
-    font-family: ${T.mono}; font-size: 9px; font-weight: 700;
-    padding: 4px 10px; border-radius: 16px; display: flex; align-items: center; gap: 4px;
+    font-family: ${T.mono}; font-size: 11px; font-weight: 700;
+    padding: 6px 14px; border-radius: 20px; letter-spacing: 0.5px;
   }
 
-  /* GRID - Desktop */
+  /* GRID */
   .op-grid {
     flex: 1; min-height: 0;
     display: grid;
-    grid-template-columns: 160px 1fr;
+    grid-template-columns: 190px 1fr 220px;
     gap: 10px;
-  }
-
-  /* LEFT RAIL */
-  .op-rail-left {
-    display: flex; flex-direction: column; gap: 6px;
-    background: ${T.panel}; border: 1px solid ${T.mist}; border-radius: 12px;
-    padding: 8px 10px;
-    overflow-y: auto;
-    max-height: 100%;
-  }
-  .op-rail-header { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-  .op-rail-title { font-size: 8px; font-weight: 800; letter-spacing: 0.5px; color: ${T.inkSoft}; }
-  .op-rail-gauges { display: flex; flex-direction: column; gap: 3px; }
-
-  .op-gauge {
-    display: flex; align-items: center; gap: 5px;
-    background: ${T.canvas}; border-radius: 6px; padding: 3px 5px;
-  }
-  .op-gauge-ring { position: relative; width: 34px; height: 34px; flex-shrink: 0; }
-  .op-gauge-ring svg { width: 34px; height: 34px; }
-  .op-gauge-icon-bg { position: absolute; inset: 6px; border-radius: 50%; }
-  .op-gauge-icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; }
-  .op-gauge-text { min-width: 0; }
-  .op-gauge-value { font-family: ${T.mono}; font-weight: 800; font-size: 12px; line-height: 1.1; }
-  .op-gauge-label { font-size: 7px; color: ${T.inkSoft}; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .op-gauge-sub { font-size: 6px; color: ${T.inkLight}; }
-
-  /* CRITERIA SECTION */
-  .op-criteria-section { margin-top: 4px; padding-top: 6px; border-top: 1px solid ${T.mist}; }
-  .op-criteria-header { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
-  .op-criteria-title { font-size: 7px; font-weight: 800; letter-spacing: 0.4px; color: ${T.inkSoft}; }
-  .op-criteria-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
-  .op-criteria-item {
-    display: flex; align-items: center; gap: 4px;
-    padding: 2px 4px; border-radius: 4px; border-left: 2px solid ${T.teal};
-    background: ${T.canvas};
-  }
-  .op-criteria-pct { font-family: ${T.mono}; font-weight: 800; font-size: 9px; }
-  .op-criteria-name { font-size: 6.5px; color: ${T.inkSoft}; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-  /* AGENDAS SECTION */
-  .op-agendas-section { margin-top: 4px; padding-top: 6px; border-top: 1px solid ${T.mist}; }
-  .op-agendas-list { display: flex; flex-direction: column; gap: 1px; max-height: 50px; overflow-y: auto; }
-  .op-agenda-mini {
-    display: flex; align-items: center; gap: 3px;
-    font-size: 6.5px; color: ${T.inkSoft}; padding: 1px 3px;
-    background: ${T.canvas}; border-radius: 3px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .op-agenda-mini svg { flex-shrink: 0; }
-
-  /* CENTER */
-  .op-center { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
-
-  .op-charts-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    flex: 1;
-    min-height: 0;
   }
 
   .op-panel {
     background: ${T.panel};
     border: 1px solid ${T.mist};
-    border-radius: 12px;
-    padding: 8px 10px 6px;
+    border-radius: 14px;
+    padding: 10px 14px 8px;
     display: flex; flex-direction: column;
     min-height: 0;
-    box-shadow: 0 1px 2px rgba(14,36,28,0.04);
-    transition: box-shadow 0.2s ease;
-  }
-  .op-panel:hover {
-    box-shadow: 0 1px 2px rgba(14,36,28,0.05), 0 8px 20px -12px rgba(14,36,28,0.15);
   }
   .op-panel-head {
     display: flex; align-items: center; justify-content: space-between;
-    font-size: 10px; font-weight: 700; color: ${T.ink};
-    margin-bottom: 3px; flex-shrink: 0;
+    font-size: 11.5px; font-weight: 700; color: ${T.ink};
+    margin-bottom: 4px; flex-shrink: 0;
   }
-  .op-panel-head svg { margin-right: 4px; vertical-align: -2px; color: ${T.teal}; }
-  .op-panel-sub { font-size: 7px; color: ${T.inkSoft}; font-weight: 500; }
-
-  .op-panel-trend { flex: 1; }
-  .op-panel-donut-small { flex: 1; }
-
+  .op-panel-head svg { margin-right: 5px; vertical-align: -2px; color: ${T.teal}; }
+  .op-panel-sub { font-size: 9.5px; color: ${T.inkSoft}; font-weight: 500; }
   .op-canvas-box { flex: 1; min-height: 0; position: relative; }
   .op-canvas-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .op-canvas-box-interactive canvas { cursor: crosshair; }
 
-  .op-panel-dept { flex: 0.8; min-height: 140px; }
+  /* LEFT RAIL — gauges */
+  .op-rail-left {
+    display: flex; flex-direction: column; gap: 6px;
+    background: ${T.panel}; border: 1px solid ${T.mist}; border-radius: 14px;
+    padding: 10px; overflow-y: auto;
+  }
+  .op-rail-title {
+    font-size: 9.5px; font-weight: 800; letter-spacing: 0.6px;
+    color: ${T.inkSoft}; margin-bottom: 2px; display: flex; align-items: center; gap: 5px;
+  }
+  .op-gauge {
+    display: flex; align-items: center; gap: 8px;
+    background: ${T.canvas}; border-radius: 10px; padding: 6px 8px;
+  }
+  .op-gauge-ring { position: relative; width: 44px; height: 44px; flex-shrink: 0; }
+  .op-gauge-ring svg { width: 44px; height: 44px; }
+  .op-gauge-icon {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .op-gauge-text { min-width: 0; }
+  .op-gauge-value { font-family: ${T.mono}; font-weight: 800; font-size: 15px; line-height: 1.1; }
+  .op-gauge-label { font-size: 9px; color: ${T.inkSoft}; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  /* DONUT LEGEND */
+  /* CENTER */
+  .op-center { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .op-panel-trend { flex: 1.05; }
+  .op-panel-dept { flex: 1; }
+
+  /* RIGHT RAIL */
+  .op-rail-right { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .op-panel-donut { flex: 1.3; align-items: center; }
   .op-donut-box { width: 100%; flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
   .op-donut-box canvas { max-width: 100%; max-height: 100%; }
+  .op-legend { width: 100%; display: flex; flex-direction: column; gap: 3px; margin-top: 4px; max-height: 84px; overflow-y: auto; }
+  .op-legend-item { display: flex; align-items: center; gap: 6px; font-size: 10px; }
+  .op-legend-dot { width: 7px; height: 7px; border-radius: 2px; flex-shrink: 0; }
+  .op-legend-name { flex: 1; color: ${T.inkSoft}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .op-legend-val { font-family: ${T.mono}; font-weight: 700; color: ${T.ink}; }
+  .op-legend-empty { font-size: 10px; color: ${T.inkSoft}; text-align: center; padding: 8px 0; }
 
-  .op-legend {
-    width: 100%;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1px 4px;
-    margin-top: 4px;
-    max-height: 48px;
-    overflow-y: auto;
+  .op-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-shrink: 0; }
+  .op-tile {
+    background: ${T.panel}; border: 1px solid ${T.mist}; border-radius: 12px;
+    padding: 10px; text-align: center;
   }
-  .op-legend::-webkit-scrollbar { width: 2px; }
-  .op-legend::-webkit-scrollbar-thumb { background: ${T.mist}; border-radius: 2px; }
-  .op-legend-item {
-    display: flex; align-items: center; gap: 3px; font-size: 7px;
-    padding: 1px 3px; border-radius: 3px; cursor: default;
-    transition: background 0.15s ease;
-  }
-  .op-legend-item:hover, .op-legend-item-active { background: rgba(20,97,73,0.06); }
-  .op-legend-dot { width: 5px; height: 5px; border-radius: 2px; flex-shrink: 0; }
-  .op-legend-name { flex: 1; min-width: 0; color: ${T.inkSoft}; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .op-legend-stats { display: flex; align-items: baseline; gap: 2px; flex-shrink: 0; }
-  .op-legend-val { font-family: ${T.mono}; font-weight: 800; color: ${T.ink}; font-size: 8px; }
-  .op-legend-pct { font-family: ${T.mono}; font-weight: 600; color: ${T.inkSoft}; font-size: 6px; }
-  .op-legend-empty { grid-column: 1 / -1; font-size: 8px; color: ${T.inkSoft}; text-align: center; padding: 2px 0; }
+  .op-tile-val { font-family: ${T.mono}; font-size: 18px; font-weight: 800; color: ${T.ink}; margin-top: 4px; }
+  .op-tile-label { font-size: 9px; color: ${T.inkSoft}; font-weight: 600; margin-top: 1px; }
 
-  /* ── RESPONSIVE ──────────────────────────────────────────── */
-  @media (max-width: 1024px) {
-    .op-grid { grid-template-columns: 140px 1fr; }
+  /* FOOTER */
+  .op-footer {
+    flex-shrink: 0; display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px;
+    background: ${T.panel}; border: 1px solid ${T.mist}; border-radius: 14px;
+    padding: 8px 12px; height: 74px;
+  }
+  .op-filmstrip, .op-agenda { display: flex; flex-direction: column; min-width: 0; }
+  .op-filmstrip-title {
+    font-size: 9px; font-weight: 800; letter-spacing: 0.5px; color: ${T.inkSoft};
+    display: flex; align-items: center; gap: 4px; margin-bottom: 4px;
+  }
+  .op-filmstrip-track { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+  .op-film-card {
+    flex-shrink: 0; width: 92px; background: ${T.canvas}; border-radius: 8px;
+    border-top: 3px solid ${T.teal}; padding: 5px 7px;
+  }
+  .op-film-pct { font-family: ${T.mono}; font-weight: 800; font-size: 13px; }
+  .op-film-name { font-size: 8.5px; color: ${T.inkSoft}; line-height: 1.2; margin-top: 1px; }
+  .op-agenda-track { display: flex; flex-wrap: wrap; gap: 4px; overflow-y: auto; align-content: flex-start; }
+  .op-agenda-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    background: ${T.canvas}; color: ${T.inkSoft}; font-size: 9.5px; font-weight: 500;
+    padding: 3px 8px; border-radius: 20px; white-space: nowrap;
   }
 
-  @media (max-width: 768px) {
-    .op-shell { padding: 8px 10px; gap: 6px; }
-    .op-grid { grid-template-columns: 1fr; gap: 6px; }
-    .op-rail-left { max-height: none; flex-direction: row; flex-wrap: wrap; padding: 6px 8px; }
-    .op-rail-header { width: 100%; }
-    .op-rail-gauges { flex-direction: row; flex-wrap: wrap; gap: 3px; }
-    .op-gauge { flex: 1 1 30%; min-width: 80px; }
-    .op-criteria-grid { grid-template-columns: 1fr 1fr; }
-    .op-agendas-list { max-height: 40px; }
-    
-    .op-charts-row { grid-template-columns: 1fr; gap: 6px; }
-    .op-center { gap: 6px; }
-    .op-panel { padding: 6px 8px 4px; }
-    .op-panel-head { font-size: 9px; }
-    .op-panel-sub { font-size: 6px; }
-    .op-panel-dept { min-height: 120px; }
-    
-    .op-header { flex-direction: column; align-items: stretch; gap: 6px; }
-    .op-identity { justify-content: center; }
+  /* RESPONSIVE — below this width the instrument-panel lock
+     gives way to a normal scrollable stack; a fixed-height grid
+     doesn't work on small screens. */
+  @media (max-width: 980px) {
+    .op-shell { height: auto; min-height: 100vh; overflow: visible; }
+    .op-grid { grid-template-columns: 1fr; }
+    .op-rail-left { flex-direction: row; flex-wrap: wrap; }
+    .op-gauge { flex: 1 1 45%; }
+    .op-footer { grid-template-columns: 1fr; height: auto; }
     .op-ai-ticker { display: none; }
-    .op-date-badge { align-self: center; font-size: 8px; padding: 3px 8px; }
-    .op-avatar { width: 32px; height: 32px; font-size: 11px; }
-    .op-greeting { font-size: 12px; }
-    
-    .op-legend { grid-template-columns: 1fr 1fr; max-height: 40px; }
-  }
-
-  @media (max-width: 480px) {
-    .op-shell { padding: 4px 6px; gap: 4px; }
-    .op-rail-left { padding: 4px 6px; }
-    .op-gauge { flex: 1 1 100%; }
-    .op-gauge-ring { width: 28px; height: 28px; }
-    .op-gauge-ring svg { width: 28px; height: 28px; }
-    .op-gauge-value { font-size: 10px; }
-    .op-gauge-label { font-size: 6px; }
-    .op-criteria-grid { grid-template-columns: 1fr; }
-    .op-criteria-item { padding: 1px 3px; }
-    .op-criteria-pct { font-size: 8px; }
-    .op-criteria-name { font-size: 6px; }
-    .op-panel { padding: 4px 6px 3px; }
-    .op-panel-head { font-size: 8px; }
-    .op-panel-dept { min-height: 100px; }
-    .op-legend { grid-template-columns: 1fr; max-height: 50px; }
-    .op-legend-item { font-size: 6px; }
-    .op-legend-val { font-size: 7px; }
   }
 `;
