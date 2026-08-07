@@ -7,6 +7,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../hooks/useLanguage";
 import { dailyReportAPI, goldenMondayAPI } from "../services/api";
 import { AIDashboardWidget } from "../components/ai";
+import { dashboardTranslations } from "../constants/dashboard";
 import {
   FiTrendingUp,
   FiBarChart2,
@@ -22,7 +23,14 @@ export default function Dashboard({ t: tProp }) {
   const languageContext = useLanguage();
   const t = tProp || languageContext.t;
 
-  const td = (key, fb = "") => t?.(`dashboard.${key}`) || fb;
+  // ✅ Use dashboard-specific translations
+  const td = (key, fb = "") => {
+    const lang = languageContext.lang || "en";
+    const dashboardT = dashboardTranslations[lang] || dashboardTranslations.en;
+    return dashboardT[key] || fb;
+  };
+
+  // Fallback to main translations for common strings
   const tc = (key, fb = "") => t?.(`criteria.${key}`) || fb;
   const tcm = (key, fb = "") => t?.(`common.${key}`) || fb;
 
@@ -320,7 +328,7 @@ export default function Dashboard({ t: tProp }) {
       ctx.fillText(total, centerX, centerY - 6);
       ctx.fillStyle = "#888";
       ctx.font = "9px sans-serif";
-      ctx.fillText("Total", centerX, centerY + 14);
+      ctx.fillText(td("total"), centerX, centerY + 14);
     };
 
     const drawTrendChart = () => {
