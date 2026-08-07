@@ -1,5 +1,4 @@
 // frontend/src/constants/translations/dashboard.js
-// Dashboard page translations
 
 export const dashboardTranslations = {
   en: {
@@ -23,6 +22,23 @@ export const dashboardTranslations = {
       roleAdmin: "Admin",
       roleSuperAdmin: "Super Admin",
       noData: "No data available",
+      // ✅ ADD THESE
+      total: "Total",
+      weeklyTrend: "Weekly Trend",
+      last7Days: "Last 7 days",
+      deptDistribution: "Department Distribution",
+      topDepts: "Top departments",
+      deptPerformance: "Department Performance",
+      byValue: "By value",
+      distribution: "Distribution",
+      byDept: "By department",
+      quickStats: "Quick Stats",
+      totalServices: "Total Services",
+      totalDepts: "Departments",
+      goldenSessions: "Golden Sessions",
+      presenters: "Presenters",
+      totalPresented: "Presentations",
+      avgRating: "Avg Rating",
     },
   },
   am: {
@@ -46,6 +62,23 @@ export const dashboardTranslations = {
       roleAdmin: "አድሚን",
       roleSuperAdmin: "ሱፐር አድሚን",
       noData: "ምንም መረጃ የለም",
+      // ✅ ADD THESE
+      total: "ጠቅላላ",
+      weeklyTrend: "ሳምንታዊ አዝማሚያ",
+      last7Days: "የመጨረሻ 7 ቀናት",
+      deptDistribution: "የዘርፎች ስርጭት",
+      topDepts: "ከፍተኛ ዘርፎች",
+      deptPerformance: "የዘርፍ አፈጻጸም",
+      byValue: "በዋጋ",
+      distribution: "ስርጭት",
+      byDept: "በዘርፍ",
+      quickStats: "ፈጣን ስታቲስቲክስ",
+      totalServices: "ጠቅላላ አገልግሎቶች",
+      totalDepts: "ዘርፎች",
+      goldenSessions: "የወርቃማ ሰኞ ክፍለ ጊዜዎች",
+      presenters: "አቅራቢዎች",
+      totalPresented: "የቀረቡ አቀራረቦች",
+      avgRating: "አማካይ ደረጃ",
     },
   },
   om: {
@@ -69,6 +102,23 @@ export const dashboardTranslations = {
       roleAdmin: "Admin",
       roleSuperAdmin: "Super Admin",
       noData: "Odeeffannoon hin jiru",
+      // ✅ ADD THESE
+      total: "Waliigala",
+      weeklyTrend: "Haalli Torbanii",
+      last7Days: "Guyyaa 7 darbe",
+      deptDistribution: "Qoodama Kutaa",
+      topDepts: "Kutaa Olaanaa",
+      deptPerformance: "Qabxii Kutaa",
+      byValue: "Gatii",
+      distribution: "Qoodama",
+      byDept: "Kutaan",
+      quickStats: "Isteetiksii Hatattamaa",
+      totalServices: "Tajaajiloota Waliigalaa",
+      totalDepts: "Kutaa",
+      goldenSessions: "Wiixata Warqee",
+      presenters: "Dhiheessitoota",
+      totalPresented: "Dhiheessaa",
+      avgRating: "Sadarkaa Giddugaleessaa",
     },
   },
 };

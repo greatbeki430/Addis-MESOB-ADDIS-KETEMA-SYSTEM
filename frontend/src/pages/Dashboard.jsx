@@ -194,6 +194,13 @@ export default function Dashboard({ t: tProp }) {
   useEffect(() => {
     if (loading || stats.departments.length === 0) return;
 
+    console.log("📊 Canvas refs:", {
+      barChart: !!canvasRefs.current.barChart,
+      pieChart: !!canvasRefs.current.pieChart,
+      trendChart: !!canvasRefs.current.trendChart,
+      deptChart: !!canvasRefs.current.deptChart,
+    });
+
     // ✅ Define all chart drawing functions inside the effect or use useCallback
     const drawBarChart = () => {
       const canvas = canvasRefs.current.barChart;
@@ -331,7 +338,7 @@ export default function Dashboard({ t: tProp }) {
       ctx.fillText(total, centerX, centerY - 6);
       ctx.fillStyle = "#888";
       ctx.font = "9px sans-serif";
-      ctx.fillText(td("total"), centerX, centerY + 14);
+      ctx.fillText("Total", centerX, centerY + 14);
     };
 
     const drawTrendChart = () => {
