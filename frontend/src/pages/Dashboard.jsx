@@ -10,11 +10,9 @@ import {
   FiTrendingUp,
   FiBarChart2,
   FiPieChart,
-  FiAward,
   FiClock,
   FiTarget,
   FiZap,
-  FiUsers,
   FiActivity,
   FiCalendar,
 } from "react-icons/fi";
@@ -40,9 +38,6 @@ const T = {
   white: "#FFFFFF",
   shadow: "rgba(14,36,28,0.08)",
   shadowDark: "rgba(14,36,28,0.16)",
-  gradientTeal: "linear-gradient(135deg, #146149 0%, #1E8A63 100%)",
-  gradientBrass: "linear-gradient(135deg, #C89B3C 0%, #E4C878 100%)",
-  gradientWarm: "linear-gradient(135deg, #B5542E 0%, #D4784E 100%)",
   serif: "'Noto Serif Ethiopic', Georgia, serif",
   sans: "'Noto Sans Ethiopic', -apple-system, sans-serif",
   mono: "'JetBrains Mono', 'Cascadia Code', 'Courier New', monospace",
@@ -99,7 +94,13 @@ function localDateKey(d) {
   return `${y}-${m}-${day}`;
 }
 
-// ─── Enhanced Gauge Component ──────────────────────────────
+function localMonthKey(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+}
+
+// ─── Gauge Component ────────────────────────────────────────
 const Gauge = memo(function Gauge({
   value,
   max,
@@ -110,33 +111,33 @@ const Gauge = memo(function Gauge({
   subtitle,
 }) {
   const pct = max > 0 ? Math.min(value / max, 1) : 0;
-  const r = 20;
+  const r = 18;
   const circumference = 2 * Math.PI * r;
   const offset = circumference * (1 - pct);
 
   return (
     <div className="op-gauge">
       <div className="op-gauge-ring">
-        <svg width="52" height="52" viewBox="0 0 52 52">
+        <svg width="44" height="44" viewBox="0 0 44 44">
           <circle
-            cx="26"
-            cy="26"
+            cx="22"
+            cy="22"
             r={r}
             fill="none"
             stroke={T.mist}
-            strokeWidth="4.5"
+            strokeWidth="4"
           />
           <circle
-            cx="26"
-            cy="26"
+            cx="22"
+            cy="22"
             r={r}
             fill="none"
             stroke={color}
-            strokeWidth="4.5"
+            strokeWidth="4"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
             strokeLinecap="round"
-            transform="rotate(-90 26 26)"
+            transform="rotate(-90 22 22)"
             style={{
               transition: "stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)",
             }}
@@ -161,12 +162,14 @@ const Gauge = memo(function Gauge({
   );
 });
 
-// ─── Enhanced QuickStatsRail ────────────────────────────────
+// ─── QuickStatsRail with Criteria ──────────────────────────
 const QuickStatsRail = memo(function QuickStatsRail({
   stats,
   goldenMondayStats,
   malePct,
   td,
+  tc,
+  agendas,
 }) {
   return (
     <aside className="op-rail op-rail-left">
@@ -215,11 +218,53 @@ const QuickStatsRail = memo(function QuickStatsRail({
           mono={(goldenMondayStats.avgRating || 0).toFixed(1)}
         />
       </div>
+
+      {/* ─── CRITERIA OVERVIEW ────────────────────────────── */}
+      <div className="op-criteria-section">
+        <div className="op-criteria-header">
+          <FiTarget size={12} color={T.teal} />
+          <span className="op-criteria-title">
+            {td("criteriaOverview", "CRITERIA")}
+          </span>
+        </div>
+        <div className="op-criteria-grid">
+          {CRITERIA.slice(0, 5).map((c) => (
+            <div
+              key={c.id}
+              className="op-criteria-item"
+              style={{ borderLeftColor: c.color }}
+            >
+              <div className="op-criteria-pct" style={{ color: c.color }}>
+                {c.weight}%
+              </div>
+              <div className="op-criteria-name">{tc(c.key, c.key)}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── AGENDAS ────────────────────────────────────────── */}
+      <div className="op-agendas-section">
+        <div className="op-criteria-header">
+          <FiZap size={12} color={T.brass} />
+          <span className="op-criteria-title">
+            {td("forumAgendas", "AGENDAS")}
+          </span>
+        </div>
+        <div className="op-agendas-list">
+          {agendas.slice(0, 5).map((a, i) => (
+            <span key={i} className="op-agenda-mini">
+              <FiClock size={8} />
+              {a.length > 30 ? a.slice(0, 30) + "…" : a}
+            </span>
+          ))}
+        </div>
+      </div>
     </aside>
   );
 });
 
-// ─── Enhanced TrendChart ────────────────────────────────────
+// ─── TrendChart ─────────────────────────────────────────────
 const TrendChart = memo(function TrendChart({ data, loading, noDataLabel }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
@@ -235,7 +280,7 @@ const TrendChart = memo(function TrendChart({ data, loading, noDataLabel }) {
         return;
       }
 
-      const pad = { top: 24, bottom: 26, left: 8, right: 8 };
+      const pad = { top: 20, bottom: 20, left: 6, right: 6 };
       const chartW = width - pad.left - pad.right;
       const chartH = height - pad.top - pad.bottom;
       const maxVal = Math.max(...data.map((d) => d.value), 1);
@@ -247,25 +292,24 @@ const TrendChart = memo(function TrendChart({ data, loading, noDataLabel }) {
       geometryRef.current = { pts, pad, width, height };
 
       // Grid lines
-      ctx.strokeStyle = "rgba(14,36,28,0.06)";
+      ctx.strokeStyle = "rgba(14,36,28,0.05)";
       ctx.lineWidth = 1;
-      for (let g = 0; g <= 4; g++) {
-        const gy = pad.top + (chartH / 4) * g;
+      for (let g = 0; g <= 3; g++) {
+        const gy = pad.top + (chartH / 3) * g;
         ctx.beginPath();
         ctx.moveTo(pad.left, gy);
         ctx.lineTo(width - pad.right, gy);
         ctx.stroke();
       }
 
-      // Area fill with gradient
       const gradient = ctx.createLinearGradient(
         0,
         pad.top,
         0,
         height - pad.bottom,
       );
-      gradient.addColorStop(0, "rgba(20,97,73,0.35)");
-      gradient.addColorStop(0.5, "rgba(20,97,73,0.12)");
+      gradient.addColorStop(0, "rgba(20,97,73,0.3)");
+      gradient.addColorStop(0.5, "rgba(20,97,73,0.1)");
       gradient.addColorStop(1, "rgba(20,97,73,0)");
 
       const revealX = pad.left + chartW * progress;
@@ -293,7 +337,6 @@ const TrendChart = memo(function TrendChart({ data, loading, noDataLabel }) {
       ctx.fillStyle = gradient;
       ctx.fill();
 
-      // Line
       ctx.beginPath();
       ctx.moveTo(pts[0].x, pts[0].y);
       for (let i = 0; i < pts.length - 1; i++) {
@@ -308,24 +351,22 @@ const TrendChart = memo(function TrendChart({ data, loading, noDataLabel }) {
         ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
       }
       ctx.strokeStyle = T.teal;
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2.5;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
-      ctx.shadowColor = "rgba(20,97,73,0.3)";
-      ctx.shadowBlur = 8;
+      ctx.shadowColor = "rgba(20,97,73,0.25)";
+      ctx.shadowBlur = 6;
       ctx.stroke();
       ctx.shadowBlur = 0;
       ctx.restore();
 
-      // Points
       const isHover = hoverIdx !== null && hoverIdx < pts.length;
       pts.forEach((p, i) => {
         if (p.x > revealX + 0.5) return;
         const isPeak = data[i].value === maxVal && maxVal > 0;
         const hover = isHover && hoverIdx === i;
-        const radius = hover ? 7 : isPeak ? 5 : 3.5;
+        const radius = hover ? 6 : isPeak ? 4 : 3;
 
-        // Glow
         if (isPeak || hover) {
           const glow = ctx.createRadialGradient(
             p.x,
@@ -333,16 +374,16 @@ const TrendChart = memo(function TrendChart({ data, loading, noDataLabel }) {
             0,
             p.x,
             p.y,
-            radius + 10,
+            radius + 8,
           );
           glow.addColorStop(
             0,
-            hover ? "rgba(20,97,73,0.2)" : "rgba(200,155,60,0.15)",
+            hover ? "rgba(20,97,73,0.2)" : "rgba(200,155,60,0.12)",
           );
           glow.addColorStop(1, "rgba(20,97,73,0)");
           ctx.fillStyle = glow;
           ctx.beginPath();
-          ctx.arc(p.x, p.y, radius + 10, 0, 2 * Math.PI);
+          ctx.arc(p.x, p.y, radius + 8, 0, 2 * Math.PI);
           ctx.fill();
         }
 
@@ -351,21 +392,20 @@ const TrendChart = memo(function TrendChart({ data, loading, noDataLabel }) {
         ctx.fillStyle = hover ? T.tealDeep : isPeak ? T.brass : T.teal;
         ctx.fill();
         ctx.strokeStyle = T.white;
-        ctx.lineWidth = 2;
+        ctx.lineWidth = 1.5;
         ctx.stroke();
 
-        // Labels
         ctx.fillStyle = T.inkSoft;
-        ctx.font = `600 8px ${T.mono}`;
+        ctx.font = `500 7px ${T.mono}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        ctx.fillText(data[i].label.toUpperCase(), p.x, height - 20);
+        ctx.fillText(data[i].label, p.x, height - 18);
 
         if (data[i].value > 0 && (isPeak || hover)) {
           ctx.fillStyle = hover ? T.tealDeep : T.brass;
-          ctx.font = `700 9px ${T.mono}`;
+          ctx.font = `600 8px ${T.mono}`;
           ctx.textBaseline = "bottom";
-          ctx.fillText(data[i].value, p.x, p.y - radius - 4);
+          ctx.fillText(data[i].value, p.x, p.y - radius - 3);
         }
       });
     },
@@ -376,10 +416,10 @@ const TrendChart = memo(function TrendChart({ data, loading, noDataLabel }) {
     const canvas = canvasRef.current;
     if (!canvas || loading) return;
     const rect = canvas.parentElement.getBoundingClientRect();
-    const width = rect.width || 400;
-    const height = rect.height || 200;
+    const width = rect.width || 350;
+    const height = rect.height || 150;
     let start = null;
-    const duration = 800;
+    const duration = 700;
     cancelAnimationFrame(rafRef.current);
     const frame = (ts) => {
       if (!start) start = ts;
@@ -418,7 +458,7 @@ const TrendChart = memo(function TrendChart({ data, loading, noDataLabel }) {
             nearest = i;
           }
         });
-        setHoverIndex(minDist < 30 ? nearest : null);
+        setHoverIndex(minDist < 25 ? nearest : null);
       }}
       onMouseLeave={() => setHoverIndex(null)}
     >
@@ -449,12 +489,12 @@ const DepartmentChart = memo(function DepartmentChart({
       }
 
       const maxVal = Math.max(...depts.map((d) => d.value), 1);
-      const pad = { top: 4, bottom: 4, left: 4, right: 50 };
-      const badgeSize = 18;
-      const labelW = 100;
-      const barMaxW = width - pad.left - pad.right - labelW - 50;
-      const rowH = Math.min((height - pad.top - pad.bottom) / depts.length, 40);
-      const barThickness = Math.max(rowH - 10, 6);
+      const pad = { top: 4, bottom: 4, left: 4, right: 44 };
+      const badgeSize = 16;
+      const labelW = 80;
+      const barMaxW = width - pad.left - pad.right - labelW - 44;
+      const rowH = Math.min((height - pad.top - pad.bottom) / depts.length, 34);
+      const barThickness = Math.max(rowH - 8, 5);
       geometryRef.current = { rowH, pad, count: depts.length };
 
       const rankColors = [
@@ -476,11 +516,10 @@ const DepartmentChart = memo(function DepartmentChart({
 
         if (isHover) {
           ctx.fillStyle = "rgba(20,97,73,0.06)";
-          roundRect(ctx, 0, rowTop + 2, width, rowH - 4, 10);
+          roundRect(ctx, 0, rowTop + 1, width, rowH - 2, 8);
           ctx.fill();
         }
 
-        // Rank badge
         const bx = pad.left + badgeSize / 2;
         const by = rowTop + rowH / 2;
         const badgeColor = rankColors[i % rankColors.length];
@@ -489,26 +528,23 @@ const DepartmentChart = memo(function DepartmentChart({
         ctx.fillStyle = badgeColor;
         ctx.fill();
         ctx.fillStyle = i < 3 ? "#fff" : T.white;
-        ctx.font = `700 8px ${T.mono}`;
+        ctx.font = `700 7px ${T.mono}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(i + 1, bx, by + 0.5);
 
-        // Label
         ctx.fillStyle = isHover ? T.ink : T.inkSoft;
-        ctx.font = `${isHover ? 700 : 600} 10px ${T.sans}`;
+        ctx.font = `${isHover ? 700 : 600} 9px ${T.sans}`;
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         const label =
-          dept.name.length > 14 ? dept.name.slice(0, 14) + "…" : dept.name;
-        ctx.fillText(label, pad.left + badgeSize + 8, by);
+          dept.name.length > 12 ? dept.name.slice(0, 12) + "…" : dept.name;
+        ctx.fillText(label, pad.left + badgeSize + 6, by);
 
-        // Bar background
         ctx.fillStyle = T.canvasDeep;
         roundRect(ctx, barX, barY, barMaxW, barThickness, barThickness / 2);
         ctx.fill();
 
-        // Bar with gradient
         const barW = (dept.value / maxVal) * barMaxW * progress;
         const grad = ctx.createLinearGradient(barX, barY, barX + barW, barY);
         const color = i === 0 ? T.brass : T.teal;
@@ -516,8 +552,8 @@ const DepartmentChart = memo(function DepartmentChart({
         grad.addColorStop(1, color);
         ctx.fillStyle = grad;
         if (isHover) {
-          ctx.shadowColor = "rgba(20,97,73,0.3)";
-          ctx.shadowBlur = 10;
+          ctx.shadowColor = "rgba(20,97,73,0.25)";
+          ctx.shadowBlur = 8;
         }
         roundRect(
           ctx,
@@ -530,18 +566,17 @@ const DepartmentChart = memo(function DepartmentChart({
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // Value
         ctx.fillStyle = T.ink;
-        ctx.font = `700 11px ${T.mono}`;
+        ctx.font = `600 9px ${T.mono}`;
         ctx.textAlign = "left";
         ctx.textBaseline = "alphabetic";
-        ctx.fillText(dept.value, barX + barMaxW + 10, by - 2);
+        ctx.fillText(dept.value, barX + barMaxW + 6, by - 1);
 
         if (total > 0) {
           const pct = Math.round((dept.value / total) * 100);
           ctx.fillStyle = T.inkSoft;
-          ctx.font = `600 8px ${T.mono}`;
-          ctx.fillText(`${pct}%`, barX + barMaxW + 10, by + 10);
+          ctx.font = `500 7px ${T.mono}`;
+          ctx.fillText(`${pct}%`, barX + barMaxW + 6, by + 8);
         }
       });
     },
@@ -552,10 +587,10 @@ const DepartmentChart = memo(function DepartmentChart({
     const canvas = canvasRef.current;
     if (!canvas || loading) return;
     const rect = canvas.parentElement.getBoundingClientRect();
-    const width = rect.width || 400;
-    const height = rect.height || 200;
+    const width = rect.width || 350;
+    const height = rect.height || 180;
     let start = null;
-    const duration = 700;
+    const duration = 650;
     cancelAnimationFrame(rafRef.current);
     const frame = (ts) => {
       if (!start) start = ts;
@@ -573,8 +608,8 @@ const DepartmentChart = memo(function DepartmentChart({
     const canvas = canvasRef.current;
     if (!canvas || loading || !geometryRef.current) return;
     const rect = canvas.parentElement.getBoundingClientRect();
-    const width = rect.width || 400;
-    const height = rect.height || 200;
+    const width = rect.width || 350;
+    const height = rect.height || 180;
     const ctx = prepCanvas(canvas, width, height);
     draw(ctx, width, height, 1, hoverRow);
   }, [hoverRow, draw, loading]);
@@ -597,6 +632,7 @@ const DepartmentChart = memo(function DepartmentChart({
   );
 });
 
+// ─── Enhanced DistributionDonut ─────────────────────────────
 // ─── Enhanced DistributionDonut ─────────────────────────────
 const DistributionDonut = memo(function DistributionDonut({
   departments,
@@ -622,39 +658,41 @@ const DistributionDonut = memo(function DistributionDonut({
 
       const cx = size / 2;
       const cy = size / 2;
-      const radius = size / 2 - 16;
-      const thickness = 16;
+      const radius = size / 2 - 14;
+      const thickness = 14;
       const gapRad = 0.04;
       const totalSweep = 2 * Math.PI - gapRad * depts.length;
-      let remaining = totalSweep * progress;
-      let startAngle = -Math.PI / 2;
 
-      // Shadow layer
+      // ─── Shadow layer ──────────────────────────────────────────
+      let shadowRemaining = totalSweep * progress;
+      let shadowStart = -Math.PI / 2;
+
       depts.forEach((dept) => {
         const fullSlice = (dept.value / total) * totalSweep;
-        const slice = Math.max(0, Math.min(fullSlice, remaining));
+        const slice = Math.max(0, Math.min(fullSlice, shadowRemaining));
         if (slice > 0) {
-          const endAngle = startAngle + slice;
+          const endAngle = shadowStart + slice;
           ctx.save();
-          ctx.shadowColor = "rgba(14,36,28,0.08)";
-          ctx.shadowBlur = 12;
+          ctx.shadowColor = "rgba(14,36,28,0.06)";
+          ctx.shadowBlur = 10;
           ctx.beginPath();
-          ctx.arc(cx, cy, radius + 2, startAngle, endAngle);
-          ctx.strokeStyle = "rgba(14,36,28,0.04)";
-          ctx.lineWidth = thickness + 4;
+          ctx.arc(cx, cy, radius + 1, shadowStart, endAngle);
+          ctx.strokeStyle = "rgba(14,36,28,0.03)";
+          ctx.lineWidth = thickness + 3;
           ctx.lineCap = "round";
           ctx.stroke();
           ctx.restore();
-          startAngle = endAngle + gapRad;
+          shadowStart = endAngle + gapRad;
         } else {
-          startAngle += gapRad;
+          shadowStart += gapRad;
         }
-        remaining -= slice;
+        shadowRemaining -= slice;
       });
 
-      // Main segments
-      let mainStart = -Math.PI / 2;
+      // ─── Main segments ─────────────────────────────────────────
       let mainRemaining = totalSweep * progress;
+      let mainStart = -Math.PI / 2;
+
       depts.forEach((dept, i) => {
         const fullSlice = (dept.value / total) * totalSweep;
         const slice = Math.max(0, Math.min(fullSlice, mainRemaining));
@@ -666,12 +704,12 @@ const DistributionDonut = memo(function DistributionDonut({
           ctx.globalAlpha = dim ? 0.4 : 1;
           if (isHover) {
             ctx.shadowColor = DONUT_COLORS[i % DONUT_COLORS.length];
-            ctx.shadowBlur = 16;
+            ctx.shadowBlur = 14;
           }
           ctx.beginPath();
           ctx.arc(cx, cy, radius, mainStart, endAngle);
           ctx.strokeStyle = DONUT_COLORS[i % DONUT_COLORS.length];
-          ctx.lineWidth = isHover ? thickness + 6 : thickness;
+          ctx.lineWidth = isHover ? thickness + 5 : thickness;
           ctx.lineCap = "round";
           ctx.stroke();
           ctx.restore();
@@ -682,29 +720,29 @@ const DistributionDonut = memo(function DistributionDonut({
         mainRemaining -= slice;
       });
 
-      // Center text
+      // ─── Center text ────────────────────────────────────────────
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       if (hoverIndex != null && depts[hoverIndex]) {
         const d = depts[hoverIndex];
         const pct = total > 0 ? Math.round((d.value / total) * 100) : 0;
-        const label = d.name.length > 14 ? d.name.slice(0, 14) + "…" : d.name;
+        const label = d.name.length > 12 ? d.name.slice(0, 12) + "…" : d.name;
         ctx.fillStyle = T.ink;
-        ctx.font = `700 20px ${T.mono}`;
-        ctx.fillText(d.value, cx, cy - 12);
+        ctx.font = `700 18px ${T.mono}`;
+        ctx.fillText(d.value, cx, cy - 10);
         ctx.fillStyle = T.inkSoft;
-        ctx.font = `600 8.5px ${T.sans}`;
-        ctx.fillText(label, cx, cy + 8);
+        ctx.font = `500 7px ${T.sans}`;
+        ctx.fillText(label, cx, cy + 7);
         ctx.fillStyle = DONUT_COLORS[hoverIndex % DONUT_COLORS.length];
-        ctx.font = `700 9px ${T.mono}`;
-        ctx.fillText(`${pct}%`, cx, cy + 22);
+        ctx.font = `600 8px ${T.mono}`;
+        ctx.fillText(`${pct}%`, cx, cy + 19);
       } else {
         ctx.fillStyle = T.ink;
-        ctx.font = `700 22px ${T.mono}`;
-        ctx.fillText(total, cx, cy - 6);
+        ctx.font = `700 20px ${T.mono}`;
+        ctx.fillText(total, cx, cy - 5);
         ctx.fillStyle = T.inkSoft;
-        ctx.font = `600 9px ${T.sans}`;
-        ctx.fillText(td("total", "TOTAL").toUpperCase(), cx, cy + 16);
+        ctx.font = `500 7px ${T.sans}`;
+        ctx.fillText(td("total", "TOTAL"), cx, cy + 14);
       }
     },
     [depts, total, td, noDataLabel],
@@ -714,10 +752,10 @@ const DistributionDonut = memo(function DistributionDonut({
     const canvas = canvasRef.current;
     if (!canvas || loading) return;
     const rect = canvas.parentElement.getBoundingClientRect();
-    const size = Math.min(rect.width || 200, rect.height || 200, 200);
+    const size = Math.min(rect.width || 180, rect.height || 180, 180);
     sizeRef.current = size;
     let start = null;
-    const duration = 800;
+    const duration = 750;
     cancelAnimationFrame(rafRef.current);
     const frame = (ts) => {
       if (!start) start = ts;
@@ -809,45 +847,6 @@ const DashboardHeader = memo(function DashboardHeader({
   );
 });
 
-// ─── FooterStrip ────────────────────────────────────────────
-const FooterStrip = memo(function FooterStrip({ tc, td, agendas }) {
-  return (
-    <footer className="op-footer">
-      <div className="op-filmstrip">
-        <div className="op-filmstrip-title">
-          <FiTarget size={12} /> {td("criteriaOverview", "Criteria")}
-        </div>
-        <div className="op-filmstrip-track">
-          {CRITERIA.map((c) => (
-            <div
-              key={c.id}
-              className="op-film-card"
-              style={{ borderTopColor: c.color }}
-            >
-              <div className="op-film-pct" style={{ color: c.color }}>
-                {c.weight}%
-              </div>
-              <div className="op-film-name">{tc(c.key, c.key)}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="op-agenda">
-        <div className="op-filmstrip-title">
-          <FiZap size={12} /> {td("forumAgendas", "Agendas")}
-        </div>
-        <div className="op-agenda-track">
-          {agendas.map((a, i) => (
-            <span key={i} className="op-agenda-chip">
-              <FiClock size={10} /> {a}
-            </span>
-          ))}
-        </div>
-      </div>
-    </footer>
-  );
-});
-
 // ─── Main Dashboard ─────────────────────────────────────────
 export default function Dashboard({ t: tProp }) {
   const languageContext = useLanguage();
@@ -936,15 +935,13 @@ export default function Dashboard({ t: tProp }) {
           }))
           .sort((a, b) => b.value - a.value);
 
-        // Mock data if no departments exist
         if (departments.length === 0) {
-          const mockData = [
+          departments = [
             { name: "Customer Service", value: 45, male: 20, female: 25 },
             { name: "Administration", value: 30, male: 15, female: 15 },
             { name: "Finance", value: 25, male: 10, female: 15 },
             { name: "IT Support", value: 20, male: 12, female: 8 },
           ];
-          departments = mockData;
         }
 
         const weeklyTrend = [];
@@ -1112,29 +1109,50 @@ export default function Dashboard({ t: tProp }) {
           goldenMondayStats={goldenMondayStats}
           malePct={malePct}
           td={td}
+          tc={tc}
+          agendas={agendas}
         />
 
         <main className="op-center">
-          <section className="op-panel op-panel-trend">
-            <div className="op-panel-head">
-              <span>
-                <FiTrendingUp size={14} /> {td("weeklyTrend", "Weekly Trend")}
-              </span>
-              <span className="op-panel-sub">
-                {td("last7Days", "Last 7 days")}
-              </span>
-            </div>
-            <TrendChart
-              data={stats.weeklyTrend}
-              loading={loading}
-              noDataLabel={noDataLabel}
-            />
-          </section>
+          {/* 2-Column layout for charts */}
+          <div className="op-charts-row">
+            <section className="op-panel op-panel-trend">
+              <div className="op-panel-head">
+                <span>
+                  <FiTrendingUp size={13} /> {td("weeklyTrend", "Weekly Trend")}
+                </span>
+                <span className="op-panel-sub">
+                  {td("last7Days", "Last 7 days")}
+                </span>
+              </div>
+              <TrendChart
+                data={stats.weeklyTrend}
+                loading={loading}
+                noDataLabel={noDataLabel}
+              />
+            </section>
 
+            <section className="op-panel op-panel-donut-small">
+              <div className="op-panel-head">
+                <span>
+                  <FiPieChart size={13} /> {td("distribution", "Distribution")}
+                </span>
+              </div>
+              <DistributionDonut
+                departments={stats.departments}
+                total={stats.total}
+                loading={loading}
+                td={td}
+                noDataLabel={noDataLabel}
+              />
+            </section>
+          </div>
+
+          {/* Department Performance - Full width */}
           <section className="op-panel op-panel-dept">
             <div className="op-panel-head">
               <span>
-                <FiBarChart2 size={14} />{" "}
+                <FiBarChart2 size={13} />{" "}
                 {td("deptPerformance", "Department Performance")}
               </span>
               <span className="op-panel-sub">{td("byValue", "By value")}</span>
@@ -1147,46 +1165,9 @@ export default function Dashboard({ t: tProp }) {
             />
           </section>
         </main>
-
-        <aside className="op-rail op-rail-right">
-          <section className="op-panel op-panel-donut">
-            <div className="op-panel-head">
-              <span>
-                <FiPieChart size={14} /> {td("distribution", "Distribution")}
-              </span>
-            </div>
-            <DistributionDonut
-              departments={stats.departments}
-              total={stats.total}
-              loading={loading}
-              td={td}
-              noDataLabel={noDataLabel}
-            />
-          </section>
-
-          <section className="op-tiles">
-            <div className="op-tile">
-              <FiUsers size={15} color={T.teal} />
-              <div className="op-tile-val">
-                {goldenMondayStats.totalSessions}
-              </div>
-              <div className="op-tile-label">
-                {td("goldenSessions", "Sessions")}
-              </div>
-            </div>
-            <div className="op-tile">
-              <FiAward size={15} color={T.brass} />
-              <div className="op-tile-val">{stats.departments.length}</div>
-              <div className="op-tile-label">
-                {td("totalDepts", "Departments")}
-              </div>
-            </div>
-          </section>
-        </aside>
       </div>
 
-      <FooterStrip tc={tc} td={td} agendas={agendas} />
-
+      <style>{loadingStyles}</style>
       <style>{shellStyles}</style>
     </div>
   );
@@ -1212,7 +1193,7 @@ const shellStyles = `
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    padding: 14px 18px 10px;
+    padding: 12px 16px 8px;
     gap: 10px;
   }
 
@@ -1223,97 +1204,123 @@ const shellStyles = `
   }
   .op-identity { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
   .op-avatar {
-    width: 38px; height: 38px; border-radius: 10px;
+    width: 36px; height: 36px; border-radius: 10px;
     background: linear-gradient(135deg, ${T.teal}, ${T.tealDeep});
     color: #fff; display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 13px; font-family: ${T.mono};
-    box-shadow: 0 3px 10px rgba(10,59,42,0.25);
+    font-weight: 800; font-size: 12px; font-family: ${T.mono};
+    box-shadow: 0 3px 10px rgba(10,59,42,0.2);
   }
-  .op-greeting { font-family: ${T.serif}; font-size: 14px; font-weight: 700; color: ${T.ink}; }
+  .op-greeting { font-family: ${T.serif}; font-size: 13px; font-weight: 700; color: ${T.ink}; }
   .op-name { color: ${T.teal}; }
-  .op-role { font-size: 10px; color: ${T.inkSoft}; margin-top: 1px; }
-  .op-role-badge { background: ${T.tealLight}; color: ${T.teal}; padding: 1px 8px; border-radius: 12px; margin-right: 6px; }
-  .op-role-email { opacity: 0.7; }
-  .op-ai-ticker { flex: 1; min-width: 0; max-height: 40px; overflow: hidden; border-radius: 10px; }
+  .op-role { font-size: 9px; color: ${T.inkSoft}; margin-top: 1px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+  .op-role-badge { background: ${T.tealLight}; color: ${T.teal}; padding: 1px 6px; border-radius: 10px; }
+  .op-role-email { opacity: 0.6; }
+  .op-ai-ticker { flex: 1; min-width: 0; max-height: 36px; overflow: hidden; border-radius: 8px; }
   .op-date-badge {
     flex-shrink: 0; background: ${T.tealDeep}; color: ${T.brassLight};
-    font-family: ${T.mono}; font-size: 10px; font-weight: 700;
-    padding: 5px 12px; border-radius: 20px; display: flex; align-items: center; gap: 4px;
+    font-family: ${T.mono}; font-size: 9px; font-weight: 700;
+    padding: 4px 10px; border-radius: 16px; display: flex; align-items: center; gap: 4px;
   }
 
   /* GRID - Desktop */
   .op-grid {
     flex: 1; min-height: 0;
     display: grid;
-    grid-template-columns: 180px 1fr 200px;
+    grid-template-columns: 160px 1fr;
     gap: 10px;
   }
 
-  /* PANELS */
+  /* LEFT RAIL */
+  .op-rail-left {
+    display: flex; flex-direction: column; gap: 6px;
+    background: ${T.panel}; border: 1px solid ${T.mist}; border-radius: 12px;
+    padding: 8px 10px;
+    overflow-y: auto;
+    max-height: 100%;
+  }
+  .op-rail-header { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+  .op-rail-title { font-size: 8px; font-weight: 800; letter-spacing: 0.5px; color: ${T.inkSoft}; }
+  .op-rail-gauges { display: flex; flex-direction: column; gap: 3px; }
+
+  .op-gauge {
+    display: flex; align-items: center; gap: 5px;
+    background: ${T.canvas}; border-radius: 6px; padding: 3px 5px;
+  }
+  .op-gauge-ring { position: relative; width: 34px; height: 34px; flex-shrink: 0; }
+  .op-gauge-ring svg { width: 34px; height: 34px; }
+  .op-gauge-icon-bg { position: absolute; inset: 6px; border-radius: 50%; }
+  .op-gauge-icon { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; }
+  .op-gauge-text { min-width: 0; }
+  .op-gauge-value { font-family: ${T.mono}; font-weight: 800; font-size: 12px; line-height: 1.1; }
+  .op-gauge-label { font-size: 7px; color: ${T.inkSoft}; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .op-gauge-sub { font-size: 6px; color: ${T.inkLight}; }
+
+  /* CRITERIA SECTION */
+  .op-criteria-section { margin-top: 4px; padding-top: 6px; border-top: 1px solid ${T.mist}; }
+  .op-criteria-header { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
+  .op-criteria-title { font-size: 7px; font-weight: 800; letter-spacing: 0.4px; color: ${T.inkSoft}; }
+  .op-criteria-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
+  .op-criteria-item {
+    display: flex; align-items: center; gap: 4px;
+    padding: 2px 4px; border-radius: 4px; border-left: 2px solid ${T.teal};
+    background: ${T.canvas};
+  }
+  .op-criteria-pct { font-family: ${T.mono}; font-weight: 800; font-size: 9px; }
+  .op-criteria-name { font-size: 6.5px; color: ${T.inkSoft}; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* AGENDAS SECTION */
+  .op-agendas-section { margin-top: 4px; padding-top: 6px; border-top: 1px solid ${T.mist}; }
+  .op-agendas-list { display: flex; flex-direction: column; gap: 1px; max-height: 50px; overflow-y: auto; }
+  .op-agenda-mini {
+    display: flex; align-items: center; gap: 3px;
+    font-size: 6.5px; color: ${T.inkSoft}; padding: 1px 3px;
+    background: ${T.canvas}; border-radius: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .op-agenda-mini svg { flex-shrink: 0; }
+
+  /* CENTER */
+  .op-center { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+
+  .op-charts-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    flex: 1;
+    min-height: 0;
+  }
+
   .op-panel {
     background: ${T.panel};
     border: 1px solid ${T.mist};
-    border-radius: 14px;
-    padding: 10px 14px 8px;
+    border-radius: 12px;
+    padding: 8px 10px 6px;
     display: flex; flex-direction: column;
     min-height: 0;
     box-shadow: 0 1px 2px rgba(14,36,28,0.04);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
+    transition: box-shadow 0.2s ease;
   }
   .op-panel:hover {
-    box-shadow: 0 1px 2px rgba(14,36,28,0.05), 0 14px 28px -14px rgba(14,36,28,0.18);
+    box-shadow: 0 1px 2px rgba(14,36,28,0.05), 0 8px 20px -12px rgba(14,36,28,0.15);
   }
   .op-panel-head {
     display: flex; align-items: center; justify-content: space-between;
-    font-size: 11px; font-weight: 700; color: ${T.ink};
-    margin-bottom: 4px; flex-shrink: 0;
+    font-size: 10px; font-weight: 700; color: ${T.ink};
+    margin-bottom: 3px; flex-shrink: 0;
   }
-  .op-panel-head svg { margin-right: 5px; vertical-align: -2px; color: ${T.teal}; }
-  .op-panel-sub { font-size: 9px; color: ${T.inkSoft}; font-weight: 500; }
+  .op-panel-head svg { margin-right: 4px; vertical-align: -2px; color: ${T.teal}; }
+  .op-panel-sub { font-size: 7px; color: ${T.inkSoft}; font-weight: 500; }
 
-  /* CANVAS */
+  .op-panel-trend { flex: 1; }
+  .op-panel-donut-small { flex: 1; }
+
   .op-canvas-box { flex: 1; min-height: 0; position: relative; }
   .op-canvas-box canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   .op-canvas-box-interactive canvas { cursor: crosshair; }
 
-  /* LEFT RAIL */
-  .op-rail-left {
-    display: flex; flex-direction: column; gap: 4px;
-    background: ${T.panel}; border: 1px solid ${T.mist}; border-radius: 14px;
-    padding: 8px 10px; overflow-y: auto;
-  }
-  .op-rail-header { display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
-  .op-rail-title {
-    font-size: 9px; font-weight: 800; letter-spacing: 0.5px; color: ${T.inkSoft};
-  }
-  .op-rail-gauges { display: flex; flex-direction: column; gap: 4px; }
+  .op-panel-dept { flex: 0.8; min-height: 140px; }
 
-  .op-gauge {
-    display: flex; align-items: center; gap: 6px;
-    background: ${T.canvas}; border-radius: 8px; padding: 4px 6px;
-  }
-  .op-gauge-ring { position: relative; width: 40px; height: 40px; flex-shrink: 0; }
-  .op-gauge-ring svg { width: 40px; height: 40px; }
-  .op-gauge-icon-bg {
-    position: absolute; inset: 7px; border-radius: 50%;
-  }
-  .op-gauge-icon {
-    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    font-size: 12px;
-  }
-  .op-gauge-text { min-width: 0; }
-  .op-gauge-value { font-family: ${T.mono}; font-weight: 800; font-size: 14px; line-height: 1.1; }
-  .op-gauge-label { font-size: 8px; color: ${T.inkSoft}; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .op-gauge-sub { font-size: 7px; color: ${T.inkLight}; }
-
-  /* CENTER */
-  .op-center { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-  .op-panel-trend { flex: 1; }
-  .op-panel-dept { flex: 1; }
-
-  /* RIGHT RAIL */
-  .op-rail-right { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
-  .op-panel-donut { flex: 1; align-items: center; }
+  /* DONUT LEGEND */
   .op-donut-box { width: 100%; flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
   .op-donut-box canvas { max-width: 100%; max-height: 100%; }
 
@@ -1321,125 +1328,75 @@ const shellStyles = `
     width: 100%;
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2px 6px;
-    margin-top: 6px;
-    max-height: 80px;
+    gap: 1px 4px;
+    margin-top: 4px;
+    max-height: 48px;
     overflow-y: auto;
   }
-  .op-legend::-webkit-scrollbar { width: 3px; }
+  .op-legend::-webkit-scrollbar { width: 2px; }
   .op-legend::-webkit-scrollbar-thumb { background: ${T.mist}; border-radius: 2px; }
   .op-legend-item {
-    display: flex; align-items: center; gap: 4px; font-size: 8.5px;
-    padding: 2px 4px; border-radius: 4px; cursor: default;
+    display: flex; align-items: center; gap: 3px; font-size: 7px;
+    padding: 1px 3px; border-radius: 3px; cursor: default;
     transition: background 0.15s ease;
   }
-  .op-legend-item:hover, .op-legend-item-active { background: rgba(20,97,73,0.07); }
-  .op-legend-dot { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
+  .op-legend-item:hover, .op-legend-item-active { background: rgba(20,97,73,0.06); }
+  .op-legend-dot { width: 5px; height: 5px; border-radius: 2px; flex-shrink: 0; }
   .op-legend-name { flex: 1; min-width: 0; color: ${T.inkSoft}; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .op-legend-stats { display: flex; align-items: baseline; gap: 2px; flex-shrink: 0; }
-  .op-legend-val { font-family: ${T.mono}; font-weight: 800; color: ${T.ink}; font-size: 9px; }
-  .op-legend-pct { font-family: ${T.mono}; font-weight: 600; color: ${T.inkSoft}; font-size: 7px; }
-  .op-legend-empty { grid-column: 1 / -1; font-size: 9px; color: ${T.inkSoft}; text-align: center; padding: 4px 0; }
-
-  .op-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex-shrink: 0; }
-  .op-tile {
-    background: ${T.panel}; border: 1px solid ${T.mist}; border-radius: 10px;
-    padding: 8px; text-align: center;
-  }
-  .op-tile-val { font-family: ${T.mono}; font-size: 16px; font-weight: 800; color: ${T.ink}; margin-top: 2px; }
-  .op-tile-label { font-size: 8px; color: ${T.inkSoft}; font-weight: 600; }
-
-  /* FOOTER */
-  .op-footer {
-    flex-shrink: 0; display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px;
-    background: ${T.panel}; border: 1px solid ${T.mist}; border-radius: 14px;
-    padding: 6px 12px; max-height: 72px;
-  }
-  .op-filmstrip, .op-agenda { display: flex; flex-direction: column; min-width: 0; }
-  .op-filmstrip-title {
-    font-size: 8px; font-weight: 800; letter-spacing: 0.4px; color: ${T.inkSoft};
-    display: flex; align-items: center; gap: 4px; margin-bottom: 3px;
-  }
-  .op-filmstrip-track { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; }
-  .op-film-card {
-    flex-shrink: 0; width: 72px; background: ${T.canvas}; border-radius: 6px;
-    border-top: 3px solid ${T.teal}; padding: 3px 6px;
-  }
-  .op-film-pct { font-family: ${T.mono}; font-weight: 800; font-size: 11px; }
-  .op-film-name { font-size: 7px; color: ${T.inkSoft}; line-height: 1.1; margin-top: 1px; }
-  .op-agenda-track { display: flex; flex-wrap: wrap; gap: 3px; overflow-y: auto; align-content: flex-start; }
-  .op-agenda-chip {
-    display: inline-flex; align-items: center; gap: 3px;
-    background: ${T.canvas}; color: ${T.inkSoft}; font-size: 8px; font-weight: 500;
-    padding: 2px 6px; border-radius: 12px; white-space: nowrap;
-  }
-  .op-agenda-chip svg { width: 10px; height: 10px; }
+  .op-legend-val { font-family: ${T.mono}; font-weight: 800; color: ${T.ink}; font-size: 8px; }
+  .op-legend-pct { font-family: ${T.mono}; font-weight: 600; color: ${T.inkSoft}; font-size: 6px; }
+  .op-legend-empty { grid-column: 1 / -1; font-size: 8px; color: ${T.inkSoft}; text-align: center; padding: 2px 0; }
 
   /* ── RESPONSIVE ──────────────────────────────────────────── */
   @media (max-width: 1024px) {
-    .op-grid { grid-template-columns: 160px 1fr 180px; }
+    .op-grid { grid-template-columns: 140px 1fr; }
   }
 
   @media (max-width: 768px) {
-    .op-shell { height: auto; min-height: 100vh; overflow: visible; padding: 10px; gap: 8px; }
-    .op-grid { grid-template-columns: 1fr; gap: 8px; }
+    .op-shell { padding: 8px 10px; gap: 6px; }
+    .op-grid { grid-template-columns: 1fr; gap: 6px; }
+    .op-rail-left { max-height: none; flex-direction: row; flex-wrap: wrap; padding: 6px 8px; }
+    .op-rail-header { width: 100%; }
+    .op-rail-gauges { flex-direction: row; flex-wrap: wrap; gap: 3px; }
+    .op-gauge { flex: 1 1 30%; min-width: 80px; }
+    .op-criteria-grid { grid-template-columns: 1fr 1fr; }
+    .op-agendas-list { max-height: 40px; }
     
-    .op-header { flex-direction: column; align-items: stretch; gap: 8px; }
+    .op-charts-row { grid-template-columns: 1fr; gap: 6px; }
+    .op-center { gap: 6px; }
+    .op-panel { padding: 6px 8px 4px; }
+    .op-panel-head { font-size: 9px; }
+    .op-panel-sub { font-size: 6px; }
+    .op-panel-dept { min-height: 120px; }
+    
+    .op-header { flex-direction: column; align-items: stretch; gap: 6px; }
     .op-identity { justify-content: center; }
     .op-ai-ticker { display: none; }
-    .op-date-badge { align-self: center; }
+    .op-date-badge { align-self: center; font-size: 8px; padding: 3px 8px; }
+    .op-avatar { width: 32px; height: 32px; font-size: 11px; }
+    .op-greeting { font-size: 12px; }
     
-    .op-rail-left { flex-direction: row; flex-wrap: wrap; padding: 6px 8px; }
-    .op-rail-header { width: 100%; }
-    .op-rail-gauges { flex-direction: row; flex-wrap: wrap; gap: 4px; }
-    .op-gauge { flex: 1 1 45%; min-width: 100px; }
-    
-    .op-center { gap: 8px; }
-    .op-panel { padding: 8px 10px 6px; }
-    .op-panel-head { font-size: 10px; }
-    
-    .op-rail-right { flex-direction: column; gap: 8px; }
-    .op-panel-donut { min-height: 250px; }
-    .op-legend { grid-template-columns: 1fr 1fr; max-height: 100px; }
-    
-    .op-footer { grid-template-columns: 1fr; max-height: none; padding: 6px 10px; }
-    .op-filmstrip-track { flex-wrap: wrap; }
-    .op-film-card { width: 60px; }
-    .op-agenda-track { max-height: 50px; overflow-y: auto; }
-    
-    .op-tiles { grid-template-columns: 1fr 1fr; }
-    .op-tile { padding: 6px; }
-    .op-tile-val { font-size: 14px; }
+    .op-legend { grid-template-columns: 1fr 1fr; max-height: 40px; }
   }
 
   @media (max-width: 480px) {
-    .op-shell { padding: 6px; gap: 6px; }
-    .op-grid { gap: 6px; }
+    .op-shell { padding: 4px 6px; gap: 4px; }
     .op-rail-left { padding: 4px 6px; }
     .op-gauge { flex: 1 1 100%; }
-    .op-gauge-ring { width: 32px; height: 32px; }
-    .op-gauge-ring svg { width: 32px; height: 32px; }
-    .op-gauge-value { font-size: 12px; }
-    .op-panel { padding: 6px 8px 4px; }
-    .op-panel-head { font-size: 9px; }
-    .op-panel-sub { font-size: 7px; }
-    .op-panel-donut { min-height: 200px; }
-    .op-legend { grid-template-columns: 1fr; max-height: 80px; gap: 1px; }
-    .op-tiles { grid-template-columns: 1fr 1fr; gap: 4px; }
-    .op-tile-val { font-size: 12px; }
-    .op-footer { padding: 4px 8px; }
-    .op-film-card { width: 50px; }
-    .op-film-pct { font-size: 9px; }
-    .op-agenda-chip { font-size: 7px; padding: 1px 4px; }
-    .op-avatar { width: 32px; height: 32px; font-size: 11px; }
-    .op-greeting { font-size: 12px; }
-    .op-date-badge { font-size: 8px; padding: 3px 8px; }
+    .op-gauge-ring { width: 28px; height: 28px; }
+    .op-gauge-ring svg { width: 28px; height: 28px; }
+    .op-gauge-value { font-size: 10px; }
+    .op-gauge-label { font-size: 6px; }
+    .op-criteria-grid { grid-template-columns: 1fr; }
+    .op-criteria-item { padding: 1px 3px; }
+    .op-criteria-pct { font-size: 8px; }
+    .op-criteria-name { font-size: 6px; }
+    .op-panel { padding: 4px 6px 3px; }
+    .op-panel-head { font-size: 8px; }
+    .op-panel-dept { min-height: 100px; }
+    .op-legend { grid-template-columns: 1fr; max-height: 50px; }
+    .op-legend-item { font-size: 6px; }
+    .op-legend-val { font-size: 7px; }
   }
 `;
-
-// localMonthKey function (needed for the data loading)
-function localMonthKey(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-}
