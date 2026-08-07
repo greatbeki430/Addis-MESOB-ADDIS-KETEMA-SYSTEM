@@ -91,21 +91,45 @@ export default function Dashboard({ t: tProp }) {
         const data = response.data || [];
 
         // Calculate totals
-        const total = data.reduce((sum, r) => sum + (r.total || 0), 0);
-        const male = data.reduce((sum, r) => sum + (r.male || 0), 0);
-        const female = data.reduce((sum, r) => sum + (r.female || 0), 0);
+        // ✅ FIX: department/total/male/female live inside each report's
+        // `entries[]` array, not as flat fields on the report itself.
+        // Reading r.dept / r.total directly was always undefined, which is
+        // why departments stayed empty and charts never rendered.
+        const getReportTotal = (r) => {
+          const entries = Array.isArray(r.entries) ? r.entries : [];
+          return typeof r.grandTotal === "number"
+            ? r.grandTotal
+            : entries.reduce((sum, e) => sum + (e.total || 0), 0);
+        };
+        const getReportMale = (r) =>
+          (Array.isArray(r.entries) ? r.entries : []).reduce(
+            (sum, e) => sum + (e.male || 0),
+            0,
+          );
+        const getReportFemale = (r) =>
+          (Array.isArray(r.entries) ? r.entries : []).reduce(
+            (sum, e) => sum + (e.female || 0),
+            0,
+          );
 
-        // Department breakdown
+        // Calculate totals
+        const total = data.reduce((sum, r) => sum + getReportTotal(r), 0);
+        const male = data.reduce((sum, r) => sum + getReportMale(r), 0);
+        const female = data.reduce((sum, r) => sum + getReportFemale(r), 0);
+
+        // Department breakdown — built from each report's entries[]
         const deptMap = {};
         const deptMaleMap = {};
         const deptFemaleMap = {};
         data.forEach((r) => {
-          if (r.dept) {
-            deptMap[r.dept] = (deptMap[r.dept] || 0) + (r.total || 0);
-            deptMaleMap[r.dept] = (deptMaleMap[r.dept] || 0) + (r.male || 0);
-            deptFemaleMap[r.dept] =
-              (deptFemaleMap[r.dept] || 0) + (r.female || 0);
-          }
+          const entries = Array.isArray(r.entries) ? r.entries : [];
+          entries.forEach((e) => {
+            if (!e.dept) return;
+            deptMap[e.dept] = (deptMap[e.dept] || 0) + (e.total || 0);
+            deptMaleMap[e.dept] = (deptMaleMap[e.dept] || 0) + (e.male || 0);
+            deptFemaleMap[e.dept] =
+              (deptFemaleMap[e.dept] || 0) + (e.female || 0);
+          });
         });
 
         const departments = Object.entries(deptMap).map(([name, value]) => ({
@@ -123,7 +147,7 @@ export default function Dashboard({ t: tProp }) {
           const dateStr = d.toISOString().split("T")[0];
           const dayTotal = data
             .filter((r) => r.date && r.date.startsWith(dateStr))
-            .reduce((sum, r) => sum + (r.total || 0), 0);
+            .reduce((sum, r) => sum + getReportTotal(r), 0);
           weeklyTrend.push({
             date: dateStr,
             label: d.toLocaleDateString("en-US", { weekday: "short" }),
@@ -139,7 +163,7 @@ export default function Dashboard({ t: tProp }) {
           const monthStr = d.toISOString().slice(0, 7);
           const monthTotal = data
             .filter((r) => r.date && r.date.startsWith(monthStr))
-            .reduce((sum, r) => sum + (r.total || 0), 0);
+            .reduce((sum, r) => sum + getReportTotal(r), 0);
           monthlyData.push({
             month: d.toLocaleDateString("en-US", { month: "short" }),
             value: monthTotal,
@@ -192,7 +216,38 @@ export default function Dashboard({ t: tProp }) {
 
   // ─── Draw Charts ──────────────────────────────────────────────
   useEffect(() => {
-    if (loading || stats.departments.length === 0) return;
+    if (loading) return;
+
+    // ✅ No data yet — draw a "no data" message on each canvas instead
+    // of leaving them blank, and skip the real chart-drawing logic below.
+    if (stats.departments.length === 0) {
+      const canvasKeys = ["barChart", "pieChart", "trendChart", "deptChart"];
+      canvasKeys.forEach((key) => {
+        const canvas = canvasRefs.current[key];
+        if (!canvas) return;
+        const ctx = canvas.getContext("2d");
+        const rect = canvas.parentElement.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const width = rect.width || 300;
+        const height =
+          key === "pieChart" ? width : key === "barChart" ? 200 : 180;
+
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.scale(dpr, dpr);
+        ctx.clearRect(0, 0, width, height);
+
+        ctx.fillStyle = "#ccc";
+        ctx.font = "13px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(td("noData", "No data available"), width / 2, height / 2);
+      });
+      return;
+    }
 
     console.log("📊 Canvas refs:", {
       barChart: !!canvasRefs.current.barChart,
@@ -215,6 +270,7 @@ export default function Dashboard({ t: tProp }) {
       canvas.height = height * dpr;
       canvas.style.width = width + "px";
       canvas.style.height = height + "px";
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
 
       ctx.clearRect(0, 0, width, height);
@@ -276,6 +332,7 @@ export default function Dashboard({ t: tProp }) {
       canvas.height = size * dpr;
       canvas.style.width = size + "px";
       canvas.style.height = size + "px";
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
 
       ctx.clearRect(0, 0, size, size);
@@ -354,6 +411,7 @@ export default function Dashboard({ t: tProp }) {
       canvas.height = height * dpr;
       canvas.style.width = width + "px";
       canvas.style.height = height + "px";
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
 
       ctx.clearRect(0, 0, width, height);
@@ -443,6 +501,7 @@ export default function Dashboard({ t: tProp }) {
       canvas.height = height * dpr;
       canvas.style.width = width + "px";
       canvas.style.height = height + "px";
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.scale(dpr, dpr);
 
       ctx.clearRect(0, 0, width, height);
