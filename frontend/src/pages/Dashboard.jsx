@@ -1588,8 +1588,18 @@ export default function Dashboard({ t: tProp }) {
       />
 
       {/* AI Digest banner — its own flex row, full width, never overlapped */}
-      <div className="op-ai-banner">
-        <AIDashboardWidget stats={aiStats} refreshInterval={120000} />
+      <div
+        className="op-ai-banner"
+        style={{
+          flexShrink: 0,
+          minHeight: "auto",
+          maxHeight: "none",
+          overflow: "visible",
+        }}
+      >
+        <div style={{ padding: "4px 0" }}>
+          <AIDashboardWidget stats={aiStats} refreshInterval={120000} />
+        </div>
       </div>
 
       <div className="op-grid">
@@ -1775,18 +1785,24 @@ const shellStyles = `
     padding: 4px 10px; border-radius: 16px; display: flex; align-items: center; gap: 4px;
   }
 
-  /* AI DIGEST BANNER — own row, own stacking context, cannot be overlapped */
+  /* AI DIGEST BANNER — FIXED: no cut off, visible completely */
   .op-ai-banner {
     flex-shrink: 0;
-    min-height: 46px;
-    max-height: 64px;
-    overflow: hidden;
+    min-height: auto;
+    max-height: none;
+    overflow: visible;
     border-radius: 10px;
     position: relative;
     z-index: 5;
     box-shadow: 0 2px 10px rgba(14,36,28,0.06);
     background: ${T.panel};
     border: 1px solid ${T.mist};
+    padding: 2px 0;
+    width: 100%;
+  }
+  .op-ai-banner * {
+    max-height: none;
+    overflow: visible;
   }
 
   /* GRID - Desktop: left rail | center | right rail */
@@ -1804,7 +1820,11 @@ const shellStyles = `
     background: ${T.panel}; border: 1px solid ${T.mist}; border-radius: 12px;
     padding: 8px 10px;
     overflow-y: auto;
+    overflow-x: hidden;
     min-height: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
   }
   .op-rail-left { grid-area: left; }
   .op-rail-right { grid-area: right; }
@@ -1825,27 +1845,70 @@ const shellStyles = `
   .op-gauge-label { font-size: 7px; color: ${T.inkSoft}; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .op-gauge-sub { font-size: 6px; color: ${T.inkLight}; }
 
-  /* CRITERIA SECTION */
-  .op-criteria-section { margin-top: 4px; padding-top: 6px; border-top: 1px solid ${T.mist}; flex-shrink: 0; }
+  /* CRITERIA SECTION — FIXED: no horizontal scroll */
+  .op-criteria-section { 
+    margin-top: 4px; 
+    padding-top: 6px; 
+    border-top: 1px solid ${T.mist}; 
+    flex-shrink: 0;
+    overflow: hidden;
+    width: 100%;
+  }
   .op-criteria-header { display: flex; align-items: center; gap: 5px; margin-bottom: 4px; }
   .op-criteria-title { font-size: 7px; font-weight: 800; letter-spacing: 0.4px; color: ${T.inkSoft}; }
-  .op-criteria-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
-  .op-criteria-item {
-    display: flex; align-items: center; gap: 4px;
-    padding: 2px 4px; border-radius: 4px; border-left: 2px solid ${T.teal};
-    background: ${T.canvas};
+  .op-criteria-grid { 
+    display: grid; 
+    grid-template-columns: 1fr 1fr; 
+    gap: 2px;
+    width: 100%;
+    overflow: hidden;
   }
-  .op-criteria-pct { font-family: ${T.mono}; font-weight: 800; font-size: 9px; }
-  .op-criteria-name { font-size: 6.5px; color: ${T.inkSoft}; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .op-criteria-item {
+    display: flex; 
+    align-items: center; 
+    gap: 4px;
+    padding: 2px 4px; 
+    border-radius: 4px; 
+    border-left: 2px solid ${T.teal};
+    background: ${T.canvas};
+    min-width: 0;
+    overflow: hidden;
+  }
+  .op-criteria-pct { font-family: ${T.mono}; font-weight: 800; font-size: 9px; flex-shrink: 0; }
+  .op-criteria-name { 
+    font-size: 6.5px; 
+    color: ${T.inkSoft}; 
+    font-weight: 500; 
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis; 
+    flex: 1;
+    min-width: 0;
+  }
 
-  /* AGENDAS SECTION (moved from footer) */
-  .op-agendas-section { margin-top: 4px; padding-top: 6px; border-top: 1px solid ${T.mist}; flex-shrink: 0; }
-  .op-agendas-list { display: flex; flex-direction: column; gap: 2px; }
+  /* AGENDAS SECTION — FIXED: no horizontal scroll */
+  .op-agendas-section { 
+    margin-top: 4px; 
+    padding-top: 6px; 
+    border-top: 1px solid ${T.mist}; 
+    flex-shrink: 0;
+    overflow: hidden;
+    width: 100%;
+  }
+  .op-agendas-list { display: flex; flex-direction: column; gap: 2px; width: 100%; }
   .op-agenda-mini {
-    display: flex; align-items: center; gap: 3px;
-    font-size: 6.5px; color: ${T.inkSoft}; padding: 2px 4px;
-    background: ${T.canvas}; border-radius: 3px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    display: flex; 
+    align-items: center; 
+    gap: 3px;
+    font-size: 6.5px; 
+    color: ${T.inkSoft}; 
+    padding: 2px 4px;
+    background: ${T.canvas}; 
+    border-radius: 3px;
+    white-space: nowrap; 
+    overflow: hidden; 
+    text-overflow: ellipsis;
+    max-width: 100%;
   }
   .op-agenda-mini svg { flex-shrink: 0; }
   .op-agenda-empty { color: ${T.inkLight}; font-style: italic; }
