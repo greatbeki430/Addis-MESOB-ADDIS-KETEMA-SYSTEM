@@ -1,5 +1,5 @@
 // frontend/src/pages/Dashboard.jsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { C, F, card } from "../styles/theme";
 import StatCard from "../components/ui/StatCard";
 import { CRITERIA } from "../constants/criteria";
@@ -23,12 +23,15 @@ export default function Dashboard({ t: tProp }) {
   const languageContext = useLanguage();
   const t = tProp || languageContext.t;
 
-  // ✅ Use dashboard-specific translations
-  const td = (key, fb = "") => {
-    const lang = languageContext.lang || "en";
-    const dashboardT = dashboardTranslations[lang] || dashboardTranslations.en;
-    return dashboardT[key] || fb;
-  };
+  const td = useCallback(
+    (key, fb = "") => {
+      const lang = languageContext.lang || "en";
+      const dashboardT =
+        dashboardTranslations[lang] || dashboardTranslations.en;
+      return dashboardT[key] || fb;
+    },
+    [languageContext.lang],
+  );
 
   // Fallback to main translations for common strings
   const tc = (key, fb = "") => t?.(`criteria.${key}`) || fb;
@@ -518,7 +521,7 @@ export default function Dashboard({ t: tProp }) {
     drawPieChart();
     drawTrendChart();
     drawDepartmentChart();
-  }, [loading, stats]);
+  }, [loading, stats, td]);
 
   // ─── Helper: Get greeting ────────────────────────────────────
   const getGreetingKey = () => {
