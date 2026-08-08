@@ -34,8 +34,7 @@ const formatGregorianDateAmharic = (date = new Date()) => {
 
 // ─── Helper: Format Ethiopian date in Amharic ───────────────
 const formatEthiopianDateAmharic = (date = new Date()) => {
-  const ethiopianDate = getEthiopianDate(date);
-  return ethiopianDate;
+  return getEthiopianDate(date);
 };
 
 // ─── EXPORT TO EXCEL ──────────────────────────────────────────
@@ -121,7 +120,6 @@ export const exportReportToWord = (
   const reportTypeDisplay =
     reportType.charAt(0).toUpperCase() + reportType.slice(1);
 
-  // ✅ Use the imported functions
   const ethiopianDate = formatEthiopianDateAmharic(new Date());
   const gregorianDate = formatGregorianDateAmharic(new Date());
 
@@ -129,6 +127,13 @@ export const exportReportToWord = (
   if (preparedByDisplay) {
     preparedByText += ` (${preparedByDisplay})`;
   }
+
+  // Combine all info into one line
+  const infoLine =
+    `${tr("generated", "Generated")}: ${gregorianDate} (GC) | ${ethiopianDate}, ` +
+    `${tr("team", "Team")}: ${teamName || tr("allTeams", "All Teams")}, ` +
+    `${tr("period", "Period")}: ${period}, ` +
+    `${tr("preparedBy", "Prepared By")}: ${preparedByText}`;
 
   const tableRows = reportData.data
     .map(
@@ -155,16 +160,12 @@ export const exportReportToWord = (
           body { font-family: 'Noto Sans Ethiopic', Arial, sans-serif; padding: 20px; }
           h1 { color: #1a6b4a; font-size: 24px; text-align: center; }
           .subtitle { text-align: center; color: #666; font-size: 14px; margin-top: -5px; }
-          .info-line { margin: 6px 0; font-size: 12px; color: #555; text-align: center; }
+          .info-line { margin: 8px 0; font-size: 11px; color: #555; text-align: center; }
           .info-line strong { color: #333; }
           .divider { border-top: 2px solid #1a6b4a; margin: 12px 0; }
           table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10px; }
           th { background-color: #1a6b4a; color: white; padding: 8px; text-align: left; border: 1px solid #ddd; }
           td { padding: 6px 8px; border: 1px solid #ddd; }
-          .summary { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin: 10px 0; }
-          .summary-card { background: #f5f5f5; padding: 10px 20px; border-radius: 8px; min-width: 100px; text-align: center; border: 1px solid #e0e0e0; }
-          .summary-card h3 { margin: 0; color: #666; font-size: 11px; }
-          .summary-card p { margin: 3px 0 0; font-size: 20px; font-weight: bold; color: #1a6b4a; }
           .footer { margin-top: 20px; color: #999; font-size: 11px; text-align: center; border-top: 1px solid #ddd; padding-top: 12px; }
         </style>
       </head>
@@ -175,27 +176,9 @@ export const exportReportToWord = (
 
         <div class="divider"></div>
 
-        <div class="info-line">
-          <strong>${tr("generated", "Generated")}:</strong> ${gregorianDate} (GC) | ${ethiopianDate}
-        </div>
-        <div class="info-line">
-          <strong>${tr("team", "Team")}:</strong> ${teamName || tr("allTeams", "All Teams")}
-        </div>
-        <div class="info-line">
-          <strong>${tr("period", "Period")}:</strong> ${period}
-        </div>
-        <div class="info-line">
-          <strong>${tr("preparedBy", "Prepared By")}:</strong> ${preparedByText}
-        </div>
+        <div class="info-line">${infoLine}</div>
 
         <div class="divider"></div>
-
-        <div class="summary">
-          <div class="summary-card"><h3>${tr("totalRecords", "Total Records")}</h3><p>${reportData.summary?.total || 0}</p></div>
-          <div class="summary-card"><h3>${tr("completed", "Completed")}</h3><p>${reportData.summary?.completed || 0}</p></div>
-          <div class="summary-card"><h3>${tr("pending", "Pending")}</h3><p>${reportData.summary?.pending || 0}</p></div>
-          <div class="summary-card"><h3>${tr("average", "Average Value")}</h3><p>${reportData.summary?.average || 0}</p></div>
-        </div>
 
         <table>
           <thead>
@@ -261,7 +244,6 @@ export const exportReportToPDF = (
     format: "a4",
   });
 
-  // ✅ Load fonts for Amharic support
   loadFonts(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -304,23 +286,24 @@ export const exportReportToPDF = (
   doc.line(margin, yPos, pageWidth - margin, yPos);
   yPos += 10;
 
-  // ─── INFO LINES (inline, centered) ─────────────────────────
-  // ✅ Use imported functions
+  // ─── INFO LINE (single line with all info) ──────────────────
   const ethiopianDate = formatEthiopianDateAmharic(new Date());
   const gregorianDate = formatGregorianDateAmharic(new Date());
+
+  // Build single info line
+  const infoLine =
+    `${tr("generated", "Generated")}: ${gregorianDate} (GC) | ${ethiopianDate}, ` +
+    `${tr("team", "Team")}: ${teamName || tr("allTeams", "All Teams")}, ` +
+    `${tr("period", "Period")}: ${period}, ` +
+    `${tr("preparedBy", "Prepared By")}: ${preparedByText}`;
 
   doc.setFontSize(10);
   doc.setTextColor(0, 0, 0);
 
-  // ✅ Build info lines in the Daily Report style
-  const infoLines = [
-    `${tr("generated", "Generated")}: ${gregorianDate} (GC) | ${ethiopianDate}`,
-    `${tr("team", "Team")}: ${teamName || tr("allTeams", "All Teams")}`,
-    `${tr("period", "Period")}: ${period}`,
-    `${tr("preparedBy", "Prepared By")}: ${preparedByText}`,
-  ];
-
-  infoLines.forEach((line) => {
+  // Draw the info line - centered, will wrap if needed
+  const maxWidth = pageWidth - margin * 2;
+  const lines = doc.splitTextToSize(infoLine, maxWidth);
+  lines.forEach((line) => {
     drawMixedScriptText(doc, line, pageWidth / 2, yPos, {
       align: "center",
       bold: false,
@@ -328,60 +311,6 @@ export const exportReportToPDF = (
     yPos += 6;
   });
   yPos += 4;
-
-  // ─── DIVIDER ─────────────────────────────────────────────────
-  doc.setDrawColor(200, 200, 200);
-  doc.setLineWidth(0.3);
-  doc.line(margin, yPos, pageWidth - margin, yPos);
-  yPos += 8;
-
-  // ─── SUMMARY CARDS ──────────────────────────────────────────
-  const summaryData = [
-    {
-      label: tr("totalRecords", "Total Records"),
-      value: reportData.summary?.total || 0,
-      color: "#1a3aad",
-    },
-    {
-      label: tr("completed", "Completed"),
-      value: reportData.summary?.completed || 0,
-      color: "#10b981",
-    },
-    {
-      label: tr("pending", "Pending"),
-      value: reportData.summary?.pending || 0,
-      color: "#f59e0b",
-    },
-    {
-      label: tr("average", "Average Value"),
-      value: reportData.summary?.average || 0,
-      color: "#1a3aad",
-    },
-  ];
-
-  const cardWidth = (pageWidth - margin * 2) / summaryData.length - 4;
-  summaryData.forEach((item, idx) => {
-    const x = margin + idx * (cardWidth + 4);
-    doc.setFillColor(240, 247, 244);
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.2);
-    doc.roundedRect(x, yPos, cardWidth, 20, 2, 2, "FD");
-
-    doc.setFontSize(12);
-    doc.setTextColor(item.color);
-    const valueStr = String(item.value);
-    drawMixedScriptText(doc, valueStr, x + cardWidth / 2, yPos + 6, {
-      align: "center",
-      bold: true,
-    });
-
-    doc.setFontSize(7);
-    doc.setTextColor(100, 100, 100);
-    drawMixedScriptText(doc, item.label, x + cardWidth / 2, yPos + 14, {
-      align: "center",
-    });
-  });
-  yPos += 28;
 
   // ─── DIVIDER ─────────────────────────────────────────────────
   doc.setDrawColor(200, 200, 200);
@@ -411,7 +340,7 @@ export const exportReportToPDF = (
           day: "numeric",
         });
       } catch (e) {
-        console.warn("Failed to parse date:", dateStr, e);
+        console.warn("Failed to format date:", dateStr, e);
         dateStr = dateStr.split("T")[0] || dateStr;
       }
     }
@@ -426,6 +355,7 @@ export const exportReportToPDF = (
     ];
   });
 
+  // ─── TABLE WITH FULL WIDTH ──────────────────────────────────
   autoTable(doc, {
     startY: yPos,
     head: [tableHeaders],
@@ -445,13 +375,13 @@ export const exportReportToPDF = (
     columnStyles: {
       0: { cellWidth: 10, halign: "center" },
       1: { cellWidth: 25, halign: "center" },
-      2: { cellWidth: 30, halign: "left" },
-      3: { cellWidth: 25, halign: "center" },
-      4: { cellWidth: 40, halign: "left" },
+      2: { cellWidth: "auto", halign: "left" },
+      3: { cellWidth: "auto", halign: "center" },
+      4: { cellWidth: "auto", halign: "left" },
       5: { cellWidth: 15, halign: "center" },
       6: { cellWidth: 20, halign: "center" },
     },
-    tableWidth: pageWidth - margin * 2,
+    tableWidth: "auto", // ✅ Auto width to fill page
     rowHeight: 12,
     styles: {
       overflow: "linebreak",
