@@ -4,123 +4,9 @@ import { saveAs } from "file-saver";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import { loadFonts, FONT_NAMES } from "./pdf/fontLoader";
-
-// ─── REUSE HELPER FUNCTIONS FROM pdfExport.js ───────────────
-// These are copied from pdfExport.js to maintain consistency
-// In a production app, these would be in a shared file like pdfHelpers.js
-
-// ─── ETHIOPIAN CALENDAR HELPERS ─────────────────────────────
-const ETHIOPIAN_MONTHS_AM = [
-  "መስከረም",
-  "ጥቅምት",
-  "ህዳር",
-  "ታህሳስ",
-  "ጥር",
-  "የካቲት",
-  "መጋቢት",
-  "ሚያዝያ",
-  "ግንቦት",
-  "ሰኔ",
-  "ሐምሌ",
-  "ነሐሴ",
-  "ጳጉሜ",
-];
-
-const JDN_EPOCH_OFFSET_AMETE_MIHRET = 1723856;
-
-function gregorianToJDN(year, month, day) {
-  const a = Math.floor((14 - month) / 12);
-  const y = year + 4800 - a;
-  const m = month + 12 * a - 3;
-  return (
-    day +
-    Math.floor((153 * m + 2) / 5) +
-    365 * y +
-    Math.floor(y / 4) -
-    Math.floor(y / 100) +
-    Math.floor(y / 400) -
-    32045
-  );
-}
-
-function toEthiopianDate(date = new Date()) {
-  const jdn = gregorianToJDN(
-    date.getFullYear(),
-    date.getMonth() + 1,
-    date.getDate(),
-  );
-  const offsetDays = jdn - JDN_EPOCH_OFFSET_AMETE_MIHRET;
-  const r = offsetDays % 1461;
-  const n = (r % 365) + 365 * Math.floor(r / 1460);
-  const year =
-    4 * Math.floor(offsetDays / 1461) +
-    Math.floor(r / 365) -
-    Math.floor(r / 1460);
-  const month = Math.floor(n / 30) + 1;
-  const day = (n % 30) + 1;
-  return { year, month, day };
-}
-
-const getEthiopianDate = (date = new Date()) => {
-  const { year, month, day } = toEthiopianDate(date);
-  const monthName = ETHIOPIAN_MONTHS_AM[month - 1];
-  return `${monthName} ${day} ቀን ${year} ዓ.ም`;
-};
-
-// ─── MIXED-SCRIPT TEXT RENDERING ─────────────────────────────
-const AMHARIC_CHAR_RE = /[\u1200-\u137F]/;
-const SCRIPT_RUN_RE = /[\u1200-\u137F]+|[^\u1200-\u137F]+/g;
-
-function splitIntoScriptRuns(text) {
-  const str = String(text ?? "");
-  const runs = str.match(SCRIPT_RUN_RE) || [str];
-  return runs.map((run) => ({
-    text: run,
-    isAmharic: AMHARIC_CHAR_RE.test(run),
-  }));
-}
-
-function setFontForRun(doc, isAmharicRun, bold) {
-  const style = bold ? "bold" : "normal";
-  try {
-    if (isAmharicRun) {
-      doc.setFont(
-        doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica",
-        style,
-      );
-    } else {
-      doc.setFont(doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica", style);
-    }
-  } catch (error) {
-    console.warn("Font fallback while drawing mixed text:", error.message);
-    doc.setFont("helvetica", style);
-  }
-}
-
-function drawMixedScriptText(doc, text, x, y, opts = {}) {
-  const { align = "left", bold = false } = opts;
-  const runs = splitIntoScriptRuns(text);
-
-  const widths = runs.map((run) => {
-    setFontForRun(doc, run.isAmharic, bold);
-    return doc.getTextWidth(run.text);
-  });
-
-  const totalWidth = widths.reduce((sum, w) => sum + w, 0);
-
-  let startX = x;
-  if (align === "center") startX = x - totalWidth / 2;
-  else if (align === "right") startX = x - totalWidth;
-
-  let cursorX = startX;
-  runs.forEach((run, i) => {
-    setFontForRun(doc, run.isAmharic, bold);
-    doc.text(run.text, cursorX, y, { align: "left" });
-    cursorX += widths[i];
-  });
-
-  return totalWidth;
-}
+import { getEthiopianDate, drawMixedScriptText } from "./pdf/pdfHelpers";
+import { isAmharic } from "./pdf/language";
+import { showErrorToast, showSuccessToast } from "./toastHelper";
 
 // ─── EXPORT TO EXCEL ──────────────────────────────────────────
 export const exportReportToExcel = (
@@ -131,7 +17,8 @@ export const exportReportToExcel = (
   t,
 ) => {
   if (!reportData || !reportData.data || reportData.data.length === 0) {
-    alert(t?.report?.noDataToExport || "No data to export.");
+    const msg = t?.report?.noDataToExport || "No data to export.";
+    showErrorToast?.(msg) || alert(msg);
     return false;
   }
 
@@ -180,6 +67,7 @@ export const exportReportToExcel = (
     blob,
     `${reportType}_report_${new Date().toISOString().split("T")[0]}.xlsx`,
   );
+  showSuccessToast?.(tr("exportSuccess", "Excel exported successfully!"));
   return true;
 };
 
@@ -192,7 +80,8 @@ export const exportReportToWord = (
   t,
 ) => {
   if (!reportData || !reportData.data || reportData.data.length === 0) {
-    alert(t?.report?.noDataToExport || "No data to export.");
+    const msg = t?.report?.noDataToExport || "No data to export.";
+    showErrorToast?.(msg) || alert(msg);
     return false;
   }
 
@@ -273,6 +162,7 @@ export const exportReportToWord = (
     blob,
     `${reportType}_report_${new Date().toISOString().split("T")[0]}.doc`,
   );
+  showSuccessToast?.(tr("exportSuccess", "Word exported successfully!"));
   return true;
 };
 
@@ -285,7 +175,8 @@ export const exportReportToPDF = (
   t,
 ) => {
   if (!reportData || !reportData.data || reportData.data.length === 0) {
-    alert(t?.report?.noDataToExport || "No data to export.");
+    const msg = t?.report?.noDataToExport || "No data to export.";
+    showErrorToast?.(msg) || alert(msg);
     return false;
   }
 
@@ -299,7 +190,7 @@ export const exportReportToPDF = (
     format: "a4",
   });
 
-  // ✅ Load fonts for Amharic support (same as pdfExport.js)
+  // ✅ Load fonts for Amharic support (reuses fontLoader)
   loadFonts(doc);
 
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -308,29 +199,63 @@ export const exportReportToPDF = (
   let yPos = margin;
 
   // ─── TITLE SECTION ──────────────────────────────────────────
+  // ✅ Amharic title with proper font
+  const amharicTitle = `📊 ${reportTypeDisplay} ${tr("report", "Report")}`;
   doc.setFontSize(20);
-  drawMixedScriptText(
-    doc,
-    `📊 ${reportTypeDisplay} ${tr("report", "Report")}`,
-    pageWidth / 2,
-    yPos,
-    { align: "center", bold: true },
-  );
+  drawMixedScriptText(doc, amharicTitle, pageWidth / 2, yPos, {
+    align: "center",
+    bold: true,
+  });
   yPos += 10;
 
-  doc.setFontSize(10);
+  // ─── SUBTITLE ──────────────────────────────────────────────
+  const amharicSubtitle = "የአዲስ አበባ ከተማ አስተዳደር · የህዝብ አገልግሎት ቢሮ";
+  doc.setFontSize(11);
   doc.setTextColor(100, 100, 100);
+  drawMixedScriptText(doc, amharicSubtitle, pageWidth / 2, yPos, {
+    align: "center",
+  });
+  yPos += 6;
+
+  const englishSubtitle =
+    "Addis Ababa City Administration · Public Service Bureau";
+  doc.setFontSize(9);
+  drawMixedScriptText(doc, englishSubtitle, pageWidth / 2, yPos, {
+    align: "center",
+  });
+  doc.setTextColor(0, 0, 0);
+  yPos += 10;
+
+  // ─── DIVIDER ─────────────────────────────────────────────────
+  doc.setDrawColor(26, 107, 74);
+  doc.setLineWidth(0.5);
+  doc.line(margin, yPos, pageWidth - margin, yPos);
+  yPos += 10;
+
+  // ─── REPORT INFO ────────────────────────────────────────────
+  const ethiopianDate = getEthiopianDate();
+  const gregorianDate = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
+  doc.setFontSize(10);
+  doc.setTextColor(0, 0, 0);
+
   const infoLines = [
-    `${tr("generated", "Generated")}: ${new Date().toLocaleString()}`,
+    `${tr("generated", "Generated")}: ${gregorianDate} (GC) | ${ethiopianDate}`,
     `${tr("team", "Team")}: ${teamName || tr("allTeams", "All Teams")}`,
     `${tr("period", "Period")}: ${period}`,
   ];
+
   infoLines.forEach((line) => {
     drawMixedScriptText(doc, line, margin, yPos);
     yPos += 6;
   });
   yPos += 4;
 
+  // ─── DIVIDER ─────────────────────────────────────────────────
   doc.setDrawColor(200, 200, 200);
   doc.setLineWidth(0.3);
   doc.line(margin, yPos, pageWidth - margin, yPos);
@@ -384,6 +309,12 @@ export const exportReportToPDF = (
   });
   yPos += 28;
 
+  // ─── DIVIDER ─────────────────────────────────────────────────
+  doc.setDrawColor(200, 200, 200);
+  doc.setLineWidth(0.3);
+  doc.line(margin, yPos, pageWidth - margin, yPos);
+  yPos += 8;
+
   // ─── TABLE ──────────────────────────────────────────────────
   const tableHeaders = [
     "#",
@@ -405,6 +336,7 @@ export const exportReportToPDF = (
     item.status || "",
   ]);
 
+  // ✅ Use autoTable with Amharic font support
   doc.autoTable({
     startY: yPos,
     head: [tableHeaders],
@@ -416,20 +348,40 @@ export const exportReportToPDF = (
       textColor: [255, 255, 255],
       fontSize: 8,
       halign: "center",
+      font: FONT_NAMES.ethiopic,
     },
-    bodyStyles: { fontSize: 7, halign: "center" },
+    bodyStyles: {
+      fontSize: 7,
+      halign: "center",
+    },
     columnStyles: {
-      0: { cellWidth: 10 },
-      1: { cellWidth: 25 },
-      2: { cellWidth: 30 },
-      3: { cellWidth: 25 },
-      4: { cellWidth: 40 },
-      5: { cellWidth: 15 },
-      6: { cellWidth: 20 },
+      0: { cellWidth: 10, halign: "center" },
+      1: { cellWidth: 25, halign: "center" },
+      2: { cellWidth: 30, halign: "left" },
+      3: { cellWidth: 25, halign: "center" },
+      4: { cellWidth: 40, halign: "left" },
+      5: { cellWidth: 15, halign: "center" },
+      6: { cellWidth: 20, halign: "center" },
     },
     tableWidth: pageWidth - margin * 2,
     rowHeight: 12,
-    styles: { overflow: "linebreak", cellPadding: 3 },
+    styles: {
+      overflow: "linebreak",
+      cellPadding: 3,
+      font: FONT_NAMES.ethiopic,
+    },
+    didParseCell: (data) => {
+      const cellText = String(data.cell.raw || "");
+      if (isAmharic(cellText)) {
+        data.cell.styles.font = doc.__hasEthiopicFont
+          ? FONT_NAMES.ethiopic
+          : "helvetica";
+      } else {
+        data.cell.styles.font = doc.__hasLatinFont
+          ? FONT_NAMES.latin
+          : "helvetica";
+      }
+    },
   });
 
   yPos = doc.lastAutoTable?.finalY + 10 || yPos + 40;
@@ -447,14 +399,41 @@ export const exportReportToPDF = (
 
   doc.setFontSize(8);
   doc.setTextColor(150, 150, 150);
-  const ethiopianDate = getEthiopianDate();
+
   const footerText = `${tr("footerText", "Generated by A-MESOB Report Generator")} © ${new Date().getFullYear()} | ${ethiopianDate}`;
   drawMixedScriptText(doc, footerText, pageWidth / 2, yPos, {
     align: "center",
   });
 
-  doc.save(
-    `${reportType}_report_${new Date().toISOString().split("T")[0]}.pdf`,
-  );
+  // ─── PAGE NUMBERS ───────────────────────────────────────────
+  const pageCount = doc.internal.getNumberOfPages();
+  const footerY = pageHeight - 14;
+
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+
+    const amharicFooter = `የአዲስ አበባ ከተማ አስተዳደር · የህዝብ አገልግሎት ቢሮ | ${ethiopianDate} | ገጽ ${i}/${pageCount}`;
+    drawMixedScriptText(doc, amharicFooter, pageWidth / 2, footerY, {
+      align: "center",
+    });
+
+    const englishFooter = `Addis Ababa City Administration · Public Service Bureau | ${gregorianDate} | Page ${i}/${pageCount}`;
+    drawMixedScriptText(doc, englishFooter, pageWidth / 2, footerY + 5, {
+      align: "center",
+    });
+  }
+
+  // ─── SAVE ────────────────────────────────────────────────────
+  const filename = `${reportType}_report_${new Date().toISOString().split("T")[0]}.pdf`;
+  doc.save(filename);
+
+  showSuccessToast?.(tr("exportSuccess", "PDF exported successfully!"));
   return true;
 };
