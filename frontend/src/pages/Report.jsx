@@ -6,11 +6,12 @@ import { AISummary } from "../components/ai";
 import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../hooks/useLanguage";
 
-// ✅ Import export utilities
-import * as XLSX from "xlsx";
-import { saveAs } from "file-saver";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
+// ✅ Import export utilities from new file
+import {
+  exportReportToExcel,
+  exportReportToWord,
+  exportReportToPDF,
+} from "../utils/reportExport";
 
 // ✅ Import react-icons
 import {
@@ -337,238 +338,23 @@ export default function Report({ t: tProp }) {
   };
 
   const exportToExcel = () => {
-    if (!reportData || !reportData.data.length) return;
-
-    const wsData = [
-      [
-        "#",
-        tr("date", "Date"),
-        tr("team", "Team"),
-        tr("typeCol", "Type"),
-        tr("descriptionCol", "Description"),
-        tr("value", "Value"),
-        tr("status", "Status"),
-      ],
-      ...reportData.data.map((item, idx) => [
-        idx + 1,
-        item.date,
-        item.team,
-        item.type,
-        item.description,
-        item.value,
-        item.status,
-      ]),
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, tr("report", "Report"));
-
-    const colWidths = [
-      { wch: 5 },
-      { wch: 15 },
-      { wch: 25 },
-      { wch: 20 },
-      { wch: 30 },
-      { wch: 12 },
-      { wch: 15 },
-    ];
-    ws["!cols"] = colWidths;
-
-    const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    const blob = new Blob([excelBuffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    saveAs(
-      blob,
-      `${reportType}_report_${new Date().toISOString().split("T")[0]}.xlsx`,
-    );
+    const teamName =
+      isLeader && userTeam ? userTeam.name : getTeamDisplayName();
+    exportReportToExcel(reportData, reportType, period, teamName, safeT);
     setShowExportOptions(false);
   };
 
   const exportToWord = () => {
-    if (!reportData || !reportData.data.length) return;
-
-    let tableRows = reportData.data
-      .map(
-        (item, idx) => `
-      <tr>
-        <td style="border: 1px solid #ddd; padding: 8px;">${idx + 1}</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">${item.date}</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">${item.team}</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">${item.type}</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">${item.description}</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">${item.value}</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">${item.status}</td>
-      </tr>
-    `,
-      )
-      .join("");
-
-    const reportTypeDisplay =
-      reportType.charAt(0).toUpperCase() + reportType.slice(1);
-
-    const htmlContent = `
-      <html>
-        <head>
-          <meta charset="UTF-8">
-          <title>${tr("report", "Report")}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            h1 { color: #1a6b4a; }
-            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th { background-color: #1a6b4a; color: white; padding: 10px; text-align: left; border: 1px solid #ddd; }
-            td { padding: 8px; border: 1px solid #ddd; }
-            .summary { margin-top: 20px; display: flex; gap: 20px; flex-wrap: wrap; }
-            .summary-card { background: #f5f5f5; padding: 15px; border-radius: 8px; min-width: 120px; }
-            .summary-card h3 { margin: 0; color: #666; font-size: 12px; }
-            .summary-card p { margin: 5px 0 0; font-size: 24px; font-weight: bold; color: #1a6b4a; }
-            .footer { margin-top: 30px; color: #999; font-size: 12px; text-align: center; }
-          </style>
-        </head>
-        <body>
-          <h1>📊 ${reportTypeDisplay} ${tr("report", "Report")}</h1>
-          <p><strong>${tr("generated", "Generated")}:</strong> ${new Date(reportData.generatedAt).toLocaleString()}</p>
-          <p><strong>${tr("team", "Team")}:</strong> ${getTeamDisplayName() || tr("allTeams", "All Teams")}</p>
-          <p><strong>${tr("period", "Period")}:</strong> ${period}</p>
-          
-          <div class="summary">
-            <div class="summary-card"><h3>${tr("totalRecords", "Total Records")}</h3><p>${reportData.summary.total}</p></div>
-            <div class="summary-card"><h3>${tr("completed", "Completed")}</h3><p>${reportData.summary.completed}</p></div>
-            <div class="summary-card"><h3>${tr("pending", "Pending")}</h3><p>${reportData.summary.pending}</p></div>
-            <div class="summary-card"><h3>${tr("average", "Average Value")}</h3><p>${reportData.summary.average}</p></div>
-          </div>
-
-          <table>
-            <thead>
-              <tr><th>#</th><th>${tr("date", "Date")}</th><th>${tr("team", "Team")}</th><th>${tr("typeCol", "Type")}</th>
-              <th>${tr("descriptionCol", "Description")}</th><th>${tr("value", "Value")}</th><th>${tr("status", "Status")}</th></tr>
-            </thead>
-            <tbody>${tableRows}</tbody>
-          </table>
-          <div class="footer">${tr("footerText", "Generated by A-MESOB Report Generator")} © ${new Date().getFullYear()}</div>
-        </body>
-      </html>
-    `;
-
-    const blob = new Blob([htmlContent], { type: "application/msword" });
-    saveAs(
-      blob,
-      `${reportType}_report_${new Date().toISOString().split("T")[0]}.doc`,
-    );
+    const teamName =
+      isLeader && userTeam ? userTeam.name : getTeamDisplayName();
+    exportReportToWord(reportData, reportType, period, teamName, safeT);
     setShowExportOptions(false);
   };
 
   const exportToPDF = () => {
-    if (!reportData || !reportData.data.length) return;
-
-    const doc = new jsPDF();
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    const reportTypeDisplay =
-      reportType.charAt(0).toUpperCase() + reportType.slice(1);
-
-    doc.setFontSize(18);
-    doc.setTextColor("#1a6b4a");
-    doc.text(
-      `📊 ${reportTypeDisplay} ${tr("report", "Report")}`,
-      pageWidth / 2,
-      20,
-      {
-        align: "center",
-      },
-    );
-
-    doc.setFontSize(10);
-    doc.setTextColor("#666");
-    doc.text(
-      `${tr("generated", "Generated")}: ${new Date(reportData.generatedAt).toLocaleString()}`,
-      14,
-      35,
-    );
-    doc.text(
-      `${tr("team", "Team")}: ${getTeamDisplayName() || tr("allTeams", "All Teams")}`,
-      14,
-      42,
-    );
-    doc.text(`${tr("period", "Period")}: ${period}`, 14, 49);
-
-    const summaryY = 60;
-    doc.setFontSize(10);
-    doc.setTextColor("#333");
-    doc.text(
-      `${tr("totalRecords", "Total Records")}: ${reportData.summary.total}`,
-      14,
-      summaryY,
-    );
-    doc.text(
-      `${tr("completed", "Completed")}: ${reportData.summary.completed}`,
-      80,
-      summaryY,
-    );
-    doc.text(
-      `${tr("pending", "Pending")}: ${reportData.summary.pending}`,
-      145,
-      summaryY,
-    );
-    doc.text(
-      `${tr("average", "Average Value")}: ${reportData.summary.average}`,
-      14,
-      summaryY + 10,
-    );
-
-    const tableData = reportData.data.map((item) => [
-      item.date,
-      item.team,
-      item.type,
-      item.description || "",
-      item.value.toString(),
-      item.status,
-    ]);
-
-    doc.autoTable({
-      startY: summaryY + 20,
-      head: [
-        [
-          tr("date", "Date"),
-          tr("team", "Team"),
-          tr("typeCol", "Type"),
-          tr("descriptionCol", "Description"),
-          tr("value", "Value"),
-          tr("status", "Status"),
-        ],
-      ],
-      body: tableData,
-      theme: "striped",
-      headStyles: {
-        fillColor: [26, 107, 74],
-        textColor: [255, 255, 255],
-        fontSize: 9,
-      },
-      bodyStyles: { fontSize: 8 },
-      columnStyles: {
-        0: { cellWidth: 25 },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 40 },
-        4: { cellWidth: 15 },
-        5: { cellWidth: 20 },
-      },
-    });
-
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.setFontSize(8);
-    doc.setTextColor("#999");
-    doc.text(
-      `${tr("footerText", "Generated by A-MESOB Report Generator")} © ${new Date().getFullYear()}`,
-      pageWidth / 2,
-      finalY + 10,
-      { align: "center" },
-    );
-
-    doc.save(
-      `${reportType}_report_${new Date().toISOString().split("T")[0]}.pdf`,
-    );
+    const teamName =
+      isLeader && userTeam ? userTeam.name : getTeamDisplayName();
+    exportReportToPDF(reportData, reportType, period, teamName, safeT);
     setShowExportOptions(false);
   };
 
