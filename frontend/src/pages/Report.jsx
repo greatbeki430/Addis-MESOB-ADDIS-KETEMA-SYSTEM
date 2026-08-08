@@ -396,24 +396,66 @@ export default function Report({ t: tProp }) {
     setShowHistory(false);
   };
 
+  // ✅ Helper to resolve team name from ID
+  const resolveTeamName = (teamId) => {
+    if (!teamId) return "Unknown Team";
+    // If it's already a string name (not an ID), return it
+    if (typeof teamId === "string" && !teamId.match(/^[0-9a-fA-F]{24}$/)) {
+      return teamId;
+    }
+    // Look up in teams array
+    const team = teams.find((t) => (t.id || t._id) === teamId);
+    return team?.name || teamId || "Unknown Team";
+  };
+
   const exportToExcel = () => {
     const teamName =
       isLeader && userTeam ? userTeam.name : getTeamDisplayName();
-    exportReportToExcel(reportData, reportType, period, teamName, safeT);
+
+    // ✅ Resolve team names in report data
+    const resolvedData = {
+      ...reportData,
+      data: reportData.data.map((item) => ({
+        ...item,
+        team: resolveTeamName(item.team),
+      })),
+    };
+
+    exportReportToExcel(resolvedData, reportType, period, teamName, safeT);
     setShowExportOptions(false);
   };
 
   const exportToWord = () => {
     const teamName =
       isLeader && userTeam ? userTeam.name : getTeamDisplayName();
-    exportReportToWord(reportData, reportType, period, teamName, safeT);
+
+    // ✅ Resolve team names in report data
+    const resolvedData = {
+      ...reportData,
+      data: reportData.data.map((item) => ({
+        ...item,
+        team: resolveTeamName(item.team),
+      })),
+    };
+
+    exportReportToWord(resolvedData, reportType, period, teamName, safeT);
     setShowExportOptions(false);
   };
 
   const exportToPDF = () => {
     const teamName =
       isLeader && userTeam ? userTeam.name : getTeamDisplayName();
-    exportReportToPDF(reportData, reportType, period, teamName, safeT);
+
+    // ✅ Resolve team names in report data
+    const resolvedData = {
+      ...reportData,
+      data: reportData.data.map((item) => ({
+        ...item,
+        team: resolveTeamName(item.team),
+      })),
+    };
+
+    exportReportToPDF(resolvedData, reportType, period, teamName, safeT);
     setShowExportOptions(false);
   };
 
