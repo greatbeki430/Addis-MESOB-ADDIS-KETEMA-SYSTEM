@@ -926,7 +926,7 @@ const MonthlyTrendChart = memo(function MonthlyTrendChart({
         geometryRef.current = null;
         return;
       }
-      const pad = { top: 10, bottom: 16, left: 4, right: 4 };
+      const pad = { top: 10, bottom: 20, left: 4, right: 4 };
       const chartW = width - pad.left - pad.right;
       const chartH = height - pad.top - pad.bottom;
       const maxVal = Math.max(...data.map((d) => d.value), 1);
@@ -956,10 +956,10 @@ const MonthlyTrendChart = memo(function MonthlyTrendChart({
 
         if (i % 2 === 0 || data.length <= 6 || isHover) {
           ctx.fillStyle = isHover ? T.ink : T.inkSoft;
-          ctx.font = `${isHover ? 700 : 500} 6.5px ${T.mono}`;
+          ctx.font = `${isHover ? 700 : 600} 8px ${T.mono}`;
           ctx.textAlign = "center";
           ctx.textBaseline = "top";
-          ctx.fillText(d.month, x + barW / 2, pad.top + chartH + 3);
+          ctx.fillText(d.month, x + barW / 2, pad.top + chartH + 5);
         }
         if (isHover) {
           ctx.fillStyle = T.brass;
@@ -1043,7 +1043,7 @@ const GenderStackedBar = memo(function GenderStackedBar({
         ...depts.map((d) => (d.male || 0) + (d.female || 0)),
         1,
       );
-      const pad = { top: 14, bottom: 4, left: 4, right: 4 };
+      const pad = { top: 14, bottom: 20, left: 4, right: 4 };
       const chartH = height - pad.top - pad.bottom;
       const gap = 8;
       const barW = Math.max(
@@ -1082,11 +1082,11 @@ const GenderStackedBar = memo(function GenderStackedBar({
         }
 
         ctx.fillStyle = isHover ? T.ink : T.inkSoft;
-        ctx.font = `${isHover ? 700 : 500} 6.5px ${T.sans}`;
+        ctx.font = `${isHover ? 700 : 600} 8px ${T.sans}`;
         ctx.textAlign = "center";
         ctx.textBaseline = "top";
-        const label = d.name.length > 8 ? d.name.slice(0, 8) + "…" : d.name;
-        ctx.fillText(label, x + barW / 2, baseY + 2);
+        const label = d.name.length > 9 ? d.name.slice(0, 9) + "…" : d.name;
+        ctx.fillText(label, x + barW / 2, baseY + 4);
       });
     },
     [depts, noDataLabel],
@@ -1170,16 +1170,28 @@ const ActivityHeatmap = memo(function ActivityHeatmap({
     return <div className="op-heatmap-empty">{noDataLabel}</div>;
   }
 
+  const stops = [T.canvasDeep, T.tealLight, T.tealBright, T.teal, T.tealDeep];
   const cellColor = (v) => {
     const pct = v / max;
     if (pct <= 0) return T.canvasDeep;
-    const stops = [T.tealLight, T.tealBright, T.teal, T.tealDeep];
-    const idx = Math.min(stops.length - 1, Math.floor(pct * stops.length));
+    const idx = Math.min(stops.length - 1, Math.ceil(pct * (stops.length - 1)));
     return stops[idx];
   };
 
   return (
     <div className="op-heatmap">
+      {/* Week header row */}
+      <div className="op-heatmap-weekrow">
+        <span className="op-heatmap-daylabel" />
+        <div className="op-heatmap-cells">
+          {weeks.map((_, w) => (
+            <span key={w} className="op-heatmap-weeklabel">
+              W{w + 1}
+            </span>
+          ))}
+        </div>
+      </div>
+
       <div className="op-heatmap-rows">
         {dayLabels.map((label, r) => (
           <div className="op-heatmap-row" key={label}>
@@ -1191,11 +1203,26 @@ const ActivityHeatmap = memo(function ActivityHeatmap({
                   className="op-heatmap-cell"
                   style={{ background: cellColor(week[r] || 0) }}
                   title={`${label} · W${w + 1}: ${week[r] || 0}`}
-                />
+                >
+                  <span className="op-heatmap-cell-val">{week[r] || 0}</span>
+                </div>
               ))}
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Legend */}
+      <div className="op-heatmap-legend">
+        <span className="op-heatmap-legend-label">Low</span>
+        {stops.map((c, i) => (
+          <span
+            key={i}
+            className="op-heatmap-legend-swatch"
+            style={{ background: c }}
+          />
+        ))}
+        <span className="op-heatmap-legend-label">High</span>
       </div>
     </div>
   );
@@ -1960,15 +1987,24 @@ const shellStyles = `
   .op-stacked-legend span { display: flex; align-items: center; gap: 4px; font-size: 9px; color: ${T.inkSoft}; font-weight: 600; }
   .op-stacked-legend i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
 
-  /* HEATMAP */
-  .op-heatmap { flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 0; overflow: hidden; }
-  .op-heatmap-rows { display: flex; flex-direction: column; gap: 2px; }
+ /* HEATMAP */
+  .op-heatmap { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 0; overflow: hidden; }
+  .op-heatmap-weekrow { display: flex; align-items: center; gap: 5px; }
+  .op-heatmap-weeklabel { flex: 1; text-align: center; font-size: 7px; color: ${T.inkLight}; font-weight: 600; }
+  .op-heatmap-rows { display: flex; flex-direction: column; gap: 3px; }
   .op-heatmap-row { display: flex; align-items: center; gap: 5px; }
-  .op-heatmap-daylabel { width: 26px; font-size: 8px; color: ${T.inkSoft}; font-weight: 600; flex-shrink: 0; }
+  .op-heatmap-daylabel { width: 26px; font-size: 8px; color: ${T.inkSoft}; font-weight: 700; flex-shrink: 0; }
   .op-heatmap-cells { display: flex; gap: 3px; flex: 1; }
-  .op-heatmap-cell { flex: 1; aspect-ratio: 1.6; border-radius: 3px; transition: transform 0.15s ease; }
-  .op-heatmap-cell:hover { transform: scale(1.12); }
+  .op-heatmap-cell {
+    flex: 1; aspect-ratio: 1.4; border-radius: 4px; transition: transform 0.15s ease;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .op-heatmap-cell:hover { transform: scale(1.15); }
+  .op-heatmap-cell-val { font-size: 7px; font-weight: 700; color: rgba(255,255,255,0.9); font-family: ${T.mono}; }
   .op-heatmap-empty { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 10px; color: ${T.inkSoft}; }
+  .op-heatmap-legend { display: flex; align-items: center; gap: 3px; justify-content: center; margin-top: 2px; flex-shrink: 0; }
+  .op-heatmap-legend-swatch { width: 10px; height: 8px; border-radius: 2px; }
+  .op-heatmap-legend-label { font-size: 6.5px; color: ${T.inkLight}; font-weight: 600; margin: 0 2px; }
 
   /* RADIAL GAUGE */
   .op-radial-gauge { display: flex; flex-direction: column; align-items: center; gap: 1px; flex-shrink: 0; }
