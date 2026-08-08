@@ -28,6 +28,14 @@ export const evaluationTranslations = {
       signaturesTitle: "Digital Signatures",
       // ✅ ADD THIS
       signatureFor: "Signature for",
+      // ✅ Employee read-only Evaluation Feed (view/react/comment)
+      employeeNotice:
+        "Evaluations are completed by your Team Leader or Admin. You can view, react, and comment here.",
+      noEvaluations: "No evaluations have been posted yet.",
+      by: "by",
+      avg: "avg",
+      react: "React",
+      writeComment: "Write a comment...",
       // ✅ ADD THIS
       aiInsights: "AI Evaluation Insights",
       aiPowered: "AI Powered",
@@ -150,6 +158,14 @@ export const evaluationTranslations = {
       signaturesTitle: "ዲጂታል ፊርማዎች",
       // ✅ ADD THIS
       signatureFor: "ፊርማ ለ",
+      // ✅ የሰራተኛ ንባብ-ብቻ ምዘና ዝርዝር (መመልከት/ምላሽ መስጠት/አስተያየት)
+      employeeNotice:
+        "ምዘናዎች የሚጠናቀቁት በቡድን መሪዎ ወይም በአስተዳዳሪ ነው። እዚህ መመልከት፣ ምላሽ መስጠት እና አስተያየት መስጠት ይችላሉ።",
+      noEvaluations: "እስካሁን የተለጠፉ ምዘናዎች የሉም።",
+      by: "በ",
+      avg: "አማካይ",
+      react: "ምላሽ ስጥ",
+      writeComment: "አስተያየት ይጻፉ...",
       // ✅ ADD THIS
       aiInsights: "የAI ምዘና ግንዛቤዎች",
       aiPowered: "በAI የተጎላበተ",
@@ -267,6 +283,14 @@ export const evaluationTranslations = {
       signaturesTitle: "Mallattoo Dijitaalaa",
       // ✅ ADD THIS
       signatureFor: "Mallattoo f",
+      // ✅ Odeeffannoo Madaallii Hojjettootaa (ilaaluu/deebii/yaada - ta'e qofa)
+      employeeNotice:
+        "Madaalliin Hoogganaa Garee ykn Admin keessaniin xumurama. Asitti ilaaluu, deebii kennuu fi yaada kennuu ni dandeessu.",
+      noEvaluations: "Hanga ammaatti madaalliin hin maxxanfamne.",
+      by: "",
+      avg: "giddugaleessa",
+      react: "Deebii kenni",
+      writeComment: "Yaada barreessi...",
       // ✅ ADD THIS
       aiInsights: "Hubannoo Madaallii AI",
       aiPowered: "AI-n Hojjetame",

@@ -18,6 +18,10 @@ import {
 } from "react-icons/fi";
 
 const REACTIONS = ["👍", "❤️", "🎉", "👏", "💡"];
+// Shared page-level padding, matching every other page (incl. the leader+
+// scoring form this replaces for employees) so content isn't flush against
+// the top header bar.
+const PAGE_PADDING = "clamp(16px, 4vw, 28px) clamp(12px, 4vw, 20px)";
 
 function timeAgo(dateStr) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -149,21 +153,23 @@ export default function EvaluationFeed({ t }) {
 
   if (loading) {
     return (
-      <div style={{ ...card, textAlign: "center", padding: 40 }}>
-        <FiLoader
-          size={24}
-          color={C.primary}
-          style={{ animation: "spin 1s linear infinite" }}
-        />
-        <p style={{ color: C.muted, marginTop: 12 }}>
-          {te("loading", "Loading evaluations...")}
-        </p>
+      <div style={{ maxWidth: 820, margin: "0 auto", padding: PAGE_PADDING }}>
+        <div style={{ ...card, textAlign: "center", padding: 40 }}>
+          <FiLoader
+            size={24}
+            color={C.primary}
+            style={{ animation: "spin 1s linear infinite" }}
+          />
+          <p style={{ color: C.muted, marginTop: 12 }}>
+            {te("loading", "Loading evaluations...")}
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 820, margin: "0 auto", padding: "0 4px" }}>
+    <div style={{ maxWidth: 820, margin: "0 auto", padding: PAGE_PADDING }}>
       <div
         style={{
           ...card,
