@@ -8,6 +8,36 @@ import { getEthiopianDate, drawMixedScriptText } from "./pdf/pdfHelpers";
 import { isAmharic } from "./pdf/language";
 import { showErrorToast, showSuccessToast } from "./toastHelper";
 
+// ─── GREGORIAN MONTH NAMES IN AMHARIC ──────────────────────
+const GREGORIAN_MONTHS_AM = [
+  "ጃንዋሪ",
+  "ፌብሩዋሪ",
+  "ማርች",
+  "ኤፕሪል",
+  "ሜይ",
+  "ጁን",
+  "ጁላይ",
+  "ኦገስት",
+  "ሴፕቴምበር",
+  "ኦክቶበር",
+  "ኖቬምበር",
+  "ዲሴምበር",
+];
+
+// ─── Helper: Format Gregorian date in Amharic ──────────────
+const formatGregorianDateAmharic = (date = new Date()) => {
+  const monthIdx = date.getMonth();
+  const day = date.getDate();
+  const year = date.getFullYear();
+  return `${GREGORIAN_MONTHS_AM[monthIdx]} ${day}, ${year}`;
+};
+
+// ─── Helper: Format Ethiopian date in Amharic ───────────────
+const formatEthiopianDateAmharic = (date = new Date()) => {
+  const ethiopianDate = getEthiopianDate(date);
+  return ethiopianDate;
+};
+
 // ─── EXPORT TO EXCEL ──────────────────────────────────────────
 export const exportReportToExcel = (
   reportData,
@@ -91,10 +121,10 @@ export const exportReportToWord = (
   const reportTypeDisplay =
     reportType.charAt(0).toUpperCase() + reportType.slice(1);
 
-  const ethiopianDate = getEthiopianDate();
-  const generatedDate = new Date().toLocaleString();
+  // ✅ Use the imported functions
+  const ethiopianDate = formatEthiopianDateAmharic(new Date());
+  const gregorianDate = formatGregorianDateAmharic(new Date());
 
-  // Build prepared by display
   let preparedByText = preparedBy || "Administrator";
   if (preparedByDisplay) {
     preparedByText += ` (${preparedByDisplay})`;
@@ -125,38 +155,36 @@ export const exportReportToWord = (
           body { font-family: 'Noto Sans Ethiopic', Arial, sans-serif; padding: 20px; }
           h1 { color: #1a6b4a; font-size: 24px; text-align: center; }
           .subtitle { text-align: center; color: #666; font-size: 14px; margin-top: -5px; }
-          .subtitle-english { text-align: center; color: #999; font-size: 11px; margin-top: -5px; }
-          .info { margin: 8px 0; font-size: 12px; color: #555; }
-          .info strong { color: #333; }
-          .divider { border-top: 2px solid #1a6b4a; margin: 15px 0; }
-          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-          th { background-color: #1a6b4a; color: white; padding: 8px; text-align: left; border: 1px solid #ddd; font-size: 11px; }
-          td { padding: 6px 8px; border: 1px solid #ddd; font-size: 10px; }
-          .summary { margin-top: 15px; display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; }
-          .summary-card { background: #f5f5f5; padding: 12px 20px; border-radius: 8px; min-width: 100px; text-align: center; border: 1px solid #e0e0e0; }
+          .info-line { margin: 6px 0; font-size: 12px; color: #555; text-align: center; }
+          .info-line strong { color: #333; }
+          .divider { border-top: 2px solid #1a6b4a; margin: 12px 0; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10px; }
+          th { background-color: #1a6b4a; color: white; padding: 8px; text-align: left; border: 1px solid #ddd; }
+          td { padding: 6px 8px; border: 1px solid #ddd; }
+          .summary { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin: 10px 0; }
+          .summary-card { background: #f5f5f5; padding: 10px 20px; border-radius: 8px; min-width: 100px; text-align: center; border: 1px solid #e0e0e0; }
           .summary-card h3 { margin: 0; color: #666; font-size: 11px; }
-          .summary-card p { margin: 3px 0 0; font-size: 22px; font-weight: bold; color: #1a6b4a; }
-          .footer { margin-top: 25px; color: #999; font-size: 11px; text-align: center; border-top: 1px solid #ddd; padding-top: 12px; }
-          .page-info { text-align: right; font-size: 10px; color: #999; margin-top: 10px; }
+          .summary-card p { margin: 3px 0 0; font-size: 20px; font-weight: bold; color: #1a6b4a; }
+          .footer { margin-top: 20px; color: #999; font-size: 11px; text-align: center; border-top: 1px solid #ddd; padding-top: 12px; }
         </style>
       </head>
       <body>
         <h1>📊 ${reportTypeDisplay} ${tr("report", "Report")}</h1>
         <div class="subtitle">የአዲስ አበባ ከተማ አስተዳደር · የህዝብ አገልግሎት ቢሮ</div>
-        <div class="subtitle-english">Addis Ababa City Administration · Public Service Bureau</div>
-        
+        <div class="subtitle" style="font-size: 11px; color: #999;">Addis Ababa City Administration · Public Service Bureau</div>
+
         <div class="divider"></div>
 
-        <div class="info">
-          <strong>${tr("generated", "Generated")}:</strong> ${generatedDate} (GC) | ${ethiopianDate}
+        <div class="info-line">
+          <strong>${tr("generated", "Generated")}:</strong> ${gregorianDate} (GC) | ${ethiopianDate}
         </div>
-        <div class="info">
+        <div class="info-line">
           <strong>${tr("team", "Team")}:</strong> ${teamName || tr("allTeams", "All Teams")}
         </div>
-        <div class="info">
+        <div class="info-line">
           <strong>${tr("period", "Period")}:</strong> ${period}
         </div>
-        <div class="info">
+        <div class="info-line">
           <strong>${tr("preparedBy", "Prepared By")}:</strong> ${preparedByText}
         </div>
 
@@ -222,7 +250,6 @@ export const exportReportToPDF = (
   const reportTypeDisplay =
     reportType.charAt(0).toUpperCase() + reportType.slice(1);
 
-  // Build prepared by display
   let preparedByText = preparedBy || "Administrator";
   if (preparedByDisplay) {
     preparedByText += ` (${preparedByDisplay})`;
@@ -242,20 +269,17 @@ export const exportReportToPDF = (
   const margin = 15;
   let yPos = margin;
 
-  // ─── TITLE SECTION ──────────────────────────────────────────
-  // Title
+  // ─── TITLE ──────────────────────────────────────────────────
+  const titleText = `${reportTypeDisplay} ${tr("report", "Report")}`;
   doc.setFontSize(22);
   doc.setTextColor(26, 107, 74);
-  drawMixedScriptText(
-    doc,
-    `📊 ${reportTypeDisplay} ${tr("report", "Report")}`,
-    pageWidth / 2,
-    yPos,
-    { align: "center", bold: true },
-  );
+  drawMixedScriptText(doc, titleText, pageWidth / 2, yPos, {
+    align: "center",
+    bold: true,
+  });
   yPos += 10;
 
-  // Amharic Subtitle
+  // ─── SUBTITLE ──────────────────────────────────────────────
   doc.setFontSize(11);
   doc.setTextColor(100, 100, 100);
   const amharicSubtitle = "የአዲስ አበባ ከተማ አስተዳደር · የህዝብ አገልግሎት ቢሮ";
@@ -264,7 +288,6 @@ export const exportReportToPDF = (
   });
   yPos += 6;
 
-  // English Subtitle
   doc.setFontSize(9);
   doc.setTextColor(150, 150, 150);
   const englishSubtitle =
@@ -281,17 +304,15 @@ export const exportReportToPDF = (
   doc.line(margin, yPos, pageWidth - margin, yPos);
   yPos += 10;
 
-  // ─── REPORT INFO ────────────────────────────────────────────
-  const ethiopianDate = getEthiopianDate();
-  const gregorianDate = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  // ─── INFO LINES (inline, centered) ─────────────────────────
+  // ✅ Use imported functions
+  const ethiopianDate = formatEthiopianDateAmharic(new Date());
+  const gregorianDate = formatGregorianDateAmharic(new Date());
 
   doc.setFontSize(10);
   doc.setTextColor(0, 0, 0);
 
+  // ✅ Build info lines in the Daily Report style
   const infoLines = [
     `${tr("generated", "Generated")}: ${gregorianDate} (GC) | ${ethiopianDate}`,
     `${tr("team", "Team")}: ${teamName || tr("allTeams", "All Teams")}`,
@@ -300,7 +321,10 @@ export const exportReportToPDF = (
   ];
 
   infoLines.forEach((line) => {
-    drawMixedScriptText(doc, line, margin, yPos);
+    drawMixedScriptText(doc, line, pageWidth / 2, yPos, {
+      align: "center",
+      bold: false,
+    });
     yPos += 6;
   });
   yPos += 4;
@@ -377,7 +401,6 @@ export const exportReportToPDF = (
   ];
 
   const tableBody = reportData.data.map((item, idx) => {
-    // Format date properly
     let dateStr = item.date || "";
     if (dateStr && dateStr.includes("T")) {
       try {
@@ -388,7 +411,7 @@ export const exportReportToPDF = (
           day: "numeric",
         });
       } catch (e) {
-        console.warn("Failed to format date:", e);
+        console.warn("Failed to parse date:", dateStr, e);
         dateStr = dateStr.split("T")[0] || dateStr;
       }
     }
@@ -450,20 +473,16 @@ export const exportReportToPDF = (
 
   yPos = doc.lastAutoTable?.finalY + 10 || yPos + 40;
 
-  // ─── FOOTER ──────────────────────────────────────────────────
-  // Page numbers at bottom of each page
+  // ─── PAGE NUMBERS ───────────────────────────────────────────
   const pageCount = doc.internal.getNumberOfPages();
   const footerY = pageHeight - 14;
 
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
 
-    // Only add footer if not already added
-    if (i > 1 || pageCount > 1) {
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.3);
-      doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
-    }
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
 
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
