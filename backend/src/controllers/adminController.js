@@ -5,12 +5,25 @@ const User = require("../models/User");
 const Team = require("../models/Team");
 const mongoose = require("mongoose");
 
+// Self-service digital attendance endpoints are open to every employee, but
+// only for their OWN record — an admin/superadmin may act on someone else's
+// behalf (e.g. manual correction).
+const isSelfOrAdminTier = (req, targetUserId) => {
+  if (!targetUserId) return false;
+  if (req.user._id.toString() === targetUserId.toString()) return true;
+  return req.user.role === "admin" || req.user.role === "superadmin";
+};
+
 // ──────────────────────────────────────────────────────────────
 // DIGITAL ATTENDANCE - Check In (Backup for Biometrics)
 // ──────────────────────────────────────────────────────────────
 exports.digitalCheckIn = async (req, res) => {
   try {
     const { userId, teamId, location, deviceInfo, reason } = req.body;
+
+    if (!isSelfOrAdminTier(req, userId)) {
+      return res.status(403).json({ error: "You can only check yourself in" });
+    }
 
     // Validate user
     const user = await User.findById(userId);
@@ -85,6 +98,10 @@ exports.digitalCheckOut = async (req, res) => {
   try {
     const { userId, location, notes } = req.body;
 
+    if (!isSelfOrAdminTier(req, userId)) {
+      return res.status(403).json({ error: "You can only check yourself out" });
+    }
+
     const today = new Date().toISOString().split("T")[0];
 
     const attendance = await DigitalAttendance.findOne({
@@ -129,6 +146,13 @@ exports.digitalCheckOut = async (req, res) => {
 exports.getCurrentAttendance = async (req, res) => {
   try {
     const { userId } = req.params;
+
+    if (!isSelfOrAdminTier(req, userId)) {
+      return res
+        .status(403)
+        .json({ error: "You can only view your own attendance status" });
+    }
+
     const today = new Date().toISOString().split("T")[0];
 
     // Check digital attendance first
@@ -165,6 +189,12 @@ exports.getDigitalHistory = async (req, res) => {
   try {
     const { userId } = req.params;
     const { limit = 30 } = req.query;
+
+    if (!isSelfOrAdminTier(req, userId)) {
+      return res
+        .status(403)
+        .json({ error: "You can only view your own attendance history" });
+    }
 
     const history = await DigitalAttendance.find({ userId })
       .sort({ createdAt: -1 })
