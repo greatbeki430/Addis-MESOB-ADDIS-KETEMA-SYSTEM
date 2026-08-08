@@ -1774,18 +1774,17 @@ const shellStyles = `
     padding: 4px 10px; border-radius: 16px; display: flex; align-items: center; gap: 4px;
   }
 
-  /* AI DIGEST BANNER — own row, own stacking context, cannot be overlapped */
+ /* AI DIGEST BANNER — auto-height, never clips content, cannot be overlapped */
   .op-ai-banner {
     flex-shrink: 0;
-    min-height: 46px;
-    max-height: 64px;
-    overflow: hidden;
+    overflow: visible;
     border-radius: 10px;
     position: relative;
     z-index: 5;
     box-shadow: 0 2px 10px rgba(14,36,28,0.06);
     background: ${T.panel};
     border: 1px solid ${T.mist};
+    padding: 2px;
   }
 
   /* GRID - Desktop: left rail | center | right rail (widened to fit larger text) */
@@ -2041,7 +2040,6 @@ const shellStyles = `
     .op-avatar { width: 32px; height: 32px; font-size: 11px; }
     .op-greeting { font-size: 12px; }
     .op-ai-banner { max-height: none; }
-
     .op-legend { grid-template-columns: 1fr 1fr; max-height: 44px; }
   }
 
