@@ -9,12 +9,23 @@ const sameTeam = (userTeam, evalTeam) => {
 };
 
 // ✅ Create Evaluation (with enhanced data)
+// Employees are evaluated, not evaluators — only team leaders and above can
+// create an evaluation. (Also enforced by `leaderOrAdmin` at the route
+// level; checked again here so this stays safe even if the route changes.)
 const createEvaluation = async (req, res) => {
   try {
+    if (!isLeaderTier(req.user.role)) {
+      return res.status(403).json({
+        message:
+          "Only a Team Leader, Admin, or Super Admin can create an evaluation.",
+      });
+    }
+
     const evaluationData = {
       ...req.body,
       evaluatedBy: req.user.name || req.user.email || "Unknown",
       createdBy: req.user._id,
+      team: req.body.team || req.user.team || undefined,
       // If team is provided as teamName but not team ID, keep it
     };
 
@@ -53,7 +64,8 @@ const getAllEvaluations = async (req, res) => {
 
     const evaluations = await Evaluation.find(filter)
       .sort({ createdAt: -1 })
-      .populate("team", "name");
+      .populate("team", "name")
+      .populate("discussion.user", "name role profilePhotoUrl");
     res.json(evaluations);
   } catch (error) {
     console.error("Get evaluations error:", error);
@@ -79,10 +91,10 @@ const getEvaluationsByTeam = async (req, res) => {
 };
 
 // ✅ Update evaluation
-// Any team member can still edit while it's a draft (they're filling it in
-// together), but once submitted/approved, only the team's leader or an
-// admin/superadmin can make changes — this was previously wide open to
-// anyone, letting any employee alter any team's finalized evaluation.
+// Employees never edit scores — only the team's leader (their own team) or
+// an admin/superadmin (any team) can create/adjust an evaluation, at any
+// stage. This replaces the earlier "creator can edit while draft" rule,
+// since employees should not be the creator of an evaluation at all now.
 const updateEvaluation = async (req, res) => {
   try {
     const evaluation = await Evaluation.findById(req.params.id);
@@ -90,17 +102,11 @@ const updateEvaluation = async (req, res) => {
       return res.status(404).json({ message: "Evaluation not found" });
     }
 
-    const isCreator =
-      evaluation.createdBy?.toString() === req.user._id.toString();
     const isTeamLeader =
       req.user.role === "leader" && sameTeam(req.user.team, evaluation.team);
-    const canEditFreely = isAdminTier(req.user.role) || isTeamLeader;
-    const canEditDraft = isCreator && evaluation.status === "draft";
-
-    if (!canEditFreely && !canEditDraft) {
+    if (!isAdminTier(req.user.role) && !isTeamLeader) {
       return res.status(403).json({
-        message:
-          "This evaluation has already been submitted. Only your team leader or an admin can edit it further.",
+        message: "Only your team leader or an admin can edit an evaluation.",
       });
     }
 
@@ -143,6 +149,84 @@ const deleteEvaluation = async (req, res) => {
   }
 };
 
+// ✅ Discussion comment — this is the employee's actual privilege here:
+// they can't score anyone, but they CAN discuss and react to a finalized
+// evaluation. Open to anyone (any team can view/discuss any evaluation, per
+// the intended visibility), same pattern as Daily Report's team feed.
+const addComment = async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      return res.status(400).json({ message: "Comment text is required" });
+    }
+    const evaluation = await Evaluation.findById(req.params.id);
+    if (!evaluation) {
+      return res.status(404).json({ message: "Evaluation not found" });
+    }
+    evaluation.discussion.push({ user: req.user._id, text: text.trim() });
+    await evaluation.save();
+    await evaluation.populate("discussion.user", "name role profilePhotoUrl");
+    res.status(201).json(evaluation);
+  } catch (error) {
+    console.error("Add evaluation comment error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const deleteComment = async (req, res) => {
+  try {
+    const evaluation = await Evaluation.findById(req.params.id);
+    if (!evaluation) {
+      return res.status(404).json({ message: "Evaluation not found" });
+    }
+    const comment = evaluation.discussion.id(req.params.commentId);
+    if (!comment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+    const isCommentOwner = comment.user?.toString() === req.user._id.toString();
+    const isTeamLeader =
+      req.user.role === "leader" && sameTeam(req.user.team, evaluation.team);
+    if (!isCommentOwner && !isTeamLeader && !isAdminTier(req.user.role)) {
+      return res
+        .status(403)
+        .json({ message: "Not authorized to delete this comment" });
+    }
+    comment.deleteOne();
+    await evaluation.save();
+    await evaluation.populate("discussion.user", "name role profilePhotoUrl");
+    res.json(evaluation);
+  } catch (error) {
+    console.error("Delete evaluation comment error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ✅ Toggle a reaction (one per user, same emoji again = un-react)
+const toggleReaction = async (req, res) => {
+  try {
+    const emoji = req.body.emoji || "👍";
+    const evaluation = await Evaluation.findById(req.params.id);
+    if (!evaluation) {
+      return res.status(404).json({ message: "Evaluation not found" });
+    }
+    const idx = evaluation.reactions.findIndex(
+      (r) => r.user.toString() === req.user._id.toString(),
+    );
+    if (idx === -1) {
+      evaluation.reactions.push({ user: req.user._id, emoji });
+    } else if (evaluation.reactions[idx].emoji === emoji) {
+      evaluation.reactions.splice(idx, 1);
+    } else {
+      evaluation.reactions[idx].emoji = emoji;
+    }
+    await evaluation.save();
+    res.json(evaluation);
+  } catch (error) {
+    console.error("Toggle evaluation reaction error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createEvaluation,
   getEvaluationById,
@@ -150,4 +234,7 @@ module.exports = {
   getEvaluationsByTeam,
   updateEvaluation,
   deleteEvaluation,
+  addComment,
+  deleteComment,
+  toggleReaction,
 };

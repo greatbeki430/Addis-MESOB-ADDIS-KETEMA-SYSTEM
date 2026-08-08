@@ -48,6 +48,34 @@ router.put("/:id", protect, adminOrSuperAdmin, async (req, res) => {
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // ⚠️ The frontend's Edit User form already limits a plain "admin" to
+    // only assigning Employee/Team Leader roles (getAvailableRoles() in
+    // UserManagement.jsx), but that was never enforced here — meaning
+    // anyone hitting this API directly as an "admin" could hand out (or
+    // take) Admin/Super Admin access. Enforcing the same rule server-side:
+    // only a Super Admin can grant Admin/Super Admin, or edit an existing
+    // Admin/Super Admin account at all.
+    const RANK = { employee: 1, leader: 2, admin: 3, superadmin: 4 };
+    const isSuperAdminCaller = req.user.role === "superadmin";
+
+    if (!isSuperAdminCaller) {
+      if (
+        (user.role === "admin" || user.role === "superadmin") &&
+        user._id.toString() !== req.user._id.toString()
+      ) {
+        return res.status(403).json({
+          message:
+            "Only a Super Admin can modify an Admin or Super Admin account",
+        });
+      }
+      if (role && RANK[role] >= RANK.admin) {
+        return res.status(403).json({
+          message:
+            "Only a Super Admin can assign the Admin or Super Admin role",
+        });
+      }
+    }
+
     // Prevent demoting last superadmin
     if (user.role === "superadmin" && role !== "superadmin") {
       const superAdminCount = await User.countDocuments({ role: "superadmin" });

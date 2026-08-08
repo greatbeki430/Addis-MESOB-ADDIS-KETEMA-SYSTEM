@@ -122,6 +122,12 @@ export const evaluationAPI = {
   getByTeam: (teamId) => api.get(`/evaluations/team/${teamId}`),
   update: (id, data) => api.put(`/evaluations/${id}`, data),
   delete: (id) => api.delete(`/evaluations/${id}`),
+  // ✅ Discussion: employees can react to and comment on evaluations
+  // even though they can't create or edit the scores themselves.
+  addComment: (id, text) => api.post(`/evaluations/${id}/comments`, { text }),
+  deleteComment: (id, commentId) =>
+    api.delete(`/evaluations/${id}/comments/${commentId}`),
+  react: (id, emoji) => api.post(`/evaluations/${id}/reactions`, { emoji }),
 };
 
 // ============================================================
