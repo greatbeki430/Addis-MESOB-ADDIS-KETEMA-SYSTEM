@@ -67,6 +67,30 @@ const evaluationSchema = new mongoose.Schema(
       type: Object,
       default: {},
     },
+    // ✅ Social feed: lets employees (who can't create/edit evaluations)
+    // react to and discuss a finalized evaluation. Kept separate from
+    // `comments` above, which stores per-criterion scoring notes.
+    reactions: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        emoji: { type: String, required: true, default: "👍" },
+        _id: false,
+      },
+    ],
+    discussion: [
+      {
+        user: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        text: { type: String, required: true, trim: true, maxlength: 1000 },
+      },
+    ],
   },
   { timestamps: true },
 );

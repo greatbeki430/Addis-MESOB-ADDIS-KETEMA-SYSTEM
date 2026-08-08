@@ -13,6 +13,7 @@ import { useToast } from "../hooks/useToast";
 // import LanguageSelector from "../components/LanguageSelector";
 import { useLanguage } from "../context/LanguageContext";
 import SignatureModal from "../components/SignatureModal";
+import EvaluationFeed from "../components/EvaluationFeed";
 import {
   FiChevronDown,
   FiUser,
@@ -91,7 +92,7 @@ const formatAINarrative = (text) => {
   return formatted;
 };
 
-export default function Evaluation({ t, lang }) {
+function EvaluationForm({ t, lang }) {
   // ✅ Use language context
   const { language: contextLang, t: contextT } = useLanguage();
   // Use context language or props language (props take precedence)
@@ -2833,4 +2834,17 @@ export default function Evaluation({ t, lang }) {
       />
     </div>
   );
+}
+
+// ════════════════════════════════════════════════════════════
+// Role router: Employees are evaluated, not evaluators — they get a
+// read-only feed (view + react + comment). Team Leader/Admin/Super Admin
+// get the full scoring form above, unchanged.
+// ════════════════════════════════════════════════════════════
+export default function Evaluation({ t, lang }) {
+  const { user } = useAuth();
+  if (user?.role === "employee") {
+    return <EvaluationFeed t={t} lang={lang} />;
+  }
+  return <EvaluationForm t={t} lang={lang} />;
 }
