@@ -69,7 +69,11 @@ const BOOKMARK_KEY = "mesob:evalBookmarks";
 
 // ── Helpers ────────────────────────────────────────────────
 function timeAgo(dateStr) {
-  const diffMs = Date.now() - new Date(dateStr).getTime();
+  if (!dateStr) return "just now";
+  const date = new Date(dateStr);
+  // Check if date is valid
+  if (isNaN(date.getTime())) return "just now";
+  const diffMs = Date.now() - date.getTime();
   const mins = Math.floor(diffMs / 60000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m`;
@@ -77,7 +81,7 @@ function timeAgo(dateStr) {
   if (hrs < 24) return `${hrs}h`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `${days}d`;
-  return new Date(dateStr).toLocaleDateString();
+  return date.toLocaleDateString();
 }
 
 function avgScore(evaluation) {
@@ -283,7 +287,9 @@ function CommentItem({ comment, canDelete, onDelete, onReply }) {
           <span className="ef-comment-text">{comment.text}</span>
         </div>
         <div className="ef-comment-meta">
-          <span>{timeAgo(comment.createdAt)}</span>
+          <span>
+            {comment.createdAt ? timeAgo(comment.createdAt) : "Just now"}
+          </span>{" "}
           <button
             className="ef-comment-action"
             onClick={() => onReply(comment.user?.name)}
@@ -980,13 +986,13 @@ export default function EvaluationFeed({ t }) {
 
 // ── Styles ──────────────────────────────────────────────────
 const feedStyles = `
-  .ef-page {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: clamp(16px, 4vw, 28px) clamp(12px, 4vw, 20px) 60px;
-    font-family: ${T.sans};
-    color: ${T.ink};
-  }
+ .ef-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: clamp(16px, 4vw, 28px) clamp(20px, 6vw, 48px) 60px;
+  font-family: ${T.sans};
+  color: ${T.ink};
+}
 
   /* HERO */
   .ef-hero {
