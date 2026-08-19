@@ -4,6 +4,7 @@
 // Shown to unauthenticated visitors at "/". Introduces the whole
 // platform (not a single feature) and funnels into /login.
 // ════════════════════════════════════════════════════════════
+
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { C, F } from "../styles/theme";
@@ -11,517 +12,28 @@ import { useLanguage } from "../hooks/useLanguage";
 import { LANGUAGES } from "../constants/translations";
 import { publicAPI } from "../services/api";
 import mesobLogo from "../assets/mesoblogo.png";
-import heroBackgroundImage from "../assets/a-mesob-image.jpg";
+
+// Import modular components
+import HeroSection from "../components/landing/HeroSection";
+import DepartmentsMarquee from "../components/landing/DepartmentsMarquee";
+import FeaturesGrid from "../components/landing/FeaturesGrid";
+import ServicesSection from "../components/landing/ServicesSection";
+import HowItWorks from "../components/landing/HowItWorks";
+import GoldenMondayTeaser from "../components/landing/GoldenMondayTeaser";
+import FAQSection from "../components/landing/FAQSection";
+import SiteFooter from "../components/landing/SiteFooter";
+
 import {
-  FiMessageSquare,
-  FiStar,
-  FiFileText,
-  FiBarChart2,
-  FiUsers,
-  FiShield,
-  FiGlobe,
-  FiSunrise,
-  FiCpu,
-  FiArrowRight,
-  FiChevronDown,
-  FiCheckCircle,
-  FiLogIn,
-  FiMapPin,
   FiMenu,
   FiX,
   FiArrowUp,
-  FiHelpCircle,
-  FiMail,
-  FiSearch,
   FiGrid,
-  FiTool,
-  FiPackage,
-  FiBox,
-  FiCheck,
-  FiBriefcase,
-  FiSettings,
-  FiAward,
-  FiUser,
-  FiClock,
-  FiCalendar,
-  FiPhone,
-  FiLoader,
-  FiChevronLeft,
-  FiChevronRight,
+  FiBarChart2,
+  FiFileText,
+  FiUsers,
+  FiShield,
+  FiCpu,
 } from "react-icons/fi";
-
-// ─────────────────────────────────────────────────────────────
-// TOKENS — extending the existing brand palette, not replacing it
-// ─────────────────────────────────────────────────────────────
-const T = {
-  ink: "#081d17",
-  paper: "#fbfaf6",
-  weave: "rgba(245,197,24,0.14)",
-  heroDeep: "#0d3327",
-  heroMid: "#1a6b4a",
-};
-
-// ─────────────────────────────────────────────────────────────
-// FAQ CONTENT
-// ─────────────────────────────────────────────────────────────
-const FAQ_ITEMS = [
-  {
-    q: {
-      en: "Do I need a separate account for each service?",
-      am: "ለእያንዳንዱ አገልግሎት የተለየ መለያ ያስፈልገኛል?",
-      om: "Tajaajila hundaaf herrega addaa naa barbaachisaa?",
-    },
-    a: {
-      en: "No. One organization account signs you into every module — dashboard, evaluations, reports, documents, and Golden Monday — with access automatically scoped to your role.",
-      am: "አያስፈልግም። አንድ የድርጅት መለያ ወደ ሁሉም ክፍሎች — ዳሽቦርድ፣ ግምገማ፣ ሪፖርት፣ ሰነድ እና ወርቃማ ሰኞ — ያስገባዎታል፣ ተደራሽነትም በራስ-ሰር በሚናዎ መሰረት ይወሰናል።",
-      om: "Lakki. Herregni dhaabbilee tokko moduulii hunda keessatti si seensisa — daashboordii, madaallii, gabaasa, ragaa, fi Wiixata Warqee — dhaqqabamummaanis akkaataa gahee keetiitiin ofumaan murtaa'a.",
-    },
-  },
-  {
-    q: {
-      en: "Who can register new employees or create teams?",
-      am: "አዲስ ሰራተኞችን መመዝገብ ወይም ቡድን መፍጠር የሚችለው ማን ነው?",
-      om: "Hojjetoota haaraa galmeessuu ykn garee uumuu kan danda'u eenyu?",
-    },
-    a: {
-      en: "Team leaders and admins can register employees and manage rosters. Creating and renaming departments, and full user management, is reserved for admins and super admins.",
-      am: "ቡድን መሪዎችና አድሚኖች ሰራተኞችን መመዝገብና ዝርዝሮችን ማስተዳደር ይችላሉ። ክፍል መፍጠርና እንደገና መሰየም እንዲሁም ሙሉ የተጠቃሚ አስተዳደር ለአድሚኖችና ለሱፐር አድሚኖች ብቻ የተከለለ ነው።",
-      om: "Hoogganoonni garee fi admin-oonni hojjetoota galmeessuu fi tarree bulchuu ni danda'u. Kutaa uumuu fi maqaa jijjiiruu, akkasumas bulchiinsa fayyadamaa guutuu, admin-oota fi super admin-ootaaf qofa kan qophaa'edha.",
-    },
-  },
-  {
-    q: {
-      en: "Can I use the platform in Amharic or Afaan Oromo?",
-      am: "መድረኩን በአማርኛ ወይም በአፋን ኦሮሞ መጠቀም እችላለሁ?",
-      om: "Waltajjicha Afaan Amaaraa ykn Afaan Oromootiin fayyadamuu danda'aa?",
-    },
-    a: {
-      en: "Yes — every screen works in English, Amharic, and Afaan Oromo. Switch anytime using the language selector in the top navigation.",
-      am: "አዎ — እያንዳንዱ ገጽ በእንግሊዝኛ፣ በአማርኛና በአፋን ኦሮሞ ይሰራል። በላይኛው ዳሰሳ ውስጥ ባለው የቋንቋ መራጭ በማንኛውም ጊዜ መቀየር ይችላሉ።",
-      om: "Eeyyee — fuulli hundi Ingiliffaan, Amaariffaan, fi Afaan Oromootiin hojjeta. Filannoo afaanii kan gubbaa jiru fayyadamuun yeroo barbaadanitti jijjiiruu ni dandeessu.",
-    },
-  },
-  {
-    q: {
-      en: "What does the AI assistant actually do?",
-      am: "የAI ረዳቱ በትክክል ምን ያደርጋል?",
-      om: "Deeggartuun AI dhugumaan maal godha?",
-    },
-    a: {
-      en: "It drafts recap summaries for Golden Monday sessions, suggests presentation topics, auto-fills scanned document fields, and answers questions inline across dashboards and reports.",
-      am: "ለወርቃማ ሰኞ ስብሰባዎች ማጠቃለያ ረቂቅ ያዘጋጃል፣ የአቀራረብ ርዕሶችን ይጠቁማል፣ የተቃኙ ሰነድ መስኮችን በራስ-ሰር ይሞላል፣ እንዲሁም በዳሽቦርድና ሪፖርቶች ላይ ጥያቄዎችን በቀጥታ ይመልሳል።",
-      om: "Cuunfaa walga'ii Wiixata Warqeetiif qopheessa, mata duree dhiyeessii ni yaada, unka ragaa sikaanamee ofumaan guuta, gaaffiiwwan dashboard fi gabaasa keessattis kallattiin ni deebisa.",
-    },
-  },
-];
-
-// ─────────────────────────────────────────────────────────────
-// ORBITING SERVICE ICONS
-// ─────────────────────────────────────────────────────────────
-const ORBIT_ICONS = [
-  { icon: <FiBarChart2 size={18} />, label: "Dashboard" },
-  { icon: <FiMessageSquare size={18} />, label: "Forum" },
-  { icon: <FiStar size={18} />, label: "Evaluation" },
-  { icon: <FiFileText size={18} />, label: "Reports" },
-  { icon: <FiShield size={18} />, label: "Documents" },
-  { icon: <FiSunrise size={18} />, label: "Golden Monday" },
-];
-
-// ─────────────────────────────────────────────────────────────
-// FEATURES
-// ─────────────────────────────────────────────────────────────
-// These are now static and use the t() function for translations
-const FEATURES = [
-  {
-    icon: <FiBarChart2 size={24} />,
-    big: true,
-    titleKey: "dashboardAnalytics",
-    bodyKey: "dashboardAnalyticsBody",
-  },
-  {
-    icon: <FiSunrise size={24} />,
-    big: true,
-    titleKey: "goldenMonday",
-    bodyKey: "goldenMondayBody",
-  },
-  {
-    icon: <FiMessageSquare size={20} />,
-    titleKey: "peerForum",
-    bodyKey: "peerForumBody",
-  },
-  {
-    icon: <FiStar size={20} />,
-    titleKey: "evaluation",
-    bodyKey: "evaluationBody",
-  },
-  {
-    icon: <FiFileText size={20} />,
-    titleKey: "dailyForumReports",
-    bodyKey: "dailyForumReportsBody",
-  },
-  {
-    icon: <FiShield size={20} />,
-    titleKey: "documentVault",
-    bodyKey: "documentVaultBody",
-  },
-  {
-    icon: <FiCpu size={20} />,
-    titleKey: "aiAssistant",
-    bodyKey: "aiAssistantBody",
-  },
-  {
-    icon: <FiUsers size={20} />,
-    titleKey: "teamUserManagement",
-    bodyKey: "teamUserManagementBody",
-  },
-  {
-    icon: <FiGlobe size={20} />,
-    titleKey: "threeLanguages",
-    bodyKey: "threeLanguagesBody",
-  },
-];
-
-// ─────────────────────────────────────────────────────────────
-// STEPS
-// ─────────────────────────────────────────────────────────────
-const STEPS = [
-  {
-    icon: <FiLogIn size={20} />,
-    titleKey: "step1Title",
-    bodyKey: "step1Body",
-  },
-  {
-    icon: <FiUsers size={20} />,
-    titleKey: "step2Title",
-    bodyKey: "step2Body",
-  },
-  {
-    icon: <FiCheckCircle size={20} />,
-    titleKey: "step3Title",
-    bodyKey: "step3Body",
-  },
-];
-
-// ─────────────────────────────────────────────────────────────
-// ANIMATED COUNTER
-// ─────────────────────────────────────────────────────────────
-function AnimatedStat({ value, active }) {
-  const match = /^(\d+)(.*)$/.exec(String(value));
-  const numeric = match ? parseInt(match[1], 10) : null;
-  const suffix = match ? match[2] : "";
-  const [display, setDisplay] = useState(numeric === null ? value : 0);
-  const hasRun = useRef(false);
-
-  useEffect(() => {
-    if (!active || numeric === null || hasRun.current) return;
-    hasRun.current = true;
-    const duration = 900;
-    const steps = 24;
-    const increment = numeric / steps;
-    let current = 0;
-    let step = 0;
-    const timer = setInterval(() => {
-      step++;
-      current += increment;
-      if (step >= steps) {
-        current = numeric;
-        clearInterval(timer);
-      }
-      setDisplay(Math.round(current));
-    }, duration / steps);
-    return () => clearInterval(timer);
-  }, [active, numeric]);
-
-  return <>{numeric === null ? value : display + suffix}</>;
-}
-
-// ─────────────────────────────────────────────────────────────
-// FAQ ACCORDION
-// ─────────────────────────────────────────────────────────────
-function FAQAccordion({ items, getText }) {
-  const [openIndex, setOpenIndex] = useState(0);
-
-  return (
-    <div style={{ display: "grid", gap: 10 }}>
-      {items.map((item, i) => {
-        const isOpen = openIndex === i;
-        return (
-          <div
-            key={i}
-            style={{
-              background: C.white,
-              border: `1px solid ${C.border}`,
-              borderRadius: 14,
-              overflow: "hidden",
-            }}
-          >
-            <button
-              onClick={() => setOpenIndex(isOpen ? -1 : i)}
-              aria-expanded={isOpen}
-              style={{
-                width: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                padding: "16px 20px",
-                background: "none",
-                border: "none",
-                cursor: "pointer",
-                textAlign: "left",
-                fontFamily: F.sans,
-              }}
-            >
-              <span
-                style={{
-                  fontSize: 14.5,
-                  fontWeight: 700,
-                  color: C.dark,
-                }}
-              >
-                {getText(item.q)}
-              </span>
-              <FiChevronDown
-                size={18}
-                color={C.muted}
-                style={{
-                  flexShrink: 0,
-                  transform: isOpen ? "rotate(180deg)" : "none",
-                  transition: "transform 0.2s ease",
-                }}
-              />
-            </button>
-            <div
-              style={{
-                maxHeight: isOpen ? 200 : 0,
-                overflow: "hidden",
-                transition: "max-height 0.25s ease",
-              }}
-            >
-              <p
-                style={{
-                  margin: 0,
-                  padding: "0 20px 16px",
-                  fontSize: 13.5,
-                  lineHeight: 1.65,
-                  color: C.muted,
-                }}
-              >
-                {getText(item.a)}
-              </p>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// SIGNATURE VISUAL — "Digital Mesob"
-// ─────────────────────────────────────────────────────────────
-function DigitalMesob({ t }) {
-  const radius = 150;
-
-  // Get translated orbit labels
-  const orbitLabels = [
-    t("landing.orbitDashboard") || "Dashboard",
-    t("landing.orbitForum") || "Forum",
-    t("landing.orbitEvaluation") || "Evaluation",
-    t("landing.orbitReports") || "Reports",
-    t("landing.orbitDocuments") || "Documents",
-    t("landing.orbitGoldenMonday") || "Golden Monday",
-  ];
-
-  const orbitIcons = ORBIT_ICONS.map((item, index) => ({
-    ...item,
-    label: orbitLabels[index] || item.label,
-  }));
-
-  return (
-    <div
-      style={{
-        position: "relative",
-        width: 340,
-        height: 340,
-        maxWidth: "100%",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-      }}
-    >
-      <svg
-        viewBox="0 0 340 340"
-        width="340"
-        height="340"
-        style={{ position: "absolute", inset: 0, zIndex: 3 }}
-        aria-hidden
-      >
-        <defs>
-          <linearGradient id="weaveGold" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor={C.gold} stopOpacity="0.9" />
-            <stop offset="100%" stopColor={C.goldLight} stopOpacity="0.5" />
-          </linearGradient>
-          <path
-            id="mesobOrbitTextPath"
-            d="M170,170 m-92,0 a92,92 0 1,1 184,0 a92,92 0 1,1 -184,0"
-          />
-        </defs>
-        {[0, 1, 2].map((ring) => (
-          <circle
-            key={ring}
-            cx="170"
-            cy="170"
-            r={70 + ring * 40}
-            fill="none"
-            stroke={ring === 1 ? "url(#weaveGold)" : "rgba(255,255,255,0.14)"}
-            strokeWidth={ring === 1 ? 2 : 1}
-            strokeDasharray={ring % 2 === 0 ? "3 7" : "1 5"}
-          />
-        ))}
-        {Array.from({ length: 10 }).map((_, i) => {
-          const angle = (i / 10) * Math.PI * 2;
-          const x1 = 170 + Math.cos(angle) * 34;
-          const y1 = 170 + Math.sin(angle) * 34;
-          const x2 = 170 + Math.cos(angle + Math.PI) * 34;
-          const y2 = 170 + Math.sin(angle + Math.PI) * 34;
-          return (
-            <line
-              key={i}
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke={C.goldLight}
-              strokeOpacity="0.35"
-              strokeWidth="1"
-            />
-          );
-        })}
-        <g className="mesob-orbit-text">
-          <text
-            fill={C.goldLight}
-            fontSize="13.5"
-            fontWeight="800"
-            letterSpacing="3.5"
-            style={{ fontFamily: F.sans }}
-          >
-            <textPath href="#mesobOrbitTextPath" startOffset="0%">
-              ADDIS MESOB • ADDIS MESOB •&nbsp;
-            </textPath>
-          </text>
-        </g>
-      </svg>
-
-      <div
-        style={{
-          width: 92,
-          height: 92,
-          borderRadius: "50%",
-          background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: `0 0 0 8px rgba(245,197,24,0.12), 0 12px 32px rgba(0,0,0,0.35)`,
-          zIndex: 2,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: F.serif,
-            fontSize: 38,
-            fontWeight: 900,
-            color: C.dark,
-          }}
-        >
-          አ
-        </span>
-      </div>
-
-      {orbitIcons.map((item, i) => {
-        const angle = (i / orbitIcons.length) * Math.PI * 2 - Math.PI / 2;
-        const x = 170 + Math.cos(angle) * radius;
-        const y = 170 + Math.sin(angle) * radius;
-        return (
-          <div
-            key={item.label}
-            title={item.label}
-            className="mesob-node"
-            style={{
-              position: "absolute",
-              left: x - 20,
-              top: y - 20,
-              width: 40,
-              height: 40,
-              borderRadius: 12,
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.18)",
-              backdropFilter: "blur(4px)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: C.goldLight,
-              animation: `mesob-float 5s ease-in-out ${i * 0.35}s infinite`,
-            }}
-          >
-            {item.icon}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// SECTION HEADING
-// ─────────────────────────────────────────────────────────────
-function SectionHeading({ eyebrow, title, sub, dark, center }) {
-  return (
-    <div style={{ textAlign: center ? "center" : "left" }}>
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          fontSize: 11,
-          fontWeight: 800,
-          letterSpacing: 1.2,
-          textTransform: "uppercase",
-          color: dark ? C.gold : C.primary,
-          marginBottom: 12,
-        }}
-      >
-        {eyebrow}
-      </div>
-      <h2
-        style={{
-          fontFamily: F.serif,
-          fontSize: "clamp(24px, 4vw, 34px)",
-          fontWeight: 800,
-          letterSpacing: "-0.01em",
-          margin: 0,
-          color: dark ? "#fff" : C.dark,
-        }}
-      >
-        {title}
-      </h2>
-      {sub && (
-        <p
-          style={{
-            marginTop: 12,
-            fontSize: 15,
-            lineHeight: 1.65,
-            color: dark ? "#a9b3e0" : C.muted,
-            maxWidth: 580,
-            margin: center ? "12px auto 0" : "12px 0 0",
-          }}
-        >
-          {sub}
-        </p>
-      )}
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────
 // MAIN LANDING COMPONENT
@@ -550,10 +62,7 @@ export default function Landing() {
   const hasLoadedRef = useRef(false);
   const isInitialMount = useRef(true);
 
-  // ─── Translation helper for FAQ items ──────────────────
-  const getText = (obj) => obj[language] || obj.en;
-
-  // ─── Load services from database ──────────────────────────────
+  // ─── Load services from database ──────────────────────────
   const loadServices = useCallback(async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -589,7 +98,7 @@ export default function Landing() {
     }
   }, [currentPage, itemsPerPage, searchTerm, filterDept, t]);
 
-  // ─── Load departments ──────────────────────────────────────────
+  // ─── Load departments ──────────────────────────────────────
   const loadDepartments = useCallback(async () => {
     try {
       const response = await publicAPI.getDepartments();
@@ -601,7 +110,7 @@ export default function Landing() {
     }
   }, []);
 
-  // ─── Initial load ──────────────────────────────────────────────
+  // ─── Initial load ──────────────────────────────────────────
   useEffect(() => {
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
@@ -621,7 +130,7 @@ export default function Landing() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ─── Handle page, search, and filter changes ───────────────
+  // ─── Handle page, search, and filter changes ──────────────
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -635,14 +144,14 @@ export default function Landing() {
     return () => clearTimeout(timer);
   }, [currentPage, searchTerm, filterDept, loadServices]);
 
-  // ─── Memoized stats ──────────────────────────────────────────
+  // ─── Memoized stats ────────────────────────────────────────
   const stats = useMemo(() => {
     const agencies = new Set((services || []).map((s) => s.dept || s.deptEn))
       .size;
     return { services: (services || []).length, agencies };
   }, [services]);
 
-  // ─── Departments list for marquee ─────────────────────────────
+  // ─── Departments list for marquee ──────────────────────────
   const departmentsList = useMemo(() => {
     const seen = new Set();
     const list = [];
@@ -656,24 +165,15 @@ export default function Landing() {
     return list;
   }, [services]);
 
-  // ─── Get service icon ──────────────────────────────────────────
+  // ─── Get service icon ──────────────────────────────────────
   const getServiceIcon = (index) => {
     const icons = [
-      <FiTool size={24} />,
-      <FiPackage size={24} />,
-      <FiBox size={24} />,
-      <FiSettings size={24} />,
-      <FiStar size={24} />,
-      <FiAward size={24} />,
-      <FiBriefcase size={24} />,
+      <FiGrid size={24} />,
+      <FiBarChart2 size={24} />,
+      <FiFileText size={24} />,
       <FiUsers size={24} />,
-      <FiUser size={24} />,
-      <FiClock size={24} />,
-      <FiCalendar size={24} />,
-      <FiMapPin size={24} />,
-      <FiPhone size={24} />,
-      <FiMail size={24} />,
-      <FiGlobe size={24} />,
+      <FiShield size={24} />,
+      <FiCpu size={24} />,
     ];
     return icons[index % icons.length];
   };
@@ -708,7 +208,7 @@ export default function Landing() {
     return () => elements.forEach((el) => observer.unobserve(el));
   }, []);
 
-  // ─── Back-to-top ──────────────────────────────────────────
+  // ─── Back-to-top ────────────────────────────────────────────
   useEffect(() => {
     const onScroll = () => setShowBackToTop(window.scrollY > 640);
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -739,7 +239,7 @@ export default function Landing() {
   const goLogin = () => navigate("/login");
   const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-  // ─── Pagination handlers ──────────────────────────────────────
+  // ─── Pagination handlers ──────────────────────────────────
   const goToPage = (page) => {
     if (page >= 1 && page <= totalPages) {
       setCurrentPage(page);
@@ -753,7 +253,7 @@ export default function Landing() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
 
-  // ─── Define landing copy using t() ───────────────────────────
+  // ─── Define landing copy using t() ────────────────────────
   const LANDING_COPY = {
     eyebrow: t("landing.eyebrow") || "Digital Ethiopia · Addis MESOB Platform",
     heroTitle: t("landing.heroTitle") || "Every service, in one basket.",
@@ -793,157 +293,18 @@ export default function Landing() {
     backToTop: t("landing.backToTop") || "Back to top",
   };
 
-  // ─── Get feature translations ─────────────────────────────────
-  const getFeatureTitle = (key) => {
-    const titles = {
-      dashboardAnalytics:
-        t("landing.featureDashboardAnalytics") || "Dashboard & Analytics",
-      goldenMonday: t("landing.featureGoldenMonday") || "Golden Monday",
-      peerForum: t("landing.featurePeerForum") || "Peer Forum",
-      evaluation: t("landing.featureEvaluation") || "Evaluation",
-      dailyForumReports:
-        t("landing.featureDailyForumReports") || "Daily & Forum Reports",
-      documentVault: t("landing.featureDocumentVault") || "Document Vault",
-      aiAssistant:
-        t("landing.featureAiAssistant") || "AI Assistant, everywhere",
-      teamUserManagement:
-        t("landing.featureTeamUserManagement") || "Team & User Management",
-      threeLanguages:
-        t("landing.featureThreeLanguages") || "Three languages, natively",
-    };
-    return titles[key] || key;
-  };
-
-  const getFeatureBody = (key) => {
-    const bodies = {
-      dashboardAnalyticsBody:
-        t("landing.featureDashboardAnalyticsBody") ||
-        "Live overview of organizational performance...",
-      goldenMondayBody:
-        t("landing.featureGoldenMondayBody") ||
-        "Weekly capacity-building program...",
-      peerForumBody:
-        t("landing.featurePeerForumBody") ||
-        "A shared space for teams to discuss cases...",
-      evaluationBody:
-        t("landing.featureEvaluationBody") ||
-        "Structured, criteria-based staff evaluation...",
-      dailyForumReportsBody:
-        t("landing.featureDailyForumReportsBody") ||
-        "Team leaders log activity once...",
-      documentVaultBody:
-        t("landing.featureDocumentVaultBody") ||
-        "Secure, traceable storage with AI auto-fill...",
-      aiAssistantBody:
-        t("landing.featureAiAssistantBody") ||
-        "A floating assistant and inline AI summaries...",
-      teamUserManagementBody:
-        t("landing.featureTeamUserManagementBody") ||
-        "Admins manage teams, roles, and access...",
-      threeLanguagesBody:
-        t("landing.featureThreeLanguagesBody") ||
-        "Every screen works in English, Amharic, and Afaan Oromo...",
-    };
-    return bodies[key] || key;
-  };
-
-  // ─── Get step translations ────────────────────────────────────
-  const getStepTitle = (key) => {
-    const titles = {
-      step1Title:
-        t("landing.step1Title") || "Sign in with your organization account",
-      step2Title: t("landing.step2Title") || "Your role decides what you see",
-      step3Title: t("landing.step3Title") || "Work, report, and let AI help",
-    };
-    return titles[key] || key;
-  };
-
-  const getStepBody = (key) => {
-    const bodies = {
-      step1Body:
-        t("landing.step1Body") ||
-        "Your admin creates your account; you sign in and land straight on your dashboard.",
-      step2Body:
-        t("landing.step2Body") ||
-        "Employees, team leaders, admins, and super admins each get exactly the tools their role needs.",
-      step3Body:
-        t("landing.step3Body") ||
-        "Log activity, evaluate staff, upload documents — AI summaries are one click away the whole time.",
-    };
-    return bodies[key] || key;
-  };
-
   return (
     <div
-      style={{ fontFamily: F.sans, background: T.paper, minHeight: "100vh" }}
+      style={{ fontFamily: F.sans, background: "#fbfaf6", minHeight: "100vh" }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700;800&family=Noto+Serif+Ethiopic:wght@700;900&display=swap');
         * { box-sizing: border-box; }
         html, body, #root { margin: 0; padding: 0; }
 
-        @keyframes lp-sweep {
-          0% { background-position: 0% 50%; }
-          100% { background-position: 200% 50%; }
-        }
-        @keyframes mesob-float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
-        @keyframes marquee-scroll {
-          from { transform: translateX(0); }
-          to { transform: translateX(-50%); }
-        }
-        @keyframes mesob-spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
         @keyframes lp-fade-in {
           from { opacity: 0; transform: translateY(8px); }
           to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes hero-zoom {
-          0% { transform: scale(1); }
-          100% { transform: scale(1.05); }
-        }
-
-        .mesob-orbit-text {
-          transform-origin: 170px 170px;
-          transform-box: fill-box;
-          animation: mesob-spin 22s linear infinite;
-        }
-
-        .lp-card { transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease; }
-        .lp-card:hover { transform: translateY(-4px); box-shadow: 0 16px 36px rgba(6,11,46,0.12); border-color: ${C.primary}55; }
-        .lp-cta { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-        .lp-cta:hover { transform: translateY(-2px); box-shadow: 0 12px 28px ${C.primary}4d; }
-        .lp-nav-link { transition: opacity 0.15s ease, color 0.15s ease; position: relative; }
-        .lp-nav-link:hover { opacity: 0.72; }
-        .lp-nav-link.active { color: ${C.gold} !important; }
-        .lp-nav-link.active::after {
-          content: "";
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: -6px;
-          height: 2px;
-          background: ${C.gold};
-          border-radius: 2px;
-        }
-        .lp-lang-btn { transition: opacity 0.15s ease, transform 0.15s ease; }
-        .lp-lang-btn:hover { opacity: 0.85; }
-        .lp-marquee-track:hover { animation-play-state: paused; }
-        .lp-back-to-top { transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease; }
-        .lp-back-to-top:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(6,11,46,0.35); }
-        a, button { -webkit-tap-highlight-color: transparent; }
-
-        a:focus-visible, button:focus-visible {
-          outline: 2px solid ${C.gold};
-          outline-offset: 2px;
         }
 
         .lp-skip-link {
@@ -973,42 +334,24 @@ export default function Landing() {
           * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
         }
 
-        @keyframes marquee-scroll-right {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-50%); }
+        .lp-nav-link { transition: opacity 0.15s ease, color 0.15s ease; position: relative; }
+        .lp-nav-link:hover { opacity: 0.72; }
+        .lp-nav-link.active { color: ${C.gold} !important; }
+        .lp-nav-link.active::after {
+          content: "";
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: -6px;
+          height: 2px;
+          background: ${C.gold};
+          border-radius: 2px;
         }
+        .lp-lang-btn { transition: opacity 0.15s ease, transform 0.15s ease; }
+        .lp-lang-btn:hover { opacity: 0.85; }
 
-        @keyframes marquee-scroll-left {
-          0% { transform: translateX(-50%); }
-          100% { transform: translateX(0); }
-        }
-
-        @media (max-width: 768px) {
-          .lp-marquee-desktop { display: none !important; }
-          .lp-marquee-mobile { display: flex !important; }
-        }
-
-        @media (min-width: 769px) {
-          .lp-marquee-desktop { display: flex !important; }
-          .lp-marquee-mobile { display: none !important; }
-        }
-
-        @media (max-width: 480px) {
-          .lp-marquee-row-1 { animation-duration: 20s !important; gap: 12px !important; }
-          .lp-marquee-row-2 { animation-duration: 20s !important; gap: 12px !important; }
-          .lp-marquee-mobile span { font-size: 10px !important; padding: 3px 6px !important; }
-        }
-
-        @media (max-width: 360px) {
-          .lp-marquee-row-1 { animation-duration: 16s !important; gap: 10px !important; }
-          .lp-marquee-row-2 { animation-duration: 16s !important; gap: 10px !important; }
-          .lp-marquee-mobile span { font-size: 9px !important; padding: 2px 5px !important; }
-        }
-
-        .lp-marquee-row-1:hover,
-        .lp-marquee-row-2:hover {
-          animation-play-state: paused;
-        }
+        .lp-back-to-top { transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease; }
+        .lp-back-to-top:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(6,11,46,0.35); }
       `}</style>
 
       {/* ── SKIP LINK ───────────────────────────────────── */}
@@ -1145,9 +488,19 @@ export default function Landing() {
               cursor: "pointer",
               fontFamily: F.sans,
               whiteSpace: "nowrap",
+              transition: "transform 0.2s ease, box-shadow 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow =
+                "0 12px 28px rgba(245,197,24,0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
             }}
           >
-            <FiLogIn size={14} />
+            <FiMenu size={14} />
             {LANDING_COPY.ctaPrimary}
           </button>
         </div>
@@ -1172,10 +525,11 @@ export default function Landing() {
         </button>
       </header>
 
+      {/* ── MOBILE NAV ────────────────────────────────────── */}
       {mobileNavOpen && (
         <div
           style={{
-            background: T.ink,
+            background: "#081d17",
             padding: "16px clamp(16px, 5vw, 48px) 24px",
             display: "flex",
             flexDirection: "column",
@@ -1251,1247 +605,123 @@ export default function Landing() {
         </div>
       )}
 
-      {/* ── HERO WITH BACKGROUND IMAGE ────────────────────── */}
-      <section
-        id="main-content"
-        style={{
-          position: "relative",
-          overflow: "hidden",
-          minHeight: "80vh",
-          display: "flex",
-          alignItems: "center",
-          padding:
-            "clamp(48px, 8vw, 80px) clamp(20px, 6vw, 64px) clamp(56px, 8vw, 88px)",
-          color: "#fff",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 0,
-            backgroundImage: `url(${heroBackgroundImage})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            animation: "hero-zoom 20s ease-in-out infinite alternate",
+      {/* ── MAIN CONTENT ──────────────────────────────────── */}
+      <div id="main-content">
+        {/* Hero Section */}
+        <HeroSection t={t} onLogin={goLogin} />
+
+        {/* Departments Marquee */}
+        <DepartmentsMarquee
+          departments={departmentsList}
+          loading={loading}
+          label={LANDING_COPY.deptsEyebrow}
+        />
+
+        {/* Features Grid */}
+        <FeaturesGrid
+          ref={registerRef("features")}
+          data-reveal="features"
+          style={revealStyle("features")}
+          t={t}
+          copy={{
+            eyebrow: LANDING_COPY.featuresEyebrow,
+            title: LANDING_COPY.featuresTitle,
+            sub: LANDING_COPY.featuresSub,
           }}
         />
 
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            zIndex: 1,
-            background:
-              "linear-gradient(135deg, rgba(8,29,23,0.88) 0%, rgba(26,107,74,0.75) 50%, rgba(10,40,30,0.85) 100%)",
+        {/* Services Section */}
+        <ServicesSection
+          ref={registerRef("services")}
+          data-reveal="services"
+          style={revealStyle("services")}
+          t={t}
+          services={services}
+          loading={loading}
+          error={error}
+          departments={departments}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          filterDept={filterDept}
+          onFilterChange={(val) => {
+            setFilterDept(val);
+            setCurrentPage(1);
+          }}
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          itemsPerPage={itemsPerPage}
+          startIndex={startIndex}
+          endIndex={endIndex}
+          onPageChange={goToPage}
+          copy={{
+            searchPlaceholder:
+              t("landing.searchServices") || "Search services...",
+            showing: t("landing.showingServices") || "Showing",
+            of: t("landing.of") || "of",
+            services: t("landing.services") || "services",
+            page: t("landing.page") || "Page",
+            previous: t("landing.previous") || "Previous",
+            next: t("landing.next") || "Next",
+            active: t("landing.active") || "Active",
+            inactive: t("landing.inactive") || "Inactive",
+            loading: t("landing.loadingServices") || "Loading services...",
+            noServices: t("landing.noServicesFound") || "No services found",
+            service: t("landing.service") || "service",
+            available: t("landing.available") || "available",
+          }}
+          getServiceIcon={getServiceIcon}
+          language={language}
+        />
+
+        {/* How It Works */}
+        <HowItWorks
+          ref={registerRef("how")}
+          data-reveal="how"
+          style={revealStyle("how")}
+          t={t}
+          copy={{
+            eyebrow: LANDING_COPY.howEyebrow,
+            title: LANDING_COPY.howTitle,
           }}
         />
 
-        <div
-          style={{
-            maxWidth: 1200,
-            margin: "0 auto",
-            display: "flex",
-            gap: 48,
-            alignItems: "center",
-            flexWrap: "wrap",
-            position: "relative",
-            zIndex: 2,
-            width: "100%",
+        {/* Golden Monday Teaser */}
+        <GoldenMondayTeaser
+          ref={registerRef("gm")}
+          data-reveal="gm"
+          style={revealStyle("gm")}
+          t={t}
+          copy={{
+            eyebrow: LANDING_COPY.gmEyebrow,
+            title: LANDING_COPY.gmTitle,
+            body: LANDING_COPY.gmBody,
+            cta: LANDING_COPY.gmCta,
           }}
-        >
-          <div style={{ flex: "1 1 480px" }}>
-            <div
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                background: "rgba(245,197,24,0.16)",
-                border: "1px solid rgba(245,197,24,0.33)",
-                color: C.goldLight,
-                padding: "6px 14px",
-                borderRadius: 999,
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: 0.4,
-                marginBottom: 24,
-              }}
-            >
-              <FiMapPin size={13} />
-              {LANDING_COPY.eyebrow}
-            </div>
-            <h1
-              style={{
-                fontFamily: F.serif,
-                fontSize: "clamp(34px, 6vw, 58px)",
-                fontWeight: 900,
-                lineHeight: 1.08,
-                letterSpacing: "-0.015em",
-                margin: 0,
-                textShadow: "0 2px 20px rgba(0,0,0,0.3)",
-              }}
-            >
-              {LANDING_COPY.heroTitle}
-            </h1>
-            <p
-              style={{
-                fontSize: "clamp(15px, 2.2vw, 18px)",
-                lineHeight: 1.7,
-                color: "#dfe4ff",
-                maxWidth: 600,
-                marginTop: 22,
-                textShadow: "0 1px 10px rgba(0,0,0,0.2)",
-              }}
-            >
-              {LANDING_COPY.heroBody}
-            </p>
-            <div
-              style={{
-                display: "flex",
-                gap: 14,
-                marginTop: 32,
-                flexWrap: "wrap",
-              }}
-            >
-              <button
-                onClick={goLogin}
-                className="lp-cta"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-                  color: C.dark,
-                  border: "none",
-                  padding: "13px 24px",
-                  borderRadius: 10,
-                  fontWeight: 800,
-                  fontSize: 14,
-                  cursor: "pointer",
-                  fontFamily: F.sans,
-                  boxShadow: "0 4px 20px rgba(245,197,24,0.3)",
-                }}
-              >
-                {LANDING_COPY.ctaPrimary}
-                <FiArrowRight size={16} />
-              </button>
-              <a
-                href="#features"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 8,
-                  color: "#fff",
-                  textDecoration: "none",
-                  fontWeight: 700,
-                  fontSize: 14,
-                  border: "1.5px solid rgba(255,255,255,0.3)",
-                  padding: "13px 22px",
-                  borderRadius: 10,
-                  backdropFilter: "blur(4px)",
-                  background: "rgba(255,255,255,0.05)",
-                }}
-              >
-                {LANDING_COPY.ctaSecondary}
-                <FiChevronDown size={16} />
-              </a>
-            </div>
-
-            <div
-              ref={registerRef("stats")}
-              data-reveal="stats"
-              style={{
-                display: "flex",
-                gap: 30,
-                marginTop: 48,
-                flexWrap: "wrap",
-              }}
-            >
-              {[
-                [stats.services + "+", LANDING_COPY.statServices],
-                [(stats.agencies || 0) + "", LANDING_COPY.statAgencies],
-                ["3", LANDING_COPY.statLanguages],
-                ["24/7", LANDING_COPY.statAI],
-              ].map(([num, label], i) => (
-                <div key={i}>
-                  <div
-                    style={{
-                      fontFamily: F.serif,
-                      fontSize: 26,
-                      fontWeight: 900,
-                      color: C.goldLight,
-                      textShadow: "0 1px 10px rgba(0,0,0,0.2)",
-                    }}
-                  >
-                    <AnimatedStat value={num} active={!!visible.stats} />
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 11.5,
-                      color: "#a9b3e0",
-                      fontWeight: 600,
-                      marginTop: 2,
-                    }}
-                  >
-                    {label}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div
-            style={{
-              flex: "1 1 340px",
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
-            <DigitalMesob t={t} />
-          </div>
-        </div>
-      </section>
-
-      {/* ── DEPARTMENTS MARQUEE ──────────────────────────── */}
-      <section
-        style={{
-          background: C.dark,
-          padding: "18px 0",
-          overflow: "hidden",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-        }}
-      >
-        <div
-          style={{
-            textAlign: "center",
-            fontSize: "clamp(10px, 2vw, 10.5px)",
-            fontWeight: 800,
-            letterSpacing: 1.4,
-            textTransform: "uppercase",
-            color: C.gold,
-            marginBottom: 10,
-          }}
-        >
-          {LANDING_COPY.deptsEyebrow}
-        </div>
-
-        <div
-          className="lp-marquee-desktop"
-          style={{
-            display: "flex",
-            overflow: "hidden",
-            width: "100%",
-            position: "relative",
-          }}
-        >
-          <div
-            className="lp-marquee-track"
-            style={{
-              display: "flex",
-              gap: "clamp(24px, 4vw, 48px)",
-              paddingRight: "clamp(24px, 4vw, 48px)",
-              animation: "marquee-scroll 40s linear infinite",
-              whiteSpace: "nowrap",
-              flexShrink: 0,
-              minWidth: "max-content",
-            }}
-          >
-            {departmentsList.length > 0
-              ? [
-                  ...departmentsList,
-                  ...departmentsList,
-                  ...departmentsList,
-                  ...departmentsList,
-                ].map((d, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      color: "#c9d0f0",
-                      fontSize: "clamp(13px, 2vw, 16px)",
-                      fontWeight: 600,
-                      whiteSpace: "nowrap",
-                      display: "inline-block",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {d}
-                  </span>
-                ))
-              : [
-                  "Trade",
-                  "Ethiotelecom",
-                  "Labor & Skills",
-                  "Federal Document",
-                  "Traffic",
-                  "Digital Services",
-                ].map((d, i) => (
-                  <span
-                    key={i}
-                    style={{
-                      color: "#c9d0f0",
-                      fontSize: "clamp(13px, 2vw, 16px)",
-                      fontWeight: 600,
-                      whiteSpace: "nowrap",
-                      display: "inline-block",
-                      flexShrink: 0,
-                      opacity: loading ? 0.6 : 0.4,
-                    }}
-                  >
-                    {loading ? "Loading..." : d}
-                  </span>
-                ))}
-          </div>
-        </div>
-
-        <div
-          className="lp-marquee-mobile"
-          style={{
-            display: "none",
-            flexDirection: "column",
-            gap: "8px",
-            overflow: "hidden",
-            width: "100%",
-            padding: "4px 0",
-          }}
-        >
-          <div style={{ overflow: "hidden", width: "100%" }}>
-            <div
-              className="lp-marquee-row-1"
-              style={{
-                display: "flex",
-                gap: "clamp(16px, 3vw, 24px)",
-                animation: "marquee-scroll-right 25s linear infinite",
-                whiteSpace: "nowrap",
-                width: "max-content",
-              }}
-            >
-              {departmentsList.length > 0
-                ? [
-                    ...departmentsList,
-                    ...departmentsList,
-                    ...departmentsList,
-                  ].map((d, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        color: "#c9d0f0",
-                        fontSize: "clamp(11px, 2.5vw, 13px)",
-                        fontWeight: 600,
-                        whiteSpace: "nowrap",
-                        display: "inline-block",
-                        flexShrink: 0,
-                        padding: "4px 8px",
-                        background: "rgba(255,255,255,0.06)",
-                        borderRadius: "20px",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                      }}
-                    >
-                      {d}
-                    </span>
-                  ))
-                : [
-                    "Trade",
-                    "Ethiotelecom",
-                    "Labor & Skills",
-                    "Federal Document",
-                  ].map((d, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        color: "#c9d0f0",
-                        fontSize: "clamp(11px, 2.5vw, 13px)",
-                        fontWeight: 600,
-                        whiteSpace: "nowrap",
-                        display: "inline-block",
-                        flexShrink: 0,
-                        padding: "4px 8px",
-                        background: "rgba(255,255,255,0.06)",
-                        borderRadius: "20px",
-                        border: "1px solid rgba(255,255,255,0.06)",
-                        opacity: loading ? 0.6 : 0.4,
-                      }}
-                    >
-                      {loading ? "Loading..." : d}
-                    </span>
-                  ))}
-            </div>
-          </div>
-
-          <div style={{ overflow: "hidden", width: "100%" }}>
-            <div
-              className="lp-marquee-row-2"
-              style={{
-                display: "flex",
-                gap: "clamp(16px, 3vw, 24px)",
-                animation: "marquee-scroll-left 25s linear infinite",
-                whiteSpace: "nowrap",
-                width: "max-content",
-              }}
-            >
-              {departmentsList.length > 0
-                ? [...departmentsList, ...departmentsList, ...departmentsList]
-                    .reverse()
-                    .map((d, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          color: "#c9d0f0",
-                          fontSize: "clamp(11px, 2.5vw, 13px)",
-                          fontWeight: 600,
-                          whiteSpace: "nowrap",
-                          display: "inline-block",
-                          flexShrink: 0,
-                          padding: "4px 8px",
-                          background: "rgba(255,255,255,0.06)",
-                          borderRadius: "20px",
-                          border: "1px solid rgba(255,255,255,0.06)",
-                        }}
-                      >
-                        {d}
-                      </span>
-                    ))
-                : ["Traffic", "Digital Services", "Ethiotelecom", "Trade"]
-                    .reverse()
-                    .map((d, i) => (
-                      <span
-                        key={i}
-                        style={{
-                          color: "#c9d0f0",
-                          fontSize: "clamp(11px, 2.5vw, 13px)",
-                          fontWeight: 600,
-                          whiteSpace: "nowrap",
-                          display: "inline-block",
-                          flexShrink: 0,
-                          padding: "4px 8px",
-                          background: "rgba(255,255,255,0.06)",
-                          borderRadius: "20px",
-                          border: "1px solid rgba(255,255,255,0.06)",
-                          opacity: loading ? 0.6 : 0.4,
-                        }}
-                      >
-                        {loading ? "Loading..." : d}
-                      </span>
-                    ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FEATURES ──────────────────────────────────────── */}
-      <section
-        id="features"
-        ref={registerRef("features")}
-        data-reveal="features"
-        style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "clamp(56px, 8vw, 84px) clamp(20px, 6vw, 40px) 12px",
-          ...revealStyle("features"),
-        }}
-      >
-        <SectionHeading
-          eyebrow={LANDING_COPY.featuresEyebrow}
-          title={LANDING_COPY.featuresTitle}
-          sub={LANDING_COPY.featuresSub}
-          center
-        />
-        <div
-          id="lp-features-grid"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 18,
-            marginTop: 40,
-          }}
-        >
-          {FEATURES.map((f, i) => (
-            <div
-              key={i}
-              className="lp-card"
-              style={{
-                gridColumn: f.big ? "span 2" : "span 1",
-                background: C.white,
-                borderRadius: 18,
-                padding: f.big ? 30 : 22,
-                border: `1px solid ${C.border}`,
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              {f.big && (
-                <div
-                  aria-hidden
-                  style={{
-                    position: "absolute",
-                    top: -30,
-                    right: -30,
-                    width: 100,
-                    height: 100,
-                    borderRadius: "50%",
-                    background: T.weave,
-                  }}
-                />
-              )}
-              <div
-                style={{
-                  width: f.big ? 48 : 40,
-                  height: f.big ? 48 : 40,
-                  borderRadius: 12,
-                  background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 16,
-                  position: "relative",
-                  zIndex: 1,
-                }}
-              >
-                {f.icon}
-              </div>
-              <h3
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: f.big ? 18 : 15.5,
-                  color: C.dark,
-                  fontFamily: F.serif,
-                  fontWeight: 800,
-                }}
-              >
-                {getFeatureTitle(f.titleKey)}
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13.5,
-                  lineHeight: 1.6,
-                  color: C.muted,
-                }}
-              >
-                {getFeatureBody(f.bodyKey)}
-              </p>
-            </div>
-          ))}
-        </div>
-        <style>{`
-          @media (max-width: 900px) { #lp-features-grid { grid-template-columns: repeat(2, 1fr) !important; } #lp-features-grid > div { grid-column: span 1 !important; } }
-          @media (max-width: 560px) { #lp-features-grid { grid-template-columns: 1fr !important; } }
-          @media (max-width: 640px) {
-            #lp-search-filter { grid-template-columns: 1fr !important; }
-          }
-        `}</style>
-      </section>
-
-      {/* ── SERVICES SECTION ─────────────────────────────── */}
-      <section
-        id="services"
-        ref={registerRef("services")}
-        data-reveal="services"
-        style={{
-          maxWidth: 1200,
-          margin: "0 auto",
-          padding: "clamp(56px, 8vw, 84px) clamp(20px, 6vw, 40px) 12px",
-          ...revealStyle("services"),
-        }}
-      >
-        <SectionHeading
-          eyebrow={
-            <>
-              <FiGrid size={14} style={{ marginRight: 4 }} />
-              {t("landing.servicesAvailable") || "Available Services"}
-            </>
-          }
-          title={t("landing.servicesTitle") || "Browse our service catalogue"}
-          sub={
-            t("landing.servicesSub") ||
-            "Explore all available services. Login to access full features and management."
-          }
-          center
+          onLogin={goLogin}
         />
 
-        <div
-          id="lp-search-filter"
-          style={{
-            display: "grid",
-            gridTemplateColumns: "2fr 1fr",
-            gap: 12,
-            marginTop: 24,
-            marginBottom: 20,
+        {/* FAQ Section */}
+        <FAQSection
+          ref={registerRef("faq")}
+          data-reveal="faq"
+          style={revealStyle("faq")}
+          t={t}
+          copy={{
+            eyebrow: LANDING_COPY.faqEyebrow,
+            title: LANDING_COPY.faqTitle,
           }}
-        >
-          <div style={{ position: "relative", width: "100%" }}>
-            <span
-              style={{
-                position: "absolute",
-                left: 12,
-                top: "50%",
-                transform: "translateY(-50%)",
-                color: C.muted,
-              }}
-            >
-              <FiSearch size={18} />
-            </span>
-            <input
-              type="text"
-              placeholder={t("landing.searchServices") || "Search services..."}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: "100%",
-                boxSizing: "border-box",
-                padding: "10px 14px 10px 42px",
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                fontSize: 14,
-                background: C.white,
-                outline: "none",
-                transition: "border-color 0.2s",
-              }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = C.primary)}
-              onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
-            />
-          </div>
-          <select
-            value={filterDept}
-            onChange={(e) => {
-              setFilterDept(e.target.value);
-              setCurrentPage(1);
-            }}
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              padding: "10px 14px",
-              border: `1px solid ${C.border}`,
-              borderRadius: 8,
-              fontSize: 14,
-              background: C.white,
-              outline: "none",
-              transition: "border-color 0.2s",
-            }}
-            onFocus={(e) => (e.currentTarget.style.borderColor = C.primary)}
-            onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
-          >
-            {departments.map((d) => (
-              <option key={d} value={d}>
-                {d}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {!loading && !error && services.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 12,
-              flexWrap: "wrap",
-              gap: 8,
-            }}
-          >
-            <span
-              style={{ fontSize: "clamp(12px, 3vw, 13px)", color: C.muted }}
-            >
-              {t("landing.showingServices") || "Showing"} {startIndex + 1}–
-              {endIndex} {t("landing.of") || "of"} {totalItems}{" "}
-              {t("landing.services") || "services"}
-            </span>
-            <span
-              style={{ fontSize: "clamp(12px, 3vw, 13px)", color: C.muted }}
-            >
-              {t("landing.page") || "Page"} {currentPage}{" "}
-              {t("landing.of") || "of"} {totalPages}
-            </span>
-          </div>
-        )}
-
-        {error && (
-          <div
-            style={{
-              background: "#fee2e2",
-              color: "#dc2626",
-              padding: "12px 16px",
-              borderRadius: 8,
-              marginBottom: 16,
-              border: "1px solid #fecaca",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-            }}
-          >
-            <span>⚠️</span>
-            {error}
-          </div>
-        )}
-
-        {loading ? (
-          <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
-            <FiLoader
-              size={32}
-              style={{ animation: "spin 1s linear infinite" }}
-            />
-            <p>
-              {t("landing.loadingServices") ||
-                "Loading services from database..."}
-            </p>
-          </div>
-        ) : services.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
-            <FiPackage size={48} style={{ marginBottom: 12, opacity: 0.5 }} />
-            <p>
-              {t("landing.noServicesFound") ||
-                "No services found matching your criteria"}
-            </p>
-          </div>
-        ) : (
-          <>
-            <div
-              id="services-grid"
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fill, minmax(min(100%, 200px), 1fr))",
-                gap: 16,
-              }}
-            >
-              {services.map((s, i) => (
-                <div
-                  key={s._id || i}
-                  style={{
-                    background: C.white,
-                    borderRadius: 12,
-                    padding: "16px 18px",
-                    border: `1px solid ${C.border}`,
-                    transition: "all 0.3s ease",
-                    cursor: "default",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-4px)";
-                    e.currentTarget.style.boxShadow =
-                      "0 8px 30px rgba(0,0,0,0.1)";
-                    e.currentTarget.style.borderColor = C.primary;
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
-                    e.currentTarget.style.borderColor = C.border;
-                  }}
-                >
-                  <div
-                    style={{ fontSize: 28, color: C.primary, marginBottom: 8 }}
-                  >
-                    {getServiceIcon(i)}
-                  </div>
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      fontSize: 14,
-                      color: C.dark,
-                      marginBottom: 2,
-                    }}
-                  >
-                    {language === "en" ? s.nameEn || s.name : s.name}
-                  </div>
-                  {s.nameEn && language === "en" && (
-                    <div
-                      style={{ fontSize: 11, color: "#bbb", marginBottom: 4 }}
-                    >
-                      {s.name}
-                    </div>
-                  )}
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: "#888",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      marginBottom: 8,
-                    }}
-                  >
-                    <FiBriefcase size={12} />
-                    {language === "en" ? s.deptEn || s.dept : s.dept}
-                  </div>
-                  <span
-                    style={{
-                      background: s.active ? C.bg : "#ffeee8",
-                      color: s.active ? C.primary : C.orange,
-                      borderRadius: 12,
-                      padding: "2px 10px",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 4,
-                    }}
-                  >
-                    {s.active ? (
-                      <>
-                        <FiCheck size={10} /> {t("landing.active") || "Active"}
-                      </>
-                    ) : (
-                      t("landing.inactive") || "Inactive"
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {totalPages > 1 && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  gap: "clamp(6px, 2vw, 12px)",
-                  marginTop: "clamp(20px, 4vw, 32px)",
-                  padding: "16px 0",
-                  flexWrap: "wrap",
-                }}
-              >
-                <button
-                  onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  style={{
-                    background: currentPage === 1 ? "#e5e7eb" : C.primary,
-                    color: currentPage === 1 ? "#999" : "#fff",
-                    border: "none",
-                    borderRadius: 8,
-                    padding: "8px 16px",
-                    fontSize: "clamp(12px, 3vw, 14px)",
-                    fontWeight: 600,
-                    cursor: currentPage === 1 ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    opacity: currentPage === 1 ? 0.6 : 1,
-                    transition: "all 0.3s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentPage !== 1) {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = `0 4px 12px ${C.primary}44`;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                >
-                  <FiChevronLeft size={16} />
-                  {t("landing.previous") || "Previous"}
-                </button>
-
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "clamp(4px, 1.5vw, 8px)",
-                    flexWrap: "wrap",
-                    justifyContent: "center",
-                  }}
-                >
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                    (page) => {
-                      const showPage =
-                        page === 1 ||
-                        page === totalPages ||
-                        Math.abs(page - currentPage) <= 2;
-
-                      if (!showPage) {
-                        if (page === 2 || page === totalPages - 1) {
-                          return (
-                            <span
-                              key={page}
-                              style={{
-                                padding: "8px 6px",
-                                color: "#999",
-                                fontSize: "clamp(12px, 3vw, 14px)",
-                              }}
-                            >
-                              …
-                            </span>
-                          );
-                        }
-                        return null;
-                      }
-
-                      return (
-                        <button
-                          key={page}
-                          onClick={() => goToPage(page)}
-                          style={{
-                            background:
-                              currentPage === page ? C.primary : "#f3f4f6",
-                            color: currentPage === page ? "#fff" : "#555",
-                            border:
-                              currentPage === page
-                                ? `2px solid ${C.primary}`
-                                : "1px solid #e5e7eb",
-                            borderRadius: 8,
-                            padding: "8px 14px",
-                            minWidth: "40px",
-                            fontSize: "clamp(12px, 3vw, 14px)",
-                            fontWeight: currentPage === page ? 700 : 500,
-                            cursor: "pointer",
-                            transition: "all 0.3s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            if (currentPage !== page) {
-                              e.currentTarget.style.background = "#e5e7eb";
-                              e.currentTarget.style.transform =
-                                "translateY(-2px)";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (currentPage !== page) {
-                              e.currentTarget.style.background = "#f3f4f6";
-                              e.currentTarget.style.transform = "translateY(0)";
-                            }
-                          }}
-                        >
-                          {page}
-                        </button>
-                      );
-                    },
-                  )}
-                </div>
-
-                <button
-                  onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  style={{
-                    background:
-                      currentPage === totalPages ? "#e5e7eb" : C.primary,
-                    color: currentPage === totalPages ? "#999" : "#fff",
-                    border: "none",
-                    borderRadius: 8,
-                    padding: "8px 16px",
-                    fontSize: "clamp(12px, 3vw, 14px)",
-                    fontWeight: 600,
-                    cursor:
-                      currentPage === totalPages ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    opacity: currentPage === totalPages ? 0.6 : 1,
-                    transition: "all 0.3s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (currentPage !== totalPages) {
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = `0 4px 12px ${C.primary}44`;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                >
-                  {t("landing.next") || "Next"}
-                  <FiChevronRight size={16} />
-                </button>
-              </div>
-            )}
-
-            {totalItems > 0 && (
-              <div
-                style={{
-                  textAlign: "center",
-                  marginTop: "clamp(8px, 2vw, 12px)",
-                  fontSize: "clamp(11px, 2.5vw, 12px)",
-                  color: C.muted,
-                  padding: "8px 0",
-                }}
-              >
-                {totalItems}{" "}
-                {totalItems === 1
-                  ? t("landing.service") || "service"
-                  : t("landing.services") || "services"}{" "}
-                {t("landing.available") || "available"}
-              </div>
-            )}
-          </>
-        )}
-      </section>
-
-      {/* ── HOW IT WORKS ─────────────────────────────────── */}
-      <section
-        id="how"
-        ref={registerRef("how")}
-        data-reveal="how"
-        style={{
-          maxWidth: 1000,
-          margin: "0 auto",
-          padding: "clamp(56px, 8vw, 84px) clamp(20px, 6vw, 40px) 12px",
-          ...revealStyle("how"),
-        }}
-      >
-        <SectionHeading
-          eyebrow={LANDING_COPY.howEyebrow}
-          title={LANDING_COPY.howTitle}
-          center
+          language={language}
         />
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: 20,
-            marginTop: 36,
-          }}
-        >
-          {STEPS.map((s, i) => (
-            <div
-              key={i}
-              style={{
-                background: C.white,
-                borderRadius: 16,
-                padding: 24,
-                border: `1px solid ${C.border}`,
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: -14,
-                  left: 22,
-                  width: 28,
-                  height: 28,
-                  borderRadius: "50%",
-                  background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-                  color: C.dark,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 900,
-                  fontSize: 13,
-                }}
-              >
-                {i + 1}
-              </div>
-              <div
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 10,
-                  background: C.bg,
-                  color: C.primary,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 16,
-                  marginTop: 8,
-                }}
-              >
-                {s.icon}
-              </div>
-              <h3
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: 15.5,
-                  color: C.dark,
-                  fontFamily: F.serif,
-                  fontWeight: 800,
-                }}
-              >
-                {getStepTitle(s.titleKey)}
-              </h3>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13,
-                  lineHeight: 1.6,
-                  color: C.muted,
-                }}
-              >
-                {getStepBody(s.bodyKey)}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── GOLDEN MONDAY TEASER ─────────────────────────── */}
-      <section
-        ref={registerRef("gm")}
-        data-reveal="gm"
-        style={{
-          background: T.ink,
-          color: "#fff",
-          marginTop: 40,
-          padding: "clamp(56px, 8vw, 84px) clamp(20px, 6vw, 40px)",
-          ...revealStyle("gm"),
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 1000,
-            margin: "0 auto",
-            display: "flex",
-            gap: 36,
-            alignItems: "center",
-            flexWrap: "wrap",
-          }}
-        >
-          <div
-            style={{
-              width: 64,
-              height: 64,
-              borderRadius: 18,
-              background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-              color: C.dark,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <FiSunrise size={30} />
-          </div>
-          <div style={{ flex: "1 1 480px" }}>
-            <SectionHeading
-              eyebrow={LANDING_COPY.gmEyebrow}
-              title={LANDING_COPY.gmTitle}
-              sub={LANDING_COPY.gmBody}
-              dark
-            />
-            <button
-              onClick={goLogin}
-              className="lp-cta"
-              style={{
-                marginTop: 22,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-                color: C.dark,
-                border: "none",
-                padding: "12px 22px",
-                borderRadius: 10,
-                fontWeight: 800,
-                fontSize: 14,
-                cursor: "pointer",
-                fontFamily: F.sans,
-              }}
-            >
-              {LANDING_COPY.gmCta}
-              <FiArrowRight size={16} />
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ── FAQ ──────────────────────────────────────────── */}
-      <section
-        id="faq"
-        ref={registerRef("faq")}
-        data-reveal="faq"
-        style={{
-          maxWidth: 760,
-          margin: "0 auto",
-          padding:
-            "clamp(56px, 8vw, 84px) clamp(20px, 6vw, 40px) clamp(40px, 6vw, 60px)",
-          ...revealStyle("faq"),
-        }}
-      >
-        <SectionHeading
-          eyebrow={
-            <>
-              <FiHelpCircle size={14} style={{ marginRight: 4 }} />{" "}
-              {LANDING_COPY.faqEyebrow}
-            </>
-          }
-          title={LANDING_COPY.faqTitle}
-          center
-        />
-        <div style={{ marginTop: 32 }}>
-          <FAQAccordion items={FAQ_ITEMS} getText={getText} />
-        </div>
-      </section>
+      </div>
 
       {/* ── FOOTER ───────────────────────────────────────── */}
-      <footer
-        style={{
-          background: "#04081f",
-          color: "#8892c0",
-          padding: "40px clamp(20px, 6vw, 40px) 28px",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 1000,
-            margin: "0 auto",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            flexWrap: "wrap",
-            gap: 24,
-            paddingBottom: 24,
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-          }}
-        >
-          <div style={{ maxWidth: 320 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <img
-                src={mesobLogo}
-                alt="Addis MESOB"
-                style={{ width: 28, height: 28, borderRadius: 6 }}
-              />
-              <span
-                style={{
-                  fontFamily: F.serif,
-                  fontWeight: 800,
-                  color: "#fff",
-                  fontSize: 15,
-                }}
-              >
-                Addis MESOB
-              </span>
-            </div>
-            <p style={{ fontSize: 12.5, margin: "12px 0 0" }}>
-              {LANDING_COPY.footerTagline}
-            </p>
-          </div>
-          <nav
-            aria-label="Footer"
-            style={{
-              display: "flex",
-              gap: 20,
-              flexWrap: "wrap",
-              fontSize: 12.5,
-            }}
-          >
-            <a
-              href="/privacy"
-              style={{ color: "#8892c0", textDecoration: "none" }}
-            >
-              {LANDING_COPY.footerPrivacy}
-            </a>
-            <a
-              href="/terms"
-              style={{ color: "#8892c0", textDecoration: "none" }}
-            >
-              {LANDING_COPY.footerTerms}
-            </a>
-            <a
-              href="mailto:support@addismesob.example"
-              style={{
-                color: "#8892c0",
-                textDecoration: "none",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 5,
-              }}
-            >
-              <FiMail size={12} />
-              {LANDING_COPY.footerContact}
-            </a>
-          </nav>
-        </div>
-        <p style={{ fontSize: 11, margin: "18px 0 0", textAlign: "center" }}>
-          © {new Date().getFullYear()} Digital Ethiopia · Addis MESOB
-        </p>
-      </footer>
+      <SiteFooter
+        tagline={LANDING_COPY.footerTagline}
+        privacyLabel={LANDING_COPY.footerPrivacy}
+        termsLabel={LANDING_COPY.footerTerms}
+        contactLabel={LANDING_COPY.footerContact}
+      />
 
       {/* ── BACK TO TOP ──────────────────────────────────── */}
       <button
@@ -2516,17 +746,20 @@ export default function Landing() {
           zIndex: 40,
           opacity: showBackToTop ? 1 : 0,
           pointerEvents: showBackToTop ? "auto" : "none",
+          transition:
+            "transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "translateY(-3px)";
+          e.currentTarget.style.boxShadow = "0 10px 24px rgba(6,11,46,0.35)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = "0 6px 18px rgba(6,11,46,0.3)";
         }}
       >
         <FiArrowUp size={18} />
       </button>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 }
