@@ -31,7 +31,7 @@ export default function ChangePassword() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState({
     score: 0,
-    label: t("changePassword.strengthWeak"),
+    label: t("changePassword.strengthWeak") || "Weak",
     color: "#ef4444",
   });
 
@@ -45,20 +45,12 @@ export default function ChangePassword() {
     if (/[^a-zA-Z0-9]/.test(password)) score++;
 
     const levels = [
-      {
-        label: t("changePassword.strengthVeryWeak"),
-        color: "#ef4444",
-        score: 0,
-      },
-      { label: t("changePassword.strengthWeak"), color: "#f59e0b", score: 1 },
-      { label: t("changePassword.strengthFair"), color: "#f59e0b", score: 2 },
-      { label: t("changePassword.strengthGood"), color: "#3b82f6", score: 3 },
-      { label: t("changePassword.strengthStrong"), color: "#10b981", score: 4 },
-      {
-        label: t("changePassword.strengthVeryStrong"),
-        color: "#10b981",
-        score: 5,
-      },
+      { label: "Very Weak", color: "#ef4444", score: 0 },
+      { label: "Weak", color: "#f59e0b", score: 1 },
+      { label: "Fair", color: "#f59e0b", score: 2 },
+      { label: "Good", color: "#3b82f6", score: 3 },
+      { label: "Strong", color: "#10b981", score: 4 },
+      { label: "Very Strong", color: "#10b981", score: 5 },
     ];
 
     return levels.find((l) => l.score === score) || levels[0];
@@ -76,32 +68,52 @@ export default function ChangePassword() {
 
     // Validate
     if (!currentPassword || !newPassword || !confirmPassword) {
-      showToast(t("changePassword.errorFieldsRequired"), "warning");
+      showToast(
+        t("changePassword.errorFieldsRequired") || "All fields are required",
+        "warning",
+      );
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      showToast(t("changePassword.errorNoMatch"), "error");
+      showToast(
+        t("changePassword.errorNoMatch") || "Passwords do not match",
+        "error",
+      );
       return;
     }
 
     if (newPassword.length < 8) {
-      showToast(t("changePassword.errorMinLength"), "warning");
+      showToast(
+        t("changePassword.errorMinLength") ||
+          "Password must be at least 8 characters",
+        "warning",
+      );
       return;
     }
 
     if (newPassword === currentPassword) {
-      showToast(t("changePassword.errorSamePassword"), "warning");
+      showToast(
+        t("changePassword.errorSamePassword") ||
+          "New password must be different from current",
+        "warning",
+      );
       return;
     }
 
     setLoading(true);
     try {
-      await authAPI.changePassword({
+      const response = await authAPI.changePassword({
         currentPassword,
         newPassword,
       });
-      showToast(t("changePassword.successMessage"), "success");
+
+      console.log("✅ Password change response:", response);
+
+      showToast(
+        t("changePassword.successMessage") || "Password changed successfully!",
+        "success",
+      );
 
       // Clear form
       setCurrentPassword("");
@@ -109,51 +121,44 @@ export default function ChangePassword() {
       setConfirmPassword("");
       setPasswordStrength({
         score: 0,
-        label: t("changePassword.strengthWeak"),
+        label: "Weak",
         color: "#ef4444",
       });
     } catch (error) {
-      console.error("Password change error:", error);
+      console.error("❌ Password change error:", error);
+      console.error("Error response:", error.response?.data);
+
       const message =
-        error.response?.data?.message || t("changePassword.errorGeneric");
+        error.response?.data?.message ||
+        error.response?.data?.error ||
+        t("changePassword.errorGeneric") ||
+        "Failed to change password. Please try again.";
+
       showToast(message, "error");
     } finally {
       setLoading(false);
     }
   };
 
-  // Password requirements with translated labels
+  // Password requirements
   const requirements = [
+    { label: "At least 8 characters", met: newPassword.length >= 8 },
     {
-      label: t("changePassword.reqMinChars"),
-      met: newPassword.length >= 8,
-    },
-    {
-      label: t("changePassword.reqMinCharsRecommended"),
+      label: "At least 12 characters (recommended)",
       met: newPassword.length >= 12,
     },
     {
-      label: t("changePassword.reqUpperLower"),
+      label: "Uppercase and lowercase letters",
       met: /[a-z]/.test(newPassword) && /[A-Z]/.test(newPassword),
     },
+    { label: "At least one number", met: /\d/.test(newPassword) },
     {
-      label: t("changePassword.reqNumber"),
-      met: /\d/.test(newPassword),
-    },
-    {
-      label: t("changePassword.reqSpecial"),
+      label: "At least one special character",
       met: /[^a-zA-Z0-9]/.test(newPassword),
     },
   ];
 
   const progressPercentage = (passwordStrength.score / 5) * 100;
-
-  // Get translated strength label with interpolation
-  const getStrengthLabel = () => {
-    return t("changePassword.passwordStrength", {
-      strength: passwordStrength.label,
-    });
-  };
 
   return (
     <div
@@ -202,7 +207,7 @@ export default function ChangePassword() {
               margin: 0,
             }}
           >
-            {t("changePassword.title")}
+            {t("changePassword.title") || "Change Password"}
           </h1>
           <p
             style={{
@@ -212,8 +217,8 @@ export default function ChangePassword() {
             }}
           >
             {user?.name
-              ? `${t("common.welcome") || "Hi"} ${user.name}, ${t("changePassword.subtitle")}`
-              : t("changePassword.subtitle")}
+              ? `Hi ${user.name}, update your password securely`
+              : "Update your password securely"}
           </p>
         </div>
 
@@ -229,14 +234,14 @@ export default function ChangePassword() {
                 marginBottom: 6,
               }}
             >
-              {t("changePassword.currentPasswordLabel")}
+              {t("changePassword.currentPasswordLabel") || "Current Password"}
             </label>
             <div style={{ position: "relative" }}>
               <input
                 type={showCurrentPassword ? "text" : "password"}
                 value={currentPassword}
                 onChange={(e) => setCurrentPassword(e.target.value)}
-                placeholder={t("changePassword.currentPasswordPlaceholder")}
+                placeholder="Enter current password"
                 style={{
                   width: "100%",
                   padding: "12px 44px 12px 14px",
@@ -292,14 +297,14 @@ export default function ChangePassword() {
                 marginBottom: 6,
               }}
             >
-              {t("changePassword.newPasswordLabel")}
+              {t("changePassword.newPasswordLabel") || "New Password"}
             </label>
             <div style={{ position: "relative" }}>
               <input
                 type={showNewPassword ? "text" : "password"}
                 value={newPassword}
                 onChange={handleNewPasswordChange}
-                placeholder={t("changePassword.newPasswordPlaceholder")}
+                placeholder="Enter new password"
                 style={{
                   width: "100%",
                   padding: "12px 44px 12px 14px",
@@ -373,7 +378,7 @@ export default function ChangePassword() {
                     color: passwordStrength.color,
                   }}
                 >
-                  <span>{getStrengthLabel()}</span>
+                  <span>{passwordStrength.label}</span>
                   <span>{passwordStrength.score}/5</span>
                 </div>
               </div>
@@ -391,14 +396,15 @@ export default function ChangePassword() {
                 marginBottom: 6,
               }}
             >
-              {t("changePassword.confirmNewPasswordLabel")}
+              {t("changePassword.confirmNewPasswordLabel") ||
+                "Confirm New Password"}
             </label>
             <div style={{ position: "relative" }}>
               <input
                 type={showConfirmPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder={t("changePassword.confirmNewPasswordPlaceholder")}
+                placeholder="Confirm new password"
                 style={{
                   width: "100%",
                   padding: "12px 44px 12px 14px",
@@ -466,7 +472,7 @@ export default function ChangePassword() {
                   }}
                 >
                   <FiAlertCircle size={14} />
-                  {t("changePassword.passwordNoMatch")}
+                  Passwords do not match
                 </div>
               )}
             {confirmPassword &&
@@ -483,7 +489,7 @@ export default function ChangePassword() {
                   }}
                 >
                   <FiCheckCircle size={14} />
-                  {t("changePassword.passwordMatch")}
+                  Passwords match
                 </div>
               )}
           </div>
@@ -506,7 +512,7 @@ export default function ChangePassword() {
                   marginBottom: 6,
                 }}
               >
-                {t("changePassword.passwordRequirements")}
+                Password Requirements:
               </p>
               {requirements.map((req, idx) => (
                 <div
@@ -574,12 +580,12 @@ export default function ChangePassword() {
             {loading ? (
               <>
                 <span style={{ animation: "spin 1s linear infinite" }}>⏳</span>
-                {t("changePassword.submittingBtn")}
+                {t("changePassword.submittingBtn") || "Updating..."}
               </>
             ) : (
               <>
                 <FiLock size={18} />
-                {t("changePassword.submitBtn")}
+                {t("changePassword.submitBtn") || "Change Password"}
               </>
             )}
           </button>
@@ -593,7 +599,8 @@ export default function ChangePassword() {
             }}
           >
             <FiKey size={12} style={{ marginRight: 4 }} />
-            {t("changePassword.securityNote")}
+            For security, you'll need to log in again after changing your
+            password
           </div>
         </form>
       </div>
