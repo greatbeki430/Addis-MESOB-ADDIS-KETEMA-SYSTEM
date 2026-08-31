@@ -1,3 +1,4 @@
+// frontend/src/components/golden-monday/GalleryUploader.jsx
 import { useState } from "react";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
