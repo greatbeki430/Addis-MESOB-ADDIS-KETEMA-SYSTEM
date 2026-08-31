@@ -1,5 +1,7 @@
 // frontend/src/pages/admin/EmployeeManagement.jsx
 // Complete Employee Management System - Full CRUD + AI Integration with AI Auto-Fill
+// ✅ FIXED: Added user existence check and cleanup for 404 errors
+// ✅ FIXED: DetailRow component moved outside to prevent render-time creation
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { C, F, btn } from "../../styles/theme";
@@ -42,6 +44,34 @@ import {
   FiCheck,
   FiAlertCircle,
 } from "react-icons/fi";
+
+// ── Helper Component ── Defined OUTSIDE the main component
+const DetailRow = ({ label, value, icon }) => (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "space-between",
+      padding: "6px 0",
+      borderBottom: `1px solid ${C.border}33`,
+    }}
+  >
+    <span
+      style={{
+        fontSize: 13,
+        color: C.muted,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      {icon}
+      {label}:
+    </span>
+    <span style={{ fontSize: 13, color: C.dark, fontWeight: 500 }}>
+      {value}
+    </span>
+  </div>
+);
 
 export default function EmployeeManagement({ t }) {
   const { showToast } = useToast();
@@ -216,6 +246,22 @@ export default function EmployeeManagement({ t }) {
     [safeT],
   );
 
+  // ── ✅ NEW: Check if user exists ──
+  const ensureUserExists = useCallback(async (userId) => {
+    if (!userId) return true;
+    try {
+      await authAPI.getUser(userId);
+      return true;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        console.warn(`⚠️ User ${userId} not found - will clean up reference`);
+        return false;
+      }
+      console.warn(`⚠️ Could not verify user ${userId}:`, error.message);
+      return true;
+    }
+  }, []);
+
   // ── Load Data ──
   const loadEmployees = useCallback(async () => {
     try {
@@ -260,7 +306,7 @@ export default function EmployeeManagement({ t }) {
     }
   }, [showToast, getTranslation]);
 
-  // ── Load Users with better error handling ──
+  // ── Load Users ──
   const loadUsers = useCallback(async () => {
     setIsLoadingUsers(true);
     try {
@@ -279,12 +325,6 @@ export default function EmployeeManagement({ t }) {
       return usersArray;
     } catch (error) {
       console.error("❌ Failed to load users:", error);
-      console.error("Error details:", {
-        status: error.response?.status,
-        data: error.response?.data,
-        message: error.message,
-      });
-
       if (error.response?.status === 401) {
         showToast("Session expired. Please login again.", "error");
         setTimeout(() => (window.location.href = "/login"), 1500);
@@ -293,7 +333,6 @@ export default function EmployeeManagement({ t }) {
       } else {
         showToast("Failed to load users. Please refresh the page.", "error");
       }
-
       setAllUsers([]);
       return [];
     } finally {
@@ -301,6 +340,7 @@ export default function EmployeeManagement({ t }) {
     }
   }, [showToast, getTranslation]);
 
+  // ── Load Pending Registrations ──
   const loadPendingRegistrations = useCallback(async () => {
     try {
       const response = await goldenMondayAPI.getPendingRegistrations();
@@ -310,6 +350,7 @@ export default function EmployeeManagement({ t }) {
     }
   }, []);
 
+  // ── Approve Registration ──
   const handleApproveRegistration = async (registrationId) => {
     setProcessingApproval(registrationId);
     try {
@@ -325,6 +366,7 @@ export default function EmployeeManagement({ t }) {
     }
   };
 
+  // ── Reject Registration ──
   const handleRejectRegistration = async (registrationId) => {
     setProcessingApproval(registrationId);
     try {
@@ -565,10 +607,7 @@ export default function EmployeeManagement({ t }) {
 
   const addSkill = () => {
     if (newSkill.trim() && !formData.skills.includes(newSkill.trim())) {
-      setFormData((f) => ({
-        ...f,
-        skills: [...f.skills, newSkill.trim()],
-      }));
+      setFormData((f) => ({ ...f, skills: [...f.skills, newSkill.trim()] }));
       setNewSkill("");
     }
   };
@@ -629,22 +668,7 @@ export default function EmployeeManagement({ t }) {
     }
   };
 
-  const ensureUserExists = useCallback(async (userId) => {
-    if (!userId) return true;
-    try {
-      const response = await authAPI.getUser(userId);
-      return response.data !== null;
-    } catch (error) {
-      if (error.response?.status === 404) {
-        console.warn(`⚠️ User ${userId} not found - cleaning up reference`);
-        return false;
-      }
-      // For other errors, assume the user exists but there's a network issue
-      console.warn(`⚠️ Could not verify user ${userId}:`, error.message);
-      return true;
-    }
-  }, []);
-
+  // ── ✅ UPDATED handleSubmit with user existence check ──
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -667,17 +691,15 @@ export default function EmployeeManagement({ t }) {
         return;
       }
 
-      // ✅ NEW: If editing, check if the user exists
+      // ✅ Check if user exists before updating
       if (editingEmployee && formData.userId) {
         const userExists = await ensureUserExists(formData.userId);
         if (!userExists) {
-          // User was deleted - update the employee to remove the broken reference
           showToast(
-            "The linked user account no longer exists. The employee record will be updated without the user reference.",
+            "Linked user account no longer exists. Removing user reference.",
             "warning",
           );
-          // We'll continue with userId set to null or empty
-          // but we need to handle this in the API call
+          // We'll update without userId
         }
       }
 
@@ -693,9 +715,8 @@ export default function EmployeeManagement({ t }) {
         setUploadingPhoto(false);
       }
 
+      // ✅ Only include userId if it exists and user is valid
       const employeeData = {
-        // If user doesn't exist, don't send the userId
-        ...(formData.userId && { userId: formData.userId }),
         name: formData.name,
         email: formData.email,
         department: formData.department,
@@ -713,6 +734,14 @@ export default function EmployeeManagement({ t }) {
         notes: formData.notes || "",
       };
 
+      // ✅ Only add userId if it exists and user is valid
+      if (formData.userId) {
+        const userExists = await ensureUserExists(formData.userId);
+        if (userExists) {
+          employeeData.userId = formData.userId;
+        }
+      }
+
       console.log(
         "Employee Data to send:",
         JSON.stringify(employeeData, null, 2),
@@ -727,33 +756,14 @@ export default function EmployeeManagement({ t }) {
         if (!employeeId) {
           throw new Error("No valid employee ID found");
         }
-
-        // ✅ Check if user exists before updating, if not, we update without userId
-        if (formData.userId) {
-          const userExists = await ensureUserExists(formData.userId);
-          if (!userExists) {
-            // Remove userId from employeeData if user doesn't exist
-            delete employeeData.userId;
-            console.log(
-              "⚠️ User doesn't exist, updating employee without userId reference",
-            );
-          }
-        }
-
         await goldenMondayAPI.updateRosterEntry(employeeId, employeeData);
         showToast(getTranslation("updateSuccess"), "success");
       } else {
-        // Check if user exists before registering new employee
-        if (formData.userId) {
-          const userExists = await ensureUserExists(formData.userId);
-          if (!userExists) {
-            showToast(
-              "Selected user does not exist. Please select a valid user.",
-              "error",
-            );
-            setSaving(false);
-            return;
-          }
+        // For new employees, require userId
+        if (!employeeData.userId) {
+          showToast("Please select a valid user", "error");
+          setSaving(false);
+          return;
         }
         await goldenMondayAPI.registerEmployee(employeeData);
         showToast(getTranslation("createSuccess"), "success");
@@ -762,15 +772,45 @@ export default function EmployeeManagement({ t }) {
       resetModal();
       await loadEmployees();
     } catch (error) {
-      console.error("Failed to submit employee data:", error);
       console.error("=== ERROR IN SUBMIT ===");
-      // ... existing error handling
+      console.error("Error object:", error);
+
+      let errorDetails = "";
+      if (error.response) {
+        console.error("Error response status:", error.response.status);
+        console.error("Error response data:", error.response.data);
+
+        if (error.response.data) {
+          if (typeof error.response.data === "string") {
+            errorDetails = error.response.data;
+          } else if (error.response.data.message) {
+            errorDetails = error.response.data.message;
+          } else if (error.response.data.error) {
+            errorDetails = error.response.data.error;
+          } else {
+            errorDetails = JSON.stringify(error.response.data);
+          }
+        }
+
+        const errorMessage = `Server Error (${error.response.status}): ${errorDetails}`;
+        showToast(errorMessage, "error");
+      } else if (error.request) {
+        console.error("No response received:", error.request);
+        showToast(
+          "No response from server. Please check your connection.",
+          "error",
+        );
+      } else {
+        console.error("Error message:", error.message);
+        showToast(error.message || "An unexpected error occurred", "error");
+      }
     } finally {
       setSaving(false);
       setUploadingPhoto(false);
     }
   };
 
+  // ── Rest of the component (handlers, render, etc.) ──
   const handleDeleteWithReason = async (reason) => {
     if (!deleteTarget) return;
 
@@ -4056,31 +4096,3 @@ export default function EmployeeManagement({ t }) {
     </div>
   );
 }
-
-// ── Helper Component ──
-const DetailRow = ({ label, value, icon }) => (
-  <div
-    style={{
-      display: "flex",
-      justifyContent: "space-between",
-      padding: "6px 0",
-      borderBottom: `1px solid ${C.border}33`,
-    }}
-  >
-    <span
-      style={{
-        fontSize: 13,
-        color: C.muted,
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-      }}
-    >
-      {icon}
-      {label}:
-    </span>
-    <span style={{ fontSize: 13, color: C.dark, fontWeight: 500 }}>
-      {value}
-    </span>
-  </div>
-);
