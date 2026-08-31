@@ -145,6 +145,39 @@ export const canApproveReport = (user, report) => {
   return isAdminOrAbove(user);
 };
 
+// ─── GOLDEN MONDAY GALLERY / RESOURCE VAULT PERMISSIONS ─────────────────
+// These mirror the backend's `leaderOrAdmin` middleware used on the
+// gallery, roster, and rotation routes in goldenMondayRoutes.js — the
+// frontend must gate the same way or you get exactly the bug this was
+// written to fix: a role that CAN call the upload/delete API (per the
+// server) but never sees the button to do it (per the UI), or vice versa.
+
+// Admin side: create folders, upload resources (images, PPTX, DOCX, PDF,
+// video), delete resources, manage auto-clear, manage the roster.
+export const canManageGoldenMondayResources = (user) => isLeaderOrAbove(user);
+
+// Explicit aliases for call-site clarity where it matters what action
+// is being gated — all resolve to the same leader-or-above check today,
+// but keeping them separate means a future split (e.g. "leaders can
+// upload but only admins can bulk-delete") is a one-line change here
+// instead of a hunt through every component that imported a generic flag.
+export const canUploadGoldenMondayResource = (user) =>
+  canManageGoldenMondayResources(user);
+export const canDeleteGoldenMondayResource = (user) =>
+  canManageGoldenMondayResources(user);
+export const canManageGoldenMondayRoster = (user) =>
+  canManageGoldenMondayResources(user);
+export const canConfigureGoldenMondayAutoClear = (user) =>
+  canManageGoldenMondayResources(user);
+
+// End-user side: every authenticated role (employee and up) can browse
+// folders and download/view resources — there's no gate here by design,
+// matching the backend's `anyRole` middleware on GET /gallery and
+// GET /gallery/folders. Kept as an explicit function (not just "true")
+// so call sites read the same way as the admin-side checks and stay
+// easy to tighten later if that ever needs to change.
+export const canViewGoldenMondayResources = (user) => !!user;
+
 // ─── UI Helpers ──────────────────────────────────────────────────────
 
 // Get role display name

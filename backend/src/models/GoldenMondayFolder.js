@@ -52,6 +52,11 @@ const goldenMondayFolderSchema = new mongoose.Schema(
     // Denormalized for fast grid rendering without a join. On a "week"
     // folder these are aggregated across all its fileType children; on a
     // "fileType" folder they're scoped to that type only.
+    title: {
+      type: String,
+      default: "",
+      trim: true,
+    },
     coverPhoto: { type: String, default: "" },
     count: { type: Number, default: 0 },
 
@@ -65,16 +70,19 @@ const goldenMondayFolderSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// A week folder is unique per calendar week.
+// ✅ FIX: A week folder is unique per (weekOf, createdBy) pair
 goldenMondayFolderSchema.index(
-  { weekOf: 1 },
+  { weekOf: 1, createdBy: 1 },
   { unique: true, partialFilterExpression: { folderType: "week" } },
 );
 
-// A fileType folder is unique per (parentFolder, fileType) pair.
+// ✅ FIX: A fileType folder is unique per (parentFolder, fileType, createdBy) pair
 goldenMondayFolderSchema.index(
-  { parentFolder: 1, fileType: 1 },
+  { parentFolder: 1, fileType: 1, createdBy: 1 },
   { unique: true, partialFilterExpression: { folderType: "fileType" } },
 );
+
+// Additional index for faster queries
+goldenMondayFolderSchema.index({ createdBy: 1, folderType: 1, weekOf: -1 });
 
 module.exports = mongoose.model("GoldenMondayFolder", goldenMondayFolderSchema);
