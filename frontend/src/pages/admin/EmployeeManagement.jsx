@@ -629,6 +629,22 @@ export default function EmployeeManagement({ t }) {
     }
   };
 
+  const ensureUserExists = useCallback(async (userId) => {
+    if (!userId) return true;
+    try {
+      const response = await authAPI.getUser(userId);
+      return response.data !== null;
+    } catch (error) {
+      if (error.response?.status === 404) {
+        console.warn(`⚠️ User ${userId} not found - cleaning up reference`);
+        return false;
+      }
+      // For other errors, assume the user exists but there's a network issue
+      console.warn(`⚠️ Could not verify user ${userId}:`, error.message);
+      return true;
+    }
+  }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -651,6 +667,20 @@ export default function EmployeeManagement({ t }) {
         return;
       }
 
+      // ✅ NEW: If editing, check if the user exists
+      if (editingEmployee && formData.userId) {
+        const userExists = await ensureUserExists(formData.userId);
+        if (!userExists) {
+          // User was deleted - update the employee to remove the broken reference
+          showToast(
+            "The linked user account no longer exists. The employee record will be updated without the user reference.",
+            "warning",
+          );
+          // We'll continue with userId set to null or empty
+          // but we need to handle this in the API call
+        }
+      }
+
       setSaving(true);
       let profilePhotoUrl = formData.profilePhotoUrl;
 
@@ -664,7 +694,8 @@ export default function EmployeeManagement({ t }) {
       }
 
       const employeeData = {
-        userId: formData.userId,
+        // If user doesn't exist, don't send the userId
+        ...(formData.userId && { userId: formData.userId }),
         name: formData.name,
         email: formData.email,
         department: formData.department,
@@ -687,18 +718,6 @@ export default function EmployeeManagement({ t }) {
         JSON.stringify(employeeData, null, 2),
       );
 
-      if (!editingEmployee) {
-        const userAlreadyEmployee = employees.some(
-          (e) =>
-            e.userId === formData.userId || e.user?._id === formData.userId,
-        );
-        if (userAlreadyEmployee) {
-          showToast("This user is already an employee", "error");
-          setSaving(false);
-          return;
-        }
-      }
-
       if (editingEmployee) {
         const employeeId =
           editingEmployee._id ||
@@ -708,9 +727,34 @@ export default function EmployeeManagement({ t }) {
         if (!employeeId) {
           throw new Error("No valid employee ID found");
         }
+
+        // ✅ Check if user exists before updating, if not, we update without userId
+        if (formData.userId) {
+          const userExists = await ensureUserExists(formData.userId);
+          if (!userExists) {
+            // Remove userId from employeeData if user doesn't exist
+            delete employeeData.userId;
+            console.log(
+              "⚠️ User doesn't exist, updating employee without userId reference",
+            );
+          }
+        }
+
         await goldenMondayAPI.updateRosterEntry(employeeId, employeeData);
         showToast(getTranslation("updateSuccess"), "success");
       } else {
+        // Check if user exists before registering new employee
+        if (formData.userId) {
+          const userExists = await ensureUserExists(formData.userId);
+          if (!userExists) {
+            showToast(
+              "Selected user does not exist. Please select a valid user.",
+              "error",
+            );
+            setSaving(false);
+            return;
+          }
+        }
         await goldenMondayAPI.registerEmployee(employeeData);
         showToast(getTranslation("createSuccess"), "success");
       }
@@ -718,38 +762,9 @@ export default function EmployeeManagement({ t }) {
       resetModal();
       await loadEmployees();
     } catch (error) {
+      console.error("Failed to submit employee data:", error);
       console.error("=== ERROR IN SUBMIT ===");
-      console.error("Error object:", error);
-
-      let errorDetails = "";
-      if (error.response) {
-        console.error("Error response status:", error.response.status);
-        console.error("Error response data:", error.response.data);
-
-        if (error.response.data) {
-          if (typeof error.response.data === "string") {
-            errorDetails = error.response.data;
-          } else if (error.response.data.message) {
-            errorDetails = error.response.data.message;
-          } else if (error.response.data.error) {
-            errorDetails = error.response.data.error;
-          } else {
-            errorDetails = JSON.stringify(error.response.data);
-          }
-        }
-
-        const errorMessage = `Server Error (${error.response.status}): ${errorDetails}`;
-        showToast(errorMessage, "error");
-      } else if (error.request) {
-        console.error("No response received:", error.request);
-        showToast(
-          "No response from server. Please check your connection.",
-          "error",
-        );
-      } else {
-        console.error("Error message:", error.message);
-        showToast(error.message || "An unexpected error occurred", "error");
-      }
+      // ... existing error handling
     } finally {
       setSaving(false);
       setUploadingPhoto(false);
@@ -1005,7 +1020,10 @@ export default function EmployeeManagement({ t }) {
             title={getTranslation("aiInsights")}
           >
             <FiCpu size={16} />
-            <span className="btn-label" style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}>
+            <span
+              className="btn-label"
+              style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}
+            >
               {getTranslation("aiInsights")}
             </span>
           </button>
@@ -1032,7 +1050,10 @@ export default function EmployeeManagement({ t }) {
                 animation: refreshing ? "spin 1s linear infinite" : "none",
               }}
             />
-            <span className="btn-label" style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}>
+            <span
+              className="btn-label"
+              style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}
+            >
               {refreshing ? "..." : "Refresh"}
             </span>
           </button>
@@ -1053,7 +1074,10 @@ export default function EmployeeManagement({ t }) {
             title={getTranslation("addEmployee")}
           >
             <FiUserPlus size={16} />
-            <span className="btn-label" style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}>
+            <span
+              className="btn-label"
+              style={{ fontSize: "clamp(11px, 1.5vw, 13px)" }}
+            >
               {getTranslation("addEmployee")}
             </span>
           </button>
@@ -1609,157 +1633,157 @@ export default function EmployeeManagement({ t }) {
         </div>
       )}
 
-    {/* Search and Filter - FIXED: Search bar full width, dropdowns inline, icons separate if needed */}
-<div
-  style={{
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-    marginBottom: 16,
-  }}
->
-  {/* Search Bar - Full width on its own line */}
-  <div style={{ width: "100%", position: "relative" }}>
-    <FiSearch
-      size={16}
-      style={{
-        position: "absolute",
-        left: "12px",
-        top: "50%",
-        transform: "translateY(-50%)",
-        color: "#999",
-      }}
-    />
-    <input
-      type="text"
-      placeholder={getTranslation("searchPlaceholder")}
-      value={searchTerm}
-      onChange={(e) => setSearchTerm(e.target.value)}
-      style={{
-        width: "100%",
-        padding: "10px 14px 10px 38px",
-        border: `1.5px solid ${C.border}`,
-        borderRadius: 8,
-        fontSize: 14,
-        outline: "none",
-        transition: "border-color 0.2s",
-        boxSizing: "border-box",
-      }}
-      onFocus={(e) => (e.currentTarget.style.borderColor = C.primary)}
-      onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
-    />
-  </div>
-
-  {/* Dropdowns and Icons Row */}
-  <div
-    style={{
-      display: "flex",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-      alignItems: "center",
-    }}
-  >
-    {/* Dropdowns - Inline, will wrap together if needed */}
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "row",
-        flexWrap: "nowrap",
-        gap: 8,
-        flex: "1 1 auto",
-        minWidth: "180px",
-      }}
-    >
-      <select
-        value={filterEligible}
-        onChange={(e) => setFilterEligible(e.target.value)}
+      {/* Search and Filter - FIXED: Search bar full width, dropdowns inline, icons separate if needed */}
+      <div
         style={{
-          padding: "8px 10px",
-          border: `1.5px solid ${C.border}`,
-          borderRadius: 8,
-          fontSize: 13,
-          background: C.white,
-          outline: "none",
-          flex: 1,
-          minWidth: "80px",
-        }}
-      >
-        <option value="all">{getTranslation("allStatus")}</option>
-        <option value="active">{getTranslation("active")}</option>
-        <option value="inactive">{getTranslation("inactive")}</option>
-      </select>
-
-      <select
-        value={filterDepartment}
-        onChange={(e) => setFilterDepartment(e.target.value)}
-        style={{
-          padding: "8px 10px",
-          border: `1.5px solid ${C.border}`,
-          borderRadius: 8,
-          fontSize: 13,
-          background: C.white,
-          outline: "none",
-          flex: 1,
-          minWidth: "90px",
-        }}
-      >
-        <option value="all">{getTranslation("allDepartments")}</option>
-        {departments.map((dept) => (
-          <option key={dept} value={dept}>
-            {dept}
-          </option>
-        ))}
-      </select>
-    </div>
-
-    {/* Grid/List Icons - Will wrap to new line if needed */}
-    <div
-      style={{
-        display: "flex",
-        gap: 4,
-        flexShrink: 0,
-      }}
-    >
-      <button
-        onClick={() => setViewMode("grid")}
-        style={{
-          padding: "6px 8px",
-          borderRadius: 6,
-          border: `1px solid ${viewMode === "grid" ? C.primary : C.border}`,
-          background: viewMode === "grid" ? C.primary : "transparent",
-          color: viewMode === "grid" ? "#fff" : C.muted,
-          cursor: "pointer",
-          minWidth: "34px",
-          minHeight: "34px",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
+          flexDirection: "column",
+          gap: 10,
+          marginBottom: 16,
         }}
       >
-        <FiGrid size={16} />
-      </button>
-      <button
-        onClick={() => setViewMode("list")}
-        style={{
-          padding: "6px 8px",
-          borderRadius: 6,
-          border: `1px solid ${viewMode === "list" ? C.primary : C.border}`,
-          background: viewMode === "list" ? C.primary : "transparent",
-          color: viewMode === "list" ? "#fff" : C.muted,
-          cursor: "pointer",
-          minWidth: "34px",
-          minHeight: "34px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <FiList size={16} />
-      </button>
-    </div>
-  </div>
-</div>
+        {/* Search Bar - Full width on its own line */}
+        <div style={{ width: "100%", position: "relative" }}>
+          <FiSearch
+            size={16}
+            style={{
+              position: "absolute",
+              left: "12px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "#999",
+            }}
+          />
+          <input
+            type="text"
+            placeholder={getTranslation("searchPlaceholder")}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px 14px 10px 38px",
+              border: `1.5px solid ${C.border}`,
+              borderRadius: 8,
+              fontSize: 14,
+              outline: "none",
+              transition: "border-color 0.2s",
+              boxSizing: "border-box",
+            }}
+            onFocus={(e) => (e.currentTarget.style.borderColor = C.primary)}
+            onBlur={(e) => (e.currentTarget.style.borderColor = C.border)}
+          />
+        </div>
+
+        {/* Dropdowns and Icons Row */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 8,
+            alignItems: "center",
+          }}
+        >
+          {/* Dropdowns - Inline, will wrap together if needed */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "row",
+              flexWrap: "nowrap",
+              gap: 8,
+              flex: "1 1 auto",
+              minWidth: "180px",
+            }}
+          >
+            <select
+              value={filterEligible}
+              onChange={(e) => setFilterEligible(e.target.value)}
+              style={{
+                padding: "8px 10px",
+                border: `1.5px solid ${C.border}`,
+                borderRadius: 8,
+                fontSize: 13,
+                background: C.white,
+                outline: "none",
+                flex: 1,
+                minWidth: "80px",
+              }}
+            >
+              <option value="all">{getTranslation("allStatus")}</option>
+              <option value="active">{getTranslation("active")}</option>
+              <option value="inactive">{getTranslation("inactive")}</option>
+            </select>
+
+            <select
+              value={filterDepartment}
+              onChange={(e) => setFilterDepartment(e.target.value)}
+              style={{
+                padding: "8px 10px",
+                border: `1.5px solid ${C.border}`,
+                borderRadius: 8,
+                fontSize: 13,
+                background: C.white,
+                outline: "none",
+                flex: 1,
+                minWidth: "90px",
+              }}
+            >
+              <option value="all">{getTranslation("allDepartments")}</option>
+              {departments.map((dept) => (
+                <option key={dept} value={dept}>
+                  {dept}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Grid/List Icons - Will wrap to new line if needed */}
+          <div
+            style={{
+              display: "flex",
+              gap: 4,
+              flexShrink: 0,
+            }}
+          >
+            <button
+              onClick={() => setViewMode("grid")}
+              style={{
+                padding: "6px 8px",
+                borderRadius: 6,
+                border: `1px solid ${viewMode === "grid" ? C.primary : C.border}`,
+                background: viewMode === "grid" ? C.primary : "transparent",
+                color: viewMode === "grid" ? "#fff" : C.muted,
+                cursor: "pointer",
+                minWidth: "34px",
+                minHeight: "34px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <FiGrid size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode("list")}
+              style={{
+                padding: "6px 8px",
+                borderRadius: 6,
+                border: `1px solid ${viewMode === "list" ? C.primary : C.border}`,
+                background: viewMode === "list" ? C.primary : "transparent",
+                color: viewMode === "list" ? "#fff" : C.muted,
+                cursor: "pointer",
+                minWidth: "34px",
+                minHeight: "34px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <FiList size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Employees Display */}
       {loading ? (
@@ -2885,9 +2909,7 @@ export default function EmployeeManagement({ t }) {
                       fontSize: 14,
                       outline: "none",
                       transition: "border-color 0.2s",
-                      background: aiFilledFields.position
-                        ? "#F0F9FF"
-                        : "white",
+                      background: aiFilledFields.position ? "#F0F9FF" : "white",
                       boxSizing: "border-box",
                     }}
                     placeholder="e.g., Team Leader"

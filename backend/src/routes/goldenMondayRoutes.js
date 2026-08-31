@@ -48,6 +48,7 @@ const {
   getOrCreateTypeFolder,
   updateWeekFolderAggregates,
   getFileTypeLabel,
+  mondayOf,
 } = require("../services/galleryFolderService");
 const {
   computeContentHash,
@@ -507,38 +508,39 @@ router.get("/gallery/folders", protect, anyRole, async (req, res) => {
       GoldenMondayFolder.find(filter)
         .sort({ weekOf: -1 })
         .skip(skip)
-        .limit(parseInt(limit)),
+        .limit(parseInt(limit))
+        .lean(),
       GoldenMondayFolder.countDocuments(filter),
     ]);
 
-    const shapedFolders = [];
-    for (const week of weekFolders) {
-      const childFolders = await GoldenMondayFolder.find({
-        folderType: "fileType",
-        parentFolder: week._id,
-      });
+    // Get counts from child type folders
+    const folderIds = weekFolders.map((f) => f._id);
+    const childFolders = await GoldenMondayFolder.find({
+      parentFolder: { $in: folderIds },
+      folderType: "fileType",
+    }).lean();
 
-      const children = childFolders.map((child) => ({
-        _id: child._id,
-        fileType: child.fileType,
-        label: getFileTypeLabel(child.fileType),
-        count: child.count,
-        coverPhoto: child.coverPhoto,
-      }));
+    const childCountMap = {};
+    childFolders.forEach((child) => {
+      const parentId = child.parentFolder.toString();
+      if (!childCountMap[parentId]) childCountMap[parentId] = 0;
+      childCountMap[parentId] += child.count || 0;
+    });
 
-      shapedFolders.push({
-        _id: week._id,
-        folderType: "week",
-        title:
-          week.weekOfEthiopianDate || week.weekOf.toISOString().slice(0, 10),
-        weekOf: week.weekOf,
-        topics: week.topics,
-        count: week.count,
-        coverPhoto: week.coverPhoto,
-        children,
-        createdAt: week.createdAt,
-      });
-    }
+    const shapedFolders = weekFolders.map((week) => ({
+      _id: week._id,
+      folderType: "week",
+      title:
+        week.title ||
+        week.weekOfEthiopianDate ||
+        week.weekOf.toISOString().slice(0, 10),
+      weekOf: week.weekOf,
+      topics: week.topics || [],
+      count: childCountMap[week._id.toString()] || 0,
+      coverPhoto: week.coverPhoto || null,
+      createdAt: week.createdAt,
+      children: [],
+    }));
 
     res.json({
       folders: shapedFolders,
@@ -555,33 +557,101 @@ router.get("/gallery/folders", protect, anyRole, async (req, res) => {
   }
 });
 
-// POST /api/golden-monday/gallery/folders
-// Find-or-create folder (kept for backward compatibility, but new uploads
-// use the week-based system automatically)
+// POST /api/golden-monday/gallery/folders - FIXED
 router.post("/gallery/folders", protect, leaderOrAdmin, async (req, res) => {
   try {
     const { name, ethiopianDate, topic, category } = req.body;
 
-    if (!name || !topic) {
-      return res.status(400).json({ error: "name and topic are required" });
-    }
-
-    // For backward compatibility: create a week folder based on the name
-    const weekFolder = await getOrCreateWeekFolder({
-      uploadDate: new Date(),
+    console.log("📁 [CREATE FOLDER] Request:", {
+      name: name?.substring(0, 50),
+      ethiopianDate,
       topic,
+      category,
       userId: req.user._id,
       userName: req.user.name,
     });
 
+    // Validate required fields
+    if (!name || !topic) {
+      return res.status(400).json({
+        success: false,
+        error: "Folder name and topic are required",
+      });
+    }
+
+    // Use the existing service to get or create a week folder
+    const weekFolder = await getOrCreateWeekFolder({
+      uploadDate: new Date(),
+      topic: topic.trim(),
+      weekOfEthiopianDate: ethiopianDate || "",
+      userId: req.user._id,
+      userName: req.user.name,
+    });
+
+    console.log("✅ [CREATE FOLDER] Week folder:", weekFolder._id);
+
+    // Also create a file-type subfolder for "other" or the specified category
+    // This ensures the folder structure is complete
+    const fileType = "image"; // Default to image since we're uploading images
+    const typeFolder = await getOrCreateTypeFolder({
+      weekFolder: weekFolder,
+      fileType: fileType,
+      userId: req.user._id,
+      userName: req.user.name,
+    });
+
+    console.log("✅ [CREATE FOLDER] Type folder:", typeFolder._id);
+
     res.status(201).json({
       success: true,
       folderId: weekFolder._id,
-      folder: weekFolder,
+      _id: weekFolder._id,
+      folder: {
+        _id: weekFolder._id,
+        title:
+          weekFolder.title || weekFolder.weekOfEthiopianDate || "Week Folder",
+        weekOf: weekFolder.weekOf,
+        topics: weekFolder.topics,
+        count: weekFolder.count || 0,
+      },
+      typeFolderId: typeFolder._id,
+      message: "Folder created successfully",
     });
   } catch (error) {
     console.error("❌ [CREATE FOLDER] Error:", error);
-    res.status(500).json({ error: error.message });
+
+    // Try to find existing folder as fallback (duplicate key error)
+    if (error.code === 11000) {
+      try {
+        const weekOf = mondayOf(new Date());
+        const existing = await GoldenMondayFolder.findOne({
+          folderType: "week",
+          weekOf: weekOf,
+          createdBy: req.user._id,
+        });
+
+        if (existing) {
+          console.log(
+            "✅ [CREATE FOLDER] Found existing folder:",
+            existing._id,
+          );
+          return res.status(200).json({
+            success: true,
+            folderId: existing._id,
+            _id: existing._id,
+            folder: existing,
+            message: "Folder already exists",
+          });
+        }
+      } catch (findError) {
+        console.error("Error finding existing folder:", findError.message);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to create folder",
+    });
   }
 });
 
