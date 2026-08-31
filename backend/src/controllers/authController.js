@@ -2,6 +2,7 @@
 const User = require("../models/User");
 const { generateToken } = require("../config/jwt");
 const bcrypt = require("bcryptjs");
+const Team = require("../models/Team");
 
 /**
  * Core account-creation logic
@@ -17,7 +18,7 @@ const createUserAccount = async ({
   profilePhotoPublicId,
   branch,
   position,
-  team, // ✅ Add team parameter
+  team,
 }) => {
   const userExists = await User.findOne({ email });
   if (userExists) {
@@ -34,13 +35,12 @@ const createUserAccount = async ({
     phone,
     branch: branch || "Addis Ketema",
     position: position || "",
-    team: team || null, // ✅ Allow team assignment
+    team: team || null,
     ...(telegramChatId ? { telegramChatId } : {}),
     ...(profilePhotoUrl ? { profilePhotoUrl } : {}),
     ...(profilePhotoPublicId ? { profilePhotoPublicId } : {}),
   });
 
-  // ✅ If team is assigned, add user to team members
   if (team) {
     await Team.findByIdAndUpdate(team, {
       $addToSet: { members: user._id },
@@ -62,7 +62,7 @@ const registerUser = async (req, res) => {
       phone,
       branch,
       position,
-      team, // ✅ Pass team
+      team,
     });
 
     res.status(201).json({
@@ -144,4 +144,54 @@ const getMe = async (req, res) => {
   });
 };
 
-module.exports = { registerUser, loginUser, getMe, createUserAccount };
+// ✅ Add this for completeness (though route is in authRoutes.js)
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const userId = req.user._id;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        message: "Current password and new password are required",
+      });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({
+        message: "New password must be at least 8 characters long",
+      });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    console.error("❌ Password change error:", error);
+    res.status(500).json({
+      message: error.message || "Failed to change password",
+    });
+  }
+};
+
+module.exports = {
+  registerUser,
+  loginUser,
+  getMe,
+  createUserAccount,
+  changePassword,
+};
