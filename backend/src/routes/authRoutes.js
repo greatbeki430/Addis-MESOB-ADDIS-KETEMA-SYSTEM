@@ -15,16 +15,10 @@ router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.get("/me", protect, getMe);
 
-// ✅ Change Password route - FIXED with better error handling
+// ✅ FIXED: Change Password route
 router.put("/change-password", protect, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-
-    console.log("📝 Change Password Request:", {
-      userId: req.user._id,
-      currentPassword: currentPassword ? "provided" : "missing",
-      newPassword: newPassword ? "provided" : "missing",
-    });
 
     if (!currentPassword || !newPassword) {
       return res.status(400).json({
@@ -57,12 +51,19 @@ router.put("/change-password", protect, async (req, res) => {
       });
     }
 
-    // ✅ Hash new password using the model's method
+    // ✅ FIX: Hash the password manually (bypassing pre-save hook issues)
     const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
-    await user.save();
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
 
-    console.log("✅ Password changed successfully for:", user.email);
+    // ✅ FIX: Use findByIdAndUpdate to directly update the password
+    // This ensures the password is saved correctly
+    await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: { password: hashedPassword } },
+      { new: true },
+    );
+
+    console.log(`✅ Password changed for: ${user.email}`);
 
     res.json({
       success: true,
@@ -78,7 +79,7 @@ router.put("/change-password", protect, async (req, res) => {
   }
 });
 
-// ✅ Profile update route
+// Profile update route
 router.put("/profile", protect, async (req, res) => {
   try {
     const { name, email, phone, profilePhotoUrl } = req.body;
