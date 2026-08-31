@@ -299,6 +299,8 @@ const addToRoster = async (req, res) => {
 const updateRosterEntry = async (req, res) => {
   try {
     const {
+      name, // ✅ ADD THIS
+      email, // ✅ ADD THIS
       isEligible,
       onLeaveUntil,
       department,
@@ -314,6 +316,8 @@ const updateRosterEntry = async (req, res) => {
     } = req.body;
 
     const update = {};
+    if (name !== undefined && name.trim()) update.name = name.trim(); // ✅ ADD THIS
+    if (email !== undefined && email.trim()) update.email = email.trim(); // ✅ ADD THIS
     if (isEligible !== undefined) update.isEligible = isEligible;
     if (onLeaveUntil !== undefined) update.onLeaveUntil = onLeaveUntil;
     if (department !== undefined) update.department = department;
@@ -328,9 +332,6 @@ const updateRosterEntry = async (req, res) => {
       update.emergencyContact = emergencyContact;
     if (address !== undefined) update.address = address;
 
-    // Salary: only admin/superadmin may change it. Non-privileged
-    // callers silently have this field ignored rather than erroring,
-    // so the same form can be reused across roles without special-casing.
     if (salary !== undefined && canSeeSalary(req.user)) {
       update.salary = salary === "" ? null : Number(salary);
     }
