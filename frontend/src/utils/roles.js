@@ -15,10 +15,137 @@ export const ROLE_HIERARCHY = {
   [ROLES.EMPLOYEE]: 1,
 };
 
+// ─── Basic Role Checks ──────────────────────────────────────────────
+
 // Check if user has required role or higher
 export const hasMinRole = (userRole, requiredRole) => {
   return ROLE_HIERARCHY[userRole] >= ROLE_HIERARCHY[requiredRole];
 };
+
+// Check if user is Super Admin
+export const isSuperAdmin = (user) => user?.role === ROLES.SUPER_ADMIN;
+
+// Check if user is Admin or higher
+export const isAdminOrAbove = (user) => hasMinRole(user?.role, ROLES.ADMIN);
+
+// Check if user is Team Leader or higher
+export const isLeaderOrAbove = (user) =>
+  hasMinRole(user?.role, ROLES.TEAM_LEADER);
+
+// Check if user is Employee (base level)
+export const isEmployee = (user) => user?.role === ROLES.EMPLOYEE;
+
+// Check if user owns a resource (created by them)
+export const isOwner = (user, resource) => {
+  if (!user || !resource) return false;
+  const ownerId =
+    resource.createdBy?._id ||
+    resource.createdBy ||
+    resource.user?._id ||
+    resource.user;
+  return ownerId?.toString() === user._id?.toString();
+};
+
+// ─── DAILY REPORT PERMISSIONS ──────────────────────────────────────────────
+
+// Check if user can delete a report
+export const canDeleteReport = (user, report) => {
+  if (!user || !report) return false;
+  // Super Admin and Admin can delete any report
+  if (isAdminOrAbove(user)) return true;
+  // Team Leader can delete reports from their team
+  if (user.role === ROLES.TEAM_LEADER) {
+    const userTeam = user.team?._id || user.team;
+    const reportTeam = report.team?._id || report.team;
+    return userTeam?.toString() === reportTeam?.toString();
+  }
+  // Employee can only delete their own reports
+  return isOwner(user, report);
+};
+
+// Check if user can edit a report
+export const canEditReport = (user, report) => {
+  if (!user || !report) return false;
+  // Super Admin and Admin can edit any report
+  if (isAdminOrAbove(user)) return true;
+  // Team Leader can edit team reports or their own
+  if (user.role === ROLES.TEAM_LEADER) {
+    const userTeam = user.team?._id || user.team;
+    const reportTeam = report.team?._id || report.team;
+    if (userTeam?.toString() === reportTeam?.toString()) return true;
+  }
+  // Employee can only edit their own reports
+  return isOwner(user, report);
+};
+
+// Check if user can view all reports (org-wide)
+export const canViewAllReports = (user) => {
+  return isAdminOrAbove(user);
+};
+
+// Check if user can view team reports
+export const canViewTeamReports = (user) => {
+  return isLeaderOrAbove(user);
+};
+
+// Check if user can comment on a report
+export const canComment = (user, report) => {
+  if (!user || !report) return false;
+  // Admins can comment anywhere
+  if (isAdminOrAbove(user)) return true;
+  // Users can comment on their own reports
+  if (isOwner(user, report)) return true;
+  // Users can comment on same-team reports
+  if (user.role === ROLES.TEAM_LEADER || user.role === ROLES.EMPLOYEE) {
+    const userTeam = user.team?._id || user.team;
+    const reportTeam = report.team?._id || report.team;
+    return userTeam?.toString() === reportTeam?.toString();
+  }
+  return false;
+};
+
+// Check if user can react to a report (same as comment)
+export const canReact = canComment;
+
+// Check if user can delete a comment
+export const canDeleteComment = (user, report, comment) => {
+  if (!user || !report || !comment) return false;
+  // Super Admin and Admin can delete any comment
+  if (isAdminOrAbove(user)) return true;
+  // User can delete their own comments
+  if (isOwner(user, comment)) return true;
+  // Team Leader can delete comments on their team's reports
+  if (user.role === ROLES.TEAM_LEADER) {
+    const userTeam = user.team?._id || user.team;
+    const reportTeam = report.team?._id || report.team;
+    return userTeam?.toString() === reportTeam?.toString();
+  }
+  return false;
+};
+
+// Check if user can export a report as PDF
+export const canExportPDF = (user, report) => {
+  if (!user) return false;
+  // Admins can export any report
+  if (isAdminOrAbove(user)) return true;
+  // Team Leaders can export team reports or their own
+  if (user.role === ROLES.TEAM_LEADER) {
+    const userTeam = user.team?._id || user.team;
+    const reportTeam = report.team?._id || report.team;
+    if (userTeam?.toString() === reportTeam?.toString()) return true;
+  }
+  // Everyone can export their own reports
+  return isOwner(user, report);
+};
+
+// Check if user can approve a report
+export const canApproveReport = (user, report) => {
+  if (!user || !report) return false;
+  // Only Admins can approve reports
+  return isAdminOrAbove(user);
+};
+
+// ─── UI Helpers ──────────────────────────────────────────────────────
 
 // Get role display name
 export const getRoleDisplayName = (role) => {
@@ -53,7 +180,8 @@ export const getRoleIcon = (role) => {
   return icons[role] || "👥";
 };
 
-// ✅ Navigation items with proper role requirements
+// ─── Navigation Items ──────────────────────────────────────────────────
+
 export const NAV_ITEMS = [
   // =============================================
   // CORE USER PAGES - Available based on role
@@ -79,9 +207,6 @@ export const NAV_ITEMS = [
   {
     id: "report",
     icon: "📄",
-    // ✅ Every employee logs and shares their own daily report — this used
-    // to be leader-and-up only, which defeated the point of a *daily*
-    // report (only team leaders could ever submit one).
     label: "Daily Report",
     roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
@@ -106,11 +231,6 @@ export const NAV_ITEMS = [
   {
     id: "golden-monday",
     icon: "🌅",
-    // ✅ Every employee can view sessions, join roster, mark attendance and
-    // post experiences/results (backend already allowed this for anyRole).
-    // Only session creation, roster management, and gallery uploads stay
-    // leader-and-up, enforced inside the page/API — not by hiding the whole
-    // feature from employees.
     label: "Golden Monday",
     roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
@@ -118,7 +238,6 @@ export const NAV_ITEMS = [
   // =============================================
   // ADMIN MANAGEMENT PAGES
   // =============================================
-  // User & Team Management
   {
     id: "users",
     icon: "👥",
@@ -137,16 +256,12 @@ export const NAV_ITEMS = [
     label: "Employee Management",
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
-
-  // Admin Service Management
   {
     id: "admin/services",
     icon: "🔧",
     label: "Service Manager",
     roles: [ROLES.SUPER_ADMIN],
   },
-
-  // Attendance & Digital Attendance
   {
     id: "digital-attendance",
     icon: "📱",
@@ -165,17 +280,12 @@ export const NAV_ITEMS = [
     label: "Digital Attendance Logs",
     roles: [ROLES.SUPER_ADMIN],
   },
-
-  // Alerts & Notifications
   {
     id: "admin-alerts",
     icon: "🔔",
     label: "Alerts & Notifications",
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
-
-  // ✅ Admin Data Management - Consolidated views for admins
-  // These allow admins to view/manage ALL data across the organization
   {
     id: "admin-evaluations",
     icon: "📝",
