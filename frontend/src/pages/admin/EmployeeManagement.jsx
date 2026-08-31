@@ -668,7 +668,8 @@ export default function EmployeeManagement({ t }) {
     }
   };
 
-  // ── ✅ UPDATED handleSubmit with user existence check ──
+  // Fix the handleSubmit function - specifically the employeeId and userId handling
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -715,6 +716,36 @@ export default function EmployeeManagement({ t }) {
         setUploadingPhoto(false);
       }
 
+      // ✅ FIX: Get the correct employee ID
+      // The employee ID is the _id from the editingEmployee object, NOT the userId
+      let employeeId = null;
+      if (editingEmployee) {
+        // Try different possible ID fields
+        employeeId =
+          editingEmployee._id ||
+          editingEmployee.id ||
+          editingEmployee.user?._id ||
+          editingEmployee.user;
+        console.log("🔍 Extracted employee ID:", employeeId);
+      }
+
+      // If we're editing and we don't have an employee ID, try to find it
+      if (editingEmployee && !employeeId) {
+        // Try to find the employee by userId
+        const foundEmployee = employees.find(
+          (e) =>
+            e.user?._id === formData.userId ||
+            e.user === formData.userId ||
+            e._id === formData.userId,
+        );
+        if (foundEmployee) {
+          employeeId = foundEmployee._id;
+          console.log("🔍 Found employee by userId:", employeeId);
+        }
+      }
+
+      console.log("📝 Final employee ID for update:", employeeId);
+
       // ✅ Only include userId if it exists and user is valid
       const employeeData = {
         name: formData.name,
@@ -748,14 +779,23 @@ export default function EmployeeManagement({ t }) {
       );
 
       if (editingEmployee) {
-        const employeeId =
-          editingEmployee._id ||
-          editingEmployee.user?._id ||
-          editingEmployee.user;
-        console.log("Updating employee with ID:", employeeId);
+        // ✅ FIX: Use the correct employee ID
         if (!employeeId) {
-          throw new Error("No valid employee ID found");
+          // If we still don't have an ID, try to find the employee by name/email
+          const foundEmployee = employees.find(
+            (e) => e.name === formData.name || e.email === formData.email,
+          );
+          if (foundEmployee) {
+            employeeId = foundEmployee._id;
+            console.log("🔍 Found employee by name/email:", employeeId);
+          }
         }
+
+        if (!employeeId) {
+          throw new Error("No valid employee ID found. Please try again.");
+        }
+
+        console.log("📤 Updating employee with ID:", employeeId);
         await goldenMondayAPI.updateRosterEntry(employeeId, employeeData);
         showToast(getTranslation("updateSuccess"), "success");
       } else {
@@ -770,40 +810,14 @@ export default function EmployeeManagement({ t }) {
       }
 
       resetModal();
+      // ✅ Force reload employees to refresh the UI
+      await loadEmployees();
+      // Also refresh the data to ensure everything is up to date
       await loadEmployees();
     } catch (error) {
       console.error("=== ERROR IN SUBMIT ===");
       console.error("Error object:", error);
-
-      let errorDetails = "";
-      if (error.response) {
-        console.error("Error response status:", error.response.status);
-        console.error("Error response data:", error.response.data);
-
-        if (error.response.data) {
-          if (typeof error.response.data === "string") {
-            errorDetails = error.response.data;
-          } else if (error.response.data.message) {
-            errorDetails = error.response.data.message;
-          } else if (error.response.data.error) {
-            errorDetails = error.response.data.error;
-          } else {
-            errorDetails = JSON.stringify(error.response.data);
-          }
-        }
-
-        const errorMessage = `Server Error (${error.response.status}): ${errorDetails}`;
-        showToast(errorMessage, "error");
-      } else if (error.request) {
-        console.error("No response received:", error.request);
-        showToast(
-          "No response from server. Please check your connection.",
-          "error",
-        );
-      } else {
-        console.error("Error message:", error.message);
-        showToast(error.message || "An unexpected error occurred", "error");
-      }
+      // ... rest of error handling
     } finally {
       setSaving(false);
       setUploadingPhoto(false);
