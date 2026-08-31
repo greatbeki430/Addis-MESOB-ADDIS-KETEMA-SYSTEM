@@ -1,5 +1,5 @@
 // frontend/src/components/golden-monday/GalleryUploader.jsx
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
 import { C } from "../../styles/theme";
@@ -73,21 +73,32 @@ export default function GalleryUploader({
   const [uploadTopic, setUploadTopic] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
+  // ✅ Synchronous submit lock. React state (isCreating) updates async,
+  // so a fast double-click/double-Enter can fire two POSTs before the
+  // button visually disables. This ref blocks the second call instantly,
+  // which is what was causing two concurrent /gallery/folders requests
+  // and the "Cannot read properties of null (reading 'topics')" crash
+  // on the backend.
+  const isSubmittingRef = useRef(false);
+
   const getEthiopianDateString = () => formatEthiopianDateAmharic(new Date());
 
   const handleUpload = async () => {
-    if (uploadQueue.length === 0) {
-      showToast("Please select at least one file", "error");
-      return;
-    }
-    if (!uploadTopic.trim()) {
-      showToast("Please enter a topic for this session", "error");
-      return;
-    }
-
-    setIsCreating(true);
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
 
     try {
+      if (uploadQueue.length === 0) {
+        showToast("Please select at least one file", "error");
+        return;
+      }
+      if (!uploadTopic.trim()) {
+        showToast("Please enter a topic for this session", "error");
+        return;
+      }
+
+      setIsCreating(true);
+
       // Get the week folder (the backend will handle find-or-create)
       const dateStr = getEthiopianDateString();
       const folderName = `${dateStr} - ${uploadTopic}`;
@@ -107,7 +118,13 @@ export default function GalleryUploader({
         } else if (error.response?.data?._id) {
           folderId = error.response.data._id;
         } else {
-          throw error;
+          // Surface the real backend error message when available,
+          // instead of always falling through to the generic toast.
+          const backendMessage = error.response?.data?.error;
+          throw new Error(
+            backendMessage || error.message || "Failed to create folder",
+            { cause: error },
+          );
         }
       }
 
@@ -133,8 +150,16 @@ export default function GalleryUploader({
       });
     } catch (error) {
       console.error("Folder creation failed:", error);
-      showToast("Failed to create folder. Please try again.", "error");
+      showToast(
+        error.message && error.message !== "Failed to create folder"
+          ? `Folder creation failed: ${error.message}`
+          : "Failed to create folder. Please try again.",
+        "error",
+      );
       setIsCreating(false);
+    } finally {
+      // ✅ Always release the lock, whether we succeeded or threw.
+      isSubmittingRef.current = false;
     }
   };
 
@@ -195,6 +220,14 @@ export default function GalleryUploader({
           value={uploadTopic}
           onChange={(e) => setUploadTopic(e.target.value)}
           disabled={isCreating}
+          onKeyDown={(e) => {
+            // ✅ Prevent accidental double-submit via repeated Enter
+            // presses too, not just double-clicks.
+            if (e.key === "Enter" && !isCreating && uploadTopic.trim()) {
+              e.preventDefault();
+              handleUpload();
+            }
+          }}
           style={{
             width: "100%",
             padding: "10px 12px",
