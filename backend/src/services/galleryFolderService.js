@@ -5,11 +5,6 @@
 const GoldenMondayFolder = require("../models/GoldenMondayFolder");
 
 // Monday of the week containing `date`, normalized to local midnight.
-// NOTE: goldenMondayRotationService.js has its own `mondayOf()` used for
-// session scheduling — I haven't seen that file, so this is a
-// self-contained implementation. Worth checking the two agree if you
-// want folder weeks and rotation weeks to always line up; share that
-// file if so and I'll reconcile them.
 const mondayOf = (date = new Date()) => {
   const d = new Date(date);
   const day = d.getDay(); // 0 = Sun ... 6 = Sat
@@ -51,6 +46,7 @@ const getOrCreateWeekFolder = async ({
       });
     } catch (err) {
       if (err.code === 11000) {
+        // Someone else created it concurrently — re-fetch.
         folder = await GoldenMondayFolder.findOne({
           folderType: "week",
           weekOf,
@@ -59,6 +55,21 @@ const getOrCreateWeekFolder = async ({
         throw err;
       }
     }
+  }
+
+  // ✅ Defensive retry: covers the rare case where a concurrent insert's
+  // duplicate-key conflict resolves before the winning insert is visible
+  // to this read (replica lag / read timing), which previously crashed
+  // with "Cannot read properties of null (reading 'topics')".
+  if (!folder) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    folder = await GoldenMondayFolder.findOne({ folderType: "week", weekOf });
+  }
+
+  if (!folder) {
+    throw new Error(
+      `getOrCreateWeekFolder: folder is still null after create/retry for weekOf=${weekOf.toISOString()}`,
+    );
   }
 
   // Append the topic if it's new (case-insensitive), without duplicating.
@@ -110,12 +121,25 @@ const getOrCreateTypeFolder = async ({
     }
   }
 
+  // ✅ Same defensive retry as getOrCreateWeekFolder.
+  if (!folder) {
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    folder = await GoldenMondayFolder.findOne({
+      folderType: "fileType",
+      parentFolder: weekFolder._id,
+      fileType,
+    });
+  }
+
+  if (!folder) {
+    throw new Error(
+      `getOrCreateTypeFolder: folder is still null after create/retry for parentFolder=${weekFolder._id}, fileType=${fileType}`,
+    );
+  }
+
   return folder;
 };
 
-// ✅ ADDED — used by POST /gallery (goldenMondayRoutes.js, step 10) after
-// every file finishes uploading, to keep a week folder's denormalized
-// count/coverPhoto in sync with the sum of its fileType children.
 const updateWeekFolderAggregates = async (weekFolderId) => {
   const children = await GoldenMondayFolder.find({
     parentFolder: weekFolderId,
@@ -131,8 +155,6 @@ const updateWeekFolderAggregates = async (weekFolderId) => {
   });
 };
 
-// ✅ ADDED — small display helper, referenced by the routes import but
-// previously missing from this module's exports.
 const getFileTypeLabel = (fileType) => FILE_TYPE_LABELS[fileType] || fileType;
 
 module.exports = {
