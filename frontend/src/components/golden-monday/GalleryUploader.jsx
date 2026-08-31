@@ -5,7 +5,7 @@ import { showToast } from "../../utils/toastHelper";
 import { C } from "../../styles/theme";
 import { FiCalendar, FiUpload, FiLoader } from "react-icons/fi";
 
-// Ethiopian calendar conversion (unchanged)
+// Ethiopian calendar conversion
 const ETHIOPIAN_MONTHS_AM = [
   "መስከረም",
   "ጥቅምት",
@@ -73,12 +73,7 @@ export default function GalleryUploader({
   const [uploadTopic, setUploadTopic] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  // ✅ Synchronous submit lock. React state (isCreating) updates async,
-  // so a fast double-click/double-Enter can fire two POSTs before the
-  // button visually disables. This ref blocks the second call instantly,
-  // which is what was causing two concurrent /gallery/folders requests
-  // and the "Cannot read properties of null (reading 'topics')" crash
-  // on the backend.
+  // Synchronous submit lock to prevent double-clicks
   const isSubmittingRef = useRef(false);
 
   const getEthiopianDateString = () => formatEthiopianDateAmharic(new Date());
@@ -99,7 +94,6 @@ export default function GalleryUploader({
 
       setIsCreating(true);
 
-      // Get the week folder (the backend will handle find-or-create)
       const dateStr = getEthiopianDateString();
       const folderName = `${dateStr} - ${uploadTopic}`;
 
@@ -118,8 +112,6 @@ export default function GalleryUploader({
         } else if (error.response?.data?._id) {
           folderId = error.response.data._id;
         } else {
-          // Surface the real backend error message when available,
-          // instead of always falling through to the generic toast.
           const backendMessage = error.response?.data?.error;
           throw new Error(
             backendMessage || error.message || "Failed to create folder",
@@ -132,15 +124,9 @@ export default function GalleryUploader({
         throw new Error("Failed to create folder");
       }
 
-      // ✅ CLOSE MODAL IMMEDIATELY after folder creation
-      // The upload progress will continue in the background via the queue
       onClose();
-
-      // Reset topic for next time
       setUploadTopic("");
 
-      // Start the upload process (this runs in the background)
-      // We don't await this - let it run asynchronously
       onUploadComplete(folderId, uploadTopic).catch((error) => {
         console.error("Upload process error:", error);
         showToast(
@@ -158,12 +144,10 @@ export default function GalleryUploader({
       );
       setIsCreating(false);
     } finally {
-      // ✅ Always release the lock, whether we succeeded or threw.
       isSubmittingRef.current = false;
     }
   };
 
-  // ✅ Allow closing only if not currently creating
   const handleClose = () => {
     if (isCreating) {
       showToast("Please wait for folder creation to complete", "warning");
@@ -221,8 +205,6 @@ export default function GalleryUploader({
           onChange={(e) => setUploadTopic(e.target.value)}
           disabled={isCreating}
           onKeyDown={(e) => {
-            // ✅ Prevent accidental double-submit via repeated Enter
-            // presses too, not just double-clicks.
             if (e.key === "Enter" && !isCreating && uploadTopic.trim()) {
               e.preventDefault();
               handleUpload();

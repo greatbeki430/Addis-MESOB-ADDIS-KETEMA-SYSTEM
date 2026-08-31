@@ -32,7 +32,12 @@ const getOrCreateWeekFolder = async ({
 }) => {
   const weekOf = mondayOf(uploadDate);
 
-  let folder = await GoldenMondayFolder.findOne({ folderType: "week", weekOf });
+  // ✅ Include createdBy in the query for proper user isolation
+  let folder = await GoldenMondayFolder.findOne({
+    folderType: "week",
+    weekOf,
+    createdBy: userId,
+  });
 
   if (!folder) {
     try {
@@ -43,32 +48,44 @@ const getOrCreateWeekFolder = async ({
         topics: topic ? [topic.trim()] : [],
         createdBy: userId,
         createdByName: userName,
+        title: `${weekOfEthiopianDate || weekOf.toISOString().split("T")[0]} - ${topic || "Golden Monday"}`,
+        count: 0,
+        coverPhoto: null,
       });
+      console.log(`✅ Created week folder for user ${userId}: ${folder._id}`);
     } catch (err) {
+      console.error("❌ Error creating week folder:", err.message);
       if (err.code === 11000) {
-        // Someone else created it concurrently — re-fetch.
+        // Duplicate key error - find existing folder for this user
         folder = await GoldenMondayFolder.findOne({
           folderType: "week",
           weekOf,
+          createdBy: userId,
         });
+        if (folder) {
+          console.log(
+            `✅ Found existing week folder for user ${userId}: ${folder._id}`,
+          );
+        }
       } else {
         throw err;
       }
     }
   }
 
-  // ✅ Defensive retry: covers the rare case where a concurrent insert's
-  // duplicate-key conflict resolves before the winning insert is visible
-  // to this read (replica lag / read timing), which previously crashed
-  // with "Cannot read properties of null (reading 'topics')".
+  // ✅ Defensive retry for race conditions
   if (!folder) {
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    folder = await GoldenMondayFolder.findOne({ folderType: "week", weekOf });
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    folder = await GoldenMondayFolder.findOne({
+      folderType: "week",
+      weekOf,
+      createdBy: userId,
+    });
   }
 
   if (!folder) {
     throw new Error(
-      `getOrCreateWeekFolder: folder is still null after create/retry for weekOf=${weekOf.toISOString()}`,
+      `getOrCreateWeekFolder: folder is still null after create/retry for weekOf=${weekOf.toISOString()}, userId=${userId}`,
     );
   }
 
@@ -81,6 +98,7 @@ const getOrCreateWeekFolder = async ({
     if (!alreadyPresent) {
       folder.topics.push(trimmed);
       await folder.save();
+      console.log(`✅ Added topic "${trimmed}" to folder ${folder._id}`);
     }
   }
 
@@ -93,10 +111,12 @@ const getOrCreateTypeFolder = async ({
   userId,
   userName,
 }) => {
+  // ✅ Include createdBy in the query for proper user isolation
   let folder = await GoldenMondayFolder.findOne({
     folderType: "fileType",
     parentFolder: weekFolder._id,
     fileType,
+    createdBy: userId,
   });
 
   if (!folder) {
@@ -107,33 +127,45 @@ const getOrCreateTypeFolder = async ({
         fileType,
         createdBy: userId,
         createdByName: userName,
+        title: `${weekFolder.title || "Week"} - ${FILE_TYPE_LABELS[fileType] || fileType}`,
+        count: 0,
+        coverPhoto: null,
       });
+      console.log(`✅ Created type folder for user ${userId}: ${folder._id}`);
     } catch (err) {
+      console.error("❌ Error creating type folder:", err.message);
       if (err.code === 11000) {
         folder = await GoldenMondayFolder.findOne({
           folderType: "fileType",
           parentFolder: weekFolder._id,
           fileType,
+          createdBy: userId,
         });
+        if (folder) {
+          console.log(
+            `✅ Found existing type folder for user ${userId}: ${folder._id}`,
+          );
+        }
       } else {
         throw err;
       }
     }
   }
 
-  // ✅ Same defensive retry as getOrCreateWeekFolder.
+  // ✅ Defensive retry for race conditions
   if (!folder) {
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    await new Promise((resolve) => setTimeout(resolve, 200));
     folder = await GoldenMondayFolder.findOne({
       folderType: "fileType",
       parentFolder: weekFolder._id,
       fileType,
+      createdBy: userId,
     });
   }
 
   if (!folder) {
     throw new Error(
-      `getOrCreateTypeFolder: folder is still null after create/retry for parentFolder=${weekFolder._id}, fileType=${fileType}`,
+      `getOrCreateTypeFolder: folder is still null after create/retry for parentFolder=${weekFolder._id}, fileType=${fileType}, userId=${userId}`,
     );
   }
 
@@ -141,18 +173,24 @@ const getOrCreateTypeFolder = async ({
 };
 
 const updateWeekFolderAggregates = async (weekFolderId) => {
-  const children = await GoldenMondayFolder.find({
-    parentFolder: weekFolderId,
-    folderType: "fileType",
-  });
+  try {
+    const children = await GoldenMondayFolder.find({
+      parentFolder: weekFolderId,
+      folderType: "fileType",
+    });
 
-  const totalCount = children.reduce((sum, c) => sum + (c.count || 0), 0);
-  const coverPhoto = children.find((c) => c.coverPhoto)?.coverPhoto || "";
+    const totalCount = children.reduce((sum, c) => sum + (c.count || 0), 0);
+    const coverPhoto = children.find((c) => c.coverPhoto)?.coverPhoto || null;
 
-  await GoldenMondayFolder.findByIdAndUpdate(weekFolderId, {
-    count: totalCount,
-    ...(coverPhoto ? { coverPhoto } : {}),
-  });
+    await GoldenMondayFolder.findByIdAndUpdate(weekFolderId, {
+      count: totalCount,
+      ...(coverPhoto ? { coverPhoto } : {}),
+    });
+
+    console.log(`✅ Updated week folder aggregates: ${totalCount} items`);
+  } catch (error) {
+    console.error("Error updating week folder aggregates:", error);
+  }
 };
 
 const getFileTypeLabel = (fileType) => FILE_TYPE_LABELS[fileType] || fileType;
