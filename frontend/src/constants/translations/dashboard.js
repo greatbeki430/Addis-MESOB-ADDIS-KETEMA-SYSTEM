@@ -22,7 +22,6 @@ export const dashboardTranslations = {
       roleAdmin: "Admin",
       roleSuperAdmin: "Super Admin",
       noData: "No data available",
-      // ✅ ADD THESE
       total: "Total",
       weeklyTrend: "Weekly Trend",
       last7Days: "Last 7 days",
@@ -39,6 +38,33 @@ export const dashboardTranslations = {
       presenters: "Presenters",
       totalPresented: "Presentations",
       avgRating: "Avg Rating",
+
+      // ── Added: Right panel / performance ──
+      performance: "Performance",
+      overallScore: "Overall Score",
+      basedOnRatings: "Based on session ratings",
+      topPerformers: "Top Performers",
+      golden: "Golden Monday",
+      sessions: "Sessions",
+      attendees: "Attendees",
+      recentActivity: "Recent Activity",
+      logged: "logged",
+
+      // ── Added: Extra charts row ──
+      monthlyTrend: "Monthly Trend",
+      last12Months: "Last 12 months",
+      genderBreakdown: "Gender Breakdown",
+      activityHeatmap: "Activity Heatmap",
+      byDayOfWeek: "By day of week",
+
+      // ── Added: Left rail agendas empty state ──
+      noAgendas: "No agendas yet",
+
+      // ── Added: Fallback demo department names (used only when no real data yet) ──
+      deptCustomerService: "Customer Service",
+      deptAdministration: "Administration",
+      deptFinance: "Finance",
+      deptITSupport: "IT Support",
     },
   },
   am: {
@@ -62,7 +88,6 @@ export const dashboardTranslations = {
       roleAdmin: "አድሚን",
       roleSuperAdmin: "ሱፐር አድሚን",
       noData: "ምንም መረጃ የለም",
-      // ✅ ADD THESE
       total: "ጠቅላላ",
       weeklyTrend: "ሳምንታዊ አዝማሚያ",
       last7Days: "የመጨረሻ 7 ቀናት",
@@ -79,6 +104,33 @@ export const dashboardTranslations = {
       presenters: "አቅራቢዎች",
       totalPresented: "የቀረቡ አቀራረቦች",
       avgRating: "አማካይ ደረጃ",
+
+      // ── Added: Right panel / performance ──
+      performance: "አፈጻጸም",
+      overallScore: "አጠቃላይ ውጤት",
+      basedOnRatings: "በክፍለ ጊዜ ደረጃዎች ላይ የተመሠረተ",
+      topPerformers: "ምርጥ ፈጻሚዎች",
+      golden: "ወርቃማ ሰኞ",
+      sessions: "ክፍለ ጊዜያት",
+      attendees: "ተሳታፊዎች",
+      recentActivity: "የቅርብ ጊዜ እንቅስቃሴ",
+      logged: "ተመዝግቧል",
+
+      // ── Added: Extra charts row ──
+      monthlyTrend: "ወርሃዊ አዝማሚያ",
+      last12Months: "የመጨረሻ 12 ወራት",
+      genderBreakdown: "በፆታ ስርጭት",
+      activityHeatmap: "የእንቅስቃሴ ካርታ",
+      byDayOfWeek: "በቀን",
+
+      // ── Added: Left rail agendas empty state ──
+      noAgendas: "እስካሁን ምንም አጀንዳ የለም",
+
+      // ── Added: Fallback demo department names (used only when no real data yet) ──
+      deptCustomerService: "የደንበኞች አገልግሎት",
+      deptAdministration: "አስተዳደር",
+      deptFinance: "ፋይናንስ",
+      deptITSupport: "የአይቲ ድጋፍ",
     },
   },
   om: {
@@ -102,7 +154,6 @@ export const dashboardTranslations = {
       roleAdmin: "Admin",
       roleSuperAdmin: "Super Admin",
       noData: "Odeeffannoon hin jiru",
-      // ✅ ADD THESE
       total: "Waliigala",
       weeklyTrend: "Haalli Torbanii",
       last7Days: "Guyyaa 7 darbe",
@@ -119,6 +170,33 @@ export const dashboardTranslations = {
       presenters: "Dhiheessitoota",
       totalPresented: "Dhiheessaa",
       avgRating: "Sadarkaa Giddugaleessaa",
+
+      // ── Added: Right panel / performance ──
+      performance: "Raawwii",
+      overallScore: "Qabxii Waliigalaa",
+      basedOnRatings: "Sadarkaa walga'ii irratti hundaa'e",
+      topPerformers: "Raawwattoota Olaanoo",
+      golden: "Wiixata Warqee",
+      sessions: "Walga'iiwwan",
+      attendees: "Hirmaattota",
+      recentActivity: "Sochii Dhiyoo",
+      logged: "galmeeffame",
+
+      // ── Added: Extra charts row ──
+      monthlyTrend: "Haalli Ji'aa",
+      last12Months: "Ji'oota 12 darban",
+      genderBreakdown: "Qooddama Saalaa",
+      activityHeatmap: "Kaartaa Sochii",
+      byDayOfWeek: "Guyyaan",
+
+      // ── Added: Left rail agendas empty state ──
+      noAgendas: "Ajandaan hin jiru",
+
+      // ── Added: Fallback demo department names (used only when no real data yet) ──
+      deptCustomerService: "Tajaajila Maamiltootaa",
+      deptAdministration: "Bulchiinsa",
+      deptFinance: "Faayinaansii",
+      deptITSupport: "Deeggarsa IT",
     },
   },
 };

@@ -5,7 +5,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../hooks/useLanguage";
 import { dailyReportAPI, goldenMondayAPI } from "../services/api";
 import { AIDashboardWidget } from "../components/ai";
-import { dashboardTranslations } from "../constants/dashboard";
+// import { dashboardTranslations } from "../constants/dashboard";
 import {
   FiTrendingUp,
   FiBarChart2,
@@ -61,6 +61,66 @@ const DONUT_COLORS = [
 
 const MALE_COLOR = "#3D6B8C";
 const FEMALE_COLOR = "#B5542E";
+
+// ── Localized weekday / month labels ────────────────────────
+// Used instead of toLocaleDateString("en-US", …) so charts render
+// in the active language rather than always in English.
+const WEEKDAY_LABELS = {
+  en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+  am: ["እሁድ", "ሰኞ", "ማክሰ", "ረቡዕ", "ሐሙስ", "አርብ", "ቅዳሜ"],
+  om: ["Dil", "Wix", "Kib", "Roo", "Kam", "Jim", "San"],
+};
+
+const MONTH_LABELS = {
+  en: [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ],
+  am: ["ጃን", "ፌብ", "ማር", "ኤፕ", "ሜይ", "ጁን", "ጁላ", "ኦገ", "ሴፕ", "ኦክ", "ኖቬ", "ዲሴ"],
+  om: [
+    "Ama",
+    "Gur",
+    "Bit",
+    "Elb",
+    "Caa",
+    "Wax",
+    "Ado",
+    "Hag",
+    "Ful",
+    "Onk",
+    "Sad",
+    "Mud",
+  ],
+};
+
+function weekdayLabel(date, lang) {
+  const list = WEEKDAY_LABELS[lang] || WEEKDAY_LABELS.en;
+  return list[date.getDay()];
+}
+
+function monthLabel(monthIndex, lang) {
+  const list = MONTH_LABELS[lang] || MONTH_LABELS.en;
+  return list[monthIndex];
+}
+
+// Maps the English fallback department names (used only when no real
+// report data has been logged yet) to dashboard.* translation keys.
+const FALLBACK_DEPT_KEYS = {
+  "Customer Service": "deptCustomerService",
+  Administration: "deptAdministration",
+  Finance: "deptFinance",
+  "IT Support": "deptITSupport",
+};
 
 // ── Shared Canvas Helpers ──────────────────────────────────
 function prepCanvas(canvas, width, height) {
@@ -1356,15 +1416,22 @@ const RightPanel = memo(function RightPanel({ stats, goldenMondayStats, td }) {
 export default function Dashboard({ t: tProp }) {
   const languageContext = useLanguage();
   const t = tProp || languageContext.t;
+  const language = languageContext.language || "en";
 
+  // ── Translation helper for dashboard.* keys ──
+  // Routes through the shared t() (merged legacy + modular translations,
+  // with the modular `dashboard.js` file taking priority — see
+  // LanguageProvider.jsx / constants/translations/index.js). t() returns
+  // the dotted path itself when nothing is found in either language, so we
+  // detect that case and fall back to the caller-supplied default instead.
   const td = useCallback(
     (key, fb = "") => {
-      const lang = languageContext.lang || "en";
-      const dashboardT =
-        dashboardTranslations[lang] || dashboardTranslations.en;
-      return dashboardT[key] || fb;
+      const path = `dashboard.${key}`;
+      const val = languageContext.t ? languageContext.t(path) : undefined;
+      if (val === undefined || val === null || val === path) return fb;
+      return val;
     },
-    [languageContext.lang],
+    [languageContext],
   );
 
   const tc = useCallback((key, fb = "") => t?.(`criteria.${key}`) || fb, [t]);
@@ -1449,6 +1516,9 @@ export default function Dashboard({ t: tProp }) {
           ];
         }
 
+        // NOTE: weekday label is derived at render time (see
+        // `localizedWeeklyTrend` below) so it can react to language
+        // changes instead of being baked into state in English.
         const weeklyTrend = [];
         for (let i = 6; i >= 0; i--) {
           const d = new Date();
@@ -1459,11 +1529,12 @@ export default function Dashboard({ t: tProp }) {
             .reduce((sum, r) => sum + getReportTotal(r), 0);
           weeklyTrend.push({
             date: dateStr,
-            label: d.toLocaleDateString("en-US", { weekday: "short" }),
             value: dayTotal || Math.floor(Math.random() * 20) + 5,
           });
         }
 
+        // NOTE: month label is likewise derived at render time from
+        // `monthIndex` (see `localizedMonthlyData` below).
         const monthlyData = [];
         for (let i = 11; i >= 0; i--) {
           const d = new Date();
@@ -1473,7 +1544,7 @@ export default function Dashboard({ t: tProp }) {
             .filter((r) => r.date && r.date.startsWith(monthStr))
             .reduce((sum, r) => sum + getReportTotal(r), 0);
           monthlyData.push({
-            month: d.toLocaleDateString("en-US", { month: "short" }),
+            monthIndex: d.getMonth(),
             value: monthTotal || Math.floor(Math.random() * 50) + 10,
           });
         }
@@ -1571,25 +1642,61 @@ export default function Dashboard({ t: tProp }) {
   const malePct = Math.round((stats.male / genderTotal) * 100);
   const noDataLabel = td("noData", "No data available");
 
+  // ── Localized derived data ──────────────────────────────
+  // Weekday/month labels and fallback department names are recomputed
+  // here (not baked into `stats` on fetch) so they update immediately
+  // when the user switches language, without refetching data.
+  const localizedWeeklyTrend = useMemo(
+    () =>
+      stats.weeklyTrend.map((d) => ({
+        ...d,
+        label: weekdayLabel(new Date(d.date + "T00:00:00"), language),
+      })),
+    [stats.weeklyTrend, language],
+  );
+
+  const localizedMonthlyData = useMemo(
+    () =>
+      stats.monthlyData.map((d) => ({
+        ...d,
+        month: monthLabel(d.monthIndex, language),
+      })),
+    [stats.monthlyData, language],
+  );
+
+  const localizedDepartments = useMemo(
+    () =>
+      stats.departments.map((d) => {
+        const key = FALLBACK_DEPT_KEYS[d.name];
+        return key ? { ...d, name: td(key, d.name) } : d;
+      }),
+    [stats.departments, td],
+  );
+
+  const localizedStats = useMemo(
+    () => ({ ...stats, departments: localizedDepartments }),
+    [stats, localizedDepartments],
+  );
+
   const aiStats = useMemo(
     () => ({
       totalUsers: 1,
-      activeTeams: stats.departments.length,
+      activeTeams: localizedDepartments.length,
       totalServicesLogged: stats.total,
       evaluationsCompleted: 0,
-      topDepartment: stats.departments[0]?.name || "N/A",
+      topDepartment: localizedDepartments[0]?.name || "N/A",
       period: "this week",
     }),
-    [stats.departments, stats.total],
+    [localizedDepartments, stats.total],
   );
 
   const agendas = t?.("agendas") || [];
   const dayLabels = useMemo(
     () =>
-      stats.weeklyTrend.length
-        ? stats.weeklyTrend.map((d) => d.label)
-        : ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"],
-    [stats.weeklyTrend],
+      localizedWeeklyTrend.length
+        ? localizedWeeklyTrend.map((d) => d.label)
+        : WEEKDAY_LABELS[language] || WEEKDAY_LABELS.en,
+    [localizedWeeklyTrend, language],
   );
 
   if (loading) {
@@ -1620,7 +1727,7 @@ export default function Dashboard({ t: tProp }) {
 
       <div className="op-grid">
         <QuickStatsRail
-          stats={stats}
+          stats={localizedStats}
           goldenMondayStats={goldenMondayStats}
           malePct={malePct}
           td={td}
@@ -1640,7 +1747,7 @@ export default function Dashboard({ t: tProp }) {
                 </span>
               </div>
               <TrendChart
-                data={stats.weeklyTrend}
+                data={localizedWeeklyTrend}
                 loading={loading}
                 noDataLabel={noDataLabel}
               />
@@ -1657,7 +1764,7 @@ export default function Dashboard({ t: tProp }) {
                 </span>
               </div>
               <DepartmentChart
-                departments={stats.departments}
+                departments={localizedDepartments}
                 total={stats.total}
                 loading={loading}
                 noDataLabel={noDataLabel}
@@ -1672,7 +1779,7 @@ export default function Dashboard({ t: tProp }) {
                 </span>
               </div>
               <DistributionDonut
-                departments={stats.departments}
+                departments={localizedDepartments}
                 total={stats.total}
                 loading={loading}
                 td={td}
@@ -1690,7 +1797,7 @@ export default function Dashboard({ t: tProp }) {
                 </span>
               </div>
               <MonthlyTrendChart
-                data={stats.monthlyData}
+                data={localizedMonthlyData}
                 loading={loading}
                 noDataLabel={noDataLabel}
               />
@@ -1710,7 +1817,7 @@ export default function Dashboard({ t: tProp }) {
                 </span>
               </div>
               <GenderStackedBar
-                departments={stats.departments}
+                departments={localizedDepartments}
                 loading={loading}
                 noDataLabel={noDataLabel}
                 maleLabel={td("male", "Male")}
@@ -1729,7 +1836,7 @@ export default function Dashboard({ t: tProp }) {
                 </span>
               </div>
               <ActivityHeatmap
-                weeklyTrend={stats.weeklyTrend}
+                weeklyTrend={localizedWeeklyTrend}
                 dayLabels={dayLabels}
                 noDataLabel={noDataLabel}
               />
@@ -1738,7 +1845,7 @@ export default function Dashboard({ t: tProp }) {
         </main>
 
         <RightPanel
-          stats={stats}
+          stats={localizedStats}
           goldenMondayStats={goldenMondayStats}
           td={td}
         />
