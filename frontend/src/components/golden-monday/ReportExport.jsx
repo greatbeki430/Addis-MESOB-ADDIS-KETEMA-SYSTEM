@@ -1,15 +1,16 @@
 // components/golden-monday/ReportExport.jsx
 // Export reports for Golden Monday (attendance, sessions, gallery) - PDF, Excel, Word
 // ✅ FIXED: Complete table data for ALL report types with Amharic as default
+// ✅ Uses setSmartFont pattern from dailyReport.js for consistent font handling
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState } from "react";
 import { C, F } from "../../styles/theme";
 import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
 import { createPDF } from "../../utils/pdf/pdfEngine";
-import { FONT_NAMES } from "../../utils/pdf/fontLoader";
-import { isAmharic } from "../../utils/pdf/language";
+import { loadFonts, FONT_NAMES } from "../../utils/pdf/fontLoader";
+import { encodeText, isAmharic } from "../../utils/pdf/language";
 import {
   FiDownload,
   FiFileText,
@@ -83,58 +84,6 @@ function formatEthiopianDateAmharic(date = new Date()) {
   const { year, day, month } = toEthiopianDate(date);
   const monthName = ETHIOPIAN_MONTHS_AM[month - 1];
   return `${monthName} ${day} ቀን ${year} ዓ.ም`;
-}
-
-// ── Mixed-script text drawing ──
-const AMHARIC_CHAR_RE = /[\u1200-\u137F]/;
-const SCRIPT_RUN_RE = /[\u1200-\u137F]+|[^\u1200-\u137F]+/g;
-
-function splitIntoScriptRuns(text) {
-  const str = String(text ?? "");
-  const runs = str.match(SCRIPT_RUN_RE) || [str];
-  return runs.map((run) => ({
-    text: run,
-    isAmharic: AMHARIC_CHAR_RE.test(run),
-  }));
-}
-
-function setFontForRun(doc, isAmharicRun, bold) {
-  const style = bold ? "bold" : "normal";
-  try {
-    if (isAmharicRun) {
-      doc.setFont(
-        doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica",
-        style,
-      );
-    } else {
-      doc.setFont(doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica", style);
-    }
-  } catch (error) {
-    console.warn("Font fallback while drawing mixed text:", error.message);
-    doc.setFont("helvetica", style);
-  }
-}
-
-function drawMixedScriptText(doc, text, x, y, opts = {}) {
-  const { align = "left", bold = false } = opts;
-  const runs = splitIntoScriptRuns(text);
-  const widths = runs.map((run) => {
-    setFontForRun(doc, run.isAmharic, bold);
-    return doc.getTextWidth(run.text);
-  });
-  const totalWidth = widths.reduce((sum, w) => sum + w, 0);
-
-  let startX = x;
-  if (align === "center") startX = x - totalWidth / 2;
-  else if (align === "right") startX = x - totalWidth;
-
-  let cursorX = startX;
-  runs.forEach((run, i) => {
-    setFontForRun(doc, run.isAmharic, bold);
-    doc.text(run.text, cursorX, y, { align: "left" });
-    cursorX += widths[i];
-  });
-  return totalWidth;
 }
 
 // ── Translation Labels (Amharic Default) ──
@@ -270,6 +219,8 @@ const getLabels = (lang = "am") => {
     metric: isAm ? "መለኪያ" : isOm ? "Safartuu" : "Metric",
     value: isAm ? "እሴት" : isOm ? "Gatii" : "Value",
     aiSuggestions: isAm ? "የAI ምክሮች" : isOm ? "Gorsa AI" : "AI Suggestions",
+    descriptionCol: isAm ? "መግለጫ" : isOm ? "Ibsa" : "Description",
+    confidence: isAm ? "እምነት" : isOm ? "Amantaa" : "Confidence",
 
     // Export controls
     reportTitle: isAm ? "ሪፖርት" : isOm ? "Gabaasa" : "Report",
@@ -462,6 +413,25 @@ export default function ReportExport({ sessionId }) {
     return `golden-monday-${type}${langSuffix}_${date}.${format}`;
   };
 
+  // ─── Helper: Set smart font on doc ──────────────────────────
+  const setSmartFont = (doc, text, bold = false) => {
+    try {
+      const hasAmharic = isAmharic(text);
+      const style = bold ? "bold" : "normal";
+      if (hasAmharic) {
+        doc.setFont(
+          doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica",
+          style,
+        );
+      } else {
+        doc.setFont(doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica", style);
+      }
+    } catch (_error) {
+      doc.setFont("helvetica", bold ? "bold" : "normal");
+      console.debug("Font could not be set:", _error.message);
+    }
+  };
+
   // ─── EXPORT AS PDF ──────────────────────────────────────────
   const exportAsPDF = async (data, filename) => {
     try {
@@ -469,33 +439,36 @@ export default function ReportExport({ sessionId }) {
 
       const engine = createPDF({ orientation: "landscape", theme: "report" });
       const doc = engine.getDoc();
+      // Load fonts properly
+      loadFonts(doc, { silent: false });
+
       const pageWidth = doc.internal.pageSize.getWidth();
 
       // Title
+      setSmartFont(doc, data.title || t("reportTitle", "Report"), true);
       doc.setFontSize(18);
       doc.setTextColor(26, 58, 173);
-      drawMixedScriptText(
-        doc,
-        data.title || t("reportTitle", "Report"),
+      doc.text(
+        encodeText(data.title || t("reportTitle", "Report")),
         pageWidth / 2,
         20,
-        { align: "center", bold: true },
+        {
+          align: "center",
+        },
       );
 
       // Subtitle / Date
       const generatedDate = new Date(data.date);
       const ethiopianDateStr = formatEthiopianDateAmharic(generatedDate);
       const gregorianDateStr = generatedDate.toLocaleString();
+      const dateText = `${t("generated", "Generated")}: ${ethiopianDateStr}  |  ${gregorianDateStr}`;
 
+      setSmartFont(doc, dateText, false);
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
-      drawMixedScriptText(
-        doc,
-        `${t("generated", "Generated")}: ${ethiopianDateStr}  |  ${gregorianDateStr}`,
-        pageWidth / 2,
-        28,
-        { align: "center" },
-      );
+      doc.text(encodeText(dateText), pageWidth / 2, 28, {
+        align: "center",
+      });
 
       let yPos = 35;
 
@@ -513,9 +486,10 @@ export default function ReportExport({ sessionId }) {
         let currentY = startY;
 
         if (title) {
+          setSmartFont(doc, title, true);
           doc.setFontSize(titleSize);
           doc.setTextColor(0, 0, 0);
-          drawMixedScriptText(doc, title, 14, currentY);
+          doc.text(encodeText(title), 14, currentY);
           currentY += 6;
         }
 
@@ -830,7 +804,7 @@ export default function ReportExport({ sessionId }) {
               : t("na", "N/A"),
           ]);
 
-          yPos = createTable(
+          createTable(
             [
               t("title", "Title"),
               t("descriptionCol", "Description"),
@@ -849,24 +823,27 @@ export default function ReportExport({ sessionId }) {
 
       // ─── Footer ─────────────────────────────────────────────
       const pageCount = doc.internal.getNumberOfPages();
+      const footerY = doc.internal.pageSize.getHeight() - 10;
+
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.setTextColor(150, 150, 150);
-        drawMixedScriptText(
-          doc,
-          `${t("page", "Page")} ${i} ${t("of", "of")} ${pageCount}`,
-          pageWidth / 2,
-          doc.internal.pageSize.getHeight() - 10,
-          { align: "center" },
+
+        const pageText = `${t("page", "Page")} ${i} ${t("of", "of")} ${pageCount}`;
+        setSmartFont(doc, pageText, false);
+        doc.text(encodeText(pageText), pageWidth / 2, footerY, {
+          align: "center",
+        });
+
+        const footerText = t(
+          "footerText",
+          "Generated by Addis MESOB Golden Monday System",
         );
-        drawMixedScriptText(
-          doc,
-          t("footerText", "Generated by Addis MESOB Golden Monday System"),
-          pageWidth / 2,
-          doc.internal.pageSize.getHeight() - 6,
-          { align: "center" },
-        );
+        setSmartFont(doc, footerText, false);
+        doc.text(encodeText(footerText), pageWidth / 2, footerY + 6, {
+          align: "center",
+        });
       }
 
       engine.save(filename);
