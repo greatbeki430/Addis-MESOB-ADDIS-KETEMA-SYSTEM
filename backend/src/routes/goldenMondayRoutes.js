@@ -567,9 +567,24 @@ router.post("/gallery/folders", protect, leaderOrAdmin, async (req, res) => {
       ethiopianDate,
       topic,
       category,
-      userId: req.user._id,
-      userName: req.user.name,
+      userId: req.user?._id,
+      userName: req.user?.name,
     });
+
+    // ✅ Validate we actually have an authenticated user with the fields
+    // this folder will require — surfaces auth/middleware problems as a
+    // clear 401 instead of a confusing downstream ValidationError → 500.
+    if (!req.user || !req.user._id || !req.user.name) {
+      console.error("❌ [CREATE FOLDER] Missing req.user fields:", {
+        hasUser: !!req.user,
+        hasId: !!req.user?._id,
+        hasName: !!req.user?.name,
+      });
+      return res.status(401).json({
+        success: false,
+        error: "Authenticated user is missing required fields (id/name)",
+      });
+    }
 
     // Validate required fields
     if (!name || !topic) {
@@ -618,7 +633,20 @@ router.post("/gallery/folders", protect, leaderOrAdmin, async (req, res) => {
       message: "Folder created successfully",
     });
   } catch (error) {
-    console.error("❌ [CREATE FOLDER] Error:", error);
+    // ✅ Much more detailed error surfacing — name, message, Mongoose
+    // validation field-by-field detail, and the stack, so the next 500
+    // tells us exactly what broke instead of a bare message.
+    console.error("❌ [CREATE FOLDER] Error name:", error.name);
+    console.error("❌ [CREATE FOLDER] Error message:", error.message);
+    if (error.errors) {
+      console.error(
+        "❌ [CREATE FOLDER] Validation details:",
+        Object.fromEntries(
+          Object.entries(error.errors).map(([k, v]) => [k, v.message]),
+        ),
+      );
+    }
+    console.error("❌ [CREATE FOLDER] Stack:", error.stack);
 
     // Try to find existing folder as fallback (duplicate key error)
     if (error.code === 11000) {
@@ -651,6 +679,14 @@ router.post("/gallery/folders", protect, leaderOrAdmin, async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || "Failed to create folder",
+      ...(process.env.NODE_ENV !== "production" && {
+        errorName: error.name,
+        validationErrors: error.errors
+          ? Object.fromEntries(
+              Object.entries(error.errors).map(([k, v]) => [k, v.message]),
+            )
+          : undefined,
+      }),
     });
   }
 });

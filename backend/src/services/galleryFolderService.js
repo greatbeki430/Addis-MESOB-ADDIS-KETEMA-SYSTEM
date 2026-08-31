@@ -113,9 +113,33 @@ const getOrCreateTypeFolder = async ({
   return folder;
 };
 
+// ✅ ADDED — used by POST /gallery (goldenMondayRoutes.js, step 10) after
+// every file finishes uploading, to keep a week folder's denormalized
+// count/coverPhoto in sync with the sum of its fileType children.
+const updateWeekFolderAggregates = async (weekFolderId) => {
+  const children = await GoldenMondayFolder.find({
+    parentFolder: weekFolderId,
+    folderType: "fileType",
+  });
+
+  const totalCount = children.reduce((sum, c) => sum + (c.count || 0), 0);
+  const coverPhoto = children.find((c) => c.coverPhoto)?.coverPhoto || "";
+
+  await GoldenMondayFolder.findByIdAndUpdate(weekFolderId, {
+    count: totalCount,
+    ...(coverPhoto ? { coverPhoto } : {}),
+  });
+};
+
+// ✅ ADDED — small display helper, referenced by the routes import but
+// previously missing from this module's exports.
+const getFileTypeLabel = (fileType) => FILE_TYPE_LABELS[fileType] || fileType;
+
 module.exports = {
   mondayOf,
   getOrCreateWeekFolder,
   getOrCreateTypeFolder,
+  updateWeekFolderAggregates,
+  getFileTypeLabel,
   FILE_TYPE_LABELS,
 };
