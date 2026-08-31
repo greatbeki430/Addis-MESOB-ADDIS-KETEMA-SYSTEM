@@ -813,7 +813,6 @@ export default function EmployeeManagement({ t }) {
       // ✅ Force reload employees to refresh the UI
       await loadEmployees();
       // Also refresh the data to ensure everything is up to date
-      await loadEmployees();
     } catch (error) {
       console.error("=== ERROR IN SUBMIT ===");
       console.error("Error object:", error);
