@@ -307,28 +307,54 @@ export default function TeamManagement({ t, isSuperAdmin }) {
   const { showToast } = useToast();
 
   const fetchData = useCallback(async () => {
-    try {
-      const [teamsRes, usersRes] = await Promise.all([
-        teamAPI.getAll(),
-        authAPI.getUsers(),
-      ]);
+    // ✅ FIXED: previously both requests were wrapped in a single
+    // Promise.all — if EITHER request failed (including teamAPI.getAll(),
+    // which has nothing to do with users), the whole thing rejected and
+    // setUsers() never ran, silently leaving `users` at its initial empty
+    // array forever, even though the users endpoint on its own would have
+    // succeeded. Fetching independently means a failure in one no longer
+    // wipes out data from the other.
+    const [teamsResult, usersResult] = await Promise.allSettled([
+      teamAPI.getAll(),
+      authAPI.getUsers(),
+    ]);
 
-      console.log("📊 [TeamManagement] Teams loaded:", teamsRes.data);
-      console.log("📊 [TeamManagement] Users loaded:", usersRes.data);
+    if (teamsResult.status === "fulfilled") {
+      console.log("📊 [TeamManagement] Teams loaded:", teamsResult.value.data);
+      setTeams(teamsResult.value.data);
+    } else {
+      console.error(
+        "❌ [TeamManagement] Failed to load teams:",
+        teamsResult.reason?.response?.status,
+        teamsResult.reason?.response?.data || teamsResult.reason?.message,
+      );
+    }
 
-      // Log eligible users for debugging
-      const eligibleUsers = usersRes.data.filter((u) =>
+    if (usersResult.status === "fulfilled") {
+      console.log("📊 [TeamManagement] Users loaded:", usersResult.value.data);
+      const eligibleUsers = usersResult.value.data.filter((u) =>
         ["admin", "superadmin", "leader"].includes(u.role),
       );
       console.log(
         "📊 [TeamManagement] Eligible users (Admin/SuperAdmin/Leader):",
         eligibleUsers.map((u) => `${u.name} (${u.role})`),
       );
+      setUsers(usersResult.value.data);
+    } else {
+      console.error(
+        "❌ [TeamManagement] Failed to load users:",
+        usersResult.reason?.response?.status,
+        usersResult.reason?.response?.data || usersResult.reason?.message,
+      );
+    }
 
-      setTeams(teamsRes.data);
-      setUsers(usersRes.data);
-    } catch (error) {
-      console.error("Failed to load data:", error);
+    if (
+      teamsResult.status === "rejected" ||
+      usersResult.status === "rejected"
+    ) {
+      throw new Error(
+        "One or more of teams/users failed to load — check the console for details.",
+      );
     }
   }, []);
 
@@ -475,6 +501,8 @@ export default function TeamManagement({ t, isSuperAdmin }) {
   // ✅ NEW: distinguish "no eligible-role users exist at all" from
   // "eligible users exist but are all already leading a team" — the
   // empty-state message needs to say different things for each.
+  // Distinguish "no eligible-role users exist at all" from "eligible
+  // users exist but are all already leading a team" for the empty-state message
   const eligibleRoleUsers = useMemo(
     () =>
       users.filter((user) =>
