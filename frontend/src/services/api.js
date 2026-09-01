@@ -392,11 +392,12 @@ export const goldenMondayAPI = {
   uploadGalleryPhoto: (data, onProgress) => {
     const formData = new FormData();
 
-    // Handle base64 image
-    if (data.image && data.image.startsWith("data:image")) {
+    // Handle base64 file data (any type: image, pdf, pptx, docx, video, etc.)
+    if (data.image && data.image.startsWith("data:")) {
       const blob = dataURLtoBlob(data.image);
-      formData.append("image", blob, "photo.jpg");
-    } else {
+      const ext = blob.type.split("/")[1]?.split("+")[0] || "bin";
+      formData.append("image", blob, `upload.${ext}`);
+    } else if (data.image) {
       formData.append("image", data.image);
     }
 
@@ -406,7 +407,10 @@ export const goldenMondayAPI = {
     if (data.lang) formData.append("lang", data.lang);
 
     return api.post("/golden-monday/gallery", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
+      // No explicit Content-Type here — the browser must generate it
+      // itself (with the multipart boundary) for multer to parse the
+      // body. Setting it manually strips the boundary and breaks every
+      // upload, which was the bug.
       timeout: 180000, // 3 minutes for upload
       onUploadProgress: (progressEvent) => {
         if (onProgress) {
