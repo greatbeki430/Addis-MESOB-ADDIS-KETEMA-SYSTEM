@@ -1,6 +1,7 @@
 // frontend/src/components/ui/Modal.jsx
 
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { C, F } from "../../styles/theme";
 import {
   FiCheckCircle,
@@ -197,7 +198,7 @@ export const Modal = ({
 
   const iconColor = getIconColor();
 
-  return (
+  return createPortal(
     <div
       style={{
         position: "fixed",
@@ -436,7 +437,8 @@ export const Modal = ({
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
