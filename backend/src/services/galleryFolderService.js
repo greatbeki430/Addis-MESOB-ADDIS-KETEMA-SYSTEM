@@ -42,13 +42,10 @@ const getOrCreateWeekFolder = async ({
   const weekOf = mondayOf(uploadDate);
   const trimmedTopic = topic && topic.trim() ? topic.trim() : null;
 
+  console.log("🔍 [getOrCreateWeekFolder] weekOf:", weekOf.toISOString());
+
   let folder;
   try {
-    // ✅ Single atomic operation: if a "week" folder for this weekOf
-    // already exists, return it as-is; if not, create it in the same
-    // step. $setOnInsert means these fields are only applied when a
-    // new document is actually inserted — they're ignored on a match,
-    // so this never overwrites an existing folder's data.
     folder = await GoldenMondayFolder.findOneAndUpdate(
       { folderType: "week", weekOf },
       {
@@ -60,37 +57,40 @@ const getOrCreateWeekFolder = async ({
           createdByName: userName,
         },
       },
-      {
-        upsert: true,
-        new: true,
-        setDefaultsOnInsert: true,
-      },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
+    );
+    console.log(
+      "🔍 [getOrCreateWeekFolder] upsert succeeded, folder:",
+      folder ? folder._id : "NULL/UNDEFINED",
     );
   } catch (err) {
-    // Two upserts landing in the exact same instant can still rarely
-    // throw E11000 depending on MongoDB version/topology. If that
-    // happens, the document is now guaranteed to exist — just fetch it.
+    // ✅ Log the FULL error, not just err.code, so we can see exactly
+    // what MongoDB rejected — which index, which constraint, etc.
+    console.error("🔍 [getOrCreateWeekFolder] upsert threw. Full error:", {
+      name: err.name,
+      code: err.code,
+      message: err.message,
+      keyPattern: err.keyPattern,
+      keyValue: err.keyValue,
+    });
+
     if (err.code === 11000) {
       folder = await GoldenMondayFolder.findOne({ folderType: "week", weekOf });
+      console.log(
+        "🔍 [getOrCreateWeekFolder] post-E11000 findOne result:",
+        folder ? folder._id : "NULL",
+      );
     } else {
       throw err;
     }
   }
 
   if (!folder) {
-    // If we get here, it's not a race condition — something is
-    // actually wrong (e.g. a schema validation issue on insert, or an
-    // index conflict from an old/stale index definition). Fail with a
-    // message specific enough to debug from the server logs.
     throw new Error(
       `getOrCreateWeekFolder: upsert returned no document for weekOf=${weekOf.toISOString()}`,
     );
   }
 
-  // Append the topic if it's new (case-insensitive), without
-  // duplicating — done as its own atomic $addToSet rather than
-  // mutate-then-save, so this can't race with a concurrent topic
-  // append on the same folder either.
   if (trimmedTopic) {
     const alreadyPresent = (folder.topics || []).some(
       (t) => t.toLowerCase() === trimmedTopic.toLowerCase(),
