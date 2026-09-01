@@ -2,7 +2,13 @@
 
 const express = require("express");
 const router = express.Router();
-const { protect, anyRole, leaderOrAdmin } = require("../middleware/auth");
+// const { protect, anyRole, leaderOrAdmin } = require("../middleware/auth");
+const {
+  protect,
+  anyRole,
+  leaderOrAdmin,
+  adminOrSuperAdmin,
+} = require("../middleware/auth");
 const GoldenMondayExperience = require("../models/GoldenMondayExperience");
 const GoldenMondayResult = require("../models/GoldenMondayResult");
 const { suggestTagsFromText } = require("../services/tagSuggestionService");
@@ -1218,7 +1224,8 @@ router.post(
 // 🔍 DEBUG ROUTES
 // ──────────────────────────────────────────────────────────────
 
-router.get("/debug/roster", protect, async (req, res) => {
+// router.get("/debug/roster", protect, async (req, res) => {
+router.get("/debug/roster", protect, adminOrSuperAdmin, async (req, res) => {
   try {
     console.log("🔍 [DEBUG] Fetching roster...");
     const roster = await GoldenMondayPresenter.find()
@@ -1244,37 +1251,44 @@ router.get("/debug/roster", protect, async (req, res) => {
   }
 });
 
-router.get("/debug/attendance/:sessionId", protect, async (req, res) => {
-  try {
-    console.log(
-      "🔍 [DEBUG] Fetching attendance for session:",
-      req.params.sessionId,
-    );
-    const attendance = await GoldenMondayAttendance.find({
-      session: req.params.sessionId,
-    }).populate("user", "name email _id");
+// router.get("/debug/attendance/:sessionId", protect, async (req, res) => {
+router.get(
+  "/debug/attendance/:sessionId",
+  protect,
+  adminOrSuperAdmin,
+  async (req, res) => {
+    try {
+      console.log(
+        "🔍 [DEBUG] Fetching attendance for session:",
+        req.params.sessionId,
+      );
+      const attendance = await GoldenMondayAttendance.find({
+        session: req.params.sessionId,
+      }).populate("user", "name email _id");
 
-    console.log("🔍 [DEBUG] Attendance count:", attendance.length);
-    res.json({
-      count: attendance.length,
-      attendance: attendance.map((a) => ({
-        id: a._id,
-        userId: a.user?._id,
-        userName: a.user?.name,
-        name: a.name,
-        attended: a.attended,
-        signature: a.signature ? "✅ Has signature" : "❌ No signature",
-        signatureType: a.signatureType,
-        checkedInAt: a.checkedInAt,
-      })),
-    });
-  } catch (error) {
-    console.error("❌ [DEBUG ATTENDANCE] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+      console.log("🔍 [DEBUG] Attendance count:", attendance.length);
+      res.json({
+        count: attendance.length,
+        attendance: attendance.map((a) => ({
+          id: a._id,
+          userId: a.user?._id,
+          userName: a.user?.name,
+          name: a.name,
+          attended: a.attended,
+          signature: a.signature ? "✅ Has signature" : "❌ No signature",
+          signatureType: a.signatureType,
+          checkedInAt: a.checkedInAt,
+        })),
+      });
+    } catch (error) {
+      console.error("❌ [DEBUG ATTENDANCE] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
 
-router.get("/debug/users", protect, async (req, res) => {
+// router.get("/debug/users", protect, async (req, res) => {
+router.get("/debug/users", protect, adminOrSuperAdmin, async (req, res) => {
   try {
     console.log("🔍 [DEBUG] Fetching all users...");
     const users = await User.find().select("name email role _id");
