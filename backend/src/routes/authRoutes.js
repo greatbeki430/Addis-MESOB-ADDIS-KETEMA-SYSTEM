@@ -5,13 +5,22 @@ const {
   loginUser,
   getMe,
 } = require("../controllers/authController");
-const { protect } = require("../middleware/auth");
+const { protect, adminOrSuperAdmin } = require("../middleware/auth");
 const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 
 const router = express.Router();
 
-router.post("/register", registerUser);
+// ⚠️ SECURITY FIX: this endpoint creates a User document with whatever
+// `role` is sent in the request body. It previously had NO auth check at
+// all — anyone, logged in or not, could POST {..., role: "superadmin"}
+// and hand themselves the highest privilege level in the system. This is
+// the admin-only "Add New User" tool (see UserManagement.jsx / the
+// Register modal), not the public employee sign-up flow — that flow goes
+// through Telegram OTP + PendingRegistration + admin approval instead.
+// Restricting to adminOrSuperAdmin, and registerUser() below now also
+// enforces that only a superadmin can hand out admin/superadmin roles.
+router.post("/register", protect, adminOrSuperAdmin, registerUser);
 router.post("/login", loginUser);
 router.get("/me", protect, getMe);
 

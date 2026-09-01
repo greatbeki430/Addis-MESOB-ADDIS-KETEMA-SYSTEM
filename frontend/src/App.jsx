@@ -730,10 +730,24 @@ function AppRouter() {
   if (!isAuthenticated) {
     return (
       <Routes>
-        <Route path="/" element={<Landing />} />
+        {/* <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        {/* Redirect all other routes to landing for unauthenticated users */}
+        <Route path="*" element={<Navigate to="/" replace />} /> */}
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        {/* ⚠️ SECURITY: "/register" used to be publicly reachable here and
+            rendered the same "Add New User" form the admin panel uses,
+            which posts directly to POST /api/auth/register — an endpoint
+            that lets the caller pick their own role, including admin/
+            superadmin. Anyone who found this URL while logged out could
+            mint themselves a super admin account. Employee self-signup is
+            handled separately via the Telegram OTP + admin-approval flow
+            (PendingRegistration), so there is no legitimate use for this
+            route while logged out. The in-app "Add New User" modal
+            (already gated behind isAdminOrSuperAdmin, see below) remains
+            the only way to reach the Register form. */}
+        {/* Redirect all other routes, including /register, to landing for unauthenticated users */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );

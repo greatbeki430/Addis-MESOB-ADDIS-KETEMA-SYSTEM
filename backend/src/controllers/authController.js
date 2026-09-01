@@ -54,6 +54,20 @@ const registerUser = async (req, res) => {
   try {
     const { name, email, password, role, phone, branch, position, team } =
       req.body;
+
+    // ⚠️ This route is now restricted to admin/superadmin callers (see
+    // authRoutes.js), but a plain "admin" should still not be able to
+    // mint another admin or a superadmin — only a superadmin can. Same
+    // rule already enforced on PUT /auth/users/:id; applying it here too
+    // now that this is reachable by an authenticated admin instead of
+    // being wide open to anyone.
+    const RANK = { employee: 1, leader: 2, admin: 3, superadmin: 4 };
+    if (req.user.role !== "superadmin" && role && RANK[role] >= RANK.admin) {
+      return res.status(403).json({
+        message: "Only a Super Admin can assign the Admin or Super Admin role",
+      });
+    }
+
     const user = await createUserAccount({
       name,
       email,
