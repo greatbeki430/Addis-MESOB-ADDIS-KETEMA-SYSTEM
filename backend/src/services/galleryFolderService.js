@@ -1,6 +1,15 @@
 // backend/src/services/galleryFolderService.js
 // Resolves the (week folder, fileType subfolder) pair a gallery item
 // belongs in, creating either as needed.
+//
+// ✅ REWRITTEN to use atomic findOneAndUpdate(..., { upsert: true })
+// instead of the previous find-then-create-then-refetch pattern. That
+// older pattern is inherently racy: even with retries, there's no way
+// to guarantee "check if it exists" and "create it" happen as one
+// indivisible step across two separate database calls. An upsert IS
+// that indivisible step — MongoDB itself resolves the "does this exist
+// yet" question atomically, so there's no window for a duplicate-key
+// conflict to point at a document that a subsequent read can't find.
 
 const GoldenMondayFolder = require("../models/GoldenMondayFolder");
 
@@ -31,74 +40,67 @@ const getOrCreateWeekFolder = async ({
   userName,
 }) => {
   const weekOf = mondayOf(uploadDate);
+  const trimmedTopic = topic && topic.trim() ? topic.trim() : null;
 
-  // ✅ Include createdBy in the query for proper user isolation
-  let folder = await GoldenMondayFolder.findOne({
-    folderType: "week",
-    weekOf,
-    createdBy: userId,
-  });
-
-  if (!folder) {
-    try {
-      folder = await GoldenMondayFolder.create({
-        folderType: "week",
-        weekOf,
-        weekOfEthiopianDate: weekOfEthiopianDate || "",
-        topics: topic ? [topic.trim()] : [],
-        createdBy: userId,
-        createdByName: userName,
-        title: `${weekOfEthiopianDate || weekOf.toISOString().split("T")[0]} - ${topic || "Golden Monday"}`,
-        count: 0,
-        coverPhoto: null,
-      });
-      console.log(`✅ Created week folder for user ${userId}: ${folder._id}`);
-    } catch (err) {
-      console.error("❌ Error creating week folder:", err.message);
-      if (err.code === 11000) {
-        // Duplicate key error - find existing folder for this user
-        folder = await GoldenMondayFolder.findOne({
+  let folder;
+  try {
+    // ✅ Single atomic operation: if a "week" folder for this weekOf
+    // already exists, return it as-is; if not, create it in the same
+    // step. $setOnInsert means these fields are only applied when a
+    // new document is actually inserted — they're ignored on a match,
+    // so this never overwrites an existing folder's data.
+    folder = await GoldenMondayFolder.findOneAndUpdate(
+      { folderType: "week", weekOf },
+      {
+        $setOnInsert: {
           folderType: "week",
           weekOf,
+          weekOfEthiopianDate: weekOfEthiopianDate || "",
           createdBy: userId,
-        });
-        if (folder) {
-          console.log(
-            `✅ Found existing week folder for user ${userId}: ${folder._id}`,
-          );
-        }
-      } else {
-        throw err;
-      }
+          createdByName: userName,
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      },
+    );
+  } catch (err) {
+    // Two upserts landing in the exact same instant can still rarely
+    // throw E11000 depending on MongoDB version/topology. If that
+    // happens, the document is now guaranteed to exist — just fetch it.
+    if (err.code === 11000) {
+      folder = await GoldenMondayFolder.findOne({ folderType: "week", weekOf });
+    } else {
+      throw err;
     }
   }
 
-  // ✅ Defensive retry for race conditions
   if (!folder) {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    folder = await GoldenMondayFolder.findOne({
-      folderType: "week",
-      weekOf,
-      createdBy: userId,
-    });
-  }
-
-  if (!folder) {
+    // If we get here, it's not a race condition — something is
+    // actually wrong (e.g. a schema validation issue on insert, or an
+    // index conflict from an old/stale index definition). Fail with a
+    // message specific enough to debug from the server logs.
     throw new Error(
-      `getOrCreateWeekFolder: folder is still null after create/retry for weekOf=${weekOf.toISOString()}, userId=${userId}`,
+      `getOrCreateWeekFolder: upsert returned no document for weekOf=${weekOf.toISOString()}`,
     );
   }
 
-  // Append the topic if it's new (case-insensitive), without duplicating.
-  if (topic && topic.trim()) {
-    const trimmed = topic.trim();
-    const alreadyPresent = folder.topics.some(
-      (t) => t.toLowerCase() === trimmed.toLowerCase(),
+  // Append the topic if it's new (case-insensitive), without
+  // duplicating — done as its own atomic $addToSet rather than
+  // mutate-then-save, so this can't race with a concurrent topic
+  // append on the same folder either.
+  if (trimmedTopic) {
+    const alreadyPresent = (folder.topics || []).some(
+      (t) => t.toLowerCase() === trimmedTopic.toLowerCase(),
     );
     if (!alreadyPresent) {
-      folder.topics.push(trimmed);
-      await folder.save();
-      console.log(`✅ Added topic "${trimmed}" to folder ${folder._id}`);
+      folder = await GoldenMondayFolder.findByIdAndUpdate(
+        folder._id,
+        { $addToSet: { topics: trimmedTopic } },
+        { new: true },
+      );
     }
   }
 
@@ -111,61 +113,40 @@ const getOrCreateTypeFolder = async ({
   userId,
   userName,
 }) => {
-  // ✅ Include createdBy in the query for proper user isolation
-  let folder = await GoldenMondayFolder.findOne({
-    folderType: "fileType",
-    parentFolder: weekFolder._id,
-    fileType,
-    createdBy: userId,
-  });
-
-  if (!folder) {
-    try {
-      folder = await GoldenMondayFolder.create({
-        folderType: "fileType",
-        parentFolder: weekFolder._id,
-        fileType,
-        createdBy: userId,
-        createdByName: userName,
-        title: `${weekFolder.title || "Week"} - ${FILE_TYPE_LABELS[fileType] || fileType}`,
-        count: 0,
-        coverPhoto: null,
-      });
-      console.log(`✅ Created type folder for user ${userId}: ${folder._id}`);
-    } catch (err) {
-      console.error("❌ Error creating type folder:", err.message);
-      if (err.code === 11000) {
-        folder = await GoldenMondayFolder.findOne({
+  let folder;
+  try {
+    folder = await GoldenMondayFolder.findOneAndUpdate(
+      { folderType: "fileType", parentFolder: weekFolder._id, fileType },
+      {
+        $setOnInsert: {
           folderType: "fileType",
           parentFolder: weekFolder._id,
           fileType,
           createdBy: userId,
-        });
-        if (folder) {
-          console.log(
-            `✅ Found existing type folder for user ${userId}: ${folder._id}`,
-          );
-        }
-      } else {
-        throw err;
-      }
+          createdByName: userName,
+        },
+      },
+      {
+        upsert: true,
+        new: true,
+        setDefaultsOnInsert: true,
+      },
+    );
+  } catch (err) {
+    if (err.code === 11000) {
+      folder = await GoldenMondayFolder.findOne({
+        folderType: "fileType",
+        parentFolder: weekFolder._id,
+        fileType,
+      });
+    } else {
+      throw err;
     }
-  }
-
-  // ✅ Defensive retry for race conditions
-  if (!folder) {
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    folder = await GoldenMondayFolder.findOne({
-      folderType: "fileType",
-      parentFolder: weekFolder._id,
-      fileType,
-      createdBy: userId,
-    });
   }
 
   if (!folder) {
     throw new Error(
-      `getOrCreateTypeFolder: folder is still null after create/retry for parentFolder=${weekFolder._id}, fileType=${fileType}, userId=${userId}`,
+      `getOrCreateTypeFolder: upsert returned no document for parentFolder=${weekFolder._id}, fileType=${fileType}`,
     );
   }
 
@@ -173,24 +154,18 @@ const getOrCreateTypeFolder = async ({
 };
 
 const updateWeekFolderAggregates = async (weekFolderId) => {
-  try {
-    const children = await GoldenMondayFolder.find({
-      parentFolder: weekFolderId,
-      folderType: "fileType",
-    });
+  const children = await GoldenMondayFolder.find({
+    parentFolder: weekFolderId,
+    folderType: "fileType",
+  });
 
-    const totalCount = children.reduce((sum, c) => sum + (c.count || 0), 0);
-    const coverPhoto = children.find((c) => c.coverPhoto)?.coverPhoto || null;
+  const totalCount = children.reduce((sum, c) => sum + (c.count || 0), 0);
+  const coverPhoto = children.find((c) => c.coverPhoto)?.coverPhoto || "";
 
-    await GoldenMondayFolder.findByIdAndUpdate(weekFolderId, {
-      count: totalCount,
-      ...(coverPhoto ? { coverPhoto } : {}),
-    });
-
-    console.log(`✅ Updated week folder aggregates: ${totalCount} items`);
-  } catch (error) {
-    console.error("Error updating week folder aggregates:", error);
-  }
+  await GoldenMondayFolder.findByIdAndUpdate(weekFolderId, {
+    count: totalCount,
+    ...(coverPhoto ? { coverPhoto } : {}),
+  });
 };
 
 const getFileTypeLabel = (fileType) => FILE_TYPE_LABELS[fileType] || fileType;
