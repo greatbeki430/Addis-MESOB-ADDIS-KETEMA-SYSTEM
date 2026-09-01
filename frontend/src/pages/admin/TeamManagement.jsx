@@ -1,3 +1,6 @@
+// frontend/src/pages/admin/TeamManagement.jsx
+// Complete Team Management - Fixed leader dropdown to show only Admin, Super Admin, Team Leader roles
+
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { C, F, btn, card } from "../../styles/theme";
 import { teamAPI, authAPI } from "../../services/api";
@@ -17,7 +20,7 @@ import {
   FiBriefcase,
 } from "react-icons/fi";
 
-// ✅ Beautiful Stat Card with Gradient and Icon
+// ✅ Stat Card Component
 const StatCard = ({ icon: Icon, value, label, color, gradient, subtitle }) => (
   <div
     style={{
@@ -43,7 +46,6 @@ const StatCard = ({ icon: Icon, value, label, color, gradient, subtitle }) => (
       e.currentTarget.style.borderColor = C.border + "33";
     }}
   >
-    {/* Decorative background circle */}
     <div
       style={{
         position: "absolute",
@@ -56,7 +58,6 @@ const StatCard = ({ icon: Icon, value, label, color, gradient, subtitle }) => (
         pointerEvents: "none",
       }}
     />
-
     <div
       style={{
         display: "flex",
@@ -121,7 +122,6 @@ const StatCard = ({ icon: Icon, value, label, color, gradient, subtitle }) => (
         {subtitle}
       </div>
     )}
-    {/* Decorative gradient line */}
     <div
       style={{
         position: "absolute",
@@ -136,95 +136,103 @@ const StatCard = ({ icon: Icon, value, label, color, gradient, subtitle }) => (
   </div>
 );
 
-// ✅ Beautiful Action Button Group for Team Cards
-const TeamActionButtons = ({ onEdit, onDelete }) => {
-  return (
-    <div
+// ✅ Action Buttons
+const TeamActionButtons = ({ onEdit, onDelete }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+    <button
+      onClick={onEdit}
+      title="Edit team"
       style={{
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        border: "none",
+        background: "#eff6ff",
+        color: "#3b82f6",
+        cursor: "pointer",
         display: "flex",
         alignItems: "center",
-        gap: 4,
+        justifyContent: "center",
+        transition: "all 0.2s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "#3b82f6";
+        e.currentTarget.style.color = "#fff";
+        e.currentTarget.style.transform = "scale(1.1)";
+        e.currentTarget.style.boxShadow = "0 4px 12px rgba(59,130,246,0.3)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "#eff6ff";
+        e.currentTarget.style.color = "#3b82f6";
+        e.currentTarget.style.transform = "scale(1)";
+        e.currentTarget.style.boxShadow = "none";
       }}
     >
-      {/* Edit Button */}
-      <button
-        onClick={onEdit}
-        title="Edit team"
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 8,
-          border: "none",
-          background: "#eff6ff",
-          color: "#3b82f6",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "all 0.2s ease",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "#3b82f6";
-          e.currentTarget.style.color = "#fff";
-          e.currentTarget.style.transform = "scale(1.1)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(59,130,246,0.3)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "#eff6ff";
-          e.currentTarget.style.color = "#3b82f6";
-          e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.boxShadow = "none";
-        }}
-      >
-        <FiEdit2 size={16} />
-      </button>
+      <FiEdit2 size={16} />
+    </button>
+    <button
+      onClick={onDelete}
+      title="Delete team"
+      style={{
+        width: 34,
+        height: 34,
+        borderRadius: 8,
+        border: "none",
+        background: "#fef2f2",
+        color: "#ef4444",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        transition: "all 0.2s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.background = "#ef4444";
+        e.currentTarget.style.color = "#fff";
+        e.currentTarget.style.transform = "scale(1.1)";
+        e.currentTarget.style.boxShadow = "0 4px 12px rgba(239,68,68,0.3)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.background = "#fef2f2";
+        e.currentTarget.style.color = "#ef4444";
+        e.currentTarget.style.transform = "scale(1)";
+        e.currentTarget.style.boxShadow = "none";
+      }}
+    >
+      <FiTrash2 size={16} />
+    </button>
+  </div>
+);
 
-      {/* Delete Button */}
-      <button
-        onClick={onDelete}
-        title="Delete team"
-        style={{
-          width: 34,
-          height: 34,
-          borderRadius: 8,
-          border: "none",
-          background: "#fef2f2",
-          color: "#ef4444",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "all 0.2s ease",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.background = "#ef4444";
-          e.currentTarget.style.color = "#fff";
-          e.currentTarget.style.transform = "scale(1.1)";
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(239,68,68,0.3)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.background = "#fef2f2";
-          e.currentTarget.style.color = "#ef4444";
-          e.currentTarget.style.transform = "scale(1)";
-          e.currentTarget.style.boxShadow = "none";
-        }}
-      >
-        <FiTrash2 size={16} />
-      </button>
-    </div>
+// ✅ Role Description
+const RoleDescription = ({ role }) => {
+  const descriptions = {
+    superadmin: "Full system control",
+    admin: "Manage users & services",
+    leader: "Manage team",
+    employee: "Staff member",
+  };
+  return (
+    <span
+      style={{
+        fontSize: 9,
+        color: "#999",
+        display: "block",
+        marginTop: 1,
+        fontStyle: "italic",
+      }}
+    >
+      {descriptions[role] || ""}
+    </span>
   );
 };
 
 export default function TeamManagement({ t, isSuperAdmin }) {
-  // ✅ FIX: Memoize safeT to prevent it from changing on every render
   const safeT = useMemo(() => t || {}, [t]);
   const safeCommon = useMemo(() => safeT.common || {}, [safeT]);
 
-  const translations = useMemo(() => {
-    return safeT.teamManagement || {};
-  }, [safeT]);
+  const translations = useMemo(() => safeT.teamManagement || {}, [safeT]);
 
-  // ✅ FIX: getTranslation depends on the memoized translations
   const getTranslation = useCallback(
     (key) => {
       if (translations && translations[key]) {
@@ -264,10 +272,13 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         totalTeams: "TOTAL TEAMS",
         totalMembers: "TOTAL MEMBERS",
         teamsWithLeaders: "TEAMS WITH LEADERS",
+        admin: "Admin",
+        superAdmin: "Super Admin",
+        employee: "Employee",
       };
       return fallback[key] || key;
     },
-    [translations], // ✅ Now depends on memoized translations
+    [translations],
   );
 
   const [teams, setTeams] = useState([]);
@@ -387,6 +398,33 @@ export default function TeamManagement({ t, isSuperAdmin }) {
       teamName: teamName,
     });
   };
+
+  // ✅ Get leader IDs from all teams (to filter out users already leading)
+  const leaderIds = teams
+    .map((team) => team.leader?._id)
+    .filter(Boolean)
+    .map((id) => id.toString());
+
+  // ✅ Get users who can be team leaders: Admin, Super Admin, Team Leader (EXCLUDING Employees)
+  const availableLeaderUsers = users.filter((user) => {
+    // ✅ Only include users with roles: admin, superadmin, leader
+    const isEligibleRole = ["admin", "superadmin", "leader"].includes(
+      user.role,
+    );
+    if (!isEligibleRole) return false;
+
+    // ✅ Exclude users who are already leaders of OTHER teams
+    const isAlreadyLeader = leaderIds.includes(user._id.toString());
+    if (isAlreadyLeader) {
+      // ✅ If editing, allow the current leader to stay in dropdown
+      if (editingTeam && editingTeam.leader?._id === user._id) {
+        return true;
+      }
+      return false;
+    }
+
+    return true;
+  });
 
   // Calculate stats
   const totalMembers = teams.reduce(
@@ -702,6 +740,18 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                         <strong>{getTranslation("leader")}:</strong>
                         <span style={{ color: C.dark }}>
                           {team.leader?.name || getTranslation("notAssigned")}
+                          {team.leader?.role && (
+                            <span
+                              style={{
+                                fontSize: 9,
+                                color: C.muted,
+                                marginLeft: 4,
+                                fontStyle: "italic",
+                              }}
+                            >
+                              ({getRoleDisplayName(team.leader.role)})
+                            </span>
+                          )}
                         </span>
                       </p>
                       <p
@@ -759,7 +809,6 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                           setShowModal(true);
                         }}
                         onDelete={() => openDeleteConfirm(team._id, team.name)}
-                        isSuperAdmin={isSuperAdmin}
                       />
                     </div>
                   )}
@@ -949,19 +998,26 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                   }}
                 >
                   <option value="">{getTranslation("selectLeader")}</option>
-                  {users
-                    .filter(
-                      (u) =>
-                        u.role === "leader" ||
-                        u.role === "admin" ||
-                        u.role === "superadmin",
-                    )
-                    .map((user) => (
-                      <option key={user._id} value={user._id}>
-                        {user.name} ({getRoleDisplayName(user.role)})
-                      </option>
-                    ))}
+                  {availableLeaderUsers.map((user) => (
+                    <option key={user._id} value={user._id}>
+                      {user.name} ({getRoleDisplayName(user.role)})
+                    </option>
+                  ))}
                 </select>
+                {availableLeaderUsers.length === 0 && (
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: "#ef4444",
+                      marginTop: 4,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    No available users with Admin, Super Admin, or Team Leader
+                    roles. Create a user with one of these roles first.
+                  </p>
+                )}
+                <RoleDescription role={formData.leader ? "leader" : ""} />
               </div>
 
               <div
