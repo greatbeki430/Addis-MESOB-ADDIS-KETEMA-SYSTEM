@@ -5,8 +5,9 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { C, F, btn, card } from "../../styles/theme";
 import { teamAPI, authAPI } from "../../services/api";
 import { getRoleDisplayName } from "../../utils/roles";
-import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../hooks/useToast";
+// ✅ FIXED: Correct import path for Modal
+import { Modal } from "../../components/ui/Modal";
 import {
   FiEdit2,
   FiTrash2,
@@ -18,6 +19,7 @@ import {
   FiCheck,
   FiCalendar,
   FiBriefcase,
+  FiAlertTriangle,
 } from "react-icons/fi";
 
 // ✅ Stat Card Component
@@ -307,13 +309,6 @@ export default function TeamManagement({ t, isSuperAdmin }) {
   const { showToast } = useToast();
 
   const fetchData = useCallback(async () => {
-    // ✅ FIXED: previously both requests were wrapped in a single
-    // Promise.all — if EITHER request failed (including teamAPI.getAll(),
-    // which has nothing to do with users), the whole thing rejected and
-    // setUsers() never ran, silently leaving `users` at its initial empty
-    // array forever, even though the users endpoint on its own would have
-    // succeeded. Fetching independently means a failure in one no longer
-    // wipes out data from the other.
     const [teamsResult, usersResult] = await Promise.allSettled([
       teamAPI.getAll(),
       authAPI.getUsers(),
@@ -442,7 +437,6 @@ export default function TeamManagement({ t, isSuperAdmin }) {
   const leaderIds = useMemo(() => {
     const ids = teams
       .map((team) => {
-        // Handle both populated and unpopulated leader
         if (team.leader) {
           return team.leader._id || team.leader;
         }
@@ -466,13 +460,11 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     );
 
     const result = users.filter((user) => {
-      // ✅ Only include users with roles: admin, superadmin, leader
       const isEligibleRole = ["admin", "superadmin", "leader"].includes(
         user.role,
       );
       if (!isEligibleRole) return false;
 
-      // ✅ If editing, allow the current leader to stay in dropdown
       if (editingTeam && editingTeam.leader?._id === user._id) {
         console.log(
           `✅ User ${user.name} (${user.role}) - current leader of team being edited`,
@@ -480,7 +472,6 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         return true;
       }
 
-      // ✅ Check if user is already a leader of ANY team
       const isAlreadyLeader = leaderIds.includes(user._id.toString());
       if (isAlreadyLeader) {
         console.log(`❌ User ${user.name} (${user.role}) - already a leader`);
@@ -498,18 +489,14 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     return result;
   }, [users, leaderIds, editingTeam]);
 
-  // ✅ NEW: distinguish "no eligible-role users exist at all" from
-  // "eligible users exist but are all already leading a team" — the
-  // empty-state message needs to say different things for each.
-  // Distinguish "no eligible-role users exist at all" from "eligible
-  // users exist but are all already leading a team" for the empty-state message
   const eligibleRoleUsers = useMemo(
     () =>
       users.filter((user) =>
         ["admin", "superadmin", "leader"].includes(user.role),
       ),
     [users],
-  ); // Calculate stats
+  );
+
   const totalMembers = teams.reduce(
     (sum, team) => sum + (team.members?.length || 0),
     0,
@@ -542,7 +529,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         margin: "0 auto",
       }}
     >
-      {/* Modals */}
+      {/* Alert Modal - Using the correct Modal component */}
       <Modal
         isOpen={alertModal.isOpen}
         onClose={() =>
@@ -553,21 +540,152 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         type={alertModal.type}
       />
 
-      <Modal
-        isOpen={confirmModal.isOpen}
-        onClose={() =>
-          setConfirmModal({ isOpen: false, teamId: null, teamName: "" })
-        }
-        title={getTranslation("confirmDeleteTitle")}
-        message={`${getTranslation("confirmDeleteMessage")} "${confirmModal.teamName}"? ${getTranslation("deleteWarning")}`}
-        type="confirm"
-        confirmText={getTranslation("delete")}
-        cancelText={getTranslation("cancel")}
-        onConfirm={handleDelete}
-        onCancel={() =>
-          setConfirmModal({ isOpen: false, teamId: null, teamName: "" })
-        }
-      />
+      {/* Delete Confirmation Modal - Inline version with React Icons */}
+      {confirmModal.isOpen && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 20,
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={() =>
+            setConfirmModal({ isOpen: false, teamId: null, teamName: "" })
+          }
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: 16,
+              padding: "clamp(24px, 4vw, 32px)",
+              maxWidth: 450,
+              width: "100%",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+              position: "relative",
+              animation: "fadeIn 0.3s ease",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ textAlign: "center", marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: "50%",
+                  background: "#fee2e2",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 12px",
+                }}
+              >
+                <FiAlertTriangle size={28} color="#dc2626" />
+              </div>
+              <h3
+                style={{
+                  fontSize: "clamp(16px, 2.5vw, 20px)",
+                  fontWeight: 800,
+                  color: C.dark,
+                  margin: 0,
+                  fontFamily: F.serif,
+                }}
+              >
+                {getTranslation("confirmDeleteTitle")}
+              </h3>
+              <p
+                style={{
+                  fontSize: 14,
+                  color: C.muted,
+                  marginTop: 8,
+                  lineHeight: 1.6,
+                }}
+              >
+                {getTranslation("confirmDeleteMessage")}{" "}
+                <strong style={{ color: C.dark }}>
+                  "{confirmModal.teamName}"
+                </strong>
+                ?
+              </p>
+              <p
+                style={{
+                  fontSize: 12,
+                  color: "#ef4444",
+                  marginTop: 4,
+                  fontWeight: 500,
+                }}
+              >
+                {getTranslation("deleteWarning")}
+              </p>
+            </div>
+
+            <div
+              style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}
+            >
+              <button
+                onClick={() =>
+                  setConfirmModal({ isOpen: false, teamId: null, teamName: "" })
+                }
+                style={{
+                  padding: "10px 20px",
+                  borderRadius: 8,
+                  border: `1.5px solid ${C.border}`,
+                  background: "transparent",
+                  color: C.dark,
+                  fontSize: 13,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#f3f4f6";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                }}
+              >
+                <FiX size={16} />
+                {getTranslation("cancel")}
+              </button>
+              <button
+                onClick={handleDelete}
+                style={{
+                  padding: "10px 24px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#dc2626",
+                  color: "#fff",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#ef4444";
+                  e.currentTarget.style.transform = "scale(1.02)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "#dc2626";
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+              >
+                <FiTrash2 size={16} />
+                {getTranslation("delete")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Header */}
       <div
@@ -1158,6 +1276,14 @@ export default function TeamManagement({ t, isSuperAdmin }) {
           </div>
         </div>
       )}
+
+      {/* CSS Animation */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   );
 }

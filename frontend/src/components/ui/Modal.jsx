@@ -1,50 +1,15 @@
+// frontend/src/components/ui/Modal.jsx
+
 import { useState, useEffect, useRef } from "react";
 import { C, F } from "../../styles/theme";
 import {
   FiCheckCircle,
-  // FiAlertCircle,
   FiXCircle,
   FiInfo,
   FiHelpCircle,
   FiX,
   FiCheck,
   FiAlertTriangle,
-  // FiBell,
-  // FiMessageSquare,
-  // FiThumbsUp,
-  // FiThumbsDown,
-  // FiStar,
-  // FiAward,
-  // FiClock,
-  // FiCalendar,
-  // FiEdit2,
-  // FiTrash2,
-  // FiPlus,
-  // FiMinus,
-  // FiSave,
-  // FiDownload,
-  // FiPrinter,
-  // FiFile,
-  // FiFolder,
-  // FiSearch,
-  // FiSettings,
-  // FiUser,
-  // FiUsers,
-  // FiMail,
-  // FiPhone,
-  // FiMapPin,
-  // FiGlobe,
-  // FiLink,
-  // FiLock,
-  // FiUnlock,
-  // FiEye,
-  // FiEyeOff,
-  // FiHeart,
-  // FiFlag,
-  // FiGift,
-  // FiTrophy,
-  // FiMedal,
-  // FiAward as FiAwardIcon,
 } from "react-icons/fi";
 
 export const Modal = ({
@@ -62,39 +27,78 @@ export const Modal = ({
   showCloseButton = true,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const isOpenRef = useRef(isOpen);
+  const closeTimeoutRef = useRef(null);
+  const isMountedRef = useRef(true);
 
-  // Update ref when isOpen changes
+  // Track mounted state
   useEffect(() => {
-    isOpenRef.current = isOpen;
-  }, [isOpen]);
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
-  // Handle body scroll and visibility - using a different approach
+  // Handle open/close state changes
   useEffect(() => {
-    // Use a timeout to avoid the cascading render warning
-    const timer = setTimeout(() => {
-      if (isOpen) {
+    // Clear any pending close timeout
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+
+    if (isOpen) {
+      // When opening, set visible immediately
+      if (isMountedRef.current) {
         setIsVisible(true);
-        document.body.style.overflow = "hidden";
-      } else {
-        document.body.style.overflow = "unset";
       }
-    }, 0);
+      document.body.style.overflow = "hidden";
+    } else {
+      // When closing, trigger animation then cleanup
+      if (isMountedRef.current) {
+        setIsVisible(false);
+      }
+      closeTimeoutRef.current = setTimeout(() => {
+        if (isMountedRef.current) {
+          document.body.style.overflow = "unset";
+          if (onClose) onClose();
+        }
+        closeTimeoutRef.current = null;
+      }, 300);
+    }
 
     return () => {
-      clearTimeout(timer);
-      // Cleanup on unmount
-      document.body.style.overflow = "unset";
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      document.body.style.overflow = "unset";
+      if (closeTimeoutRef.current) {
+        clearTimeout(closeTimeoutRef.current);
+        closeTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   // Handle closing with animation
   const handleClose = () => {
-    document.body.style.overflow = "unset";
+    if (!isVisible) return;
+
     setIsVisible(false);
-    // Call onClose after animation completes
-    setTimeout(() => {
-      if (onClose) onClose();
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+    }
+    closeTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current) {
+        document.body.style.overflow = "unset";
+        if (onClose) onClose();
+      }
+      closeTimeoutRef.current = null;
     }, 300);
   };
 
@@ -460,7 +464,6 @@ export const Toast = ({
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsVisible(false);
-      // Call onClose after fade out animation
       setTimeout(() => {
         if (onClose) onClose();
       }, 300);
