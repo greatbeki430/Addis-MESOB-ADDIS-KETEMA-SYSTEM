@@ -24,13 +24,13 @@ const createTeam = async (req, res) => {
       });
     }
 
-    // Create the team
+    // ✅ Create team WITH createdBy (now in schema)
     const team = await Team.create({
       name,
       leader: leaderId,
       department: department || "",
       members: [leaderId, ...members],
-      createdBy: req.user._id,
+      createdBy: req.user._id, // ✅ Now this field exists in schema
     });
 
     // ✅ Update the leader's team field
@@ -44,11 +44,11 @@ const createTeam = async (req, res) => {
       await User.updateMany({ _id: { $in: memberIds } }, { team: team._id });
     }
 
-    // Return populated team
+    // ✅ Return populated team WITH createdBy populate
     const populatedTeam = await Team.findById(team._id)
       .populate("leader", "name email role profilePhotoUrl")
       .populate("members", "name email role")
-      .populate("createdBy", "name email");
+      .populate("createdBy", "name email"); // ✅ Now this works
 
     res.status(201).json(populatedTeam);
   } catch (error) {
@@ -63,7 +63,7 @@ const getTeams = async (req, res) => {
     const teams = await Team.find()
       .populate("leader", "name email role profilePhotoUrl")
       .populate("members", "name email role")
-      .populate("createdBy", "name email");
+      .populate("createdBy", "name email"); // ✅ Now this works
     res.json(teams);
   } catch (error) {
     console.error("Error fetching teams:", error);
@@ -77,7 +77,7 @@ const getTeamById = async (req, res) => {
     const team = await Team.findById(req.params.id)
       .populate("leader", "name email role profilePhotoUrl")
       .populate("members", "name email role")
-      .populate("createdBy", "name email");
+      .populate("createdBy", "name email"); // ✅ Now this works
     if (!team) return res.status(404).json({ message: "Team not found" });
     res.json(team);
   } catch (error) {
@@ -100,8 +100,7 @@ const updateTeam = async (req, res) => {
     if (name) team.name = name;
     if (department) team.department = department;
 
-    // ✅ FIXED: guard against team.leader being undefined (team with no
-    // leader yet) — team.leader.toString() previously threw in that case.
+    // ✅ FIXED: guard against team.leader being undefined
     const currentLeaderId = team.leader ? team.leader.toString() : null;
 
     if (leader && leader !== currentLeaderId) {
@@ -117,14 +116,11 @@ const updateTeam = async (req, res) => {
         });
       }
 
-      const oldLeaderId = team.leader; // may be undefined — that's fine now
+      const oldLeaderId = team.leader;
       team.leader = leader;
       await User.findByIdAndUpdate(leader, { team: team._id });
 
-      // ✅ FIXED: only push the old leader back into members if there
-      // *was* an old leader. Previously this ran unconditionally and
-      // could push `undefined` into team.members when a team had no
-      // prior leader.
+      // ✅ Only push old leader back if there was one
       if (oldLeaderId && !team.members.includes(oldLeaderId)) {
         team.members.push(oldLeaderId);
         await User.findByIdAndUpdate(oldLeaderId, { team: team._id });
@@ -133,10 +129,11 @@ const updateTeam = async (req, res) => {
 
     // Update members
     if (members) {
+      const currentLeaderIdStr = team.leader ? team.leader.toString() : null;
       const oldMemberIds = team.members.filter(
         (id) =>
           !members.includes(id.toString()) &&
-          id.toString() !== (team.leader ? team.leader.toString() : null),
+          id.toString() !== currentLeaderIdStr,
       );
       if (oldMemberIds.length > 0) {
         await User.updateMany(
@@ -147,8 +144,7 @@ const updateTeam = async (req, res) => {
 
       const newMemberIds = members.filter(
         (id) =>
-          !team.members.includes(id) &&
-          id.toString() !== (team.leader ? team.leader.toString() : null),
+          !team.members.includes(id) && id.toString() !== currentLeaderIdStr,
       );
       if (newMemberIds.length > 0) {
         await User.updateMany(
@@ -162,10 +158,11 @@ const updateTeam = async (req, res) => {
 
     await team.save();
 
+    // ✅ Return populated team WITH createdBy populate
     const populatedTeam = await Team.findById(team._id)
       .populate("leader", "name email role profilePhotoUrl")
       .populate("members", "name email role")
-      .populate("createdBy", "name email");
+      .populate("createdBy", "name email"); // ✅ Now this works
 
     res.json(populatedTeam);
   } catch (error) {
