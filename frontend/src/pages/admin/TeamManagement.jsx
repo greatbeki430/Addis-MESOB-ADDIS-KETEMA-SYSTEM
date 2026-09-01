@@ -472,7 +472,16 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     return result;
   }, [users, leaderIds, editingTeam]);
 
-  // Calculate stats
+  // ✅ NEW: distinguish "no eligible-role users exist at all" from
+  // "eligible users exist but are all already leading a team" — the
+  // empty-state message needs to say different things for each.
+  const eligibleRoleUsers = useMemo(
+    () =>
+      users.filter((user) =>
+        ["admin", "superadmin", "leader"].includes(user.role),
+      ),
+    [users],
+  ); // Calculate stats
   const totalMembers = teams.reduce(
     (sum, team) => sum + (team.members?.length || 0),
     0,
@@ -1059,8 +1068,9 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                       fontStyle: "italic",
                     }}
                   >
-                    No available users with Admin, Super Admin, or Team Leader
-                    roles. Create a user with one of these roles first.
+                    {eligibleRoleUsers.length === 0
+                      ? "No available users with Admin, Super Admin, or Team Leader roles. Create a user with one of these roles first."
+                      : "All users with Admin, Super Admin, or Team Leader roles are already leading a team. Reassign an existing leader or promote another user before creating a new one."}
                   </p>
                 )}
                 <RoleDescription role={formData.leader ? "leader" : ""} />
