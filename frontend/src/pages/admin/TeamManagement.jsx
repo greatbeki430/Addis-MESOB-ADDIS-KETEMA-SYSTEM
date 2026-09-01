@@ -2,6 +2,7 @@
 // Complete Team Management - Fixed leader dropdown to show only Admin, Super Admin, Team Leader roles
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { C, F, btn, card } from "../../styles/theme";
 import { teamAPI, authAPI } from "../../services/api";
 import { getRoleDisplayName } from "../../utils/roles";
@@ -521,27 +522,13 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     },
   };
 
-  return (
-    <div
-      style={{
-        padding: "clamp(12px, 3vw, 20px)",
-        maxWidth: 1200,
-        margin: "0 auto",
-      }}
-    >
-      {/* Alert Modal - Using the correct Modal component */}
-      <Modal
-        isOpen={alertModal.isOpen}
-        onClose={() =>
-          setAlertModal({ isOpen: false, title: "", message: "", type: "info" })
-        }
-        title={alertModal.title}
-        message={alertModal.message}
-        type={alertModal.type}
-      />
-
-      {/* Delete Confirmation Modal - Inline version with React Icons */}
-      {confirmModal.isOpen && (
+  // ✅ Delete Confirmation Modal — portaled to document.body so its
+  // `position: fixed` always anchors to the real viewport, regardless of
+  // whether some ancestor in the layout (sidebar wrapper, scroll
+  // container, etc.) has a transform/filter/perspective that would
+  // otherwise turn "fixed" into "fixed relative to that ancestor".
+  const deleteConfirmModal = confirmModal.isOpen
+    ? createPortal(
         <div
           style={{
             position: "fixed",
@@ -684,8 +671,293 @@ export default function TeamManagement({ t, isSuperAdmin }) {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        </div>,
+        document.body,
+      )
+    : null;
+
+  // ✅ Add/Edit Team Modal — same portal treatment as above, same reason.
+  const teamFormModal =
+    isSuperAdmin && showModal
+      ? createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 1000,
+              padding: 16,
+              backdropFilter: "blur(4px)",
+            }}
+            onClick={() => setShowModal(false)}
+          >
+            <div
+              style={{
+                background: "#fff",
+                borderRadius: 16,
+                padding: "clamp(20px, 3vw, 28px)",
+                width: "90%",
+                maxWidth: 500,
+                maxHeight: "90vh",
+                overflow: "auto",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2
+                style={{
+                  fontSize: "clamp(18px, 4vw, 22px)",
+                  fontWeight: 800,
+                  color: C.dark,
+                  fontFamily: F.serif,
+                  marginBottom: 4,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                {editingTeam ? (
+                  <>
+                    <FiEdit2 size={20} color="#3b82f6" />
+                    {getTranslation("editTeam")}
+                  </>
+                ) : (
+                  <>
+                    <FiUserPlus size={20} color={C.primary} />
+                    {getTranslation("addNewTeam")}
+                  </>
+                )}
+              </h2>
+              <p
+                style={{
+                  fontSize: "clamp(11px, 2.5vw, 12px)",
+                  color: C.muted,
+                  marginBottom: 16,
+                  fontFamily: F.sans,
+                }}
+              >
+                {editingTeam
+                  ? `Update information for ${editingTeam.name}`
+                  : "Create a new team and assign a leader"}
+              </p>
+
+              <form onSubmit={handleSubmit}>
+                <div style={{ marginBottom: 14 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                      fontSize: 12,
+                      color: C.dark,
+                    }}
+                  >
+                    {getTranslation("teamName")}{" "}
+                    <span style={{ color: "#ef4444" }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    placeholder="e.g., Customer Service Team"
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      border: `1.5px solid ${C.border}`,
+                      borderRadius: 8,
+                      fontSize: 13,
+                      outline: "none",
+                      transition: "border-color 0.2s, box-shadow 0.2s",
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = C.primary;
+                      e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = C.border;
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: 14 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                      fontSize: 12,
+                      color: C.dark,
+                    }}
+                  >
+                    {getTranslation("department")}
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.department}
+                    onChange={(e) =>
+                      setFormData({ ...formData, department: e.target.value })
+                    }
+                    placeholder={getTranslation("departmentPlaceholder")}
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      border: `1.5px solid ${C.border}`,
+                      borderRadius: 8,
+                      fontSize: 13,
+                      outline: "none",
+                      transition: "border-color 0.2s, box-shadow 0.2s",
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = C.primary;
+                      e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = C.border;
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  />
+                </div>
+
+                <div style={{ marginBottom: 18 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                      fontSize: 12,
+                      color: C.dark,
+                    }}
+                  >
+                    {getTranslation("teamLeader")}
+                  </label>
+                  <select
+                    value={formData.leader}
+                    onChange={(e) =>
+                      setFormData({ ...formData, leader: e.target.value })
+                    }
+                    style={{
+                      width: "100%",
+                      padding: "10px 14px",
+                      border: `1.5px solid ${C.border}`,
+                      borderRadius: 8,
+                      fontSize: 13,
+                      background: C.white,
+                      outline: "none",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <option value="">{getTranslation("selectLeader")}</option>
+                    {availableLeaderUsers.map((user) => (
+                      <option key={user._id} value={user._id}>
+                        {user.name} ({getRoleDisplayName(user.role)})
+                      </option>
+                    ))}
+                  </select>
+                  {availableLeaderUsers.length === 0 && (
+                    <p
+                      style={{
+                        fontSize: 11,
+                        color: "#ef4444",
+                        marginTop: 4,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      {eligibleRoleUsers.length === 0
+                        ? "No available users with Admin, Super Admin, or Team Leader roles. Create a user with one of these roles first."
+                        : "All users with Admin, Super Admin, or Team Leader roles are already leading a team. Reassign an existing leader or promote another user before creating a new one."}
+                    </p>
+                  )}
+                  <RoleDescription role={formData.leader ? "leader" : ""} />
+                </div>
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 12,
+                    justifyContent: "flex-end",
+                    borderTop: `1px solid ${C.border}`,
+                    paddingTop: 18,
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setShowModal(false)}
+                    style={{
+                      ...btn.secondary,
+                      padding: "10px 22px",
+                      fontSize: 13,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      borderRadius: 8,
+                    }}
+                  >
+                    <FiX size={16} />
+                    {getTranslation("cancel")}
+                  </button>
+                  <button
+                    type="submit"
+                    style={{
+                      ...btn.primary,
+                      padding: "10px 22px",
+                      fontSize: 13,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      borderRadius: 8,
+                    }}
+                  >
+                    {editingTeam ? (
+                      <>
+                        <FiCheck size={16} />
+                        {getTranslation("update")}
+                      </>
+                    ) : (
+                      <>
+                        <FiUserPlus size={16} />
+                        {getTranslation("create")}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body,
+        )
+      : null;
+
+  return (
+    <div
+      style={{
+        padding: "clamp(12px, 3vw, 20px)",
+        maxWidth: 1200,
+        margin: "0 auto",
+      }}
+    >
+      {/* Alert Modal - Using the correct Modal component (already portaled internally) */}
+      <Modal
+        isOpen={alertModal.isOpen}
+        onClose={() =>
+          setAlertModal({ isOpen: false, title: "", message: "", type: "info" })
+        }
+        title={alertModal.title}
+        message={alertModal.message}
+        type={alertModal.type}
+      />
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmModal}
 
       {/* Header */}
       <div
@@ -1021,261 +1293,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
       )}
 
       {/* Add/Edit Team Modal */}
-      {isSuperAdmin && showModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: 16,
-            backdropFilter: "blur(4px)",
-          }}
-          onClick={() => setShowModal(false)}
-        >
-          <div
-            style={{
-              background: "#fff",
-              borderRadius: 16,
-              padding: "clamp(20px, 3vw, 28px)",
-              width: "90%",
-              maxWidth: 500,
-              maxHeight: "90vh",
-              overflow: "auto",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2
-              style={{
-                fontSize: "clamp(18px, 4vw, 22px)",
-                fontWeight: 800,
-                color: C.dark,
-                fontFamily: F.serif,
-                marginBottom: 4,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              {editingTeam ? (
-                <>
-                  <FiEdit2 size={20} color="#3b82f6" />
-                  {getTranslation("editTeam")}
-                </>
-              ) : (
-                <>
-                  <FiUserPlus size={20} color={C.primary} />
-                  {getTranslation("addNewTeam")}
-                </>
-              )}
-            </h2>
-            <p
-              style={{
-                fontSize: "clamp(11px, 2.5vw, 12px)",
-                color: C.muted,
-                marginBottom: 16,
-                fontFamily: F.sans,
-              }}
-            >
-              {editingTeam
-                ? `Update information for ${editingTeam.name}`
-                : "Create a new team and assign a leader"}
-            </p>
-
-            <form onSubmit={handleSubmit}>
-              <div style={{ marginBottom: 14 }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontWeight: 600,
-                    fontSize: 12,
-                    color: C.dark,
-                  }}
-                >
-                  {getTranslation("teamName")}{" "}
-                  <span style={{ color: "#ef4444" }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  placeholder="e.g., Customer Service Team"
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    outline: "none",
-                    transition: "border-color 0.2s, box-shadow 0.2s",
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = C.primary;
-                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontWeight: 600,
-                    fontSize: 12,
-                    color: C.dark,
-                  }}
-                >
-                  {getTranslation("department")}
-                </label>
-                <input
-                  type="text"
-                  value={formData.department}
-                  onChange={(e) =>
-                    setFormData({ ...formData, department: e.target.value })
-                  }
-                  placeholder={getTranslation("departmentPlaceholder")}
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    outline: "none",
-                    transition: "border-color 0.2s, box-shadow 0.2s",
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = C.primary;
-                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: 18 }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontWeight: 600,
-                    fontSize: 12,
-                    color: C.dark,
-                  }}
-                >
-                  {getTranslation("teamLeader")}
-                </label>
-                <select
-                  value={formData.leader}
-                  onChange={(e) =>
-                    setFormData({ ...formData, leader: e.target.value })
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    background: C.white,
-                    outline: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  <option value="">{getTranslation("selectLeader")}</option>
-                  {availableLeaderUsers.map((user) => (
-                    <option key={user._id} value={user._id}>
-                      {user.name} ({getRoleDisplayName(user.role)})
-                    </option>
-                  ))}
-                </select>
-                {availableLeaderUsers.length === 0 && (
-                  <p
-                    style={{
-                      fontSize: 11,
-                      color: "#ef4444",
-                      marginTop: 4,
-                      fontStyle: "italic",
-                    }}
-                  >
-                    {eligibleRoleUsers.length === 0
-                      ? "No available users with Admin, Super Admin, or Team Leader roles. Create a user with one of these roles first."
-                      : "All users with Admin, Super Admin, or Team Leader roles are already leading a team. Reassign an existing leader or promote another user before creating a new one."}
-                  </p>
-                )}
-                <RoleDescription role={formData.leader ? "leader" : ""} />
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  justifyContent: "flex-end",
-                  borderTop: `1px solid ${C.border}`,
-                  paddingTop: 18,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  style={{
-                    ...btn.secondary,
-                    padding: "10px 22px",
-                    fontSize: 13,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    borderRadius: 8,
-                  }}
-                >
-                  <FiX size={16} />
-                  {getTranslation("cancel")}
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    ...btn.primary,
-                    padding: "10px 22px",
-                    fontSize: 13,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    borderRadius: 8,
-                  }}
-                >
-                  {editingTeam ? (
-                    <>
-                      <FiCheck size={16} />
-                      {getTranslation("update")}
-                    </>
-                  ) : (
-                    <>
-                      <FiUserPlus size={16} />
-                      {getTranslation("create")}
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {teamFormModal}
 
       {/* CSS Animation */}
       <style>{`
