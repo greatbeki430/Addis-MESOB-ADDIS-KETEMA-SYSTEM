@@ -100,8 +100,11 @@ const updateTeam = async (req, res) => {
     if (name) team.name = name;
     if (department) team.department = department;
 
-    // ✅ Handle leader change properly
-    if (leader && leader !== team.leader.toString()) {
+    // ✅ FIXED: guard against team.leader being undefined (team with no
+    // leader yet) — team.leader.toString() previously threw in that case.
+    const currentLeaderId = team.leader ? team.leader.toString() : null;
+
+    if (leader && leader !== currentLeaderId) {
       // Check if the new leader is already leading another team
       const existingLeaderTeam = await Team.findOne({
         leader: leader,
@@ -114,12 +117,15 @@ const updateTeam = async (req, res) => {
         });
       }
 
-      const oldLeaderId = team.leader;
+      const oldLeaderId = team.leader; // may be undefined — that's fine now
       team.leader = leader;
       await User.findByIdAndUpdate(leader, { team: team._id });
 
-      // If old leader is not in members list, add them back as member
-      if (!team.members.includes(oldLeaderId)) {
+      // ✅ FIXED: only push the old leader back into members if there
+      // *was* an old leader. Previously this ran unconditionally and
+      // could push `undefined` into team.members when a team had no
+      // prior leader.
+      if (oldLeaderId && !team.members.includes(oldLeaderId)) {
         team.members.push(oldLeaderId);
         await User.findByIdAndUpdate(oldLeaderId, { team: team._id });
       }
@@ -130,7 +136,7 @@ const updateTeam = async (req, res) => {
       const oldMemberIds = team.members.filter(
         (id) =>
           !members.includes(id.toString()) &&
-          id.toString() !== team.leader.toString(),
+          id.toString() !== (team.leader ? team.leader.toString() : null),
       );
       if (oldMemberIds.length > 0) {
         await User.updateMany(
@@ -142,7 +148,7 @@ const updateTeam = async (req, res) => {
       const newMemberIds = members.filter(
         (id) =>
           !team.members.includes(id) &&
-          id.toString() !== team.leader.toString(),
+          id.toString() !== (team.leader ? team.leader.toString() : null),
       );
       if (newMemberIds.length > 0) {
         await User.updateMany(
