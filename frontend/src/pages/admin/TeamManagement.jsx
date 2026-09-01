@@ -312,6 +312,19 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         teamAPI.getAll(),
         authAPI.getUsers(),
       ]);
+
+      console.log("📊 [TeamManagement] Teams loaded:", teamsRes.data);
+      console.log("📊 [TeamManagement] Users loaded:", usersRes.data);
+
+      // Log eligible users for debugging
+      const eligibleUsers = usersRes.data.filter((u) =>
+        ["admin", "superadmin", "leader"].includes(u.role),
+      );
+      console.log(
+        "📊 [TeamManagement] Eligible users (Admin/SuperAdmin/Leader):",
+        eligibleUsers.map((u) => `${u.name} (${u.role})`),
+      );
+
       setTeams(teamsRes.data);
       setUsers(usersRes.data);
     } catch (error) {
@@ -399,32 +412,65 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     });
   };
 
-  // ✅ Get leader IDs from all teams (to filter out users already leading)
-  const leaderIds = teams
-    .map((team) => team.leader?._id)
-    .filter(Boolean)
-    .map((id) => id.toString());
+  // ✅ FIXED: Get leader IDs from all teams with proper null checks
+  const leaderIds = useMemo(() => {
+    const ids = teams
+      .map((team) => {
+        // Handle both populated and unpopulated leader
+        if (team.leader) {
+          return team.leader._id || team.leader;
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .map((id) => id.toString());
 
-  // ✅ Get users who can be team leaders: Admin, Super Admin, Team Leader (EXCLUDING Employees)
-  const availableLeaderUsers = users.filter((user) => {
-    // ✅ Only include users with roles: admin, superadmin, leader
-    const isEligibleRole = ["admin", "superadmin", "leader"].includes(
-      user.role,
+    console.log("🔍 [TeamManagement] Leader IDs:", ids);
+    return ids;
+  }, [teams]);
+
+  // ✅ FIXED: Get users who can be team leaders: Admin, Super Admin, Team Leader
+  const availableLeaderUsers = useMemo(() => {
+    console.log("🔍 [TeamManagement] Calculating available leader users...");
+    console.log("🔍 [TeamManagement] Total users:", users.length);
+    console.log("🔍 [TeamManagement] Leader IDs:", leaderIds);
+    console.log(
+      "🔍 [TeamManagement] Editing team:",
+      editingTeam?.name || "None",
     );
-    if (!isEligibleRole) return false;
 
-    // ✅ Exclude users who are already leaders of OTHER teams
-    const isAlreadyLeader = leaderIds.includes(user._id.toString());
-    if (isAlreadyLeader) {
+    const result = users.filter((user) => {
+      // ✅ Only include users with roles: admin, superadmin, leader
+      const isEligibleRole = ["admin", "superadmin", "leader"].includes(
+        user.role,
+      );
+      if (!isEligibleRole) return false;
+
       // ✅ If editing, allow the current leader to stay in dropdown
       if (editingTeam && editingTeam.leader?._id === user._id) {
+        console.log(
+          `✅ User ${user.name} (${user.role}) - current leader of team being edited`,
+        );
         return true;
       }
-      return false;
-    }
 
-    return true;
-  });
+      // ✅ Check if user is already a leader of ANY team
+      const isAlreadyLeader = leaderIds.includes(user._id.toString());
+      if (isAlreadyLeader) {
+        console.log(`❌ User ${user.name} (${user.role}) - already a leader`);
+        return false;
+      }
+
+      console.log(`✅ User ${user.name} (${user.role}) - available`);
+      return true;
+    });
+
+    console.log(
+      "🔍 [TeamManagement] Available leader users:",
+      result.map((u) => `${u.name} (${u.role})`),
+    );
+    return result;
+  }, [users, leaderIds, editingTeam]);
 
   // Calculate stats
   const totalMembers = teams.reduce(
