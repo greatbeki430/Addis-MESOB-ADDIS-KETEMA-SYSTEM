@@ -60,7 +60,13 @@ export default function PresenterSpotlight({ onRefresh }) {
       if (!isMounted.current) return;
       setPresenter(response.data);
 
-      // Get full presenter details with photo
+      // Get full presenter details with photo — best-effort enrichment only.
+      // The rotation service can return a presenter whose linked User
+      // document has since been deleted (orphaned reference); a 404 here
+      // is an expected, recoverable case, not a bug to alarm on every
+      // load. Downgrade to a single quiet debug line instead of a
+      // recurring console.warn, and don't let it block rendering the
+      // presenter data we already have from getNextPresenter().
       if (response.data && response.data._id) {
         try {
           const detailRes = await goldenMondayAPI.getUserDetails(
@@ -72,7 +78,14 @@ export default function PresenterSpotlight({ onRefresh }) {
             ...detailRes.data,
           }));
         } catch (detailErr) {
-          console.warn("Could not fetch user details:", detailErr);
+          if (detailErr.response?.status === 404) {
+            // Expected/orphaned-reference case — the presenter's linked
+            // user account no longer exists. Silently continue with the
+            // base rotation data (name/department/etc. from
+            // getNextPresenter still render fine without this).
+          } else {
+            console.warn("Could not fetch presenter user details:", detailErr);
+          }
         }
       }
     } catch (error) {
