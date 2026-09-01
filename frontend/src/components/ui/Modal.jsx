@@ -26,84 +26,96 @@ export const Modal = ({
   size = "md",
   showCloseButton = true,
 }) => {
-  const [isVisible, setIsVisible] = useState(false);
-  const closeTimeoutRef = useRef(null);
-  const isMountedRef = useRef(true);
+  // `shouldRender` = whether the modal exists in the DOM at all.
+  // `active`       = whether it should be showing its "open" visual state.
+  // Splitting these lets us mount with the "closed" styles first, then flip
+  // to "open" on the next frame so the CSS transition has something to
+  // animate from. This replaces the old approach of swapping named
+  // keyframe animations, which could get stuck mid fade-out (content at
+  // opacity 0) while the backdrop blur was still applied — that's what
+  // produced the "blurred, empty overlay" bug.
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [active, setActive] = useState(false);
 
-  // Track mounted state
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, []);
+  // Tracks the isOpen value from the previous render so we can react to it
+  // changing. React's own guidance for "state that must update the instant
+  // a prop changes" is to do that update in the render body (comparing
+  // against a value stored in state), not in an effect — see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes.
+  // Doing it here (rather than as a top-level setState call inside
+  // useEffect) is what the ESLint rule below is asking for.
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
-  // Handle open/close state changes
+  // Keep the latest onClose in a ref instead of an effect dependency.
+  // Callers pass onClose as a new inline arrow function every render, so
+  // depending on it directly would re-run effects (and re-animate) on
+  // every parent render, not just on actual open/close — the original
+  // source of the cascading-render warning and the flicker/race.
+  const onCloseRef = useRef(onClose);
+  const hasClosedRef = useRef(false);
+
   useEffect(() => {
-    // Clear any pending close timeout
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-      closeTimeoutRef.current = null;
+    onCloseRef.current = onClose;
+  });
+
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    if (isOpen) {
+      setShouldRender(true);
+    } else {
+      setActive(false);
     }
+  }
+
+  // This effect only does things that genuinely require the DOM to have
+  // committed/painted: locking body scroll, kicking off the enter
+  // transition one frame later, and delaying the unmount until the exit
+  // transition finishes. Every setState call here is nested inside a
+  // requestAnimationFrame or setTimeout callback rather than sitting
+  // directly in the effect body, so it isn't a synchronous render-triggering
+  // call from React's point of view.
+  useEffect(() => {
+    let rafId;
+    let timeoutId;
 
     if (isOpen) {
-      // When opening, set visible immediately
-      if (isMountedRef.current) {
-        setIsVisible(true);
-      }
+      hasClosedRef.current = false;
       document.body.style.overflow = "hidden";
+      // Wait a frame so the "closed" styles paint first, then flip to
+      // "active" on the next frame so the opacity/transform transition
+      // actually has a starting point to animate from.
+      rafId = requestAnimationFrame(() => {
+        rafId = requestAnimationFrame(() => setActive(true));
+      });
     } else {
-      // When closing, trigger animation then cleanup
-      if (isMountedRef.current) {
-        setIsVisible(false);
-      }
-      closeTimeoutRef.current = setTimeout(() => {
-        if (isMountedRef.current) {
-          document.body.style.overflow = "unset";
-          if (onClose) onClose();
-        }
-        closeTimeoutRef.current = null;
+      timeoutId = setTimeout(() => {
+        setShouldRender(false);
+        document.body.style.overflow = "unset";
       }, 300);
     }
 
     return () => {
-      if (closeTimeoutRef.current) {
-        clearTimeout(closeTimeoutRef.current);
-        closeTimeoutRef.current = null;
-      }
+      if (rafId) cancelAnimationFrame(rafId);
+      if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       document.body.style.overflow = "unset";
-      if (closeTimeoutRef.current) {
-        clearTimeout(closeTimeoutRef.current);
-        closeTimeoutRef.current = null;
-      }
     };
   }, []);
 
-  // Handle closing with animation
-  const handleClose = () => {
-    if (!isVisible) return;
-
-    setIsVisible(false);
-    if (closeTimeoutRef.current) {
-      clearTimeout(closeTimeoutRef.current);
-    }
-    closeTimeoutRef.current = setTimeout(() => {
-      if (isMountedRef.current) {
-        document.body.style.overflow = "unset";
-        if (onClose) onClose();
-      }
-      closeTimeoutRef.current = null;
-    }, 300);
+  // Single entry point for closing — guarantees onClose fires at most once
+  // per open/close cycle, no matter which UI element triggered it.
+  const requestClose = () => {
+    if (hasClosedRef.current) return;
+    hasClosedRef.current = true;
+    onCloseRef.current?.();
   };
 
-  // Don't render if not open and not visible
-  if (!isOpen && !isVisible) return null;
+  if (!shouldRender) return null;
 
   const getIcon = () => {
     switch (type) {
@@ -135,20 +147,7 @@ export const Modal = ({
     }
   };
 
-  const getHeaderColor = () => {
-    switch (type) {
-      case "success":
-        return "#10b981";
-      case "warning":
-        return "#f59e0b";
-      case "error":
-        return "#ef4444";
-      case "confirm":
-        return "#3b82f6";
-      default:
-        return C.primary;
-    }
-  };
+  const getHeaderColor = () => getIconColor();
 
   const getButtonStyle = () => {
     switch (type) {
@@ -178,7 +177,7 @@ export const Modal = ({
 
   const handleOverlayClick = (e) => {
     if (e.target === e.currentTarget) {
-      handleClose();
+      requestClose();
     }
   };
 
@@ -186,14 +185,14 @@ export const Modal = ({
     if (onConfirm) {
       onConfirm();
     }
-    handleClose();
+    requestClose();
   };
 
   const handleCancel = () => {
     if (onCancel) {
       onCancel();
     }
-    handleClose();
+    requestClose();
   };
 
   const iconColor = getIconColor();
@@ -213,27 +212,12 @@ export const Modal = ({
         zIndex: 9999,
         padding: "16px",
         backdropFilter: "blur(4px)",
-        animation: isVisible ? "fadeIn 0.2s ease" : "fadeOut 0.2s ease",
+        opacity: active ? 1 : 0,
+        transition: "opacity 0.2s ease",
       }}
       onClick={handleOverlayClick}
     >
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes fadeOut {
-          from { opacity: 1; }
-          to { opacity: 0; }
-        }
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-30px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @keyframes slideUp {
-          from { opacity: 1; transform: translateY(0) scale(1); }
-          to { opacity: 0; transform: translateY(-30px) scale(0.95); }
-        }
         @keyframes pulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.1); }
@@ -248,7 +232,11 @@ export const Modal = ({
           maxHeight: "90vh",
           overflow: "auto",
           boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
-          animation: isVisible ? "slideDown 0.3s ease" : "slideUp 0.3s ease",
+          opacity: active ? 1 : 0,
+          transform: active
+            ? "translateY(0) scale(1)"
+            : "translateY(-30px) scale(0.95)",
+          transition: "opacity 0.3s ease, transform 0.3s ease",
           display: "flex",
           flexDirection: "column",
         }}
@@ -291,7 +279,7 @@ export const Modal = ({
           </div>
           {showCloseButton && (
             <button
-              onClick={handleClose}
+              onClick={requestClose}
               style={{
                 background: "none",
                 border: "none",
@@ -418,7 +406,7 @@ export const Modal = ({
           )}
           {!onConfirm && !onCancel && (
             <button
-              onClick={handleClose}
+              onClick={requestClose}
               style={{
                 padding: "8px 20px",
                 ...getButtonStyle(),
@@ -452,7 +440,7 @@ export const Modal = ({
   );
 };
 
-// ✅ Toast notification component
+// ✅ Toast notification component (unchanged — no bug reported here)
 export const Toast = ({
   message,
   type = "success",
@@ -501,6 +489,12 @@ export const Toast = ({
         width: "100%",
       }}
     >
+      <style>{`
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-30px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
       <div
         style={{
           background: colors.bg,
@@ -551,7 +545,7 @@ export const Toast = ({
   );
 };
 
-// ✅ ToastContainer component
+// ✅ ToastContainer component (unchanged)
 export const ToastContainer = ({ toasts, removeToast }) => {
   if (!toasts || toasts.length === 0) return null;
 
