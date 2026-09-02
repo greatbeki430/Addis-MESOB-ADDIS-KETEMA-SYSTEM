@@ -1,3 +1,4 @@
+// frontend/src/pages/admin/UserManagement.jsx
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { C, F, btn } from "../../styles/theme";
 import { authAPI } from "../../services/api";
@@ -10,6 +11,10 @@ import {
 } from "../../utils/roles";
 import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../hooks/useToast";
+import {
+  generateTempPassword,
+  copyToClipboard,
+} from "../../utils/passwordUtils";
 import {
   FiEdit2,
   FiEye,
@@ -24,6 +29,8 @@ import {
   FiStar,
   FiX,
   FiCheck,
+  FiCopy,
+  FiEyeOff,
 } from "react-icons/fi";
 
 // ✅ Beautiful Stat Card with Gradient and Icon
@@ -52,7 +59,6 @@ const StatCard = ({ icon: Icon, value, label, color, gradient, subtitle }) => (
       e.currentTarget.style.borderColor = C.border + "33";
     }}
   >
-    {/* Decorative background circle */}
     <div
       style={{
         position: "absolute",
@@ -130,7 +136,6 @@ const StatCard = ({ icon: Icon, value, label, color, gradient, subtitle }) => (
         {subtitle}
       </div>
     )}
-    {/* Decorative gradient line */}
     <div
       style={{
         position: "absolute",
@@ -145,14 +150,14 @@ const StatCard = ({ icon: Icon, value, label, color, gradient, subtitle }) => (
   </div>
 );
 
-// ✅ Beautiful Action Button Group - FIXED: Removed unused showMore
+// ✅ Action Button Group
 const ActionButtons = ({
   user,
   onEdit,
   onView,
   onRoleChange,
   onDelete,
-  onToggleGoldenMondayAdmin, // ✅ NEW
+  onToggleGoldenMondayAdmin,
   isSuperAdmin,
   isAdmin,
   currentUser,
@@ -172,7 +177,6 @@ const ActionButtons = ({
         flexWrap: "wrap",
       }}
     >
-      {/* View Button */}
       <button
         onClick={() => onView(user)}
         title="View user details"
@@ -205,7 +209,6 @@ const ActionButtons = ({
         <FiEye size={16} />
       </button>
 
-      {/* Edit Button */}
       <button
         onClick={() => onEdit(user)}
         title="Edit user"
@@ -238,7 +241,6 @@ const ActionButtons = ({
         <FiEdit2 size={16} />
       </button>
 
-      {/* Role Change Button - Only for SuperAdmin */}
       {isSuperAdmin && user.role !== ROLES.SUPER_ADMIN && (
         <button
           onClick={() => onRoleChange(user)}
@@ -273,7 +275,6 @@ const ActionButtons = ({
         </button>
       )}
 
-      {/* ✅ Golden Monday Admin Toggle Button - For Admin/SuperAdmin only */}
       {isAdminOrAbove &&
         user.role !== ROLES.ADMIN &&
         user.role !== ROLES.SUPER_ADMIN &&
@@ -312,7 +313,6 @@ const ActionButtons = ({
           </button>
         )}
 
-      {/* Delete Button */}
       {canDelete && (
         <button
           onClick={() => onDelete(user._id, user.name)}
@@ -369,6 +369,141 @@ const RoleDescription = ({ role }) => {
     >
       {descriptions[role] || ""}
     </span>
+  );
+};
+
+// ✅ Password Display Component
+const PasswordDisplay = ({ password, onClose }) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    const success = await copyToClipboard(password);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        background: "#f0fdf4",
+        border: "1px solid #86efac",
+        borderRadius: 8,
+        padding: "14px 16px",
+        marginBottom: 16,
+        animation: "fadeIn 0.3s ease",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: 6,
+        }}
+      >
+        <p
+          style={{ margin: 0, fontSize: 13, color: "#065f46", fontWeight: 600 }}
+        >
+          ✅ User Created Successfully!
+        </p>
+        <button
+          onClick={onClose}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#065f46",
+            cursor: "pointer",
+            fontSize: 16,
+            padding: "2px 4px",
+          }}
+        >
+          <FiX size={16} />
+        </button>
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          background: "#fff",
+          borderRadius: 6,
+          padding: "6px 12px",
+          border: "1px solid #86efac",
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11,
+            color: "#065f46",
+            fontWeight: 500,
+            flexShrink: 0,
+          }}
+        >
+          Temporary Password:
+        </span>
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 700,
+            color: "#065f46",
+            fontFamily: "monospace",
+            letterSpacing: 0.5,
+            flex: 1,
+            wordBreak: "break-all",
+          }}
+        >
+          {showPassword ? password : "••••••••••••"}
+        </span>
+        <button
+          onClick={() => setShowPassword(!showPassword)}
+          style={{
+            background: "none",
+            border: "none",
+            color: "#065f46",
+            cursor: "pointer",
+            padding: "4px",
+          }}
+          title={showPassword ? "Hide password" : "Show password"}
+        >
+          {showPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+        </button>
+        <button
+          onClick={handleCopy}
+          style={{
+            background: copied ? "#10b981" : "none",
+            color: copied ? "#fff" : "#065f46",
+            border: copied ? "none" : "1px solid #86efac",
+            borderRadius: 4,
+            padding: "4px 10px",
+            cursor: "pointer",
+            fontSize: 11,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            transition: "all 0.2s ease",
+          }}
+        >
+          <FiCopy size={12} />
+          {copied ? "Copied!" : "Copy"}
+        </button>
+      </div>
+
+      <p
+        style={{
+          margin: "6px 0 0",
+          fontSize: 10,
+          color: "#065f46",
+          opacity: 0.8,
+        }}
+      >
+        📋 Share this password with the user. They can change it after logging
+        in.
+      </p>
+    </div>
   );
 };
 
@@ -430,6 +565,15 @@ export default function UserManagement({ t }) {
         roleTeamLeader: "Team Leader",
         roleAdmin: "Admin",
         roleSuperAdmin: "Super Admin",
+        loadError: "Failed to load users. Please refresh.",
+        saveError: "Operation failed. Please try again.",
+        updateSuccess: "User updated successfully!",
+        createSuccess: "User created successfully!",
+        deleteSuccess: "User deleted successfully!",
+        deleteError: "Failed to delete user. Please try again.",
+        temporaryPassword: "Temporary Password",
+        copyPassword: "Copy Password",
+        passwordCopied: "Password copied to clipboard!",
       };
       return fallback[key] || key;
     },
@@ -442,6 +586,8 @@ export default function UserManagement({ t }) {
   const [editingUser, setEditingUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [generatedPassword, setGeneratedPassword] = useState(null);
+  const [showPasswordDisplay, setShowPasswordDisplay] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -493,25 +639,12 @@ export default function UserManagement({ t }) {
   }, [getTranslation]);
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        const response = await authAPI.getUsers();
-        setUsers(response.data);
-      } catch (error) {
-        console.error("Failed to load users:", error);
-        setAlertModal({
-          isOpen: true,
-          title: getTranslation("title"),
-          message: getTranslation("loadError"),
-          type: "error",
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchUsers();
-  }, [getTranslation]);
+    const timeoutId = setTimeout(() => {
+      loadUsers();
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [loadUsers]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -524,20 +657,40 @@ export default function UserManagement({ t }) {
           phone: formData.phone,
         });
         showToast(getTranslation("updateSuccess"), "success");
+        setShowModal(false);
+        setEditingUser(null);
+        resetForm();
+        loadUsers();
       } else {
-        await authAPI.register(formData);
+        // ✅ Generate temporary password for new users
+        const tempPassword = generateTempPassword(12);
+        const userData = {
+          name: formData.name,
+          email: formData.email,
+          password: tempPassword,
+          role: formData.role,
+          phone: formData.phone || "",
+        };
+
+        await authAPI.register(userData);
+
+        // ✅ Store the generated password to display
+        setGeneratedPassword(tempPassword);
+        setShowPasswordDisplay(true);
+
         showToast(getTranslation("createSuccess"), "success");
+
+        // Don't close modal yet - show password first
+        // Reset form but keep modal open to show password
+        setFormData({
+          name: "",
+          email: "",
+          password: "",
+          role: "employee",
+          phone: "",
+        });
+        loadUsers();
       }
-      setShowModal(false);
-      setEditingUser(null);
-      setFormData({
-        name: "",
-        email: "",
-        password: "",
-        role: "employee",
-        phone: "",
-      });
-      loadUsers();
     } catch (error) {
       console.error("Failed to save user:", error);
       setAlertModal({
@@ -547,6 +700,26 @@ export default function UserManagement({ t }) {
         type: "error",
       });
     }
+  };
+
+  const handlePasswordDisplayClose = () => {
+    setShowPasswordDisplay(false);
+    setGeneratedPassword(null);
+    setShowModal(false);
+    setEditingUser(null);
+    resetForm();
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      email: "",
+      password: "",
+      role: "employee",
+      phone: "",
+    });
+    setGeneratedPassword(null);
+    setShowPasswordDisplay(false);
   };
 
   const handleDelete = async () => {
@@ -643,7 +816,6 @@ export default function UserManagement({ t }) {
 
   const roleStats = getRoleStats();
 
-  // Color configurations for stat cards
   const cardColors = {
     total: {
       color: "#1a3aad",
@@ -905,6 +1077,8 @@ export default function UserManagement({ t }) {
         <button
           onClick={() => {
             setEditingUser(null);
+            setGeneratedPassword(null);
+            setShowPasswordDisplay(false);
             setFormData({
               name: "",
               email: "",
@@ -938,7 +1112,7 @@ export default function UserManagement({ t }) {
         </button>
       </div>
 
-      {/* Statistics Cards - Responsive Grid */}
+      {/* Statistics Cards */}
       <div
         style={{
           display: "grid",
@@ -1253,7 +1427,6 @@ export default function UserManagement({ t }) {
                         </span>
                         {getRoleDisplayName(user.role)}
                       </span>
-                      {/* ✅ Golden Monday Admin Badge */}
                       {user.isGoldenMondayAdmin && (
                         <span
                           style={{
@@ -1292,6 +1465,8 @@ export default function UserManagement({ t }) {
                       user={user}
                       onEdit={(u) => {
                         setEditingUser(u);
+                        setGeneratedPassword(null);
+                        setShowPasswordDisplay(false);
                         setFormData({
                           name: u.name,
                           email: u.email,
@@ -1310,9 +1485,9 @@ export default function UserManagement({ t }) {
                         });
                       }}
                       onDelete={openDeleteConfirm}
-                      onToggleGoldenMondayAdmin={handleToggleGoldenMondayAdmin} // ✅ ADD THIS
+                      onToggleGoldenMondayAdmin={handleToggleGoldenMondayAdmin}
                       isSuperAdmin={isSuperAdmin}
-                      isAdmin={isAdmin} // ✅ ADD THIS
+                      isAdmin={isAdmin}
                       currentUser={currentUser}
                     />
                   </td>
@@ -1346,7 +1521,7 @@ export default function UserManagement({ t }) {
         </div>
       )}
 
-      {/* ✅ FIXED: User Modal - Mobile Optimized */}
+      {/* ✅ User Modal with Password Display */}
       {showModal && (
         <div
           style={{
@@ -1363,14 +1538,20 @@ export default function UserManagement({ t }) {
             padding: "12px",
             backdropFilter: "blur(4px)",
           }}
-          onClick={() => setShowModal(false)}
+          onClick={() => {
+            if (!showPasswordDisplay) {
+              setShowModal(false);
+              setEditingUser(null);
+              resetForm();
+            }
+          }}
         >
           <div
             style={{
               background: C.white,
               borderRadius: 16,
               padding: "clamp(20px, 4vw, 32px)",
-              width: "min(92%, 500px)", // ✅ Increased max width on mobile
+              width: "min(92%, 500px)",
               maxWidth: 500,
               maxHeight: "90vh",
               overflow: "auto",
@@ -1380,345 +1561,412 @@ export default function UserManagement({ t }) {
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2
-              style={{
-                fontSize: "clamp(18px, 4vw, 24px)",
-                fontWeight: 800,
-                color: C.dark,
-                fontFamily: F.serif,
-                marginBottom: 4,
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-              }}
-            >
-              {editingUser ? (
-                <>
-                  <FiEdit2 size={22} color="#3b82f6" />
-                  {getTranslation("editUser")}
-                </>
-              ) : (
-                <>
-                  <FiUserPlus size={22} color={C.primary} />
-                  {getTranslation("addNewUser")}
-                </>
-              )}
-            </h2>
-            <p
-              style={{
-                fontSize: "clamp(12px, 2.5vw, 14px)",
-                color: C.muted,
-                marginBottom: 20,
-                fontFamily: F.sans,
-              }}
-            >
-              {editingUser
-                ? `${getTranslation("updateInfo")} ${editingUser.name}`
-                : getTranslation("createAccount")}
-            </p>
-
-            <form id="user-form" onSubmit={handleSubmit}>
-              <div style={{ marginBottom: 14 }}>
-                <label
+            {!editingUser && showPasswordDisplay && generatedPassword ? (
+              // ✅ Show Password Display
+              <>
+                <h2
                   style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontWeight: 600,
-                    fontSize: 12,
+                    fontSize: "clamp(18px, 4vw, 24px)",
+                    fontWeight: 800,
                     color: C.dark,
+                    fontFamily: F.serif,
+                    marginBottom: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
                   }}
                 >
-                  {getTranslation("fullName")}{" "}
-                  <span style={{ color: "#ef4444" }}>*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g., John Doe"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    transition: "border-color 0.2s, box-shadow 0.2s",
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = C.primary;
-                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
+                  <FiUserPlus size={22} color="#10b981" />
+                  {getTranslation("createSuccess")}
+                </h2>
+                <PasswordDisplay
+                  password={generatedPassword}
+                  onClose={handlePasswordDisplayClose}
                 />
-              </div>
-
-              <div style={{ marginBottom: 14 }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontWeight: 600,
-                    fontSize: 12,
-                    color: C.dark,
-                  }}
-                >
-                  {getTranslation("email")}{" "}
-                  <span style={{ color: "#ef4444" }}>*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  placeholder="user@example.com"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    transition: "border-color 0.2s, box-shadow 0.2s",
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = C.primary;
-                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                />
-              </div>
-
-              {!editingUser && (
-                <div style={{ marginBottom: 14 }}>
-                  <label
-                    style={{
-                      display: "block",
-                      marginBottom: 4,
-                      fontWeight: 600,
-                      fontSize: 12,
-                      color: C.dark,
-                    }}
-                  >
-                    {getTranslation("password")}{" "}
-                    <span style={{ color: "#ef4444" }}>*</span>
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Min 6 characters"
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    style={{
-                      width: "100%",
-                      padding: "10px 14px",
-                      border: `1.5px solid ${C.border}`,
-                      borderRadius: 8,
-                      fontSize: 13,
-                      transition: "border-color 0.2s, box-shadow 0.2s",
-                      outline: "none",
-                      boxSizing: "border-box",
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = C.primary;
-                      e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = C.border;
-                      e.currentTarget.style.boxShadow = "none";
-                    }}
-                  />
-                </div>
-              )}
-
-              <div style={{ marginBottom: 14 }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontWeight: 600,
-                    fontSize: 12,
-                    color: C.dark,
-                  }}
-                >
-                  {getTranslation("role")}{" "}
-                  <span style={{ color: "#ef4444" }}>*</span>
-                </label>
-                <select
-                  value={formData.role}
-                  onChange={(e) =>
-                    setFormData({ ...formData, role: e.target.value })
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    background: C.white,
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
-                >
-                  {getAvailableRoles().map((role) => (
-                    <option key={role.value} value={role.value}>
-                      {role.label}
-                    </option>
-                  ))}
-                </select>
-                <RoleDescription role={formData.role} />
-              </div>
-
-              <div style={{ marginBottom: 18 }}>
-                <label
-                  style={{
-                    display: "block",
-                    marginBottom: 4,
-                    fontWeight: 600,
-                    fontSize: 12,
-                    color: C.dark,
-                  }}
-                >
-                  {getTranslation("phoneOptional")}
-                </label>
-                <input
-                  type="tel"
-                  placeholder="+251 9XX XXX XXX"
-                  value={formData.phone}
-                  onChange={(e) =>
-                    setFormData({ ...formData, phone: e.target.value })
-                  }
-                  style={{
-                    width: "100%",
-                    padding: "10px 14px",
-                    border: `1.5px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    transition: "border-color 0.2s, box-shadow 0.2s",
-                    outline: "none",
-                    boxSizing: "border-box",
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = C.primary;
-                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                />
-              </div>
-
-              {/* ✅ FIXED: Mobile-optimized buttons */}
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "10px",
-                  borderTop: `1px solid ${C.border}`,
-                  paddingTop: 20,
-                  marginTop: 4,
-                }}
-              >
-                {/* Desktop/Tablet: Side by side, Mobile: Stacked */}
-                <style>{`
-                  @media (min-width: 480px) {
-                    .modal-button-row {
-                      flex-direction: row !important;
-                      justify-content: flex-end !important;
-                    }
-                    .modal-button-row button {
-                      flex: 0 1 auto !important;
-                      min-width: 100px !important;
-                      width: auto !important;
-                    }
-                  }
-                  @media (max-width: 479px) {
-                    .modal-button-row button {
-                      width: 100% !important;
-                      justify-content: center !important;
-                      padding: 14px 20px !important;
-                      font-size: 15px !important;
-                    }
-                  }
-                `}</style>
-
                 <div
-                  className="modal-button-row"
                   style={{
                     display: "flex",
-                    flexDirection: "column",
-                    gap: "10px",
+                    gap: 10,
+                    justifyContent: "flex-end",
+                    marginTop: 8,
                   }}
                 >
                   <button
-                    type="button"
-                    onClick={() => setShowModal(false)}
-                    style={{
-                      ...btn.secondary,
-                      padding: "12px 24px",
-                      fontSize: "14px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      borderRadius: 10,
-                      width: "100%",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      border: `1.5px solid ${C.border}`,
-                    }}
-                  >
-                    <FiX size={18} />
-                    {getTranslation("cancel")}
-                  </button>
-                  <button
-                    type="submit"
+                    onClick={handlePasswordDisplayClose}
                     style={{
                       ...btn.primary,
-                      padding: "12px 24px",
+                      padding: "10px 24px",
                       fontSize: "14px",
                       display: "flex",
                       alignItems: "center",
                       gap: 8,
                       borderRadius: 10,
-                      width: "100%",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                      boxShadow: `0 4px 14px ${C.primary}44`,
                     }}
                   >
-                    {editingUser ? (
-                      <>
-                        <FiCheck size={18} />
-                        {getTranslation("updateUser")}
-                      </>
-                    ) : (
-                      <>
-                        <FiUserPlus size={18} />
-                        {getTranslation("createUser")}
-                      </>
-                    )}
+                    <FiCheck size={18} />
+                    Done
                   </button>
                 </div>
-              </div>
-            </form>
+              </>
+            ) : (
+              // ✅ User Form
+              <>
+                <h2
+                  style={{
+                    fontSize: "clamp(18px, 4vw, 24px)",
+                    fontWeight: 800,
+                    color: C.dark,
+                    fontFamily: F.serif,
+                    marginBottom: 4,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                  }}
+                >
+                  {editingUser ? (
+                    <>
+                      <FiEdit2 size={22} color="#3b82f6" />
+                      {getTranslation("editUser")}
+                    </>
+                  ) : (
+                    <>
+                      <FiUserPlus size={22} color={C.primary} />
+                      {getTranslation("addNewUser")}
+                    </>
+                  )}
+                </h2>
+                <p
+                  style={{
+                    fontSize: "clamp(12px, 2.5vw, 14px)",
+                    color: C.muted,
+                    marginBottom: 20,
+                    fontFamily: F.sans,
+                  }}
+                >
+                  {editingUser
+                    ? `${getTranslation("updateInfo")} ${editingUser.name}`
+                    : getTranslation("createAccount")}
+                </p>
+
+                <form id="user-form" onSubmit={handleSubmit}>
+                  <div style={{ marginBottom: 14 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: 4,
+                        fontWeight: 600,
+                        fontSize: 12,
+                        color: C.dark,
+                      }}
+                    >
+                      {getTranslation("fullName")}{" "}
+                      <span style={{ color: "#ef4444" }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g., John Doe"
+                      value={formData.name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, name: e.target.value })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        border: `1.5px solid ${C.border}`,
+                        borderRadius: 8,
+                        fontSize: 13,
+                        transition: "border-color 0.2s, box-shadow 0.2s",
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = C.primary;
+                        e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = C.border;
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ marginBottom: 14 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: 4,
+                        fontWeight: 600,
+                        fontSize: 12,
+                        color: C.dark,
+                      }}
+                    >
+                      {getTranslation("email")}{" "}
+                      <span style={{ color: "#ef4444" }}>*</span>
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="user@example.com"
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        border: `1.5px solid ${C.border}`,
+                        borderRadius: 8,
+                        fontSize: 13,
+                        transition: "border-color 0.2s, box-shadow 0.2s",
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = C.primary;
+                        e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = C.border;
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    />
+                  </div>
+
+                  {!editingUser && (
+                    <div style={{ marginBottom: 14 }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: 4,
+                          fontWeight: 600,
+                          fontSize: 12,
+                          color: C.dark,
+                        }}
+                      >
+                        {getTranslation("password")}{" "}
+                        <span style={{ color: "#ef4444" }}>*</span>
+                        <span
+                          style={{
+                            fontSize: 10,
+                            color: C.muted,
+                            fontWeight: 400,
+                            marginLeft: 6,
+                          }}
+                        >
+                          (Auto-generated if left empty)
+                        </span>
+                      </label>
+                      <input
+                        type="password"
+                        placeholder="Min 6 characters or leave empty for auto-generate"
+                        value={formData.password}
+                        onChange={(e) =>
+                          setFormData({ ...formData, password: e.target.value })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "10px 14px",
+                          border: `1.5px solid ${C.border}`,
+                          borderRadius: 8,
+                          fontSize: 13,
+                          transition: "border-color 0.2s, box-shadow 0.2s",
+                          outline: "none",
+                          boxSizing: "border-box",
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = C.primary;
+                          e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = C.border;
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  <div style={{ marginBottom: 14 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: 4,
+                        fontWeight: 600,
+                        fontSize: 12,
+                        color: C.dark,
+                      }}
+                    >
+                      {getTranslation("role")}{" "}
+                      <span style={{ color: "#ef4444" }}>*</span>
+                    </label>
+                    <select
+                      value={formData.role}
+                      onChange={(e) =>
+                        setFormData({ ...formData, role: e.target.value })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        border: `1.5px solid ${C.border}`,
+                        borderRadius: 8,
+                        fontSize: 13,
+                        background: C.white,
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    >
+                      {getAvailableRoles().map((role) => (
+                        <option key={role.value} value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
+                    </select>
+                    <RoleDescription role={formData.role} />
+                  </div>
+
+                  <div style={{ marginBottom: 18 }}>
+                    <label
+                      style={{
+                        display: "block",
+                        marginBottom: 4,
+                        fontWeight: 600,
+                        fontSize: 12,
+                        color: C.dark,
+                      }}
+                    >
+                      {getTranslation("phoneOptional")}
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="+251 9XX XXX XXX"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
+                      style={{
+                        width: "100%",
+                        padding: "10px 14px",
+                        border: `1.5px solid ${C.border}`,
+                        borderRadius: 8,
+                        fontSize: 13,
+                        transition: "border-color 0.2s, box-shadow 0.2s",
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = C.primary;
+                        e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = C.border;
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px",
+                      borderTop: `1px solid ${C.border}`,
+                      paddingTop: 20,
+                      marginTop: 4,
+                    }}
+                  >
+                    <style>{`
+                      @media (min-width: 480px) {
+                        .modal-button-row {
+                          flex-direction: row !important;
+                          justify-content: flex-end !important;
+                        }
+                        .modal-button-row button {
+                          flex: 0 1 auto !important;
+                          min-width: 100px !important;
+                          width: auto !important;
+                        }
+                      }
+                      @media (max-width: 479px) {
+                        .modal-button-row button {
+                          width: 100% !important;
+                          justify-content: center !important;
+                          padding: 14px 20px !important;
+                          font-size: 15px !important;
+                        }
+                      }
+                      @keyframes fadeIn {
+                        from { opacity: 0; transform: translateY(10px); }
+                        to { opacity: 1; transform: translateY(0); }
+                      }
+                    `}</style>
+
+                    <div
+                      className="modal-button-row"
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "10px",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowModal(false);
+                          setEditingUser(null);
+                          resetForm();
+                        }}
+                        style={{
+                          ...btn.secondary,
+                          padding: "12px 24px",
+                          fontSize: "14px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          borderRadius: 10,
+                          width: "100%",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          border: `1.5px solid ${C.border}`,
+                        }}
+                      >
+                        <FiX size={18} />
+                        {getTranslation("cancel")}
+                      </button>
+                      <button
+                        type="submit"
+                        style={{
+                          ...btn.primary,
+                          padding: "12px 24px",
+                          fontSize: "14px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          borderRadius: 10,
+                          width: "100%",
+                          justifyContent: "center",
+                          cursor: "pointer",
+                          transition: "all 0.2s ease",
+                          boxShadow: `0 4px 14px ${C.primary}44`,
+                        }}
+                      >
+                        {editingUser ? (
+                          <>
+                            <FiCheck size={18} />
+                            {getTranslation("updateUser")}
+                          </>
+                        ) : (
+                          <>
+                            <FiUserPlus size={18} />
+                            {getTranslation("createUser")}
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}
