@@ -12,6 +12,17 @@ const {
 } = require("../services/aiService");
 const rotation = require("../services/goldenMondayRotationService");
 const recording = require("../services/goldenMondayRecordingService");
+const {
+  notifyAndAnnouncePresenter,
+} = require("../services/goldenMondayNotificationService");
+
+// ─── Helper: Determine if user can see salary information ─────
+// Only admin/superadmin may read or write salary. This includes
+// users with isGoldenMondayAdmin flag.
+const canSeeSalary = (user) =>
+  user &&
+  (["admin", "superadmin"].includes(user.role) ||
+    user.isGoldenMondayAdmin === true);
 
 // ─── Unified AI error handler (mirrors aiController.js) ───────
 const handleAIError = (res, error, context = "") => {
@@ -54,11 +65,6 @@ const handleServiceError = (res, error, fallbackMessage) => {
     .status(status)
     .json({ message: error.message || fallbackMessage, code: error.code });
 };
-
-// Only admin/superadmin may read or write salary. Called before
-// returning roster data and before applying updates.
-const canSeeSalary = (user) =>
-  user && ["admin", "superadmin"].includes(user.role);
 
 // ============================================================
 // GET /api/golden-monday
@@ -299,8 +305,8 @@ const addToRoster = async (req, res) => {
 const updateRosterEntry = async (req, res) => {
   try {
     const {
-      name, // ✅ ADD THIS
-      email, // ✅ ADD THIS
+      name,
+      email,
       isEligible,
       onLeaveUntil,
       department,
@@ -316,8 +322,8 @@ const updateRosterEntry = async (req, res) => {
     } = req.body;
 
     const update = {};
-    if (name !== undefined && name.trim()) update.name = name.trim(); // ✅ ADD THIS
-    if (email !== undefined && email.trim()) update.email = email.trim(); // ✅ ADD THIS
+    if (name !== undefined && name.trim()) update.name = name.trim();
+    if (email !== undefined && email.trim()) update.email = email.trim();
     if (isEligible !== undefined) update.isEligible = isEligible;
     if (onLeaveUntil !== undefined) update.onLeaveUntil = onLeaveUntil;
     if (department !== undefined) update.department = department;
@@ -415,6 +421,16 @@ const assignRotation = async (req, res) => {
       manualPresenterId: manualPresenterId || null,
       actorUser: req.user,
     });
+
+    // ✅ New: auto-post to Telegram + notify the presenter, but only
+    // when this call actually assigned someone new (not when the week
+    // already had a presenter).
+    if (!result.alreadyAssigned && result.session) {
+      notifyAndAnnouncePresenter(result.session).catch((err) =>
+        console.error("[assignRotation] notify/announce failed:", err.message),
+      );
+    }
+
     res.status(result.alreadyAssigned ? 200 : 201).json(result);
   } catch (error) {
     handleServiceError(res, error, "Failed to assign presenter");

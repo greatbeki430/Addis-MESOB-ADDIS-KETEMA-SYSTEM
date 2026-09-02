@@ -152,12 +152,15 @@ const ActionButtons = ({
   onView,
   onRoleChange,
   onDelete,
+  onToggleGoldenMondayAdmin, // ✅ NEW
   isSuperAdmin,
+  isAdmin,
   currentUser,
 }) => {
   const canDelete =
     user._id !== currentUser._id &&
     !(user.role === ROLES.SUPER_ADMIN && !isSuperAdmin);
+  const isAdminOrAbove = isSuperAdmin || isAdmin;
 
   return (
     <div
@@ -166,6 +169,7 @@ const ActionButtons = ({
         alignItems: "center",
         gap: 4,
         justifyContent: "center",
+        flexWrap: "wrap",
       }}
     >
       {/* View Button */}
@@ -268,6 +272,45 @@ const ActionButtons = ({
           <FiRefreshCw size={16} />
         </button>
       )}
+
+      {/* ✅ Golden Monday Admin Toggle Button - For Admin/SuperAdmin only */}
+      {isAdminOrAbove &&
+        user.role !== ROLES.ADMIN &&
+        user.role !== ROLES.SUPER_ADMIN &&
+        onToggleGoldenMondayAdmin && (
+          <button
+            onClick={() => onToggleGoldenMondayAdmin(user)}
+            title={
+              user.isGoldenMondayAdmin
+                ? "Remove Golden Monday admin access"
+                : "Grant Golden Monday admin access"
+            }
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 8,
+              border: "none",
+              background: user.isGoldenMondayAdmin ? "#fef3c7" : "#f0f3ff",
+              color: user.isGoldenMondayAdmin ? "#b45309" : "#8b5cf6",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "scale(1.1)";
+              e.currentTarget.style.boxShadow =
+                "0 4px 12px rgba(139,92,246,0.2)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "scale(1)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            🌅
+          </button>
+        )}
 
       {/* Delete Button */}
       {canDelete && (
@@ -521,6 +564,28 @@ export default function UserManagement({ t }) {
         message: error.response?.data?.message || getTranslation("deleteError"),
         type: "error",
       });
+    }
+  };
+
+  const handleToggleGoldenMondayAdmin = async (targetUser) => {
+    try {
+      await authAPI.setGoldenMondayAdmin(
+        targetUser._id,
+        !targetUser.isGoldenMondayAdmin,
+      );
+      showToast(
+        targetUser.isGoldenMondayAdmin
+          ? `Removed Golden Monday admin access from ${targetUser.name}`
+          : `Granted Golden Monday admin access to ${targetUser.name}`,
+        "success",
+      );
+      loadUsers();
+    } catch (error) {
+      console.error("Failed to toggle Golden Monday admin:", error);
+      showToast(
+        error.response?.data?.message || "Failed to update access",
+        "error",
+      );
     }
   };
 
@@ -1188,6 +1253,23 @@ export default function UserManagement({ t }) {
                         </span>
                         {getRoleDisplayName(user.role)}
                       </span>
+                      {/* ✅ Golden Monday Admin Badge */}
+                      {user.isGoldenMondayAdmin && (
+                        <span
+                          style={{
+                            marginLeft: 6,
+                            fontSize: 9,
+                            background: "#fef3c7",
+                            color: "#b45309",
+                            padding: "1px 8px",
+                            borderRadius: 12,
+                            fontWeight: 600,
+                            display: "inline-block",
+                          }}
+                        >
+                          🌅 GM Admin
+                        </span>
+                      )}
                       <RoleDescription role={user.role} />
                     </div>
                   </td>
@@ -1228,7 +1310,9 @@ export default function UserManagement({ t }) {
                         });
                       }}
                       onDelete={openDeleteConfirm}
+                      onToggleGoldenMondayAdmin={handleToggleGoldenMondayAdmin} // ✅ ADD THIS
                       isSuperAdmin={isSuperAdmin}
+                      isAdmin={isAdmin} // ✅ ADD THIS
                       currentUser={currentUser}
                     />
                   </td>

@@ -21,6 +21,12 @@ const rotation = require("../services/goldenMondayRotationService");
 const {
   sweepExpiredRecordings,
 } = require("../services/goldenMondayRecordingService");
+const {
+  notifyAndAnnouncePresenter,
+  sendPresenterReminder,
+} = require("../services/goldenMondayNotificationService");
+const GoldenMondaySession = require("../models/GoldenMondaySession");
+const { mondayOf } = require("../services/goldenMondayRotationService");
 
 const TIMEZONE = "Africa/Addis_Ababa";
 
@@ -48,9 +54,15 @@ const startGoldenMondayScheduler = () => {
           console.log(
             "[goldenMondayScheduler] This week's presenter was already assigned — nothing to do.",
           );
-        } else {
+        } else if (result.session) {
           console.log(
             `[goldenMondayScheduler] ✅ Auto-assigned ${result.session.presenterName} for ${result.session.weekOf.toDateString()}`,
+          );
+          // ✅ New: auto-post + notify on the automatic path too.
+          await notifyAndAnnouncePresenter(result.session);
+        } else {
+          console.log(
+            `[goldenMondayScheduler] ⚠️ No eligible presenters found for ${mondayOf(new Date()).toDateString()}`,
           );
         }
       } catch (err) {
@@ -79,8 +91,65 @@ const startGoldenMondayScheduler = () => {
     { timezone: TIMEZONE },
   );
 
+  // ─── Day-before reminder — Sunday 18:00 Addis time ──
+  cron.schedule(
+    "0 18 * * 0",
+    async () => {
+      try {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const targetWeek = mondayOf(tomorrow);
+
+        const session = await GoldenMondaySession.findOne({
+          weekOf: targetWeek,
+          presenter: { $ne: null },
+        });
+
+        if (session) {
+          await sendPresenterReminder(session, "tomorrow");
+          console.log(
+            `[goldenMondayScheduler] 📢 Sent day-before reminder to ${session.presenterName}`,
+          );
+        }
+      } catch (err) {
+        console.error(
+          "[goldenMondayScheduler] ❌ Day-before reminder failed:",
+          err.message,
+        );
+      }
+    },
+    { timezone: TIMEZONE },
+  );
+
+  // ─── Morning-of reminder — Monday 09:00 Addis time ──
+  cron.schedule(
+    "0 9 * * 1",
+    async () => {
+      try {
+        const targetWeek = mondayOf(new Date());
+        const session = await GoldenMondaySession.findOne({
+          weekOf: targetWeek,
+          presenter: { $ne: null },
+        });
+
+        if (session) {
+          await sendPresenterReminder(session, "today");
+          console.log(
+            `[goldenMondayScheduler] 📢 Sent morning-of reminder to ${session.presenterName}`,
+          );
+        }
+      } catch (err) {
+        console.error(
+          "[goldenMondayScheduler] ❌ Morning-of reminder failed:",
+          err.message,
+        );
+      }
+    },
+    { timezone: TIMEZONE },
+  );
+
   console.log(
-    "[goldenMondayScheduler] 🗓️  Scheduled: Monday 06:00 auto-assign, daily 03:00 recording sweep (Africa/Addis_Ababa)",
+    "[goldenMondayScheduler] 🗓️  Scheduled: Monday 06:00 auto-assign, daily 03:00 recording sweep, Sunday 18:00 day-before reminder, Monday 09:00 morning reminder (Africa/Addis_Ababa)",
   );
 };
 

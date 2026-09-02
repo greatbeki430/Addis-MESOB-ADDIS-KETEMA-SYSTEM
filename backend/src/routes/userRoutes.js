@@ -39,6 +39,44 @@ router.get("/:id", protect, anyRole, async (req, res) => {
 });
 
 // ──────────────────────────────────────────────────────────────
+// ⭐ GOLDEN MONDAY ADMIN TOGGLE - Admin/SuperAdmin only
+// Grants/revokes leader-level access scoped ONLY to Golden Monday
+// routes (see goldenMondayAdminOrAbove middleware). Kept as its own
+// endpoint, separate from the general profile-edit route, so it's an
+// explicit, auditable action rather than something that can be
+// silently overwritten by an unrelated form save.
+// ──────────────────────────────────────────────────────────────
+router.put(
+  "/:id/golden-monday-admin",
+  protect,
+  adminOrSuperAdmin,
+  async (req, res) => {
+    try {
+      const { isGoldenMondayAdmin } = req.body;
+      if (typeof isGoldenMondayAdmin !== "boolean") {
+        return res
+          .status(400)
+          .json({ message: "isGoldenMondayAdmin (boolean) is required" });
+      }
+
+      const user = await User.findById(req.params.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      user.isGoldenMondayAdmin = isGoldenMondayAdmin;
+      await user.save();
+
+      const populatedUser = await User.findById(user._id)
+        .select("-password")
+        .populate("team", "name");
+
+      res.json(populatedUser);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+);
+
+// ──────────────────────────────────────────────────────────────
 // ✏️ UPDATE USER - Admin/SuperAdmin only
 // ──────────────────────────────────────────────────────────────
 router.put("/:id", protect, adminOrSuperAdmin, async (req, res) => {
