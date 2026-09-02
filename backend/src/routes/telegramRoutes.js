@@ -8,9 +8,14 @@ const {
   handleWebhookUpdate,
   setWebhook,
   getWebhookInfo,
+  setupPersistentMenu,
 } = require("../services/telegramService");
 const GoldenMondaySession = require("../models/GoldenMondaySession");
-const { protect, adminOrSuperAdmin } = require("../middleware/auth");
+const {
+  protect,
+  adminOrSuperAdmin,
+  goldenMondayAdminOrAbove,
+} = require("../middleware/auth");
 
 /**
  * TELEGRAM WEBHOOK - Receives updates from Telegram
@@ -87,7 +92,9 @@ router.get("/test", async (req, res) => {
       message: result ? "Bot is connected!" : "Bot connection failed",
       botToken: process.env.TELEGRAM_BOT_TOKEN ? "✅ Set" : "❌ Missing",
       channelId: process.env.TELEGRAM_CHANNEL_ID ? "✅ Set" : "❌ Missing",
-      adminGroupId: process.env.TELEGRAM_ADMIN_GROUP_ID ? "✅ Set" : "❌ Missing",
+      adminGroupId: process.env.TELEGRAM_ADMIN_GROUP_ID
+        ? "✅ Set"
+        : "❌ Missing",
     });
   } catch (error) {
     console.error("Test error:", error);
@@ -121,11 +128,12 @@ router.get("/test-message", async (req, res) => {
 /**
  * Post a specific session to Telegram
  * POST /api/telegram/post/:sessionId
+ * Now uses goldenMondayAdminOrAbove (scoped to GM feature)
  */
 router.post(
   "/post/:sessionId",
   protect,
-  adminOrSuperAdmin,
+  goldenMondayAdminOrAbove,
   async (req, res) => {
     try {
       const session = await GoldenMondaySession.findById(
@@ -162,36 +170,64 @@ router.post(
 /**
  * Post a test announcement to Telegram
  * POST /api/telegram/test-post
+ * Now uses goldenMondayAdminOrAbove (scoped to GM feature)
  */
-router.post("/test-post", protect, adminOrSuperAdmin, async (req, res) => {
-  try {
-    const testSession = {
-      date: new Date(),
-      presentationTitle: "🧪 Test Announcement",
-      presentationDescription:
-        "This is a test message to verify Telegram integration is working properly.",
-      presenter: {
-        name: "Addis MESOB Team",
-        department: "Digital Services",
-      },
-      suggestedTopics: [
-        "System Testing",
-        "Telegram Integration",
-        "Golden Monday Automation",
-      ],
-    };
+router.post(
+  "/test-post",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const testSession = {
+        date: new Date(),
+        presentationTitle: "🧪 Test Announcement",
+        presentationDescription:
+          "This is a test message to verify Telegram integration is working properly.",
+        presenter: {
+          name: "Addis MESOB Team",
+          department: "Digital Services",
+        },
+        suggestedTopics: [
+          "System Testing",
+          "Telegram Integration",
+          "Golden Monday Automation",
+        ],
+      };
 
-    const result = await postPresenterAnnouncement(testSession);
+      const result = await postPresenterAnnouncement(testSession);
+      res.json({
+        success: true,
+        result,
+        message: result.postId
+          ? "Test post sent to Telegram!"
+          : `Failed to send test post: ${result.error || "Unknown error"}`,
+      });
+    } catch (error) {
+      console.error("Error sending test post:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+/**
+ * Setup persistent menu for Telegram bot
+ * POST /api/telegram/setup-menu
+ */
+router.post("/setup-menu", protect, adminOrSuperAdmin, async (req, res) => {
+  try {
+    const result = await setupPersistentMenu();
     res.json({
-      success: true,
-      result,
-      message: result.postId
-        ? "Test post sent to Telegram!"
-        : `Failed to send test post: ${result.error || "Unknown error"}`,
+      success: result,
+      message: result
+        ? "Persistent menu setup complete!"
+        : "Failed to setup persistent menu",
     });
   } catch (error) {
-    console.error("Error sending test post:", error);
-    res.status(500).json({ error: error.message });
+    console.error("Error setting up persistent menu:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 });
 

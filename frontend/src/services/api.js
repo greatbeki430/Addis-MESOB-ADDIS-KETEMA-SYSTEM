@@ -62,6 +62,7 @@ api.interceptors.response.use(
 // ============================================================
 // AUTH API
 // ============================================================
+
 export const authAPI = {
   register: (userData) => api.post("/auth/register", userData),
   login: (credentials) => api.post("/auth/login", credentials),
@@ -72,6 +73,9 @@ export const authAPI = {
   deleteUser: (id) => api.delete(`/auth/users/${id}`),
   changePassword: (data) => api.put("/auth/change-password", data),
   updateProfile: (data) => api.put("/auth/profile", data),
+  // ✅ NEW: Golden Monday Admin toggle
+  setGoldenMondayAdmin: (id, isGoldenMondayAdmin) =>
+    api.put(`/auth/users/${id}/golden-monday-admin`, { isGoldenMondayAdmin }),
 };
 
 // ============================================================

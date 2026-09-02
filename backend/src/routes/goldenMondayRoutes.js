@@ -3,11 +3,17 @@
 const express = require("express");
 const router = express.Router();
 // const { protect, anyRole, leaderOrAdmin } = require("../middleware/auth");
+// const {
+//   protect,
+//   anyRole,
+//   leaderOrAdmin,
+//   adminOrSuperAdmin,
+// } = require("../middleware/auth");
 const {
   protect,
   anyRole,
   leaderOrAdmin,
-  adminOrSuperAdmin,
+  goldenMondayAdminOrAbove,
 } = require("../middleware/auth");
 const GoldenMondayExperience = require("../models/GoldenMondayExperience");
 const GoldenMondayResult = require("../models/GoldenMondayResult");

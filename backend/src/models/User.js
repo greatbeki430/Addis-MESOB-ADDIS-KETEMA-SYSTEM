@@ -16,6 +16,12 @@ const userSchema = new mongoose.Schema(
     phone: String,
     signature: String,
     telegramChatId: { type: String, default: null },
+    // ✅ Grants leader/admin-level access to Golden Monday routes ONLY
+    // (roster, gallery, rotation, reports). Does NOT touch global role —
+    // someone with this flag is still an "employee" everywhere else in
+    // the system (User Management, Team Management, Employee Management
+    // stay off-limits). Toggled by an admin via User Management.
+    isGoldenMondayAdmin: { type: Boolean, default: false },
     profilePhotoUrl: { type: String, default: "" },
     profilePhotoPublicId: { type: String, default: "" },
     // ✅ Branch/Location

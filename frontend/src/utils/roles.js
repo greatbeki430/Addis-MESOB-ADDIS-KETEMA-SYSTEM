@@ -152,9 +152,11 @@ export const canApproveReport = (user, report) => {
 // written to fix: a role that CAN call the upload/delete API (per the
 // server) but never sees the button to do it (per the UI), or vice versa.
 
+// ✅ UPDATED: Include isGoldenMondayAdmin flag for scoped GM access
 // Admin side: create folders, upload resources (images, PPTX, DOCX, PDF,
 // video), delete resources, manage auto-clear, manage the roster.
-export const canManageGoldenMondayResources = (user) => isLeaderOrAbove(user);
+export const canManageGoldenMondayResources = (user) =>
+  isLeaderOrAbove(user) || user?.isGoldenMondayAdmin === true;
 
 // Explicit aliases for call-site clarity where it matters what action
 // is being gated — all resolve to the same leader-or-above check today,

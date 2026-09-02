@@ -93,6 +93,25 @@ const adminOrSuperAdmin = (req, res, next) => {
     });
   }
 };
+// Feature-scoped: same privilege as leader/admin/superadmin, but ONLY
+// for Golden Monday routes. Granted per-user via isGoldenMondayAdmin
+// (see User model), not a global role change.
+const goldenMondayAdminOrAbove = (req, res, next) => {
+  if (
+    req.user &&
+    (req.user.role === "leader" ||
+      req.user.role === "admin" ||
+      req.user.role === "superadmin" ||
+      req.user.isGoldenMondayAdmin === true)
+  ) {
+    next();
+  } else {
+    res.status(403).json({
+      message: "Not authorized for Golden Monday admin actions",
+      code: "INSUFFICIENT_ROLE",
+    });
+  }
+};
 
 // Any authenticated user (employee and above)
 const anyRole = (req, res, next) => {
@@ -111,5 +130,6 @@ module.exports = {
   admin,
   leaderOrAdmin,
   adminOrSuperAdmin,
+  goldenMondayAdminOrAbove,
   anyRole,
 };
