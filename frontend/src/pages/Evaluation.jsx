@@ -1,3 +1,4 @@
+// frontend/src/pages/Evaluation.jsx
 // ════════════════════════════════════════════════════════════
 // pages/Evaluation - With Dynamic Comments & Database Storage
 // ════════════════════════════════════════════════════════════
@@ -6,7 +7,7 @@ import { btn, card, C, F, inp } from "../styles/theme";
 import { CRITERIA } from "../constants/criteria";
 import { exportEvaluationReportToPDF } from "../utils/pdfExport";
 import { useAuth } from "../hooks/useAuth";
-import { evaluationAPI } from "../services/api";
+import { evaluationAPI, teamAPI } from "../services/api";
 import { aiAPI } from "../services/api";
 import { AISummary, AIEvaluationHelper } from "../components/ai";
 import { useToast } from "../hooks/useToast";
@@ -14,6 +15,15 @@ import { useToast } from "../hooks/useToast";
 import { useLanguage } from "../context/LanguageContext";
 import SignatureModal from "../components/SignatureModal";
 import EvaluationFeed from "../components/EvaluationFeed";
+import {
+  canEvaluateTeam,
+  canViewEvaluationForm,
+  // canEditEvaluation,
+  canDeleteEvaluation,
+  // canExportEvaluationPDF,
+  getUserTeamId,
+  isAdminOrAbove,
+} from "../utils/roles";
 import {
   FiChevronDown,
   FiUser,
@@ -43,6 +53,7 @@ import {
   FiSend,
   FiEye,
   FiTrash2,
+  FiLock,
 } from "react-icons/fi";
 
 // ─── Format AI Narrative - Removes markdown and formats nicely ──
@@ -104,6 +115,8 @@ function EvaluationForm({ t, lang }) {
 
   const { user } = useAuth();
   const { showToast } = useToast();
+
+  // ─── State ──────────────────────────────────────────────────────────
   const [scores, setScores] = useState({});
   const [comments, setComments] = useState({});
   const [members, setMembers] = useState(["", "", ""]);
@@ -114,6 +127,9 @@ function EvaluationForm({ t, lang }) {
   const [signatures, setSignatures] = useState({});
   const [includeAINarrative, setIncludeAINarrative] = useState(true);
   const [aiNarrativeContent, setAiNarrativeContent] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [userTeamId, setUserTeamId] = useState(null);
+  const [canEvaluate, setCanEvaluate] = useState(false);
 
   // ─── Tab Management ──────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("form"); // "form" | "history"
@@ -137,6 +153,42 @@ function EvaluationForm({ t, lang }) {
     };
   }, []);
 
+  // ─── Load user's team and set permissions ──────────────────────
+  useEffect(() => {
+    const loadUserTeam = async () => {
+      try {
+        setLoading(true);
+        const teamId = getUserTeamId(user);
+        if (teamId) {
+          setUserTeamId(teamId);
+          // Check if user can evaluate this team
+          const canEval = canEvaluateTeam(user, teamId);
+          setCanEvaluate(canEval);
+
+          // Load team details if user is a leader
+          if (canEval) {
+            const response = await teamAPI.getById(teamId);
+            if (response?.data) {
+              const teamData = response.data;
+              setTeamName(teamData.name || teamData.department || "");
+              const teamMembers =
+                teamData.members?.map((m) => m.name || m) || [];
+              if (teamMembers.length > 0) {
+                setMembers(teamMembers);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load team:", error);
+        // Don't show error toast here to avoid confusion
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadUserTeam();
+  }, [user]);
+
   // ─── Effect to load history when tab changes ──────────────
   useEffect(() => {
     let isActive = true;
@@ -145,7 +197,15 @@ function EvaluationForm({ t, lang }) {
       if (activeTab === "history" && isActive) {
         setLoadingHistory(true);
         try {
-          const response = await evaluationAPI.getAll();
+          // Load history for user's team or all if admin
+          let response;
+          if (isAdminOrAbove(user) && !userTeamId) {
+            response = await evaluationAPI.getAll();
+          } else if (userTeamId) {
+            response = await evaluationAPI.getByTeam(userTeamId);
+          } else {
+            response = { data: [] };
+          }
           if (isActive) {
             setSavedEvaluations(response.data || []);
           }
@@ -170,7 +230,7 @@ function EvaluationForm({ t, lang }) {
     return () => {
       isActive = false;
     };
-  }, [activeTab, showToast, te.loadError]);
+  }, [activeTab, showToast, te.loadError, userTeamId, user]);
 
   // ─── Load an evaluation from history ──────────────────────
   const loadEvaluation = (evalData) => {
@@ -197,6 +257,15 @@ function EvaluationForm({ t, lang }) {
 
   // ─── Delete an evaluation ──────────────────────────────────────
   const deleteEvaluation = async (evalId, evalName) => {
+    // Check permission
+    if (!canDeleteEvaluation(user, { _id: evalId, team: userTeamId })) {
+      showToast(
+        "You don't have permission to delete this evaluation",
+        "warning",
+      );
+      return;
+    }
+
     const confirmMsg =
       te.deleteConfirm || 'Are you sure you want to delete "{name}"?';
     if (
@@ -236,6 +305,15 @@ function EvaluationForm({ t, lang }) {
     if (!evaluationId) {
       showToast(
         te.saveFirstWarning || "Please save the evaluation first",
+        "warning",
+      );
+      return;
+    }
+
+    // Check permission
+    if (!canEvaluate) {
+      showToast(
+        "You don't have permission to submit this evaluation",
         "warning",
       );
       return;
@@ -419,6 +497,12 @@ function EvaluationForm({ t, lang }) {
 
   // ─── Score management ──────────────────────────────────────
   const setScore = (cId, iIdx, m, v) => {
+    // Check permission - only allow if user can evaluate
+    if (!canEvaluate) {
+      showToast("You don't have permission to evaluate this team", "warning");
+      return;
+    }
+
     const key = `${cId}-${iIdx}-${m}`;
     const max = CRITERIA[cId - 1].items[iIdx].points;
     const value = Math.min(Number(v), max);
@@ -470,6 +554,15 @@ function EvaluationForm({ t, lang }) {
 
   // ─── Save evaluation ──────────────────────────────────────
   const saveEvaluation = async () => {
+    // Check permission
+    if (!canEvaluate) {
+      showToast(
+        "You don't have permission to save evaluations for this team",
+        "warning",
+      );
+      return;
+    }
+
     const validMembers = members.filter((m) => m.trim() !== "");
     if (validMembers.length === 0) {
       showToast(
@@ -508,6 +601,7 @@ function EvaluationForm({ t, lang }) {
         highestScore: highestScore,
         lowestScore: lowestScore,
         totalMembers: totalMembers,
+        teamId: userTeamId,
       };
 
       let response;
@@ -639,6 +733,74 @@ function EvaluationForm({ t, lang }) {
   const teKey = (key, fallback) => safeT?.(`evaluation.${key}`) || fallback;
   const tcKey = (key, fallback) => safeT?.(`common.${key}`) || fallback;
 
+  // ─── Loading State ──────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div style={{ textAlign: "center", padding: 60, color: C.muted }}>
+        <FiLoader
+          size={32}
+          style={{
+            animation: "spin 1s linear infinite",
+            display: "block",
+            margin: "0 auto 12px",
+          }}
+        />
+        <p>Loading your team information...</p>
+      </div>
+    );
+  }
+
+  // ─── No Team Access ─────────────────────────────────────────────────
+  if (!userTeamId && !isAdminOrAbove(user)) {
+    return (
+      <div
+        style={{
+          maxWidth: 600,
+          margin: "40px auto",
+          textAlign: "center",
+          padding: "40px 20px",
+        }}
+      >
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🏢</div>
+        <h2 style={{ color: C.dark, marginBottom: 8 }}>No Team Assigned</h2>
+        <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
+          You are not currently assigned to any team. Please contact your
+          administrator to be added to a team.
+        </p>
+        {isAdminOrAbove(user) && (
+          <p style={{ color: C.primary, fontSize: 13, marginTop: 8 }}>
+            As an admin, you can view all evaluations in the history tab.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // ─── No Permission ──────────────────────────────────────────────────
+  if (!canViewEvaluationForm(user, userTeamId) && !isAdminOrAbove(user)) {
+    return (
+      <div
+        style={{
+          maxWidth: 600,
+          margin: "40px auto",
+          textAlign: "center",
+          padding: "40px 20px",
+        }}
+      >
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+        <h2 style={{ color: C.dark, marginBottom: 8 }}>Access Restricted</h2>
+        <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
+          You don't have permission to evaluate this team. Only Team Leaders and
+          above can evaluate team members.
+        </p>
+        <p style={{ color: C.muted, fontSize: 13, marginTop: 8 }}>
+          You can view evaluations in the feed below.
+        </p>
+      </div>
+    );
+  }
+
+  // ─── Main Render ────────────────────────────────────────────────────
   return (
     <div
       style={{
@@ -685,6 +847,42 @@ function EvaluationForm({ t, lang }) {
         >
           {/* ✅ LANGUAGE SELECTOR */}
           {/* <LanguageSelector variant="default" /> */}
+
+          {/* Permission badge */}
+          {!canEvaluate && userTeamId && (
+            <span
+              style={{
+                background: "#FEF3C7",
+                color: "#92400E",
+                padding: "2px 12px",
+                borderRadius: 20,
+                fontSize: "10px",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <FiLock size={12} /> Read-Only
+            </span>
+          )}
+          {canEvaluate && (
+            <span
+              style={{
+                background: "#10b981",
+                color: "#fff",
+                padding: "2px 12px",
+                borderRadius: 20,
+                fontSize: "10px",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <FiCheck size={12} /> Team Leader
+            </span>
+          )}
 
           <span
             style={{
@@ -800,7 +998,7 @@ function EvaluationForm({ t, lang }) {
 
         <div style={{ flex: 1, minWidth: "8px" }} />
 
-        {evaluationId && (
+        {evaluationId && canEvaluate && (
           <button
             onClick={passToSuperAdmin}
             style={{
@@ -878,146 +1076,154 @@ function EvaluationForm({ t, lang }) {
             </div>
           ) : (
             <div style={{ display: "grid", gap: "12px" }}>
-              {savedEvaluations.map((evalItem) => (
-                <div
-                  key={evalItem._id}
-                  style={{
-                    background: C.white,
-                    borderRadius: 10,
-                    padding: "14px 18px",
-                    border: `1px solid ${C.border}`,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                    gap: "12px",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = C.primary;
-                    e.currentTarget.style.boxShadow =
-                      "0 4px 16px rgba(0,0,0,0.06)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                >
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        fontWeight: 600,
-                        fontSize: "14px",
-                        color: C.dark,
-                      }}
-                    >
-                      {evalItem.teamName ||
-                        teKey("untitledTeam", "Untitled Team")}
+              {savedEvaluations.map((evalItem) => {
+                const canDelete = canDeleteEvaluation(user, {
+                  _id: evalItem._id,
+                  team: userTeamId,
+                });
+                return (
+                  <div
+                    key={evalItem._id}
+                    style={{
+                      background: C.white,
+                      borderRadius: 10,
+                      padding: "14px 18px",
+                      border: `1px solid ${C.border}`,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                      gap: "12px",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = C.primary;
+                      e.currentTarget.style.boxShadow =
+                        "0 4px 16px rgba(0,0,0,0.06)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = C.border;
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          fontSize: "14px",
+                          color: C.dark,
+                        }}
+                      >
+                        {evalItem.teamName ||
+                          teKey("untitledTeam", "Untitled Team")}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          color: C.muted,
+                          display: "flex",
+                          gap: "12px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <span>
+                          {evalItem.members?.length || 0}{" "}
+                          {tcKey("members", "members")}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {tcKey("avg", "Avg")}: {evalItem.averageScore || 0}{" "}
+                          {teKey("points", "pts")}
+                        </span>
+                        <span>•</span>
+                        <span>
+                          {new Date(evalItem.createdAt).toLocaleDateString()}
+                        </span>
+                        {evalItem.status && (
+                          <span
+                            style={{
+                              background:
+                                evalItem.status === "submitted"
+                                  ? "#DBEAFE"
+                                  : "#D1FAE5",
+                              color:
+                                evalItem.status === "submitted"
+                                  ? "#1D4ED8"
+                                  : "#065F46",
+                              padding: "1px 8px",
+                              borderRadius: "12px",
+                              fontSize: "10px",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {evalItem.status}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: C.muted,
-                        display: "flex",
-                        gap: "12px",
-                        flexWrap: "wrap",
-                      }}
-                    >
-                      <span>
-                        {evalItem.members?.length || 0}{" "}
-                        {tcKey("members", "members")}
-                      </span>
-                      <span>•</span>
-                      <span>
-                        {tcKey("avg", "Avg")}: {evalItem.averageScore || 0}{" "}
-                        {teKey("points", "pts")}
-                      </span>
-                      <span>•</span>
-                      <span>
-                        {new Date(evalItem.createdAt).toLocaleDateString()}
-                      </span>
-                      {evalItem.status && (
-                        <span
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <button
+                        onClick={() => loadEvaluation(evalItem)}
+                        style={{
+                          ...btn.small,
+                          padding: "4px 12px",
+                          fontSize: "12px",
+                          background: C.primary,
+                          color: "#fff",
+                          border: "none",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = C.light;
+                          e.currentTarget.style.transform = "translateY(-1px)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = C.primary;
+                          e.currentTarget.style.transform = "translateY(0)";
+                        }}
+                      >
+                        <FiEye size={14} />
+                        {teKey("loadEval", "Load")}
+                      </button>
+                      {canDelete && (
+                        <button
+                          onClick={() =>
+                            deleteEvaluation(evalItem._id, evalItem.teamName)
+                          }
                           style={{
-                            background:
-                              evalItem.status === "submitted"
-                                ? "#DBEAFE"
-                                : "#D1FAE5",
-                            color:
-                              evalItem.status === "submitted"
-                                ? "#1D4ED8"
-                                : "#065F46",
-                            padding: "1px 8px",
-                            borderRadius: "12px",
-                            fontSize: "10px",
-                            fontWeight: 600,
+                            padding: "4px 12px",
+                            fontSize: "12px",
+                            background: "#fee2e2",
+                            color: "#dc2626",
+                            border: "none",
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                            transition: "all 0.2s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = "#fecaca";
+                            e.currentTarget.style.transform = "scale(1.05)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "#fee2e2";
+                            e.currentTarget.style.transform = "scale(1)";
                           }}
                         >
-                          {evalItem.status}
-                        </span>
+                          <FiTrash2 size={14} />
+                          {teKey("deleteEval", "Delete")}
+                        </button>
                       )}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    <button
-                      onClick={() => loadEvaluation(evalItem)}
-                      style={{
-                        ...btn.small,
-                        padding: "4px 12px",
-                        fontSize: "12px",
-                        background: C.primary,
-                        color: "#fff",
-                        border: "none",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = C.light;
-                        e.currentTarget.style.transform = "translateY(-1px)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = C.primary;
-                        e.currentTarget.style.transform = "translateY(0)";
-                      }}
-                    >
-                      <FiEye size={14} />
-                      {teKey("loadEval", "Load")}
-                    </button>
-                    <button
-                      onClick={() =>
-                        deleteEvaluation(evalItem._id, evalItem.teamName)
-                      }
-                      style={{
-                        padding: "4px 12px",
-                        fontSize: "12px",
-                        background: "#fee2e2",
-                        color: "#dc2626",
-                        border: "none",
-                        borderRadius: 6,
-                        cursor: "pointer",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                        transition: "all 0.2s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#fecaca";
-                        e.currentTarget.style.transform = "scale(1.05)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "#fee2e2";
-                        e.currentTarget.style.transform = "scale(1)";
-                      }}
-                    >
-                      <FiTrash2 size={14} />
-                      {teKey("deleteEval", "Delete")}
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -1049,7 +1255,14 @@ function EvaluationForm({ t, lang }) {
               )}
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
+              disabled={!canEvaluate}
             />
+            {!canEvaluate && (
+              <p style={{ fontSize: "11px", color: "#ef4444", marginTop: 4 }}>
+                <FiLock size={12} style={{ marginRight: 4 }} />
+                Team name is read-only
+              </p>
+            )}
           </div>
 
           {/* Dynamic Team Members Section */}
@@ -1078,8 +1291,20 @@ function EvaluationForm({ t, lang }) {
                 <FiUsers size={18} color={C.primary} />
                 {teKey("teamMembers", "Team Members")}{" "}
                 {teKey("maxMembers", "(Max 7)")}
+                {!canEvaluate && (
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      color: "#ef4444",
+                      fontWeight: 400,
+                      marginLeft: 8,
+                    }}
+                  >
+                    🔒 Read-only
+                  </span>
+                )}
               </h3>
-              {members.length < 7 && (
+              {canEvaluate && members.length < 7 && (
                 <button
                   onClick={addMember}
                   style={{
@@ -1124,8 +1349,9 @@ function EvaluationForm({ t, lang }) {
                     ).replace("{number}", idx + 1)}
                     value={member}
                     onChange={(e) => updateMemberName(idx, e.target.value)}
+                    disabled={!canEvaluate}
                   />
-                  {members.length > 1 && (
+                  {canEvaluate && members.length > 1 && (
                     <button
                       onClick={() => removeMember(idx)}
                       style={{
@@ -1151,132 +1377,159 @@ function EvaluationForm({ t, lang }) {
           </div>
 
           {/* Criteria Sections */}
-          {CRITERIA.map((c) => (
-            <div
-              key={c.id}
-              style={{
-                ...card,
-                borderLeft: `5px solid ${c.color}`,
-                paddingLeft: "clamp(12px, 3vw, 20px)",
-                overflowX: "auto",
-              }}
-            >
-              <h3
+          {CRITERIA.map((c) => {
+            const isReadOnly = !canEvaluate;
+            return (
+              <div
+                key={c.id}
                 style={{
-                  margin: "0 0 12px",
-                  fontSize: "clamp(13px, 4vw, 15px)",
-                  fontWeight: 800,
-                  color: c.color,
-                  fontFamily: F.sans,
-                  display: "flex",
-                  flexWrap: "wrap",
-                  alignItems: "baseline",
-                  gap: 6,
+                  ...card,
+                  borderLeft: `5px solid ${c.color}`,
+                  paddingLeft: "clamp(12px, 3vw, 20px)",
+                  overflowX: "auto",
+                  opacity: isReadOnly ? 0.85 : 1,
                 }}
               >
-                <FiTarget size={16} />
-                {safeCriteria[c.key] || c.key}
-                <span
+                <h3
                   style={{
-                    fontWeight: 400,
-                    fontSize: "clamp(10px, 3vw, 12px)",
-                    color: "#888",
+                    margin: "0 0 12px",
+                    fontSize: "clamp(13px, 4vw, 15px)",
+                    fontWeight: 800,
+                    color: c.color,
+                    fontFamily: F.sans,
+                    display: "flex",
+                    flexWrap: "wrap",
+                    alignItems: "baseline",
+                    gap: 6,
                   }}
                 >
-                  ({c.weight}%)
-                </span>
-              </h3>
+                  <FiTarget size={16} />
+                  {safeCriteria[c.key] || c.key}
+                  <span
+                    style={{
+                      fontWeight: 400,
+                      fontSize: "clamp(10px, 3vw, 12px)",
+                      color: "#888",
+                    }}
+                  >
+                    ({c.weight}%)
+                  </span>
+                  {isReadOnly && (
+                    <span
+                      style={{
+                        fontSize: "10px",
+                        color: "#ef4444",
+                        fontWeight: 400,
+                        marginLeft: 8,
+                      }}
+                    >
+                      🔒 Read-only
+                    </span>
+                  )}
+                </h3>
 
-              <div
-                style={{ overflowX: "auto", WebkitOverflowScrolling: "touch" }}
-              >
-                <table
+                <div
                   style={{
-                    width: "100%",
-                    borderCollapse: "collapse",
-                    fontSize: "clamp(10px, 3vw, 12px)",
-                    minWidth: 500,
+                    overflowX: "auto",
+                    WebkitOverflowScrolling: "touch",
                   }}
                 >
-                  <thead>
-                    <tr>
-                      <th style={thS}>መስፈርት / Criterion</th>
-                      <th style={{ ...thS, textAlign: "center" }}>
-                        {teKey("maxPts", "Max Pts")}
-                      </th>
-                      {members
-                        .filter((m) => m.trim() !== "")
-                        .map((m) => (
-                          <th
-                            key={m}
-                            style={{
-                              ...thS,
-                              textAlign: "center",
-                              minWidth: "80px",
-                            }}
-                          >
-                            {m.length > 15 ? m.substring(0, 12) + "..." : m}
-                          </th>
-                        ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {c.items.map((item, idx) => (
-                      <tr
-                        key={idx}
-                        style={idx % 2 === 0 ? { background: C.cardBg } : {}}
-                      >
-                        <td style={tdS}>{item.text}</td>
-                        <td
-                          style={{
-                            ...tdS,
-                            textAlign: "center",
-                            fontWeight: 700,
-                            color: c.color,
-                          }}
-                        >
-                          {item.points}
-                        </td>
+                  <table
+                    style={{
+                      width: "100%",
+                      borderCollapse: "collapse",
+                      fontSize: "clamp(10px, 3vw, 12px)",
+                      minWidth: 500,
+                    }}
+                  >
+                    <thead>
+                      <tr>
+                        <th style={thS}>መስፈርት / Criterion</th>
+                        <th style={{ ...thS, textAlign: "center" }}>
+                          {teKey("maxPts", "Max Pts")}
+                        </th>
                         {members
                           .filter((m) => m.trim() !== "")
-                          .map((m) => {
-                            const inputId = getInputId(c.id, idx, m);
-                            return (
-                              <td
-                                key={m}
-                                style={{ ...tdS, textAlign: "center" }}
-                              >
-                                <input
-                                  ref={(el) =>
-                                    (inputRefs.current[inputId] = el)
-                                  }
-                                  id={inputId}
-                                  type="number"
-                                  min="0"
-                                  max={item.points}
-                                  style={{
-                                    width: "clamp(50px, 12vw, 60px)",
-                                    border: `1.5px solid ${C.border}`,
-                                    borderRadius: 6,
-                                    padding: "clamp(3px, 1.5vw, 6px)",
-                                    textAlign: "center",
-                                    fontSize: "clamp(11px, 3vw, 13px)",
-                                  }}
-                                  value={scores[`${c.id}-${idx}-${m}`] || ""}
-                                  onChange={(e) =>
-                                    setScore(c.id, idx, m, e.target.value)
-                                  }
-                                />
-                              </td>
-                            );
-                          })}
+                          .map((m) => (
+                            <th
+                              key={m}
+                              style={{
+                                ...thS,
+                                textAlign: "center",
+                                minWidth: "80px",
+                              }}
+                            >
+                              {m.length > 15 ? m.substring(0, 12) + "..." : m}
+                            </th>
+                          ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {c.items.map((item, idx) => (
+                        <tr
+                          key={idx}
+                          style={idx % 2 === 0 ? { background: C.cardBg } : {}}
+                        >
+                          <td style={tdS}>{item.text}</td>
+                          <td
+                            style={{
+                              ...tdS,
+                              textAlign: "center",
+                              fontWeight: 700,
+                              color: c.color,
+                            }}
+                          >
+                            {item.points}
+                          </td>
+                          {members
+                            .filter((m) => m.trim() !== "")
+                            .map((m) => {
+                              const inputId = getInputId(c.id, idx, m);
+                              return (
+                                <td
+                                  key={m}
+                                  style={{ ...tdS, textAlign: "center" }}
+                                >
+                                  <input
+                                    ref={(el) =>
+                                      (inputRefs.current[inputId] = el)
+                                    }
+                                    id={inputId}
+                                    type="number"
+                                    min="0"
+                                    max={item.points}
+                                    disabled={isReadOnly}
+                                    style={{
+                                      width: "clamp(50px, 12vw, 60px)",
+                                      border: `1.5px solid ${isReadOnly ? "#e5e7eb" : C.border}`,
+                                      borderRadius: 6,
+                                      padding: "clamp(3px, 1.5vw, 6px)",
+                                      textAlign: "center",
+                                      fontSize: "clamp(11px, 3vw, 13px)",
+                                      background: isReadOnly
+                                        ? "#f3f4f6"
+                                        : "white",
+                                      cursor: isReadOnly
+                                        ? "not-allowed"
+                                        : "text",
+                                      opacity: isReadOnly ? 0.7 : 1,
+                                    }}
+                                    value={scores[`${c.id}-${idx}-${m}`] || ""}
+                                    onChange={(e) =>
+                                      setScore(c.id, idx, m, e.target.value)
+                                    }
+                                  />
+                                </td>
+                              );
+                            })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {/* RANKINGS WITH DYNAMIC COMMENTS */}
           <div style={card}>
@@ -1706,6 +1959,13 @@ function EvaluationForm({ t, lang }) {
                             <textarea
                               value={comment || ""}
                               onChange={(e) => {
+                                if (!canEvaluate) {
+                                  showToast(
+                                    "You don't have permission to add feedback",
+                                    "warning",
+                                  );
+                                  return;
+                                }
                                 const val = e.target.value;
                                 console.log(
                                   `✏️ Textarea changed for ${name}:`,
@@ -1717,9 +1977,10 @@ function EvaluationForm({ t, lang }) {
                                 "addFeedbackPlaceholder",
                                 "Add your feedback, strengths, or areas for improvement...",
                               )}
+                              disabled={!canEvaluate}
                               style={{
                                 width: "100%",
-                                border: `1px solid ${C.border}`,
+                                border: `1px solid ${canEvaluate ? C.border : "#e5e7eb"}`,
                                 borderRadius: 6,
                                 padding: "6px 8px",
                                 fontSize: "clamp(10px, 2.5vw, 11px)",
@@ -1728,15 +1989,21 @@ function EvaluationForm({ t, lang }) {
                                 minHeight: "50px",
                                 outline: "none",
                                 transition: "border-color 0.2s",
-                                background: "#fafbfc",
+                                background: canEvaluate ? "#fafbfc" : "#f3f4f6",
+                                cursor: canEvaluate ? "text" : "not-allowed",
+                                opacity: canEvaluate ? 1 : 0.6,
                               }}
                               onFocus={(e) => {
-                                e.currentTarget.borderColor = C.primary;
-                                e.currentTarget.boxShadow = `0 0 0 2px ${C.primary}22`;
+                                if (canEvaluate) {
+                                  e.currentTarget.borderColor = C.primary;
+                                  e.currentTarget.boxShadow = `0 0 0 2px ${C.primary}22`;
+                                }
                               }}
                               onBlur={(e) => {
-                                e.currentTarget.borderColor = C.border;
-                                e.currentTarget.boxShadow = "none";
+                                if (canEvaluate) {
+                                  e.currentTarget.borderColor = C.border;
+                                  e.currentTarget.boxShadow = "none";
+                                }
                               }}
                             />
                             {comment && comment.length > 0 && (
@@ -2608,56 +2875,57 @@ function EvaluationForm({ t, lang }) {
               WebkitOverflowScrolling: "touch",
             }}
           >
-            <button
-              style={{
-                background: "#10b981",
-                color: "#fff",
-                border: "none",
-                padding: "clamp(8px, 2.5vw, 11px) clamp(16px, 5vw, 26px)",
-                borderRadius: 8,
-                fontSize: "clamp(12px, 3.5vw, 14px)",
-                fontWeight: 700,
-                cursor: "pointer",
-                opacity: saving ? 0.7 : 1,
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                flex: "1 1 auto",
-                justifyContent: "center",
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-              }}
-              onClick={saveEvaluation}
-              disabled={saving}
-            >
-              {saving ? (
-                <>
-                  <FiLoader
-                    size={16}
-                    style={{ animation: "spin 1s linear infinite" }}
-                  />
-                  <span className="save-text">
-                    {tcKey("saving", "Saving...")}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <FiSave size={16} />
-                  <span className="save-text">
-                    {teKey("save", "Save Evaluation")}
-                  </span>
-                </>
-              )}
-              <style>{`
-                @media (max-width: 480px) {
-                  .save-text {
-                    display: none !important;
+            {canEvaluate && (
+              <button
+                style={{
+                  background: "#10b981",
+                  color: "#fff",
+                  border: "none",
+                  padding: "clamp(8px, 2.5vw, 11px) clamp(16px, 5vw, 26px)",
+                  borderRadius: 8,
+                  fontSize: "clamp(12px, 3.5vw, 14px)",
+                  fontWeight: 700,
+                  cursor: saving ? "not-allowed" : "pointer",
+                  opacity: saving ? 0.7 : 1,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  flex: "1 1 auto",
+                  justifyContent: "center",
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+                onClick={saveEvaluation}
+                disabled={saving}
+              >
+                {saving ? (
+                  <>
+                    <FiLoader
+                      size={16}
+                      style={{ animation: "spin 1s linear infinite" }}
+                    />
+                    <span className="save-text">
+                      {tcKey("saving", "Saving...")}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <FiSave size={16} />
+                    <span className="save-text">
+                      {teKey("save", "Save Evaluation")}
+                    </span>
+                  </>
+                )}
+                <style>{`
+                  @media (max-width: 480px) {
+                    .save-text {
+                      display: none !important;
+                    }
                   }
-                }
-              `}</style>
-            </button>
+                `}</style>
+              </button>
+            )}
 
-            {/* Export button */}
             {/* Export button */}
             <button
               style={{

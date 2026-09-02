@@ -8,6 +8,14 @@ import { evaluationAPI } from "../services/api";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import {
+  canCommentOnEvaluation,
+  canReactToEvaluation,
+  canDeleteEvaluationComment,
+  getUserTeamId,
+  isAdminOrAbove,
+  isLeaderOrAbove,
+} from "../utils/roles";
+import {
   FiSend,
   FiTrash2,
   FiCalendar,
@@ -26,6 +34,7 @@ import {
   FiX,
   FiChevronDown,
   FiInbox,
+  FiEye,
 } from "react-icons/fi";
 
 // ── Design Tokens (matches the Dashboard's established teal/brass/clay
@@ -314,7 +323,7 @@ function CommentItem({ comment, canDelete, onDelete, onReply }) {
 function EvaluationCard({
   evaluation,
   user,
-  isAdminOrSuperAdmin,
+  userTeamId,
   te,
   onReact,
   onLike,
@@ -335,6 +344,20 @@ function EvaluationCard({
   const inputRef = useRef(null);
   const pickerRef = useRef(null);
 
+  // ── Permission Checks using roles.js utilities ──────────────────────────────
+  const canComment = canCommentOnEvaluation(user, evaluation);
+  const canReact = canReactToEvaluation(user, evaluation);
+
+  // Can delete comments if: user owns the comment OR has admin/leader permissions
+  const canDeleteComments = (comment) => {
+    if (!user || !comment) return false;
+    // User can delete their own comments
+    if (comment.user?._id === user._id || comment.user === user._id)
+      return true;
+    // Use the utility function for role-based deletion
+    return canDeleteEvaluationComment(user, evaluation, comment);
+  };
+
   const groups = useMemo(() => {
     const g = {};
     (evaluation.reactions || []).forEach((r) => {
@@ -352,6 +375,12 @@ function EvaluationCard({
   const comments = evaluation.discussion || [];
   const visibleComments = showAllComments ? comments : comments.slice(-2);
 
+  // Check if this is the user's own team
+  const evalTeamId =
+    evaluation.team?._id || evaluation.teamId || evaluation.team;
+  const isOwnTeam =
+    userTeamId && evalTeamId && userTeamId.toString() === evalTeamId.toString();
+
   useEffect(() => {
     const onDocClick = (e) => {
       if (pickerRef.current && !pickerRef.current.contains(e.target))
@@ -362,7 +391,7 @@ function EvaluationCard({
   }, []);
 
   const handleDoubleTapLike = () => {
-    if (!iLiked) onLike(evaluation._id);
+    if (!iLiked && canReact) onLike(evaluation._id);
     setBurstHeart(true);
     setTimeout(() => setBurstHeart(false), 700);
   };
@@ -397,6 +426,20 @@ function EvaluationCard({
           <div className="ef-card-headtext">
             <div className="ef-card-title">
               {evaluation.teamName || evaluation.team?.name || "Team"}
+              {isOwnTeam && (
+                <span
+                  className="ef-status-pill ef-status-own"
+                  style={{
+                    background: T.tealLight,
+                    color: T.teal,
+                    fontSize: "8px",
+                    padding: "1px 8px",
+                    borderRadius: 12,
+                  }}
+                >
+                  YOUR TEAM
+                </span>
+              )}
               <span
                 className={`ef-status-pill ef-status-${evaluation.status || "draft"}`}
               >
@@ -466,49 +509,60 @@ function EvaluationCard({
           )}
         </div>
 
-        {/* Action bar */}
+        {/* Action bar - CONDITIONALLY RENDERED BASED ON PERMISSIONS */}
         <div className="ef-actions">
-          <button
-            className={`ef-action-btn${iLiked ? " ef-action-active ef-action-like" : ""}`}
-            onClick={() => onLike(evaluation._id)}
-          >
-            <FiHeart size={16} fill={iLiked ? "currentColor" : "none"} />
-            {te("like", "Like")}
-          </button>
+          {canReact ? (
+            <>
+              <button
+                className={`ef-action-btn${iLiked ? " ef-action-active ef-action-like" : ""}`}
+                onClick={() => onLike(evaluation._id)}
+              >
+                <FiHeart size={16} fill={iLiked ? "currentColor" : "none"} />
+                {te("like", "Like")}
+              </button>
 
-          <div className="ef-picker-wrap" ref={pickerRef}>
-            <button
-              className={`ef-action-btn${myReaction && myReaction !== LIKE_EMOJI ? " ef-action-active" : ""}`}
-              onClick={() => setOpenPicker((v) => !v)}
-            >
-              <FiSmile size={16} />
-              {te("react", "React")}
-            </button>
-            {openPicker && (
-              <div className="ef-picker">
-                {REACTIONS.map((emoji) => (
-                  <button
-                    key={emoji}
-                    className="ef-picker-emoji"
-                    onClick={() => {
-                      onReact(evaluation._id, emoji);
-                      setOpenPicker(false);
-                    }}
-                  >
-                    {emoji}
-                  </button>
-                ))}
+              <div className="ef-picker-wrap" ref={pickerRef}>
+                <button
+                  className={`ef-action-btn${myReaction && myReaction !== LIKE_EMOJI ? " ef-action-active" : ""}`}
+                  onClick={() => setOpenPicker((v) => !v)}
+                >
+                  <FiSmile size={16} />
+                  {te("react", "React")}
+                </button>
+                {openPicker && (
+                  <div className="ef-picker">
+                    {REACTIONS.map((emoji) => (
+                      <button
+                        key={emoji}
+                        className="ef-picker-emoji"
+                        onClick={() => {
+                          onReact(evaluation._id, emoji);
+                          setOpenPicker(false);
+                        }}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          <button
-            className="ef-action-btn"
-            onClick={() => setCommentsOpen((v) => !v)}
-          >
-            <FiMessageCircle size={16} />
-            {te("comment", "Comment")}
-          </button>
+              <button
+                className="ef-action-btn"
+                onClick={() => setCommentsOpen((v) => !v)}
+              >
+                <FiMessageCircle size={16} />
+                {te("comment", "Comment")}
+              </button>
+            </>
+          ) : (
+            <span
+              className="ef-action-btn ef-action-disabled"
+              style={{ color: T.inkLight, cursor: "not-allowed", opacity: 0.5 }}
+            >
+              <FiEye size={16} /> {te("viewOnly", "View Only")}
+            </span>
+          )}
 
           <button className="ef-action-btn" onClick={() => onShare(evaluation)}>
             <FiShare2 size={16} />
@@ -526,7 +580,7 @@ function EvaluationCard({
           </button>
         </div>
 
-        {/* Comments */}
+        {/* Comments - only show if user has permission to see them */}
         {commentsOpen && (
           <div className="ef-comments">
             {comments.length > 2 && !showAllComments && (
@@ -542,7 +596,7 @@ function EvaluationCard({
               <CommentItem
                 key={c._id}
                 comment={c}
-                canDelete={c.user?._id === user?._id || isAdminOrSuperAdmin}
+                canDelete={canDeleteComments(c)}
                 onDelete={() => onDeleteComment(evaluation._id, c._id)}
                 onReply={handleReply}
               />
@@ -553,33 +607,37 @@ function EvaluationCard({
               </div>
             )}
 
-            <div className="ef-composer">
-              <Avatar name={user?.name || "?"} size={28} />
-              <input
-                ref={inputRef}
-                value={commentDraft || ""}
-                onChange={(e) => onDraftChange(evaluation._id, e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && onPostComment(evaluation._id)
-                }
-                placeholder={te("writeComment", "Write a comment…")}
-                className="ef-composer-input"
-                maxLength={500}
-              />
-              <button
-                className="ef-composer-send"
-                onClick={() => onPostComment(evaluation._id)}
-                disabled={
-                  posting === evaluation._id || !(commentDraft || "").trim()
-                }
-              >
-                {posting === evaluation._id ? (
-                  <FiLoader className="ef-spin" size={14} />
-                ) : (
-                  <FiSend size={14} />
-                )}
-              </button>
-            </div>
+            {canComment && (
+              <div className="ef-composer">
+                <Avatar name={user?.name || "?"} size={28} />
+                <input
+                  ref={inputRef}
+                  value={commentDraft || ""}
+                  onChange={(e) =>
+                    onDraftChange(evaluation._id, e.target.value)
+                  }
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && onPostComment(evaluation._id)
+                  }
+                  placeholder={te("writeComment", "Write a comment…")}
+                  className="ef-composer-input"
+                  maxLength={500}
+                />
+                <button
+                  className="ef-composer-send"
+                  onClick={() => onPostComment(evaluation._id)}
+                  disabled={
+                    posting === evaluation._id || !(commentDraft || "").trim()
+                  }
+                >
+                  {posting === evaluation._id ? (
+                    <FiLoader className="ef-spin" size={14} />
+                  ) : (
+                    <FiSend size={14} />
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -589,9 +647,17 @@ function EvaluationCard({
 
 // ── Main Component ─────────────────────────────────────────
 export default function EvaluationFeed({ t }) {
-  const { user, isAdminOrSuperAdmin } = useAuth();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const te = useCallback((key, fb = "") => t?.(`evaluation.${key}`) || fb, [t]);
+
+  // Get user's team ID for permission checks
+  const userTeamId = getUserTeamId(user);
+
+  // Use utility functions for role checks
+  const isAdmin = isAdminOrAbove(user);
+  const isLeader = isLeaderOrAbove(user);
+  const isSuperAdmin = user?.role === "superadmin";
 
   const [evaluations, setEvaluations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -614,13 +680,30 @@ export default function EvaluationFeed({ t }) {
   const [sortBy, setSortBy] = useState("newest");
   const [shareModal, setShareModal] = useState(null);
 
-  // Load evaluations
+  // Load evaluations - only show evaluations user has access to
   useEffect(() => {
     const loadEvaluations = async () => {
       try {
         setLoading(true);
-        const res = await evaluationAPI.getAll();
-        const list = Array.isArray(res.data) ? res.data : [];
+        let list = [];
+
+        if (isAdmin || isSuperAdmin) {
+          // Admins see all evaluations
+          const res = await evaluationAPI.getAll();
+          list = Array.isArray(res.data) ? res.data : [];
+        } else if (isLeader) {
+          // Leaders see their own team's evaluations + can view others
+          const res = await evaluationAPI.getAll();
+          list = Array.isArray(res.data) ? res.data : [];
+          // Leaders can see all evaluations but with limited interaction on others
+        } else {
+          // Employees only see their own team's evaluations
+          if (userTeamId) {
+            const res = await evaluationAPI.getByTeam(userTeamId);
+            list = Array.isArray(res.data) ? res.data : [];
+          }
+        }
+
         list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
         setEvaluations(list);
       } catch (error) {
@@ -631,7 +714,7 @@ export default function EvaluationFeed({ t }) {
       }
     };
     loadEvaluations();
-  }, [showToast, te]);
+  }, [userTeamId, isAdmin, isSuperAdmin, isLeader, showToast, te]);
 
   const persistBookmarks = useCallback((next) => {
     setBookmarks(next);
@@ -816,10 +899,20 @@ export default function EvaluationFeed({ t }) {
               {te("title", "Team Evaluations")}
             </div>
             <div className="ef-hero-sub">
-              {te(
-                "employeeNotice",
-                "Evaluations are completed by your Team Leader or Admin. React, comment, and follow along here.",
-              )}
+              {isAdmin || isSuperAdmin
+                ? te(
+                    "adminNotice",
+                    "You have full access to all team evaluations.",
+                  )
+                : isLeader
+                  ? te(
+                      "leaderNotice",
+                      "You can evaluate your own team and view others.",
+                    )
+                  : te(
+                      "employeeNotice",
+                      "Evaluations are completed by your Team Leader or Admin. React, comment, and follow along here.",
+                    )}
             </div>
           </div>
         </div>
@@ -926,7 +1019,7 @@ export default function EvaluationFeed({ t }) {
               key={evaluation._id}
               evaluation={evaluation}
               user={user}
-              isAdminOrSuperAdmin={isAdminOrSuperAdmin}
+              userTeamId={userTeamId}
               te={te}
               onReact={react}
               onLike={likeShortcut}
@@ -1221,6 +1314,7 @@ const feedStyles = `
   .ef-modal-btn:hover { background: ${T.canvas}; }
   .ef-modal-btn-primary { background: ${T.teal}; border-color: ${T.teal}; color: #fff; margin-top: 0; }
   .ef-modal-btn-primary:hover { background: ${T.tealDeep}; }
+  .ef-action-disabled { cursor: not-allowed; opacity: 0.5; }
 
   /* RESPONSIVE */
   @media (max-width: 560px) {

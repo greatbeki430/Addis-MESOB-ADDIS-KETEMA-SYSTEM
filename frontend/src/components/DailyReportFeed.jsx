@@ -1,3 +1,4 @@
+// frontend/src/components/DailyReportFeed.jsx
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { dailyReportAPI } from "../services/api";
 import {
@@ -6,10 +7,12 @@ import {
   FiLoader,
   FiClock,
   FiUsers,
+  FiLock,
 } from "react-icons/fi";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { C, F } from "../styles/theme";
+import { canComment, canReact, canDeleteComment } from "../utils/roles";
 
 const DailyReportFeed = ({ t, isMobile }) => {
   const { user } = useAuth();
@@ -24,7 +27,10 @@ const DailyReportFeed = ({ t, isMobile }) => {
   const isMountedRef = useRef(true);
   const loadTriggeredRef = useRef(false);
 
-  // Memoize translation functions to prevent re-renders
+  // Get user's team for permission checks
+  // const userTeamId = getUserTeamId(user);
+
+  // Memoize translation functions
   const td = useCallback(
     (key, fallback = "") => t?.(`dailyReport.${key}`) || fallback,
     [t],
@@ -35,7 +41,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
     [t],
   );
 
-  // Load team feed - memoized with useCallback
+  // Load team feed
   const loadTeamFeed = useCallback(async () => {
     if (!isMountedRef.current) return;
 
@@ -46,7 +52,6 @@ const DailyReportFeed = ({ t, isMobile }) => {
         filter: filterType,
       });
 
-      // Handle different response structures
       let feedData = [];
       if (response?.data?.data) {
         feedData = Array.isArray(response.data.data) ? response.data.data : [];
@@ -75,11 +80,21 @@ const DailyReportFeed = ({ t, isMobile }) => {
     }
   }, [showToast, td, filterType]);
 
-  // Handle adding a comment
+  // Handle adding a comment - with permission check
   const handleAddComment = useCallback(
     async (reportId) => {
       const text = commentInputs[reportId]?.trim();
       if (!text) return;
+
+      // Check if user can comment on this report
+      const report = reports.find((r) => r._id === reportId);
+      if (!report || !canComment(user, report)) {
+        showToast(
+          "You don't have permission to comment on this report",
+          "warning",
+        );
+        return;
+      }
 
       try {
         setSubmitting((prev) => ({ ...prev, [reportId]: true }));
@@ -94,12 +109,22 @@ const DailyReportFeed = ({ t, isMobile }) => {
         setSubmitting((prev) => ({ ...prev, [reportId]: false }));
       }
     },
-    [commentInputs, loadTeamFeed, showToast, td],
+    [commentInputs, loadTeamFeed, showToast, td, reports, user],
   );
 
-  // Handle toggling a reaction
+  // Handle toggling a reaction - with permission check
   const handleToggleReaction = useCallback(
     async (reportId, emoji) => {
+      // Check if user can react to this report
+      const report = reports.find((r) => r._id === reportId);
+      if (!report || !canReact(user, report)) {
+        showToast(
+          "You don't have permission to react to this report",
+          "warning",
+        );
+        return;
+      }
+
       try {
         setReacting((prev) => ({ ...prev, [`${reportId}-${emoji}`]: true }));
         await dailyReportAPI.react(reportId, emoji);
@@ -111,7 +136,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
         setReacting((prev) => ({ ...prev, [`${reportId}-${emoji}`]: false }));
       }
     },
-    [loadTeamFeed, showToast, td],
+    [loadTeamFeed, showToast, td, reports, user],
   );
 
   // Load feed on mount and set up auto-refresh
@@ -143,13 +168,13 @@ const DailyReportFeed = ({ t, isMobile }) => {
     };
   }, [loadTeamFeed]);
 
-  // Get emoji count for a report
+  // Get emoji count
   const getEmojiCount = useCallback((reactions, emoji) => {
     if (!reactions || !Array.isArray(reactions)) return 0;
     return reactions.filter((r) => r.emoji === emoji).length;
   }, []);
 
-  // Check if current user has reacted with a specific emoji
+  // Check if current user has reacted
   const hasUserReacted = useCallback(
     (reactions, emoji) => {
       if (!reactions || !Array.isArray(reactions) || !user) return false;
@@ -185,11 +210,9 @@ const DailyReportFeed = ({ t, isMobile }) => {
     [td],
   );
 
-  // ✅ FIXED: Get initials from user name
+  // Get initials from user name
   const getInitials = useCallback((userData) => {
     if (!userData) return "?";
-
-    // Use 'name' field from User model
     if (userData.name) {
       const nameParts = userData.name.trim().split(" ");
       if (nameParts.length >= 2) {
@@ -197,33 +220,24 @@ const DailyReportFeed = ({ t, isMobile }) => {
       }
       return userData.name.substring(0, 2).toUpperCase();
     }
-
-    // Fallback for firstName/lastName if they exist
     if (userData.firstName || userData.lastName) {
       return `${(userData.firstName || "")[0]}${(userData.lastName || "")[0]}`.toUpperCase();
     }
-
     return "?";
   }, []);
 
-  // ✅ FIXED: Get full name from user data
+  // Get full name
   const getFullName = useCallback((userData) => {
     if (!userData) return "Unknown User";
-
-    // Use 'name' field from User model
     if (userData.name) return userData.name;
-
-    // Fallback for firstName/lastName if they exist
     if (userData.firstName || userData.lastName) {
       const fullName =
         `${userData.firstName || ""} ${userData.lastName || ""}`.trim();
       if (fullName) return fullName;
     }
-
     return "Unknown User";
   }, []);
 
-  // Memoize emojis array
   const emojis = useMemo(() => ["👍", "❤️", "🎉", "🚀", "🔥", "👏"], []);
 
   // Loading state
@@ -293,7 +307,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
         paddingBottom: "20px",
       }}
     >
-      {/* Feed header - Mobile Optimized */}
+      {/* Feed header */}
       <div
         style={{
           display: "flex",
@@ -414,6 +428,9 @@ const DailyReportFeed = ({ t, isMobile }) => {
         const isOwnReport =
           user && report.userId && report.userId._id === user._id;
 
+        // Check if user can interact with this report
+        const canInteract = canComment(user, report) && canReact(user, report);
+
         return (
           <div
             key={report._id}
@@ -432,7 +449,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
               e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)";
             }}
           >
-            {/* Report header - User info */}
+            {/* Report header */}
             <div
               style={{
                 display: "flex",
@@ -450,7 +467,6 @@ const DailyReportFeed = ({ t, isMobile }) => {
                   gap: 10,
                 }}
               >
-                {/* Avatar - FIXED: pass full userData */}
                 <div
                   style={{
                     width: isMobile ? 36 : 40,
@@ -547,7 +563,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
               </p>
             </div>
 
-            {/* Report stats - Service entries count */}
+            {/* Report stats */}
             {report.entries && report.entries.length > 0 && (
               <div
                 style={{
@@ -585,7 +601,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
               </div>
             )}
 
-            {/* Reactions */}
+            {/* Reactions - Conditional based on permissions */}
             <div
               style={{
                 display: "flex",
@@ -604,15 +620,25 @@ const DailyReportFeed = ({ t, isMobile }) => {
                 return (
                   <button
                     key={emoji}
-                    onClick={() => handleToggleReaction(report._id, emoji)}
-                    disabled={isReacting}
+                    onClick={() => {
+                      if (!canInteract) {
+                        showToast(
+                          "You don't have permission to react",
+                          "warning",
+                        );
+                        return;
+                      }
+                      handleToggleReaction(report._id, emoji);
+                    }}
+                    disabled={isReacting || !canInteract}
                     style={{
                       background: reacted ? `${C.primary}15` : "transparent",
                       border: `1px solid ${reacted ? C.primary : C.border}`,
                       borderRadius: 20,
                       padding: isMobile ? "4px 10px" : "6px 14px",
                       fontSize: isMobile ? "13px" : "14px",
-                      cursor: isReacting ? "not-allowed" : "pointer",
+                      cursor:
+                        isReacting || !canInteract ? "not-allowed" : "pointer",
                       display: "inline-flex",
                       alignItems: "center",
                       gap: 4,
@@ -620,7 +646,7 @@ const DailyReportFeed = ({ t, isMobile }) => {
                       opacity: isReacting ? 0.6 : 1,
                     }}
                     onMouseEnter={(e) => {
-                      if (!isReacting) {
+                      if (!isReacting && canInteract) {
                         e.currentTarget.style.transform = "scale(1.05)";
                         e.currentTarget.style.borderColor = C.primary;
                       }
@@ -656,6 +682,20 @@ const DailyReportFeed = ({ t, isMobile }) => {
                   </button>
                 );
               })}
+              {!canInteract && (
+                <span
+                  style={{
+                    fontSize: "10px",
+                    color: C.muted,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    marginLeft: 4,
+                  }}
+                >
+                  <FiLock size={12} /> View only
+                </span>
+              )}
             </div>
 
             {/* Comments section */}
@@ -669,155 +709,205 @@ const DailyReportFeed = ({ t, isMobile }) => {
                     overflowY: "auto",
                   }}
                 >
-                  {report.comments.map((comment, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: 8,
-                        padding: "6px 0",
-                        borderBottom:
-                          idx < report.comments.length - 1
-                            ? `1px solid ${C.border}44`
-                            : "none",
-                      }}
-                    >
+                  {report.comments.map((comment, idx) => {
+                    const canDelete = canDeleteComment(user, report, comment);
+                    return (
                       <div
+                        key={idx}
                         style={{
-                          fontSize: isMobile ? "11px" : "12px",
-                          fontWeight: 600,
-                          color: C.dark,
-                          flexShrink: 0,
-                          minWidth: isMobile ? "50px" : "60px",
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 8,
+                          padding: "6px 0",
+                          borderBottom:
+                            idx < report.comments.length - 1
+                              ? `1px solid ${C.border}44`
+                              : "none",
                         }}
                       >
-                        {getFullName(comment.user)}:
+                        <div
+                          style={{
+                            fontSize: isMobile ? "11px" : "12px",
+                            fontWeight: 600,
+                            color: C.dark,
+                            flexShrink: 0,
+                            minWidth: isMobile ? "50px" : "60px",
+                          }}
+                        >
+                          {getFullName(comment.user)}:
+                        </div>
+                        <div
+                          style={{
+                            fontSize: isMobile ? "12px" : "13px",
+                            color: C.dark,
+                            flex: 1,
+                            wordBreak: "break-word",
+                          }}
+                        >
+                          {comment.text}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: isMobile ? "9px" : "10px",
+                            color: C.muted,
+                            flexShrink: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          {formatDate(comment.createdAt)}
+                          {canDelete && (
+                            <button
+                              onClick={() => {
+                                // Delete comment - add API call
+                                console.log("Delete comment:", comment._id);
+                              }}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: "#ef4444",
+                                cursor: "pointer",
+                                padding: "2px 4px",
+                                borderRadius: 4,
+                                fontSize: 10,
+                              }}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div
-                        style={{
-                          fontSize: isMobile ? "12px" : "13px",
-                          color: C.dark,
-                          flex: 1,
-                          wordBreak: "break-word",
-                        }}
-                      >
-                        {comment.text}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: isMobile ? "9px" : "10px",
-                          color: C.muted,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {formatDate(comment.createdAt)}
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
-              {/* Comment input */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "center",
-                }}
-              >
+              {/* Comment input - Conditional based on permissions */}
+              {canInteract ? (
                 <div
                   style={{
-                    flex: 1,
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      background: "#F8FAFC",
+                      borderRadius: 20,
+                      border: `1px solid ${C.border}`,
+                      padding: "0 12px",
+                      transition: "border-color 0.2s ease",
+                    }}
+                  >
+                    <FiMessageCircle
+                      size={isMobile ? 14 : 16}
+                      color={C.muted}
+                    />
+                    <input
+                      type="text"
+                      placeholder={td("writeComment", "Write a comment...")}
+                      value={commentInputs[report._id] || ""}
+                      onChange={(e) =>
+                        setCommentInputs((prev) => ({
+                          ...prev,
+                          [report._id]: e.target.value,
+                        }))
+                      }
+                      onKeyPress={(e) => {
+                        if (e.key === "Enter") {
+                          handleAddComment(report._id);
+                        }
+                      }}
+                      style={{
+                        flex: 1,
+                        border: "none",
+                        background: "transparent",
+                        padding: isMobile ? "8px 0" : "10px 0",
+                        fontSize: isMobile ? "13px" : "14px",
+                        outline: "none",
+                        fontFamily: F.sans,
+                        color: C.dark,
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={() => handleAddComment(report._id)}
+                    disabled={
+                      submitting[report._id] ||
+                      !commentInputs[report._id]?.trim()
+                    }
+                    style={{
+                      background:
+                        submitting[report._id] ||
+                        !commentInputs[report._id]?.trim()
+                          ? C.border
+                          : C.primary,
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: isMobile ? 36 : 40,
+                      height: isMobile ? 36 : 40,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor:
+                        submitting[report._id] ||
+                        !commentInputs[report._id]?.trim()
+                          ? "not-allowed"
+                          : "pointer",
+                      transition: "all 0.2s ease",
+                      flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (
+                        !submitting[report._id] &&
+                        commentInputs[report._id]?.trim()
+                      ) {
+                        e.currentTarget.style.transform = "scale(1.05)";
+                        e.currentTarget.style.boxShadow = `0 4px 12px ${C.primary}44`;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "scale(1)";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  >
+                    {submitting[report._id] ? (
+                      <FiLoader
+                        size={isMobile ? 16 : 18}
+                        style={{ animation: "spin 1s linear infinite" }}
+                      />
+                    ) : (
+                      <FiSend size={isMobile ? 14 : 16} />
+                    )}
+                  </button>
+                </div>
+              ) : (
+                <div
+                  style={{
                     display: "flex",
                     alignItems: "center",
                     gap: 8,
+                    padding: "8px 12px",
                     background: "#F8FAFC",
                     borderRadius: 20,
                     border: `1px solid ${C.border}`,
-                    padding: "0 12px",
-                    transition: "border-color 0.2s ease",
+                    color: C.muted,
+                    fontSize: isMobile ? "12px" : "13px",
                   }}
                 >
-                  <FiMessageCircle size={isMobile ? 14 : 16} color={C.muted} />
-                  <input
-                    type="text"
-                    placeholder={td("writeComment", "Write a comment...")}
-                    value={commentInputs[report._id] || ""}
-                    onChange={(e) =>
-                      setCommentInputs((prev) => ({
-                        ...prev,
-                        [report._id]: e.target.value,
-                      }))
-                    }
-                    onKeyPress={(e) => {
-                      if (e.key === "Enter") {
-                        handleAddComment(report._id);
-                      }
-                    }}
-                    style={{
-                      flex: 1,
-                      border: "none",
-                      background: "transparent",
-                      padding: isMobile ? "8px 0" : "10px 0",
-                      fontSize: isMobile ? "13px" : "14px",
-                      outline: "none",
-                      fontFamily: F.sans,
-                      color: C.dark,
-                    }}
-                  />
+                  <FiLock size={14} />
+                  <span>
+                    {td("readOnlyComments", "Comments are read-only")}
+                  </span>
                 </div>
-                <button
-                  onClick={() => handleAddComment(report._id)}
-                  disabled={
-                    submitting[report._id] || !commentInputs[report._id]?.trim()
-                  }
-                  style={{
-                    background:
-                      submitting[report._id] ||
-                      !commentInputs[report._id]?.trim()
-                        ? C.border
-                        : C.primary,
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "50%",
-                    width: isMobile ? 36 : 40,
-                    height: isMobile ? 36 : 40,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor:
-                      submitting[report._id] ||
-                      !commentInputs[report._id]?.trim()
-                        ? "not-allowed"
-                        : "pointer",
-                    transition: "all 0.2s ease",
-                    flexShrink: 0,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (
-                      !submitting[report._id] &&
-                      commentInputs[report._id]?.trim()
-                    ) {
-                      e.currentTarget.style.transform = "scale(1.05)";
-                      e.currentTarget.style.boxShadow = `0 4px 12px ${C.primary}44`;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "scale(1)";
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                >
-                  {submitting[report._id] ? (
-                    <FiLoader
-                      size={isMobile ? 16 : 18}
-                      style={{ animation: "spin 1s linear infinite" }}
-                    />
-                  ) : (
-                    <FiSend size={isMobile ? 14 : 16} />
-                  )}
-                </button>
-              </div>
+              )}
             </div>
           </div>
         );
