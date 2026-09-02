@@ -22,7 +22,7 @@ import HowItWorks from "../components/landing/HowItWorks";
 import GoldenMondayTeaser from "../components/landing/GoldenMondayTeaser";
 import FAQSection from "../components/landing/FAQSection";
 import SiteFooter from "../components/landing/SiteFooter";
-import VisionMission from "../components/landing/VisionMission"; // ✅ Import VisionMission
+import VisionMission from "../components/landing/VisionMission";
 
 import {
   FiMenu,
@@ -46,6 +46,7 @@ export default function Landing() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("");
   const [showBackToTop, setShowBackToTop] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +63,16 @@ export default function Landing() {
   const abortControllerRef = useRef(null);
   const hasLoadedRef = useRef(false);
   const isInitialMount = useRef(true);
+
+  // ─── Check if mobile ──────────────────────────────────────
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   // ─── Load services from database ──────────────────────────
   const loadServices = useCallback(async () => {
@@ -162,12 +173,12 @@ export default function Landing() {
   // ─── Get service icon ──────────────────────────────────────
   const getServiceIcon = (index) => {
     const icons = [
-      <FiGrid size={24} />,
-      <FiBarChart2 size={24} />,
-      <FiFileText size={24} />,
-      <FiUsers size={24} />,
-      <FiShield size={24} />,
-      <FiCpu size={24} />,
+      <FiGrid size={isMobile ? 20 : 24} />,
+      <FiBarChart2 size={isMobile ? 20 : 24} />,
+      <FiFileText size={isMobile ? 20 : 24} />,
+      <FiUsers size={isMobile ? 20 : 24} />,
+      <FiShield size={isMobile ? 20 : 24} />,
+      <FiCpu size={isMobile ? 20 : 24} />,
     ];
     return icons[index % icons.length];
   };
@@ -290,7 +301,12 @@ export default function Landing() {
 
   return (
     <div
-      style={{ fontFamily: F.sans, background: "#fbfaf6", minHeight: "100vh" }}
+      style={{
+        fontFamily: F.sans,
+        background: "#fbfaf6",
+        minHeight: "100vh",
+        overflowX: "hidden",
+      }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700;800&family=Noto+Serif+Ethiopic:wght@700;900&display=swap');
@@ -320,9 +336,17 @@ export default function Landing() {
 
         .lp-desktop-only { display: flex; }
         .lp-mobile-toggle { display: none; }
-        @media (max-width: 720px) {
+
+        @media (max-width: 768px) {
           .lp-desktop-only { display: none !important; }
           .lp-mobile-toggle { display: inline-flex !important; }
+        }
+
+        @media (max-width: 480px) {
+          .lp-skip-link {
+            font-size: 11px;
+            padding: 8px 12px;
+          }
         }
 
         @media (prefers-reduced-motion: reduce) {
@@ -347,6 +371,56 @@ export default function Landing() {
 
         .lp-back-to-top { transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease; }
         .lp-back-to-top:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(6,11,46,0.35); }
+
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+          .lp-back-to-top {
+            bottom: 16px !important;
+            right: 16px !important;
+            width: 40px !important;
+            height: 40px !important;
+          }
+          .lp-back-to-top svg {
+            width: 16px !important;
+            height: 16px !important;
+          }
+        }
+        @media (max-width: 480px) {
+          .lp-back-to-top {
+            bottom: 12px !important;
+            right: 12px !important;
+            width: 36px !important;
+            height: 36px !important;
+          }
+          .lp-back-to-top svg {
+            width: 14px !important;
+            height: 14px !important;
+          }
+        }
+
+        /* Smooth scroll for mobile */
+        @media (max-width: 768px) {
+          html {
+            scroll-behavior: smooth;
+          }
+        }
+
+        /* Prevent horizontal scroll on mobile */
+        #root, #main-content {
+          overflow-x: hidden;
+          max-width: 100vw;
+        }
+
+        /* Touch-friendly button sizes */
+        @media (max-width: 768px) {
+          button, 
+          .lp-cta,
+          .lp-lang-btn,
+          .lp-mobile-toggle {
+            min-height: 44px;
+            min-width: 44px;
+          }
+        }
       `}</style>
 
       {/* ── SKIP LINK ───────────────────────────────────── */}
@@ -362,25 +436,38 @@ export default function Landing() {
           zIndex: 30,
           background: "rgba(6,11,46,0.9)",
           backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
           borderBottom: "1px solid rgba(255,255,255,0.08)",
-          padding: "12px clamp(16px, 5vw, 48px)",
+          padding: isMobile
+            ? "10px clamp(12px, 4vw, 16px)"
+            : "12px clamp(16px, 5vw, 48px)",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 16,
+          gap: isMobile ? 8 : 16,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: isMobile ? 8 : 10,
+          }}
+        >
           <img
             src={mesobLogo}
             alt="Addis MESOB"
-            style={{ width: 34, height: 34, borderRadius: 8 }}
+            style={{
+              width: isMobile ? 28 : 34,
+              height: isMobile ? 28 : 34,
+              borderRadius: 8,
+            }}
           />
           <span
             style={{
               fontFamily: F.serif,
               fontWeight: 800,
-              fontSize: 18,
+              fontSize: isMobile ? 14 : 18,
               color: "#fff",
             }}
           >
@@ -390,7 +477,7 @@ export default function Landing() {
 
         <div
           className="lp-desktop-only"
-          style={{ alignItems: "center", gap: 20 }}
+          style={{ alignItems: "center", gap: isMobile ? 12 : 20 }}
         >
           <a
             href="#features"
@@ -398,7 +485,7 @@ export default function Landing() {
             style={{
               color: activeSection === "features" ? C.gold : "#c9d0f0",
               textDecoration: "none",
-              fontSize: 13,
+              fontSize: isMobile ? 12 : 13,
               fontWeight: 600,
             }}
           >
@@ -410,7 +497,7 @@ export default function Landing() {
             style={{
               color: "#c9d0f0",
               textDecoration: "none",
-              fontSize: 13,
+              fontSize: isMobile ? 12 : 13,
               fontWeight: 600,
             }}
           >
@@ -422,7 +509,7 @@ export default function Landing() {
             style={{
               color: activeSection === "how" ? C.gold : "#c9d0f0",
               textDecoration: "none",
-              fontSize: 13,
+              fontSize: isMobile ? 12 : 13,
               fontWeight: 600,
             }}
           >
@@ -434,13 +521,13 @@ export default function Landing() {
             style={{
               color: "#c9d0f0",
               textDecoration: "none",
-              fontSize: 13,
+              fontSize: isMobile ? 12 : 13,
               fontWeight: 600,
             }}
           >
             FAQ
           </a>
-          <div style={{ display: "flex", gap: 4 }}>
+          <div style={{ display: "flex", gap: isMobile ? 2 : 4 }}>
             {LANGUAGES.map((l) => (
               <button
                 key={l.code}
@@ -453,8 +540,8 @@ export default function Landing() {
                   color: language === l.code ? C.dark : "#c9d0f0",
                   border: "none",
                   borderRadius: 6,
-                  padding: "5px 9px",
-                  fontSize: 11,
+                  padding: isMobile ? "4px 6px" : "5px 9px",
+                  fontSize: isMobile ? 10 : 11,
                   fontWeight: 700,
                   cursor: "pointer",
                   fontFamily: F.sans,
@@ -472,14 +559,14 @@ export default function Landing() {
               alignItems: "center",
               justifyContent: "center",
               gap: 6,
-              minWidth: "clamp(140px, 15vw, 180px)",
+              minWidth: isMobile ? "120px" : "clamp(140px, 15vw, 180px)",
               background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
               color: C.dark,
               border: "none",
               borderRadius: 8,
-              padding: "9px 16px",
+              padding: isMobile ? "8px 14px" : "9px 16px",
               fontWeight: 800,
-              fontSize: 13,
+              fontSize: isMobile ? 12 : 13,
               cursor: "pointer",
               fontFamily: F.sans,
               whiteSpace: "nowrap",
@@ -495,7 +582,7 @@ export default function Landing() {
               e.currentTarget.style.boxShadow = "none";
             }}
           >
-            <FiMenu size={14} />
+            <FiMenu size={isMobile ? 12 : 14} />
             {LANDING_COPY.ctaPrimary}
           </button>
         </div>
@@ -508,15 +595,20 @@ export default function Landing() {
             background: "rgba(255,255,255,0.08)",
             border: "none",
             borderRadius: 8,
-            width: 38,
-            height: 38,
+            width: isMobile ? 36 : 38,
+            height: isMobile ? 36 : 38,
             color: "#fff",
             cursor: "pointer",
             alignItems: "center",
             justifyContent: "center",
+            display: "flex",
           }}
         >
-          {mobileNavOpen ? <FiX size={18} /> : <FiMenu size={18} />}
+          {mobileNavOpen ? (
+            <FiX size={isMobile ? 16 : 18} />
+          ) : (
+            <FiMenu size={isMobile ? 16 : 18} />
+          )}
         </button>
       </header>
 
@@ -525,43 +617,63 @@ export default function Landing() {
         <div
           style={{
             background: "#081d17",
-            padding: "16px clamp(16px, 5vw, 48px) 24px",
+            padding: isMobile
+              ? "12px clamp(12px, 4vw, 16px) 20px"
+              : "16px clamp(16px, 5vw, 48px) 24px",
             display: "flex",
             flexDirection: "column",
-            gap: 14,
+            gap: isMobile ? 12 : 14,
             borderBottom: "1px solid rgba(255,255,255,0.08)",
             animation: "lp-fade-in 0.2s ease",
+            maxHeight: "80vh",
+            overflowY: "auto",
           }}
         >
           <a
             href="#features"
-            style={{ color: "#c9d0f0", fontSize: 14, fontWeight: 600 }}
+            style={{
+              color: "#c9d0f0",
+              fontSize: isMobile ? 13 : 14,
+              fontWeight: 600,
+            }}
             onClick={() => setMobileNavOpen(false)}
           >
             Features
           </a>
           <a
             href="#services"
-            style={{ color: "#c9d0f0", fontSize: 14, fontWeight: 600 }}
+            style={{
+              color: "#c9d0f0",
+              fontSize: isMobile ? 13 : 14,
+              fontWeight: 600,
+            }}
             onClick={() => setMobileNavOpen(false)}
           >
             Services
           </a>
           <a
             href="#how"
-            style={{ color: "#c9d0f0", fontSize: 14, fontWeight: 600 }}
+            style={{
+              color: "#c9d0f0",
+              fontSize: isMobile ? 13 : 14,
+              fontWeight: 600,
+            }}
             onClick={() => setMobileNavOpen(false)}
           >
             How it works
           </a>
           <a
             href="#faq"
-            style={{ color: "#c9d0f0", fontSize: 14, fontWeight: 600 }}
+            style={{
+              color: "#c9d0f0",
+              fontSize: isMobile ? 13 : 14,
+              fontWeight: 600,
+            }}
             onClick={() => setMobileNavOpen(false)}
           >
             FAQ
           </a>
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             {LANGUAGES.map((l) => (
               <button
                 key={l.code}
@@ -572,10 +684,12 @@ export default function Landing() {
                   color: language === l.code ? C.dark : "#c9d0f0",
                   border: "none",
                   borderRadius: 6,
-                  padding: "6px 10px",
-                  fontSize: 12,
+                  padding: isMobile ? "6px 10px" : "6px 10px",
+                  fontSize: isMobile ? 11 : 12,
                   fontWeight: 700,
                   cursor: "pointer",
+                  minHeight: 44,
+                  minWidth: 44,
                 }}
               >
                 {l.flag}
@@ -589,10 +703,11 @@ export default function Landing() {
               color: C.dark,
               border: "none",
               borderRadius: 8,
-              padding: "10px 16px",
+              padding: isMobile ? "12px 16px" : "10px 16px",
               fontWeight: 800,
-              fontSize: 13,
+              fontSize: isMobile ? 14 : 13,
               cursor: "pointer",
+              minHeight: 44,
             }}
           >
             {LANDING_COPY.ctaPrimary}
@@ -601,7 +716,7 @@ export default function Landing() {
       )}
 
       {/* ── MAIN CONTENT ──────────────────────────────────── */}
-      <div id="main-content">
+      <div id="main-content" style={{ overflowX: "hidden", maxWidth: "100vw" }}>
         {/* Hero Section */}
         <HeroSection t={t} onLogin={goLogin} />
 
@@ -728,10 +843,10 @@ export default function Landing() {
         className="lp-back-to-top"
         style={{
           position: "fixed",
-          bottom: 24,
-          right: 24,
-          width: 44,
-          height: 44,
+          bottom: isMobile ? 16 : 24,
+          right: isMobile ? 16 : 24,
+          width: isMobile ? 40 : 44,
+          height: isMobile ? 40 : 44,
           borderRadius: "50%",
           background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
           color: C.dark,
@@ -756,7 +871,7 @@ export default function Landing() {
           e.currentTarget.style.boxShadow = "0 6px 18px rgba(6,11,46,0.3)";
         }}
       >
-        <FiArrowUp size={18} />
+        <FiArrowUp size={isMobile ? 16 : 18} />
       </button>
     </div>
   );
