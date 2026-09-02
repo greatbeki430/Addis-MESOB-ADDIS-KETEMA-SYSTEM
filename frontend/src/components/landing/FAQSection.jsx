@@ -135,40 +135,40 @@ const FAQAccordion = ({ items, getText }) => {
   );
 };
 
-const FAQSection = forwardRef(({ t, copy, language, ...props }, ref) => {
-  const getText = (obj) => obj[language] || obj.en;
-
-  const SectionHeading = ({ eyebrow, title, center }) => (
-    <div style={{ textAlign: center ? "center" : "left" }}>
-      <div
-        style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          fontSize: 11,
-          fontWeight: 800,
-          letterSpacing: 1.2,
-          textTransform: "uppercase",
-          color: C.primary,
-          marginBottom: 12,
-        }}
-      >
-        {eyebrow}
-      </div>
-      <h2
-        style={{
-          fontFamily: F.serif,
-          fontSize: "clamp(24px, 4vw, 34px)",
-          fontWeight: 800,
-          letterSpacing: "-0.01em",
-          margin: 0,
-          color: C.dark,
-        }}
-      >
-        {title}
-      </h2>
+const SectionHeading = ({ eyebrow, title, center }) => (
+  <div style={{ textAlign: center ? "center" : "left" }}>
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 11,
+        fontWeight: 800,
+        letterSpacing: 1.2,
+        textTransform: "uppercase",
+        color: C.primary,
+        marginBottom: 12,
+      }}
+    >
+      {eyebrow}
     </div>
-  );
+    <h2
+      style={{
+        fontFamily: F.serif,
+        fontSize: "clamp(24px, 4vw, 34px)",
+        fontWeight: 800,
+        letterSpacing: "-0.01em",
+        margin: 0,
+        color: C.dark,
+      }}
+    >
+      {title}
+    </h2>
+  </div>
+);
+
+const FAQSection = forwardRef(({ copy, language, ...props }, ref) => {
+  const getText = (obj) => obj[language] || obj.en;
 
   return (
     <section
