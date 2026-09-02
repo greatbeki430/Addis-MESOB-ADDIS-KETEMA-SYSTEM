@@ -1,6 +1,6 @@
 // frontend/src/pages/Profile.jsx
-import { useState, useRef } from "react";
-import { C, F, btn, card, flex, shadows, radius, inp } from "../styles/theme";
+import { useState, useRef, useMemo, useCallback } from "react";
+import { C } from "../styles/theme";
 import { useAuth } from "../hooks/useAuth";
 import { useToast } from "../hooks/useToast";
 import { useLanguage } from "../hooks/useLanguage";
@@ -13,11 +13,28 @@ import {
   FiEdit2,
   FiSave,
   FiX,
-  FiUpload,
   FiLoader,
   FiClock,
   FiCheckCircle,
+  FiFileText,
   FiAward,
+  FiCalendar,
+  FiBriefcase,
+  FiMapPin,
+  FiGlobe,
+  FiLink,
+  FiTwitter,
+  FiGithub,
+  FiLinkedin,
+  FiChevronRight,
+  FiSettings,
+  FiCamera,
+  FiTrash2,
+  FiStar,
+  FiTrendingUp,
+  FiUsers,
+  FiMessageSquare,
+  FiZap,
 } from "react-icons/fi";
 import "./Profile.css";
 
@@ -31,43 +48,55 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [hoveredStat, setHoveredStat] = useState(null);
 
-  // ✅ FIXED: Derive form data directly from user prop
-  // This is the correct way - no useEffect needed!
   const getInitialFormData = () => ({
     name: user?.name || "",
     email: user?.email || "",
     phone: user?.phone || "",
     profilePhotoUrl: user?.profilePhotoUrl || "",
+    bio: user?.bio || "",
+    position: user?.position || "",
+    department: user?.department || "",
+    location: user?.location || "",
+    website: user?.website || "",
+    twitter: user?.twitter || "",
+    github: user?.github || "",
+    linkedin: user?.linkedin || "",
   });
 
-  // ✅ FIXED: Initialize state once with current user data
   const [formData, setFormData] = useState(getInitialFormData);
   const [photoPreviewState, setPhotoPreviewState] = useState(
     user?.profilePhotoUrl || null,
   );
 
-  // ✅ FIXED: When user changes, reset the form with a function
-  // This uses a key-based approach - the function runs when user changes
-  // but doesn't cause cascading renders
   const resetFormData = () => {
     setFormData({
       name: user?.name || "",
       email: user?.email || "",
       phone: user?.phone || "",
       profilePhotoUrl: user?.profilePhotoUrl || "",
+      bio: user?.bio || "",
+      position: user?.position || "",
+      department: user?.department || "",
+      location: user?.location || "",
+      website: user?.website || "",
+      twitter: user?.twitter || "",
+      github: user?.github || "",
+      linkedin: user?.linkedin || "",
     });
     setPhotoPreviewState(user?.profilePhotoUrl || null);
   };
 
   const photoPreview = photoPreviewState;
 
-  // Role helpers with translations
+  // Get user's role with translation
   const getUserRole = () => {
-    if (isSuperAdmin) return t("profile.roleSuperAdmin");
-    if (isAdmin) return t("profile.roleAdmin");
-    if (isLeader) return t("profile.roleTeamLeader");
-    return t("profile.roleEmployee");
+    if (isSuperAdmin) return t("profile.roleSuperAdmin") || "Super Admin";
+    if (isAdmin) return t("profile.roleAdmin") || "Admin";
+    if (isLeader) return t("profile.roleTeamLeader") || "Team Leader";
+    return t("profile.roleEmployee") || "Employee";
   };
 
   const getRoleIcon = () => {
@@ -145,6 +174,14 @@ export default function Profile() {
         email: formData.email,
         phone: formData.phone,
         profilePhotoUrl: profilePhotoUrl || formData.profilePhotoUrl,
+        bio: formData.bio,
+        position: formData.position,
+        department: formData.department,
+        location: formData.location,
+        website: formData.website,
+        twitter: formData.twitter,
+        github: formData.github,
+        linkedin: formData.linkedin,
       };
 
       await authAPI.updateProfile(updateData);
@@ -152,7 +189,6 @@ export default function Profile() {
       setIsEditing(false);
       setPhotoFile(null);
 
-      // Refresh user data
       await refreshUser();
       window.location.reload();
     } catch (error) {
@@ -177,600 +213,773 @@ export default function Profile() {
   };
 
   // Format date for member since
-  const formatMemberSince = () => {
-    if (!user?.joinDate) return t("profile.noData");
+  const formatMemberSince = useCallback(() => {
+    if (!user?.createdAt) return t("profile.noData");
     try {
-      return new Date(user.joinDate).toLocaleDateString();
+      return new Date(user.createdAt).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
     } catch {
       return t("profile.noData");
     }
-  };
+  }, [user, t]);
+
+  // Stats data
+  const stats = useMemo(() => {
+    const baseStats = [
+      {
+        id: "tasks",
+        icon: <FiCheckCircle size={18} />,
+        value: user?.totalTasks || 0,
+        label: t("profile.tasksCompleted") || "Tasks Completed",
+        color: "#3b82f6",
+        gradient: "linear-gradient(135deg, #eff6ff, #dbeafe)",
+        subtitle: "This month",
+      },
+      {
+        id: "earnings",
+        icon: <FiAward size={18} />,
+        value: `$${user?.totalEarnings || "0.00"}`,
+        label: t("profile.totalEarnings") || "Total Earnings",
+        color: "#f59e0b",
+        gradient: "linear-gradient(135deg, #fffbeb, #fef3c7)",
+        subtitle: "Lifetime",
+      },
+      {
+        id: "member",
+        icon: <FiClock size={18} />,
+        value: formatMemberSince(),
+        label: t("profile.memberSince") || "Member Since",
+        color: "#10b981",
+        gradient: "linear-gradient(135deg, #f0fdf4, #dcfce7)",
+        subtitle: "Active member",
+      },
+      {
+        id: "reports",
+        icon: <FiTrendingUp size={18} />,
+        value: user?.totalReports || 0,
+        label: t("profile.reportsSubmitted") || "Reports Submitted",
+        color: "#8b5cf6",
+        gradient: "linear-gradient(135deg, #f5f3ff, #ede9fe)",
+        subtitle: "Total reports",
+      },
+    ];
+
+    // Add role-specific stats
+    if (isLeader || isAdmin || isSuperAdmin) {
+      baseStats.push({
+        id: "team",
+        icon: <FiUsers size={18} />,
+        value: user?.teamSize || 0,
+        label: t("profile.teamSize") || "Team Size",
+        color: "#ec4899",
+        gradient: "linear-gradient(135deg, #fdf2f8, #fce7f3)",
+        subtitle: "Team members",
+      });
+    }
+
+    return baseStats;
+  }, [user, t, isLeader, isAdmin, isSuperAdmin, formatMemberSince]);
+
+  // Social links
+  const socialLinks = [
+    { key: "website", icon: <FiLink size={16} />, label: "Website" },
+    { key: "twitter", icon: <FiTwitter size={16} />, label: "Twitter" },
+    { key: "github", icon: <FiGithub size={16} />, label: "GitHub" },
+    { key: "linkedin", icon: <FiLinkedin size={16} />, label: "LinkedIn" },
+  ];
+
+  const hasSocialLinks = socialLinks.some(
+    (link) => formData[link.key] && formData[link.key].trim() !== "",
+  );
 
   return (
-    <div
-      className="profile-page"
-      style={{ padding: "20px", maxWidth: 800, margin: "0 auto" }}
-    >
-      {/* Header */}
-      <div
-        style={{
-          ...flex.between,
-          marginBottom: 24,
-          flexWrap: "wrap",
-          gap: 12,
-        }}
-      >
-        <div>
-          <h1
-            style={{
-              fontSize: "clamp(20px, 5vw, 26px)",
-              fontWeight: 900,
-              color: C.dark,
-              fontFamily: F.serif,
-              margin: 0,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-            }}
-          >
-            <FiUser size={24} color={C.primary} />
-            {t("profile.title")}
-          </h1>
-          <p
-            style={{
-              fontSize: "clamp(11px, 3vw, 13px)",
-              color: C.muted,
-              marginTop: 4,
-              fontFamily: F.sans,
-            }}
-          >
-            {t("profile.subtitle")}
-          </p>
-        </div>
-        {!isEditing && (
-          <button onClick={() => setIsEditing(true)} style={btn.primary}>
-            <FiEdit2 size={16} style={{ marginRight: 6 }} />
-            {t("profile.editProfileBtn")}
-          </button>
-        )}
-      </div>
-
-      {/* Main Card */}
-      <div style={card}>
-        <form onSubmit={handleSubmit}>
-          {/* Profile Photo Section */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              marginBottom: 24,
-            }}
-          >
-            <div style={{ position: "relative" }}>
-              {photoPreview ? (
-                <img
-                  src={photoPreview}
-                  alt={t("profile.title")}
-                  style={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: "50%",
-                    objectFit: "cover",
-                    border: `4px solid ${C.primary}`,
-                    boxShadow: shadows.md,
-                    transition: "transform 0.3s ease",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.transform = "scale(1.05)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.transform = "scale(1)")
-                  }
-                  onClick={() => window.open(photoPreview, "_blank")}
-                  title={t("common.view")}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 120,
-                    height: 120,
-                    borderRadius: "50%",
-                    background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 40,
-                    color: "#fff",
-                    fontWeight: 900,
-                    fontFamily: F.serif,
-                    border: `4px solid ${C.primary}`,
-                    boxShadow: shadows.md,
-                    transition: "transform 0.3s ease",
-                  }}
-                >
-                  {getUserInitials()}
-                </div>
-              )}
-
-              {/* ✅ Keep this for upload functionality */}
-              {isEditing && (
-                <>
-                  <label
-                    style={{
-                      position: "absolute",
-                      bottom: 0,
-                      right: 0,
-                      background: C.primary,
-                      color: "#fff",
-                      width: 36,
-                      height: 36,
-                      borderRadius: "50%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      border: `2px solid ${C.white}`,
-                      transition: "transform 0.2s ease",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.transform = "scale(1.1)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "scale(1)";
-                    }}
-                    title={t("profile.uploadPhoto")}
-                  >
-                    <FiUpload size={16} />
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePhotoChange}
-                      style={{ display: "none" }}
-                      disabled={uploadingPhoto}
-                    />
-                  </label>
-                  {uploadingPhoto && (
-                    <div
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        background: "rgba(0,0,0,0.5)",
-                        borderRadius: "50%",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <FiLoader
-                        size={32}
-                        color="#fff"
-                        style={{ animation: "spin 1s linear infinite" }}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-            {isEditing && photoPreview && (
-              <button
-                type="button"
-                onClick={removePhoto}
-                style={{
-                  marginTop: 8,
-                  background: "none",
-                  border: "none",
-                  color: C.red,
-                  fontSize: 12,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  transition: "color 0.2s ease",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = "#b91c1c")}
-                onMouseLeave={(e) => (e.currentTarget.style.color = C.red)}
-              >
-                <FiX size={14} /> {t("profile.removePhoto")}
-              </button>
-            )}
-            {isEditing && !photoPreview && (
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 11,
-                  color: C.muted,
-                  textAlign: "center",
-                }}
-              >
-                {t("profile.photoUploadHint")}
-              </div>
-            )}
-          </div>
-
-          {/* Role Badge */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "center",
-              marginBottom: 24,
-            }}
-          >
-            <span
-              style={{
-                background: getRoleColor(),
-                color: "#fff",
-                padding: "6px 16px",
-                borderRadius: radius.pill,
-                fontSize: 13,
-                fontWeight: 700,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <span>{getRoleIcon()}</span>
-              {getUserRole()}
-            </span>
-          </div>
-
-          {/* Stats Cards */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-              gap: 16,
-              marginBottom: 24,
-            }}
-          >
-            <div
-              style={{
-                background: C.bg,
-                padding: 16,
-                borderRadius: radius.md,
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                border: `1px solid transparent`,
-                transition: "all 0.3s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = shadows.md;
-                e.currentTarget.style.borderColor = C.border;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-                e.currentTarget.style.borderColor = "transparent";
-              }}
-            >
-              <FiCheckCircle size={20} color={C.primary} />
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: C.dark }}>
-                  {user?.totalTasks || 0}
-                </div>
-                <div style={{ fontSize: 12, color: C.muted }}>
-                  {t("profile.tasksCompleted")}
-                </div>
-              </div>
-            </div>
-            <div
-              style={{
-                background: C.bg,
-                padding: 16,
-                borderRadius: radius.md,
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                border: `1px solid transparent`,
-                transition: "all 0.3s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = shadows.md;
-                e.currentTarget.style.borderColor = C.border;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-                e.currentTarget.style.borderColor = "transparent";
-              }}
-            >
-              <FiAward size={20} color={C.gold} />
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: C.dark }}>
-                  ${user?.totalEarnings || "0.00"}
-                </div>
-                <div style={{ fontSize: 12, color: C.muted }}>
-                  {t("profile.totalEarnings")}
-                </div>
-              </div>
-            </div>
-            <div
-              style={{
-                background: C.bg,
-                padding: 16,
-                borderRadius: radius.md,
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                border: `1px solid transparent`,
-                transition: "all 0.3s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = shadows.md;
-                e.currentTarget.style.borderColor = C.border;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-                e.currentTarget.style.borderColor = "transparent";
-              }}
-            >
-              <FiClock size={20} color={C.muted} />
-              <div>
-                <div style={{ fontSize: 20, fontWeight: 700, color: C.dark }}>
-                  {formatMemberSince()}
-                </div>
-                <div style={{ fontSize: 12, color: C.muted }}>
-                  {t("profile.memberSince")}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Form Fields */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: 16,
-            }}
-          >
-            <div style={{ marginBottom: 14 }}>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: 4,
-                  fontWeight: 600,
-                  fontSize: 13,
-                  color: C.dark,
-                }}
-              >
-                {t("profile.fullName")} *
-              </label>
-              {isEditing ? (
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => handleFormChange("name", e.target.value)}
-                  style={{
-                    ...inp,
-                    borderColor: C.border,
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = C.primary;
-                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    background: C.bg,
-                    borderRadius: radius.md,
-                    fontSize: 14,
-                    color: C.dark,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <FiUser size={16} color={C.muted} />
-                  {formData.name || t("profile.noData")}
-                </div>
-              )}
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: 4,
-                  fontWeight: 600,
-                  fontSize: 13,
-                  color: C.dark,
-                }}
-              >
-                {t("profile.email")} *
-              </label>
-              {isEditing ? (
-                <input
-                  type="email"
-                  required
-                  value={formData.email}
-                  onChange={(e) => handleFormChange("email", e.target.value)}
-                  style={{
-                    ...inp,
-                    borderColor: C.border,
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = C.primary;
-                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    background: C.bg,
-                    borderRadius: radius.md,
-                    fontSize: 14,
-                    color: C.dark,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <FiMail size={16} color={C.muted} />
-                  {formData.email || t("profile.noData")}
-                </div>
-              )}
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: 4,
-                  fontWeight: 600,
-                  fontSize: 13,
-                  color: C.dark,
-                }}
-              >
-                {t("profile.phone")}
-              </label>
-              {isEditing ? (
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleFormChange("phone", e.target.value)}
-                  style={{
-                    ...inp,
-                    borderColor: C.border,
-                  }}
-                  placeholder="+251 9XX XXX XXX"
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = C.primary;
-                    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
-                />
-              ) : (
-                <div
-                  style={{
-                    padding: "10px 14px",
-                    background: C.bg,
-                    borderRadius: radius.md,
-                    fontSize: 14,
-                    color: C.dark,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <FiPhone size={16} color={C.muted} />
-                  {formData.phone || t("profile.noData")}
-                </div>
-              )}
-            </div>
-
-            <div style={{ marginBottom: 14 }}>
-              <label
-                style={{
-                  display: "block",
-                  marginBottom: 4,
-                  fontWeight: 600,
-                  fontSize: 13,
-                  color: C.dark,
-                }}
-              >
-                {t("profile.role")}
-              </label>
-              <div
-                style={{
-                  padding: "10px 14px",
-                  background: C.bg,
-                  borderRadius: radius.md,
-                  fontSize: 14,
-                  color: C.dark,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <FiShield size={16} color={C.muted} />
-                {getUserRole()}
-              </div>
-            </div>
-          </div>
-
-          {/* Actions */}
-          {isEditing && (
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                justifyContent: "flex-end",
-                borderTop: `1px solid ${C.border}`,
-                paddingTop: 20,
-                marginTop: 8,
-              }}
-            >
-              <button
-                type="button"
-                onClick={handleCancel}
-                style={btn.secondary}
-                disabled={saving}
-              >
-                {t("profile.cancelBtn")}
-              </button>
-              <button
-                type="submit"
-                style={{
-                  ...btn.primary,
-                  opacity: saving ? 0.7 : 1,
-                  cursor: saving ? "not-allowed" : "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-                disabled={saving || uploadingPhoto}
-              >
-                {saving || uploadingPhoto ? (
-                  <>
-                    <FiLoader
-                      size={16}
-                      style={{ animation: "spin 0.8s linear infinite" }}
-                    />
-                    {uploadingPhoto
-                      ? t("profile.uploadingPhoto")
-                      : t("profile.saving")}
-                  </>
-                ) : (
-                  <>
-                    <FiSave size={16} />
-                    {t("profile.saveChanges")}
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-        </form>
-      </div>
-
+    <div className="profile-page">
       <style>{`
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulseGlow {
+          0%, 100% { box-shadow: 0 0 20px rgba(26,58,173,0.15); }
+          50% { box-shadow: 0 0 40px rgba(26,58,173,0.25); }
+        }
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+
+      <div className="profile-container">
+        {/* Header with subtle gradient */}
+        <div className="profile-header">
+          <div className="profile-header-content">
+            <div>
+              <div className="profile-breadcrumb">
+                <span className="profile-breadcrumb-item">Dashboard</span>
+                <FiChevronRight size={14} className="profile-breadcrumb-sep" />
+                <span className="profile-breadcrumb-item active">Profile</span>
+              </div>
+              <h1 className="profile-title">
+                <FiUser size={24} className="profile-title-icon" />
+                {t("profile.title") || "My Profile"}
+              </h1>
+              <p className="profile-subtitle">
+                {t("profile.subtitle") ||
+                  "Manage your personal information and preferences"}
+              </p>
+            </div>
+            <div className="profile-header-actions">
+              {!isEditing ? (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="profile-btn profile-btn-primary"
+                >
+                  <FiEdit2 size={16} />
+                  {t("profile.editProfileBtn") || "Edit Profile"}
+                </button>
+              ) : (
+                <div className="profile-header-actions-edit">
+                  <span className="profile-unsaved-pill">
+                    <FiZap size={12} /> Editing
+                  </span>
+                  <button
+                    onClick={handleCancel}
+                    className="profile-btn profile-btn-quiet"
+                    disabled={saving}
+                  >
+                    <FiX size={16} />
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    className="profile-btn profile-btn-primary"
+                    disabled={saving || uploadingPhoto}
+                  >
+                    {saving || uploadingPhoto ? (
+                      <>
+                        <FiLoader size={16} className="profile-spin" />
+                        {uploadingPhoto
+                          ? t("profile.uploadingPhoto") || "Uploading..."
+                          : t("profile.saving") || "Saving..."}
+                      </>
+                    ) : (
+                      <>
+                        <FiSave size={16} />
+                        {t("profile.saveChanges") || "Save Changes"}
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Main Layout */}
+        <div className="profile-body">
+          <div className="profile-layout">
+            {/* Sidebar - Profile Card */}
+            <aside className="profile-sidebar">
+              <div className="profile-card profile-card-profile">
+                {/* Avatar Section */}
+                <div className="profile-avatar-section">
+                  <div className="profile-avatar-wrapper">
+                    {photoPreview ? (
+                      <img
+                        src={photoPreview}
+                        alt={t("profile.title") || "Profile"}
+                        className="profile-avatar-img"
+                      />
+                    ) : (
+                      <div
+                        className="profile-avatar-placeholder"
+                        style={{
+                          background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+                        }}
+                      >
+                        {getUserInitials()}
+                      </div>
+                    )}
+                    {isEditing && (
+                      <>
+                        <label className="profile-avatar-upload">
+                          <FiCamera size={16} />
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoChange}
+                            disabled={uploadingPhoto}
+                          />
+                        </label>
+                        {uploadingPhoto && (
+                          <div className="profile-avatar-loading">
+                            <FiLoader size={24} className="profile-spin" />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {isEditing && photoPreview && (
+                    <button
+                      type="button"
+                      onClick={removePhoto}
+                      className="profile-avatar-remove"
+                    >
+                      <FiTrash2 size={12} />
+                      {t("profile.removePhoto") || "Remove"}
+                    </button>
+                  )}
+                </div>
+
+                {/* User Info */}
+                <div className="profile-user-info">
+                  <h2 className="profile-user-name">
+                    {formData.name || t("profile.noName") || "No Name"}
+                  </h2>
+                  <p className="profile-user-title">
+                    {formData.position || formData.department
+                      ? `${formData.position || ""}${formData.position && formData.department ? " · " : ""}${formData.department || ""}`
+                      : t("profile.noRole") || "No role specified"}
+                  </p>
+                  <div className="profile-user-role">
+                    <span
+                      className="profile-role-badge"
+                      style={{ background: getRoleColor() }}
+                    >
+                      <span className="profile-role-icon">{getRoleIcon()}</span>
+                      {getUserRole()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Info */}
+                <div className="profile-quick-info">
+                  <div className="profile-quick-item">
+                    <FiMail size={14} className="profile-quick-icon" />
+                    <span>
+                      {formData.email || t("profile.noEmail") || "No email"}
+                    </span>
+                  </div>
+                  {formData.phone && (
+                    <div className="profile-quick-item">
+                      <FiPhone size={14} className="profile-quick-icon" />
+                      <span>{formData.phone}</span>
+                    </div>
+                  )}
+                  {formData.location && (
+                    <div className="profile-quick-item">
+                      <FiMapPin size={14} className="profile-quick-icon" />
+                      <span>{formData.location}</span>
+                    </div>
+                  )}
+                  <div className="profile-quick-item">
+                    <FiCalendar size={14} className="profile-quick-icon" />
+                    <span>
+                      {t("profile.joined") || "Joined"}: {formatMemberSince()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Social Links */}
+                {hasSocialLinks && (
+                  <div className="profile-social-links">
+                    <span className="profile-social-label">
+                      {t("profile.connect") || "Connect"}
+                    </span>
+                    <div className="profile-social-icons">
+                      {socialLinks.map(
+                        (link) =>
+                          formData[link.key] &&
+                          formData[link.key].trim() !== "" && (
+                            <a
+                              key={link.key}
+                              href={formData[link.key]}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="profile-social-link"
+                              title={link.label}
+                            >
+                              {link.icon}
+                            </a>
+                          ),
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </aside>
+
+            {/* Main Content */}
+            <main className="profile-content">
+              {/* Navigation Tabs */}
+              <div className="profile-tabs">
+                {[
+                  {
+                    id: "overview",
+                    label: t("profile.overview") || "Overview",
+                    icon: <FiUser size={16} />,
+                  },
+                  {
+                    id: "details",
+                    label: t("profile.details") || "Details",
+                    icon: <FiSettings size={16} />,
+                  },
+                  {
+                    id: "activity",
+                    label: t("profile.activity") || "Activity",
+                    icon: <FiTrendingUp size={16} />,
+                  },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    className={`profile-tab ${activeTab === tab.id ? "active" : ""}`}
+                    onClick={() => setActiveTab(tab.id)}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content */}
+              <div className="profile-tab-content">
+                {/* Overview Tab */}
+                {activeTab === "overview" && (
+                  <>
+                    {/* Stats Grid */}
+                    <div className="profile-stats-grid">
+                      {stats.map((stat) => (
+                        <div
+                          key={stat.id}
+                          className="profile-stat-card"
+                          style={{
+                            background: stat.gradient,
+                            borderColor:
+                              hoveredStat === stat.id
+                                ? stat.color
+                                : "transparent",
+                          }}
+                          onMouseEnter={() => setHoveredStat(stat.id)}
+                          onMouseLeave={() => setHoveredStat(null)}
+                        >
+                          <div
+                            className="profile-stat-icon"
+                            style={{ color: stat.color }}
+                          >
+                            {stat.icon}
+                          </div>
+                          <div className="profile-stat-content">
+                            <div
+                              className="profile-stat-value"
+                              style={{ color: stat.color }}
+                            >
+                              {stat.value}
+                            </div>
+                            <div className="profile-stat-label">
+                              {stat.label}
+                            </div>
+                            <div className="profile-stat-subtitle">
+                              {stat.subtitle}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Bio Section */}
+                    {formData.bio && (
+                      <div className="profile-section">
+                        <h3 className="profile-section-title">
+                          <FiMessageSquare size={18} />
+                          {t("profile.about") || "About Me"}
+                        </h3>
+                        <p className="profile-section-text">{formData.bio}</p>
+                      </div>
+                    )}
+
+                    {/* Quick Actions */}
+                    <div className="profile-quick-actions">
+                      <h3 className="profile-section-title">
+                        <FiZap size={18} />
+                        {t("profile.quickActions") || "Quick Actions"}
+                      </h3>
+                      <div className="profile-actions-grid">
+                        <button
+                          className="profile-action-btn"
+                          onClick={() => (window.location.href = "/settings")}
+                        >
+                          <FiSettings size={18} />
+                          <span>
+                            {t("profile.goToSettings") || "Go to Settings"}
+                          </span>
+                          <FiChevronRight
+                            size={14}
+                            className="profile-action-arrow"
+                          />
+                        </button>
+                        <button
+                          className="profile-action-btn"
+                          onClick={() =>
+                            (window.location.href = "/change-password")
+                          }
+                        >
+                          <FiShield size={18} />
+                          <span>
+                            {t("profile.changePassword") || "Change Password"}
+                          </span>
+                          <FiChevronRight
+                            size={14}
+                            className="profile-action-arrow"
+                          />
+                        </button>
+                        <button
+                          className="profile-action-btn"
+                          onClick={() => (window.location.href = "/dashboard")}
+                        >
+                          <FiTrendingUp size={18} />
+                          <span>
+                            {t("profile.goToDashboard") || "Go to Dashboard"}
+                          </span>
+                          <FiChevronRight
+                            size={14}
+                            className="profile-action-arrow"
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* Details Tab */}
+                {activeTab === "details" && (
+                  <div className="profile-section">
+                    <h3 className="profile-section-title">
+                      <FiSettings size={18} />
+                      {t("profile.personalDetails") || "Personal Details"}
+                    </h3>
+
+                    <div className="profile-details-grid">
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiUser size={14} />
+                          {t("profile.fullName") || "Full Name"}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) =>
+                              handleFormChange("name", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={
+                              t("profile.fullNamePlaceholder") ||
+                              "Enter your full name"
+                            }
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.name || t("profile.noData") || "No data"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiMail size={14} />
+                          {t("profile.email") || "Email"}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) =>
+                              handleFormChange("email", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={
+                              t("profile.emailPlaceholder") ||
+                              "Enter your email"
+                            }
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.email || t("profile.noData") || "No data"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiPhone size={14} />
+                          {t("profile.phone") || "Phone"}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) =>
+                              handleFormChange("phone", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={
+                              t("profile.phonePlaceholder") ||
+                              "+251 9XX XXX XXX"
+                            }
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.phone || t("profile.noData") || "No data"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiBriefcase size={14} />
+                          {t("profile.position") || "Position"}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.position}
+                            onChange={(e) =>
+                              handleFormChange("position", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={
+                              t("profile.positionPlaceholder") ||
+                              "e.g., Team Leader"
+                            }
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.position ||
+                              t("profile.noData") ||
+                              "No data"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiBriefcase size={14} />
+                          {t("profile.department") || "Department"}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.department}
+                            onChange={(e) =>
+                              handleFormChange("department", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={
+                              t("profile.departmentPlaceholder") ||
+                              "e.g., IT & Systems"
+                            }
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.department ||
+                              t("profile.noData") ||
+                              "No data"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiMapPin size={14} />
+                          {t("profile.location") || "Location"}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.location}
+                            onChange={(e) =>
+                              handleFormChange("location", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={
+                              t("profile.locationPlaceholder") ||
+                              "e.g., Addis Ababa"
+                            }
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.location ||
+                              t("profile.noData") ||
+                              "No data"}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item profile-detail-full">
+                        <label className="profile-detail-label">
+                          <FiMessageSquare size={14} />
+                          {t("profile.bio") || "Bio"}
+                        </label>
+                        {isEditing ? (
+                          <textarea
+                            value={formData.bio}
+                            onChange={(e) =>
+                              handleFormChange("bio", e.target.value)
+                            }
+                            className="profile-textarea"
+                            rows={4}
+                            placeholder={
+                              t("profile.bioPlaceholder") ||
+                              "Tell us about yourself..."
+                            }
+                            maxLength={200}
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.bio || t("profile.noData") || "No data"}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Social Links */}
+                    <div className="profile-section-sub">
+                      <h4 className="profile-section-subtitle">
+                        <FiGlobe size={16} />
+                        {t("profile.socialLinks") || "Social Links"}
+                      </h4>
+                      <div className="profile-details-grid profile-social-grid">
+                        {socialLinks.map((link) => (
+                          <div key={link.key} className="profile-detail-item">
+                            <label className="profile-detail-label">
+                              {link.icon}
+                              {link.label}
+                            </label>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={formData[link.key]}
+                                onChange={(e) =>
+                                  handleFormChange(link.key, e.target.value)
+                                }
+                                className="profile-input"
+                                placeholder={`https://${link.key}.com/username`}
+                              />
+                            ) : (
+                              <span className="profile-detail-value">
+                                {formData[link.key] ? (
+                                  <a
+                                    href={formData[link.key]}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="profile-social-link-text"
+                                  >
+                                    {formData[link.key]}
+                                  </a>
+                                ) : (
+                                  t("profile.noData") || "No data"
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Activity Tab */}
+                {activeTab === "activity" && (
+                  <div className="profile-section">
+                    <h3 className="profile-section-title">
+                      <FiTrendingUp size={18} />
+                      {t("profile.recentActivity") || "Recent Activity"}
+                    </h3>
+                    <div className="profile-activity-list">
+                      <div className="profile-activity-item">
+                        <div
+                          className="profile-activity-icon"
+                          style={{ background: "#eff6ff", color: "#3b82f6" }}
+                        >
+                          <FiCheckCircle size={16} />
+                        </div>
+                        <div className="profile-activity-content">
+                          <p className="profile-activity-text">
+                            {t("profile.activityTaskCompleted") ||
+                              "Completed a task"}
+                          </p>
+                          <span className="profile-activity-time">
+                            {t("profile.justNow") || "Just now"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="profile-activity-item">
+                        <div
+                          className="profile-activity-icon"
+                          style={{ background: "#f5f3ff", color: "#8b5cf6" }}
+                        >
+                          <FiFileText size={16} />
+                        </div>
+                        <div className="profile-activity-content">
+                          <p className="profile-activity-text">
+                            {t("profile.activityReportSubmitted") ||
+                              "Submitted a daily report"}
+                          </p>
+                          <span className="profile-activity-time">
+                            {t("profile.twoHoursAgo") || "2 hours ago"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="profile-activity-item">
+                        <div
+                          className="profile-activity-icon"
+                          style={{ background: "#f0fdf4", color: "#10b981" }}
+                        >
+                          <FiUsers size={16} />
+                        </div>
+                        <div className="profile-activity-content">
+                          <p className="profile-activity-text">
+                            {t("profile.activityJoinedTeam") ||
+                              "Joined a team meeting"}
+                          </p>
+                          <span className="profile-activity-time">
+                            {t("profile.yesterday") || "Yesterday"}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="profile-activity-item">
+                        <div
+                          className="profile-activity-icon"
+                          style={{ background: "#fffbeb", color: "#f59e0b" }}
+                        >
+                          <FiStar size={16} />
+                        </div>
+                        <div className="profile-activity-content">
+                          <p className="profile-activity-text">
+                            {t("profile.activityEvaluationReceived") ||
+                              "Received evaluation feedback"}
+                          </p>
+                          <span className="profile-activity-time">
+                            {t("profile.threeDaysAgo") || "3 days ago"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
