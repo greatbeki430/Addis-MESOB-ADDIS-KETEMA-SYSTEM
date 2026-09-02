@@ -29,7 +29,6 @@ const ServicesSection = forwardRef(
       currentPage,
       totalPages,
       totalItems,
-      itemsPerPage,
       startIndex,
       endIndex,
       onPageChange,

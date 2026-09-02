@@ -23,6 +23,11 @@ export const landingTranslations = {
       // Departments Marquee
       deptsEyebrow: "One login, every department",
 
+      // ✅ Hero Feature Pills (NEW)
+      serviceManagement: "Service Management",
+      evaluationReporting: "Evaluation & Reporting",
+      secureReliable: "Secure & Reliable",
+
       // Features Section
       featuresEyebrow: "What's inside the basket",
       featuresTitle: "Everything your organization needs, in one place",
@@ -127,7 +132,7 @@ export const landingTranslations = {
       noServicesFound: "No services found matching your criteria",
       servicesLoadError: "Failed to load services. Please try again.",
 
-      // ✅ Vision & Mission Section (Fixed - no duplicate keys)
+      // ✅ Vision & Mission Section
       visionEyebrow: "🌟 Our Guiding Star",
       visionTitle: "The Vision & Mission of Addis MESOB",
       visionSubtitle:
@@ -161,6 +166,12 @@ export const landingTranslations = {
       statLanguages: "ቋንቋዎች",
       statAI: "በAI የተደገፈ",
       deptsEyebrow: "አንድ መግቢያ፣ ሁሉም ክፍል",
+
+      // ✅ Hero Feature Pills (NEW)
+      serviceManagement: "የአገልግሎት አስተዳደር",
+      evaluationReporting: "ግምገማ እና ሪፖርት ማዘጋጀት",
+      secureReliable: "ደህንነቱ የተጠበቀ እና አስተማማኝ",
+
       featuresEyebrow: "በመሶቡ ውስጥ ያለው",
       featuresTitle: "ድርጅትዎ የሚያስፈልገው ሁሉ በአንድ ቦታ",
       featuresSub:
@@ -271,6 +282,12 @@ export const landingTranslations = {
       statLanguages: "Afaanota",
       statAI: "AI-n Deeggarame",
       deptsEyebrow: "Seensa Tokko, Kutaa Hunda",
+
+      // ✅ Hero Feature Pills (NEW)
+      serviceManagement: "Bulchiinsa Tajaajilaa",
+      evaluationReporting: "Madaallii fi Gabaasa",
+      secureReliable: "Nageenya qabu fi Amantamaa",
+
       featuresEyebrow: "Wanti Guuboo Keessa Jiru",
       featuresTitle: "Wanti Dhaabbileen Keessan Barbaadu Hundi Bakka Tokkotti",
       featuresSub:
