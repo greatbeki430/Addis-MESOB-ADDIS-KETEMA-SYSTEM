@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { feedAPI } from "../services/api";
 import { useToast } from "../hooks/useToast";
+import { useAuth } from "../hooks/useAuth";
 import { C } from "../styles/theme";
 import {
   FiFileText,
@@ -9,9 +10,12 @@ import {
   FiClock,
   FiLoader,
   FiRefreshCw,
+  FiLock,
 } from "react-icons/fi";
+import { canComment, canReact } from "../utils/roles";
 
 const UnifiedFeed = ({ t, isMobile, teamId, initialFilter = "all" }) => {
+  const { user } = useAuth();
   const { showToast } = useToast();
   const [feedItems, setFeedItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,6 +27,9 @@ const UnifiedFeed = ({ t, isMobile, teamId, initialFilter = "all" }) => {
   const loadMoreRef = useRef(null);
   const isMountedRef = useRef(true);
   const loadTriggeredRef = useRef(false);
+
+  // Get user's team for permission checks
+  // const userTeamId = getUserTeamId(user);
 
   const td = useCallback(
     (key, fallback = "") =>
@@ -85,7 +92,7 @@ const UnifiedFeed = ({ t, isMobile, teamId, initialFilter = "all" }) => {
     [filterType, teamId, limit, page, showToast, td],
   );
 
-  // Initial load - Use setTimeout to avoid setState warning
+  // Initial load
   useEffect(() => {
     isMountedRef.current = true;
 
@@ -102,7 +109,7 @@ const UnifiedFeed = ({ t, isMobile, teamId, initialFilter = "all" }) => {
     };
   }, [loadFeed]);
 
-  // Intersection observer for infinite scroll - Fixed dependency issue
+  // Intersection observer for infinite scroll
   useEffect(() => {
     if (!loadMoreRef.current || loading || !hasMore) return;
 
@@ -129,7 +136,6 @@ const UnifiedFeed = ({ t, isMobile, teamId, initialFilter = "all" }) => {
       }
       observer.disconnect();
     };
-    // ✅ Fixed: Removed loadMoreRef.current from dependencies
   }, [hasMore, loading, loadFeed]);
 
   // Handle refresh
@@ -174,12 +180,24 @@ const UnifiedFeed = ({ t, isMobile, teamId, initialFilter = "all" }) => {
     return "Unknown User";
   };
 
+  // Check if user can interact with an item
+  const canInteractWithItem = (item) => {
+    // For daily reports, use the report object
+    if (item.type === "daily_report") {
+      const report = { _id: item.id, team: item.team };
+      return canComment(user, report) && canReact(user, report);
+    }
+    // For forum reports, allow interaction if user is authenticated
+    return !!user;
+  };
+
   // Render feed item
   const renderFeedItem = (item) => {
     const isDaily = item.type === "daily_report";
     const Icon = isDaily ? FiFileText : FiMessageSquare;
     const color = isDaily ? C.primary : "#8B5CF6";
     const bgColor = isDaily ? `${C.primary}15` : "#8B5CF615";
+    const canInteract = canInteractWithItem(item);
 
     return (
       <div
@@ -256,18 +274,23 @@ const UnifiedFeed = ({ t, isMobile, teamId, initialFilter = "all" }) => {
               </div>
             </div>
           </div>
-          <span
-            style={{
-              fontSize: 10,
-              padding: "2px 10px",
-              borderRadius: "99px",
-              background: bgColor,
-              color: color,
-              fontWeight: 600,
-            }}
-          >
-            {isDaily ? td("daily", "Daily") : td("forum", "Forum")}
-          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {!canInteract && (
+              <FiLock size={12} color={C.muted} style={{ opacity: 0.5 }} />
+            )}
+            <span
+              style={{
+                fontSize: 10,
+                padding: "2px 10px",
+                borderRadius: "99px",
+                background: bgColor,
+                color: color,
+                fontWeight: 600,
+              }}
+            >
+              {isDaily ? td("daily", "Daily") : td("forum", "Forum")}
+            </span>
+          </div>
         </div>
 
         {/* Content */}

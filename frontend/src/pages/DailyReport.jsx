@@ -1,5 +1,5 @@
 // frontend/src/pages/DailyReport.jsx
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { btn, card, C, F } from "../styles/theme";
 import Field from "../components/ui/Field";
 import { dailyReportAPI, serviceAPI } from "../services/api";
@@ -9,6 +9,12 @@ import { generateDailyReportPDF } from "../utils/pdf/reports/dailyReport";
 import DailyReportFeed from "../components/DailyReportFeed";
 import { AISummary, AIReportAssistant } from "../components/ai";
 import { aiAPI } from "../services/api";
+import {
+  canEditReport,
+  canDeleteReport,
+  canExportPDF,
+  getUserTeamId,
+} from "../utils/roles";
 import {
   FiCalendar,
   FiList,
@@ -23,6 +29,7 @@ import {
   FiTrash2,
   FiEye,
   FiUsers,
+  FiLock,
 } from "react-icons/fi";
 
 export default function DailyReport({ t, lang }) {
@@ -57,9 +64,12 @@ export default function DailyReport({ t, lang }) {
 
   // ✅ Refs for tracking state
   const historyLoadedRef = useRef(false);
-  const loadingRef = useRef(false); // ✅ Track loading state to prevent duplicates
+  const loadingRef = useRef(false);
 
-  // Handle resize
+  // ─── Get user's team ID once and memoize it ──────────────────────────────────
+  const userTeamId = useMemo(() => getUserTeamId(user), [user]);
+
+  // ─── Handle resize ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", handleResize);
@@ -119,7 +129,6 @@ export default function DailyReport({ t, lang }) {
         const response = await dailyReportAPI.getMine(date);
         const report = response.data?.data;
 
-        // ✅ Handle null response gracefully
         if (report && report.entries?.length > 0) {
           setRows(report.entries);
           setSummary(report.summary || "");
@@ -132,7 +141,6 @@ export default function DailyReport({ t, lang }) {
           setSavedReportId(null);
         }
       } catch (error) {
-        // ✅ Handle any error gracefully (including 404)
         console.error("Failed to load daily report:", error);
         setRows([{ dept: "", service: "", male: 0, female: 0, total: 0 }]);
         setSummary("");
@@ -147,7 +155,6 @@ export default function DailyReport({ t, lang }) {
 
   // ─── Load history for current user ──────────────────────────────────────────
   const loadHistory = useCallback(async () => {
-    // Prevent multiple simultaneous loads using ref
     if (loadingRef.current) return;
 
     try {
@@ -155,30 +162,20 @@ export default function DailyReport({ t, lang }) {
       setHistoryLoading(true);
       const response = await dailyReportAPI.getUserHistory();
 
-      // ✅ Fix: Handle different response structures
       let historyData = [];
 
-      // Check if response.data exists
       if (response && response.data) {
-        // If response.data is an array, use it directly
         if (Array.isArray(response.data)) {
           historyData = response.data;
-        }
-        // If response.data has a data property that is an array (nested response)
-        else if (response.data.data && Array.isArray(response.data.data)) {
+        } else if (response.data.data && Array.isArray(response.data.data)) {
           historyData = response.data.data;
-        }
-        // If response.data.data has a data property that is an array (deeply nested)
-        else if (
+        } else if (
           response.data.data &&
           response.data.data.data &&
           Array.isArray(response.data.data.data)
         ) {
           historyData = response.data.data.data;
-        }
-        // Fallback: try to get array from any property
-        else {
-          // Look for any property that is an array
+        } else {
           let found = false;
           for (const key in response.data) {
             if (Array.isArray(response.data[key])) {
@@ -187,17 +184,14 @@ export default function DailyReport({ t, lang }) {
               break;
             }
           }
-          // If no array found, try response itself if it's an array
           if (!found && Array.isArray(response)) {
             historyData = response;
           }
         }
       } else if (Array.isArray(response)) {
-        // If response itself is an array
         historyData = response;
       }
 
-      // Ensure we have an array
       setHistory(Array.isArray(historyData) ? historyData : []);
       historyLoadedRef.current = true;
     } catch (error) {
@@ -207,12 +201,12 @@ export default function DailyReport({ t, lang }) {
         "error",
       );
       historyLoadedRef.current = true;
-      setHistory([]); // ✅ Set to empty array on error
+      setHistory([]);
     } finally {
       setHistoryLoading(false);
       loadingRef.current = false;
     }
-  }, [td, showToast]); // ✅ Only depend on td and showToast
+  }, [td, showToast]);
 
   // ─── Auto-load history when the History tab becomes active ─────────────────
   useEffect(() => {
@@ -229,7 +223,6 @@ export default function DailyReport({ t, lang }) {
     return { total, male, female };
   };
 
-  // ✅ Calculate totals directly from rows (no effect needed)
   const totals = calculateTotals(rows);
 
   const upd = (index, field, value) => {
@@ -269,7 +262,20 @@ export default function DailyReport({ t, lang }) {
     return allServices.filter((s) => s.dept === deptKey);
   };
 
+  // ─── Check if user can edit current report ─────────────────────────────────
+  const canEditCurrent = useMemo(() => {
+    if (!savedReportId) return true; // New reports can be edited
+    return canEditReport(user, { _id: savedReportId, team: userTeamId });
+  }, [savedReportId, userTeamId, user]);
+
+  const isReadOnly = !canEditCurrent && !!savedReportId;
+
   const saveReport = async () => {
+    if (!canEditCurrent && savedReportId) {
+      showToast("You don't have permission to edit this report", "warning");
+      return;
+    }
+
     try {
       setSaving(true);
       const entries = rows.filter((r) => r.dept || r.service);
@@ -302,9 +308,8 @@ export default function DailyReport({ t, lang }) {
       });
       setSavedReportId(response?.data?._id || null);
       showToast(td("savedSuccess", "✅ Report saved successfully!"), "success");
-      // Refresh history if it's open
       if (activeTab === "history") {
-        historyLoadedRef.current = false; // ✅ Reset flag to force reload
+        historyLoadedRef.current = false;
         loadHistory();
       }
     } catch (error) {
@@ -325,6 +330,12 @@ export default function DailyReport({ t, lang }) {
       showToast(td("saveFirst", "Please save your report first"), "warning");
       return;
     }
+
+    if (!canEditCurrent) {
+      showToast("You don't have permission to submit this report", "warning");
+      return;
+    }
+
     try {
       setSaving(true);
       await dailyReportAPI.update(savedReportId, { status: "submitted" });
@@ -377,6 +388,12 @@ export default function DailyReport({ t, lang }) {
 
   // ─── Delete a report from history ───────────────────────────────────────────
   const deleteReport = async (id) => {
+    // Check permission
+    if (!canDeleteReport(user, { _id: id, team: userTeamId })) {
+      showToast("You don't have permission to delete this report", "warning");
+      return;
+    }
+
     if (
       !confirm(
         td("confirmDelete", "Are you sure you want to delete this report?"),
@@ -391,7 +408,7 @@ export default function DailyReport({ t, lang }) {
         td("deleteSuccess", "✅ Report deleted successfully!"),
         "success",
       );
-      historyLoadedRef.current = false; // ✅ Reset flag to force reload
+      historyLoadedRef.current = false;
       await loadHistory();
     } catch (error) {
       console.error("Failed to delete report:", error);
@@ -411,7 +428,6 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
-      // ✅ Get user info with professional fallback
       const userName =
         user?.fullName ||
         user?.displayName ||
@@ -419,14 +435,12 @@ export default function DailyReport({ t, lang }) {
         user?.username ||
         "Unknown User";
 
-      // ✅ Department/Team - NO role, professional default
       const userDepartment =
         user?.team?.department ||
         user?.team?.name ||
         user?.department ||
         "A-MESOB Staff";
 
-      // ✅ Get branch/location
       const userBranch = user?.branch || "Addis Ketema";
 
       await generateDailyReportPDF(exportData, report.date, t, {
@@ -459,7 +473,6 @@ export default function DailyReport({ t, lang }) {
   };
 
   // ─── Main Export PDF ────────────────────────────────────────────────────────
-
   const exportPDF = async () => {
     try {
       setExporting(true);
@@ -471,7 +484,6 @@ export default function DailyReport({ t, lang }) {
         return;
       }
 
-      // ✅ Get user name
       const userName =
         user?.fullName ||
         user?.displayName ||
@@ -479,43 +491,27 @@ export default function DailyReport({ t, lang }) {
         user?.username ||
         "Unknown User";
 
-      // ✅ Get department from team (NOT from user directly)
-      const userDepartment =
-        user?.team?.department || // Department from team
-        user?.team?.name || // Team name as fallback
-        "";
+      const userDepartment = user?.team?.department || user?.team?.name || "";
 
-      // ✅ Get position from user
       const userPosition = user?.position || "";
 
-      // ✅ Get branch
       const userBranch = user?.branch || "Addis Ketema";
 
-      // ✅ Build the parts array - Department and Position together
       const parts = [];
 
-      // Add department if exists
       if (userDepartment && userDepartment !== "") {
         parts.push(userDepartment);
       }
 
-      // Add position if exists
       if (userPosition && userPosition !== "") {
         parts.push(userPosition);
       }
 
-      // Add branch if exists
       if (userBranch && userBranch !== "") {
         parts.push(userBranch);
       }
 
-      // If no department, position, or branch - show nothing
       const displayParts = parts.length > 0 ? `(${parts.join(" - ")})` : "";
-
-      console.log("👤 PDF prepared by:", userName);
-      console.log("🏢 Department (from team):", userDepartment);
-      console.log("💼 Position:", userPosition);
-      console.log("📍 Branch:", userBranch);
 
       await generateDailyReportPDF(exportData, date, t, {
         language: pdfLanguage,
@@ -627,6 +623,16 @@ export default function DailyReport({ t, lang }) {
               )
             : "N/A";
 
+          // Permission checks for each history item
+          const canDeleteThis = canDeleteReport(user, {
+            _id: report._id,
+            team: userTeamId,
+          });
+          const canExportThis = canExportPDF(user, {
+            _id: report._id,
+            team: userTeamId,
+          });
+
           return (
             <div
               key={report._id}
@@ -720,7 +726,7 @@ export default function DailyReport({ t, lang }) {
                 </div>
               </div>
 
-              {/* Actions */}
+              {/* Actions - Conditionally rendered based on permissions */}
               <div
                 style={{
                   display: "flex",
@@ -755,68 +761,72 @@ export default function DailyReport({ t, lang }) {
                   <FiEye size={14} />
                   {!isMobile && td("load", "Load")}
                 </button>
-                <button
-                  onClick={() => exportHistoryPDF(report)}
-                  style={{
-                    background: "#DC2626",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "6px",
-                    padding: isMobile ? "6px 10px" : "6px 12px",
-                    fontSize: isMobile ? "11px" : "12px",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    transition: "all 0.2s",
-                  }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "#B91C1C")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "#DC2626")
-                  }
-                >
-                  <FiDownload size={14} />
-                  {!isMobile && td("export", "Export")}
-                </button>
-                <button
-                  onClick={() => deleteReport(report._id)}
-                  disabled={deletingId === report._id}
-                  style={{
-                    background: "#EF4444",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: "6px",
-                    padding: isMobile ? "6px 10px" : "6px 12px",
-                    fontSize: isMobile ? "11px" : "12px",
-                    cursor:
-                      deletingId === report._id ? "not-allowed" : "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                    transition: "all 0.2s",
-                    opacity: deletingId === report._id ? 0.6 : 1,
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!deletingId)
-                      e.currentTarget.style.background = "#DC2626";
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!deletingId)
-                      e.currentTarget.style.background = "#EF4444";
-                  }}
-                >
-                  {deletingId === report._id ? (
-                    <FiLoader
-                      size={14}
-                      style={{ animation: "spin 1s linear infinite" }}
-                    />
-                  ) : (
-                    <FiTrash2 size={14} />
-                  )}
-                  {!isMobile && td("delete", "Delete")}
-                </button>
+                {canExportThis && (
+                  <button
+                    onClick={() => exportHistoryPDF(report)}
+                    style={{
+                      background: "#DC2626",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: isMobile ? "6px 10px" : "6px 12px",
+                      fontSize: isMobile ? "11px" : "12px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      transition: "all 0.2s",
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.background = "#B91C1C")
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.background = "#DC2626")
+                    }
+                  >
+                    <FiDownload size={14} />
+                    {!isMobile && td("export", "Export")}
+                  </button>
+                )}
+                {canDeleteThis && (
+                  <button
+                    onClick={() => deleteReport(report._id)}
+                    disabled={deletingId === report._id}
+                    style={{
+                      background: "#EF4444",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "6px",
+                      padding: isMobile ? "6px 10px" : "6px 12px",
+                      fontSize: isMobile ? "11px" : "12px",
+                      cursor:
+                        deletingId === report._id ? "not-allowed" : "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      transition: "all 0.2s",
+                      opacity: deletingId === report._id ? 0.6 : 1,
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!deletingId)
+                        e.currentTarget.style.background = "#DC2626";
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!deletingId)
+                        e.currentTarget.style.background = "#EF4444";
+                    }}
+                  >
+                    {deletingId === report._id ? (
+                      <FiLoader
+                        size={14}
+                        style={{ animation: "spin 1s linear infinite" }}
+                      />
+                    ) : (
+                      <FiTrash2 size={14} />
+                    )}
+                    {!isMobile && td("delete", "Delete")}
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -887,20 +897,46 @@ export default function DailyReport({ t, lang }) {
             </p>
           </div>
         </div>
-        <span
+        <div
           style={{
-            background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-            color: "#fff",
-            padding: "clamp(4px, 1.5vw, 6px) clamp(12px, 3vw, 18px)",
-            borderRadius: 20,
-            fontSize: "clamp(11px, 3vw, 13px)",
-            fontWeight: 700,
-            whiteSpace: "nowrap",
-            boxShadow: `0 4px 15px ${C.primary}44`,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            flexWrap: "wrap",
           }}
         >
-          {t?.("year") || "2018 E.C."}
-        </span>
+          {isReadOnly && (
+            <span
+              style={{
+                background: "#FEF3C7",
+                color: "#92400E",
+                padding: "2px 12px",
+                borderRadius: 20,
+                fontSize: "10px",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <FiLock size={12} /> Read-Only
+            </span>
+          )}
+          <span
+            style={{
+              background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+              color: "#fff",
+              padding: "clamp(4px, 1.5vw, 6px) clamp(12px, 3vw, 18px)",
+              borderRadius: 20,
+              fontSize: "clamp(11px, 3vw, 13px)",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              boxShadow: `0 4px 15px ${C.primary}44`,
+            }}
+          >
+            {t?.("year") || "2018 E.C."}
+          </span>
+        </div>
       </div>
 
       {/* ✅ Tabs */}
@@ -917,7 +953,7 @@ export default function DailyReport({ t, lang }) {
         <button
           onClick={() => {
             setActiveTab("new");
-            historyLoadedRef.current = false; // ✅ Reset flag when switching tabs
+            historyLoadedRef.current = false;
           }}
           style={{
             flex: 1,
@@ -1027,12 +1063,11 @@ export default function DailyReport({ t, lang }) {
               value={date}
               onChange={setDate}
               type="date"
+              disabled={isReadOnly}
             />
           </div>
 
-          {/* ✅ Daily reflection - this is what teammates actually read and
-              react to in the Team Feed; the service table alone is just
-              numbers. */}
+          {/* ✅ Daily reflection */}
           <div style={{ ...card, marginBottom: "clamp(16px, 4vw, 20px)" }}>
             <label
               style={{
@@ -1044,6 +1079,14 @@ export default function DailyReport({ t, lang }) {
               }}
             >
               {td("dailySummary", "How did today go? (visible to your team)")}
+              {isReadOnly && (
+                <span
+                  style={{ fontSize: "11px", color: "#ef4444", marginLeft: 8 }}
+                >
+                  <FiLock size={12} style={{ marginRight: 4 }} />
+                  Read-only
+                </span>
+              )}
             </label>
             <textarea
               value={summary}
@@ -1054,14 +1097,18 @@ export default function DailyReport({ t, lang }) {
               )}
               rows={3}
               maxLength={3000}
+              disabled={isReadOnly}
               style={{
                 width: "100%",
                 padding: "10px 12px",
                 borderRadius: 8,
-                border: "1px solid #E2E8F0",
+                border: `1px solid ${isReadOnly ? "#e5e7eb" : "#E2E8F0"}`,
                 fontSize: 13.5,
                 fontFamily: F.sans,
                 resize: "vertical",
+                background: isReadOnly ? "#f3f4f6" : "white",
+                cursor: isReadOnly ? "not-allowed" : "text",
+                opacity: isReadOnly ? 0.7 : 1,
               }}
             />
           </div>
@@ -1102,21 +1149,35 @@ export default function DailyReport({ t, lang }) {
                 >
                   ({rows.length} {tcm("records", "records")})
                 </span>
+                {isReadOnly && (
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      color: "#ef4444",
+                      fontWeight: 400,
+                      marginLeft: 8,
+                    }}
+                  >
+                    🔒 Read-only
+                  </span>
+                )}
               </h3>
-              <button
-                onClick={addRow}
-                style={{
-                  ...btn.secondary,
-                  padding: "clamp(6px, 1.5vw, 8px) clamp(12px, 3vw, 18px)",
-                  fontSize: "clamp(12px, 3vw, 13px)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <FiPlus size={14} />
-                {td("addRow", "Add Row")}
-              </button>
+              {!isReadOnly && (
+                <button
+                  onClick={addRow}
+                  style={{
+                    ...btn.secondary,
+                    padding: "clamp(6px, 1.5vw, 8px) clamp(12px, 3vw, 18px)",
+                    fontSize: "clamp(12px, 3vw, 13px)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <FiPlus size={14} />
+                  {td("addRow", "Add Row")}
+                </button>
+              )}
             </div>
 
             {loading ? (
@@ -1199,10 +1260,17 @@ export default function DailyReport({ t, lang }) {
                                   width: "clamp(120px, 15vw, 150px)",
                                   borderColor:
                                     hoveredRow === i ? C.primary : C.border,
-                                  cursor: "pointer",
+                                  cursor: isReadOnly
+                                    ? "not-allowed"
+                                    : "pointer",
+                                  background: isReadOnly
+                                    ? "#f3f4f6"
+                                    : "#fafffe",
+                                  opacity: isReadOnly ? 0.7 : 1,
                                 }}
                                 value={r.dept || ""}
                                 onChange={(e) => {
+                                  if (isReadOnly) return;
                                   setRows((prev) => {
                                     const next = [...prev];
                                     next[i] = {
@@ -1213,6 +1281,7 @@ export default function DailyReport({ t, lang }) {
                                     return next;
                                   });
                                 }}
+                                disabled={isReadOnly}
                               >
                                 <option value="">
                                   {td("selectDept", "Select Dept")}
@@ -1232,12 +1301,20 @@ export default function DailyReport({ t, lang }) {
                                   width: "clamp(130px, 20vw, 180px)",
                                   borderColor:
                                     hoveredRow === i ? C.primary : C.border,
-                                  cursor: "pointer",
+                                  cursor: isReadOnly
+                                    ? "not-allowed"
+                                    : "pointer",
+                                  background: isReadOnly
+                                    ? "#f3f4f6"
+                                    : "#fafffe",
+                                  opacity: isReadOnly ? 0.7 : 1,
                                 }}
                                 value={r.service || ""}
-                                onChange={(e) =>
-                                  upd(i, "service", e.target.value)
-                                }
+                                onChange={(e) => {
+                                  if (isReadOnly) return;
+                                  upd(i, "service", e.target.value);
+                                }}
+                                disabled={isReadOnly}
                               >
                                 <option value="">
                                   {td("selectService", "Select Service")}
@@ -1278,13 +1355,20 @@ export default function DailyReport({ t, lang }) {
                                   minHeight: "32px",
                                   borderColor:
                                     hoveredRow === i ? C.primary : C.border,
+                                  background: isReadOnly
+                                    ? "#f3f4f6"
+                                    : "#fafffe",
+                                  opacity: isReadOnly ? 0.7 : 1,
+                                  cursor: isReadOnly ? "not-allowed" : "text",
                                 }}
                                 value={r.male || 0}
-                                onChange={(e) =>
-                                  upd(i, "male", Number(e.target.value) || 0)
-                                }
+                                onChange={(e) => {
+                                  if (isReadOnly) return;
+                                  upd(i, "male", Number(e.target.value) || 0);
+                                }}
                                 inputMode="numeric"
                                 min="0"
+                                disabled={isReadOnly}
                               />
                             </td>
 
@@ -1298,13 +1382,20 @@ export default function DailyReport({ t, lang }) {
                                   minHeight: "32px",
                                   borderColor:
                                     hoveredRow === i ? C.primary : C.border,
+                                  background: isReadOnly
+                                    ? "#f3f4f6"
+                                    : "#fafffe",
+                                  opacity: isReadOnly ? 0.7 : 1,
+                                  cursor: isReadOnly ? "not-allowed" : "text",
                                 }}
                                 value={r.female || 0}
-                                onChange={(e) =>
-                                  upd(i, "female", Number(e.target.value) || 0)
-                                }
+                                onChange={(e) => {
+                                  if (isReadOnly) return;
+                                  upd(i, "female", Number(e.target.value) || 0);
+                                }}
                                 inputMode="numeric"
                                 min="0"
+                                disabled={isReadOnly}
                               />
                             </td>
 
@@ -1321,7 +1412,7 @@ export default function DailyReport({ t, lang }) {
                             </td>
 
                             <td style={{ ...tdCell, textAlign: "center" }}>
-                              {rows.length > 1 && (
+                              {!isReadOnly && rows.length > 1 && (
                                 <button
                                   onClick={() => removeRow(i)}
                                   style={{
@@ -1354,7 +1445,7 @@ export default function DailyReport({ t, lang }) {
                         );
                       })}
 
-                      {/* Grand Total Row - Using totals variable instead of animatedTotals */}
+                      {/* Grand Total Row */}
                       <tr
                         style={{
                           background: `linear-gradient(90deg, ${C.primary}15, ${C.primary}08)`,
@@ -1437,7 +1528,7 @@ export default function DailyReport({ t, lang }) {
                   </div>
                 )}
 
-                {/* ✅ Action Buttons */}
+                {/* ✅ Action Buttons - Conditionally rendered */}
                 <div
                   style={{
                     marginTop: "clamp(16px, 3vw, 24px)",
@@ -1448,6 +1539,67 @@ export default function DailyReport({ t, lang }) {
                     padding: isMobile ? "0" : "0",
                   }}
                 >
+                  {!isReadOnly && (
+                    <button
+                      style={{
+                        background: saving ? "#94A3B8" : C.primary,
+                        color: "#fff",
+                        border: "none",
+                        padding: isMobile
+                          ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
+                          : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
+                        borderRadius: 10,
+                        fontSize: isMobile
+                          ? "clamp(12px, 3vw, 13px)"
+                          : "clamp(13px, 2.5vw, 14px)",
+                        fontWeight: 700,
+                        cursor: saving ? "not-allowed" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 8,
+                        transition: "all 0.3s ease",
+                        opacity: saving ? 0.7 : 1,
+                        boxShadow: saving
+                          ? "none"
+                          : `0 4px 15px ${C.primary}44`,
+                        flex: isMobile ? "1 1 auto" : "0 1 auto",
+                        minWidth: isMobile ? "auto" : "140px",
+                      }}
+                      onClick={saveReport}
+                      disabled={saving}
+                      onMouseEnter={(e) => {
+                        if (!saving) {
+                          e.currentTarget.style.transform = "translateY(-2px)";
+                          e.currentTarget.style.boxShadow = `0 6px 20px ${C.primary}66`;
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = "translateY(0)";
+                        e.currentTarget.style.boxShadow = saving
+                          ? "none"
+                          : `0 4px 15px ${C.primary}44`;
+                      }}
+                    >
+                      {saving ? (
+                        <>
+                          <FiLoader
+                            size={16}
+                            style={{ animation: "spin 1s linear infinite" }}
+                          />
+                          {!isMobile && tcm("saving", "Saving...")}
+                        </>
+                      ) : (
+                        <>
+                          <FiSave size={16} />
+                          {isMobile
+                            ? tcm("save", "Save")
+                            : td("save", "Save Report")}
+                        </>
+                      )}
+                    </button>
+                  )}
+
                   <button
                     style={{
                       background: exporting ? "#94A3B8" : "#DC2626",
@@ -1508,63 +1660,7 @@ export default function DailyReport({ t, lang }) {
                     )}
                   </button>
 
-                  <button
-                    style={{
-                      background: saving ? "#94A3B8" : C.primary,
-                      color: "#fff",
-                      border: "none",
-                      padding: isMobile
-                        ? "clamp(10px, 2.5vw, 12px) clamp(14px, 4vw, 18px)"
-                        : "clamp(10px, 2vw, 13px) clamp(20px, 4vw, 28px)",
-                      borderRadius: 10,
-                      fontSize: isMobile
-                        ? "clamp(12px, 3vw, 13px)"
-                        : "clamp(13px, 2.5vw, 14px)",
-                      fontWeight: 700,
-                      cursor: saving ? "not-allowed" : "pointer",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 8,
-                      transition: "all 0.3s ease",
-                      opacity: saving ? 0.7 : 1,
-                      boxShadow: saving ? "none" : `0 4px 15px ${C.primary}44`,
-                      flex: isMobile ? "1 1 auto" : "0 1 auto",
-                      minWidth: isMobile ? "auto" : "140px",
-                    }}
-                    onClick={saveReport}
-                    disabled={saving}
-                    onMouseEnter={(e) => {
-                      if (!saving) {
-                        e.currentTarget.style.transform = "translateY(-2px)";
-                        e.currentTarget.style.boxShadow = `0 6px 20px ${C.primary}66`;
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = saving
-                        ? "none"
-                        : `0 4px 15px ${C.primary}44`;
-                    }}
-                  >
-                    {saving ? (
-                      <>
-                        <FiLoader
-                          size={16}
-                          style={{ animation: "spin 1s linear infinite" }}
-                        />
-                        {!isMobile && tcm("saving", "Saving...")}
-                      </>
-                    ) : (
-                      <>
-                        <FiSave size={16} />
-                        {isMobile
-                          ? tcm("save", "Save")
-                          : td("save", "Save Report")}
-                      </>
-                    )}
-                  </button>
-                  {savedReportId && status !== "submitted" && (
+                  {!isReadOnly && savedReportId && status !== "submitted" && (
                     <button
                       style={{
                         background: saving ? "#94A3B8" : "#8B5CF6",
@@ -1728,7 +1824,7 @@ export default function DailyReport({ t, lang }) {
             </h3>
             <button
               onClick={() => {
-                historyLoadedRef.current = false; // ✅ Reset flag to force reload
+                historyLoadedRef.current = false;
                 loadHistory();
               }}
               style={{
