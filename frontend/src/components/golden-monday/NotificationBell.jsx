@@ -76,7 +76,7 @@ export default function NotificationBell() {
         setLoading(false);
       }
     },
-    [user],
+    [user, setPage],
   );
 
   // Load on mount and when user changes

@@ -4,7 +4,7 @@ import { C, F } from "../../styles/theme";
 import { useAuth } from "../../hooks/useAuth";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
-import { FiQrCode, FiCheck, FiCamera, FiRefreshCw } from "react-icons/fi";
+import { FiGrid, FiCheck, FiCamera, FiRefreshCw } from "react-icons/fi";
 
 // We'll use a simple QR code generation approach
 // For production, consider using qrcode.react or similar
@@ -98,7 +98,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           marginBottom: 16,
         }}
       >
-        <FiQrCode size={24} color={C.primary} />
+        <FiGrid size={24} color={C.primary} />
         <h4 style={{ margin: 0, fontSize: 16, color: C.dark }}>QR Check-In</h4>
         {checkedIn && (
           <span
