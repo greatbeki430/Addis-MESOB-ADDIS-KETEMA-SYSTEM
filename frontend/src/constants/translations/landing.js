@@ -126,6 +126,26 @@ export const landingTranslations = {
       loadingServices: "Loading services from database...",
       noServicesFound: "No services found matching your criteria",
       servicesLoadError: "Failed to load services. Please try again.",
+
+      // ✅ Vision & Mission Section (Fixed - no duplicate keys)
+      visionEyebrow: "🌟 Our Guiding Star",
+      visionTitle: "The Vision & Mission of Addis MESOB",
+      visionSubtitle:
+        "Building a digital future for Ethiopia, one service at a time",
+      visionText:
+        "To become Africa's premier digital government service hub by 2023, where technology empowers every citizen through seamless, accessible, and trusted government services.",
+      missionTitle: "Our Mission",
+      missionText:
+        "To revolutionize government service delivery in Addis Ababa through innovative digital solutions, ensuring every citizen experiences efficiency, transparency, and excellence in public service.",
+      pillar1Title: "Digital Excellence",
+      pillar1Text:
+        "Leveraging cutting-edge technology to transform government services",
+      pillar2Title: "Citizen First",
+      pillar2Text: "Every service designed around the needs of our citizens",
+      pillar3Title: "Innovation Hub",
+      pillar3Text: "Fostering innovation and continuous improvement",
+      pillar4Title: "Trust & Integrity",
+      pillar4Text: "Building trust through transparency and accountability",
     },
   },
   am: {
@@ -218,6 +238,24 @@ export const landingTranslations = {
       loadingServices: "አገልግሎቶችን ከውሂብ ጎታ በመጫን ላይ...",
       noServicesFound: "ከመስፈርትዎ ጋር የሚዛመዱ አገልግሎቶች አልተገኙም",
       servicesLoadError: "አገልግሎቶችን መጫን አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
+
+      // ✅ Vision & Mission Section - Amharic
+      visionEyebrow: "🌟 የእኛ መሪ ኮከብ",
+      visionTitle: "የአዲስ መሶብ ራዕይ እና ተልዕኮ",
+      visionSubtitle: "ለኢትዮጵያ ዲጂታል የወደፊት ጊዜ መገንባት፣ እያንዳንዱን አገልግሎት በአንድ ጊዜ",
+      visionText:
+        "በ2023 በአፍሪካ ለአዲስ አበባ ከተማ ቀዳሚ ዲጂታል ነዋሪዎች በቴክኖሎጂ የመንግሥት የታገዘ የአንድ ማዕከል አንልተሉት ሰጪ ዲጂታል የመንግሥት ተቋም መሆን አንልተሉት በመስጠት",
+      missionTitle: "ተልዕካችን",
+      missionText:
+        "የተገልጋዩን ዕርካታ ማሳደግ በማስቻል የአዲስ አበባ ከተማ የመንግሥት አገልግሎት አሰጣጥ በዲጂታል መፍትሄዎች አማካኝነት ማሻሻል፣ እያንዳንዱ ዜጋ ቅልጥፍና፣ ግልጽነት እና ልቀት በህዝብ አገልግሎት እንዲያገኝ ማድረግ።",
+      pillar1Title: "ዲጂታል ልቀት",
+      pillar1Text: "የመንግሥት አገልግሎቶችን ለመለወጥ ዘመናዊ ቴክኖሎጂን መጠቀም",
+      pillar2Title: "ዜጋ ቀዳሚ",
+      pillar2Text: "እያንዳንዱ አገልግሎት በዜጎቻችን ፍላጎት ዙሪያ የተቀየሰ",
+      pillar3Title: "የፈጠራ ማዕከል",
+      pillar3Text: "ፈጠራን እና ቀጣይነት ያለው መሻሻል ማበረታታት",
+      pillar4Title: "መተማመን እና ታማኝነት",
+      pillar4Text: "በግልጽነት እና በሃላፊነት መተማመንን መገንባት",
     },
   },
   om: {
@@ -314,6 +352,26 @@ export const landingTranslations = {
       noServicesFound: "Tajaajiloon fedhii keessan wajjin walsimu hin argamne",
       servicesLoadError:
         "Tajaajiloota fe'uun hin dandeenye. Maaloo irra deebi'ii yaali.",
+
+      // ✅ Vision & Mission Section - Oromo
+      visionEyebrow: "🌟 Barsiisaa Keenya",
+      visionTitle: "Mul'ata fi Ergaa Addis MESOB",
+      visionSubtitle:
+        "Fuula Dijitaalaa Itoophiyaa ijaaruu, tajaajila tokkoo tokkoo yeroo tokko",
+      visionText:
+        "Bara 2023 keessatti, Aafrikaa keessatti magaalaa Finfinneetti qindeessaa dijitaalaa caalaa ta'uu, uummanni teeknolojiidhaan tajaajila mootummaa bakka tokkoo argachuu dandeessu",
+      missionTitle: "Ergaa Keenya",
+      missionText:
+        "Tajaajila mootummaa magaalaa Finfinnee akkaataa hojiirra oolchuun, uummanni hundi olaantummaa, iftoomummaa fi gaariinsa tajaajila mootummaarra argatu mirkaneessuu",
+      pillar1Title: "Dijitaalaa Olaantummaa",
+      pillar1Text:
+        "Teeknoolojii ammayyaa fayyadamuun tajaajila mootummaa fooyyessuu",
+      pillar2Title: "Ummanni Duraa",
+      pillar2Text: "Tajaajilli hundi fedhii uumannaa irratti ijaarame",
+      pillar3Title: "Bu'uura Keessa",
+      pillar3Text: "Akkasummaa fi fooyya'insa itti fufuu jajjabeessuu",
+      pillar4Title: "Amantii fi Amantummaa",
+      pillar4Text: "Ifa ta'uu fi itti gaafatamummaan amantii ijaaruu",
     },
   },
 };

@@ -17,8 +17,7 @@ import { employeeManagementTranslations } from "./employeeManagement";
 import { documentVaultTranslations } from "./documentVault";
 import { landingTranslations } from "./landing";
 
-// ✅ CORRECTED: Import existing Golden Monday translations from the original location
-// NOT from "./goldenMonday" - that file should be deleted
+// Import Golden Monday translations from the original location
 import { goldenMondayTranslations } from "../goldenMondayTranslations";
 
 // Combine all modular translations
@@ -37,7 +36,7 @@ export const modularTranslations = {
     ...userManagementTranslations.en,
     ...employeeManagementTranslations.en,
     ...documentVaultTranslations.en,
-    ...landingTranslations.en,
+    ...landingTranslations.en, // ✅ Landing translations are included
     goldenMonday: goldenMondayTranslations.en,
   },
   am: {
@@ -54,7 +53,7 @@ export const modularTranslations = {
     ...userManagementTranslations.am,
     ...employeeManagementTranslations.am,
     ...documentVaultTranslations.am,
-    ...landingTranslations.am,
+    ...landingTranslations.am, // ✅ Landing translations are included
     goldenMonday: goldenMondayTranslations.am,
   },
   om: {
@@ -71,7 +70,7 @@ export const modularTranslations = {
     ...userManagementTranslations.om,
     ...employeeManagementTranslations.om,
     ...documentVaultTranslations.om,
-    ...landingTranslations.om,
+    ...landingTranslations.om, // ✅ Landing translations are included
     goldenMonday: goldenMondayTranslations.om,
   },
 };

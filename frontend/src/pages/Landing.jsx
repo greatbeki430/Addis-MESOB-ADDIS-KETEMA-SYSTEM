@@ -9,7 +9,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { C, F } from "../styles/theme";
 import { useLanguage } from "../hooks/useLanguage";
-import { LANGUAGES } from "../constants/translations";
+import { LANGUAGES } from "../constants/translations/index";
 import { publicAPI } from "../services/api";
 import mesobLogo from "../assets/mesoblogo.png";
 
@@ -22,6 +22,7 @@ import HowItWorks from "../components/landing/HowItWorks";
 import GoldenMondayTeaser from "../components/landing/GoldenMondayTeaser";
 import FAQSection from "../components/landing/FAQSection";
 import SiteFooter from "../components/landing/SiteFooter";
+import VisionMission from "../components/landing/VisionMission"; // ✅ Import VisionMission
 
 import {
   FiMenu,
@@ -144,13 +145,6 @@ export default function Landing() {
     return () => clearTimeout(timer);
   }, [currentPage, searchTerm, filterDept, loadServices]);
 
-  // ─── Memoized stats ────────────────────────────────────────
-  const stats = useMemo(() => {
-    const agencies = new Set((services || []).map((s) => s.dept || s.deptEn))
-      .size;
-    return { services: (services || []).length, agencies };
-  }, [services]);
-
   // ─── Departments list for marquee ──────────────────────────
   const departmentsList = useMemo(() => {
     const seen = new Set();
@@ -259,7 +253,7 @@ export default function Landing() {
     heroTitle: t("landing.heroTitle") || "Every service, in one basket.",
     heroBody:
       t("landing.heroBody") ||
-      "For generations, a mesob has meant many dishes served from one vessel...",
+      "For generations, a mesob has meant many dishes served from one vessel. Addis MESOB carries that same idea into government service — registration, evaluation, reporting, documents, and AI assistance, gathered into one digital basket for staff and citizens alike.",
     ctaPrimary: t("landing.ctaPrimary") || "Sign in to your account",
     ctaSecondary: t("landing.ctaSecondary") || "See what's inside",
     statServices: t("landing.statServices") || "Services",
@@ -272,14 +266,15 @@ export default function Landing() {
       t("landing.featuresTitle") ||
       "Everything your organization needs, in one place",
     featuresSub:
-      t("landing.featuresSub") || "Access adapts automatically to your role...",
+      t("landing.featuresSub") ||
+      "Access adapts automatically to your role — employee, team leader, admin, or super admin.",
     howEyebrow: t("landing.howEyebrow") || "How it works",
     howTitle: t("landing.howTitle") || "Three steps from login to done",
     gmEyebrow: t("landing.gmEyebrow") || "The philosophy behind it",
     gmTitle: t("landing.gmTitle") || "Built on the Golden Monday mindset",
     gmBody:
       t("landing.gmBody") ||
-      "Ethiopia's weekly Golden Monday sessions push every employee toward multiskilling...",
+      "Ethiopia's weekly Golden Monday (ወርቃማ ሰኞ) sessions push every employee toward multiskilling and peer-led learning. Addis MESOB carries that same drive for less friction into how citizens actually get things done — and the program itself now lives inside the platform for every signed-in team.",
     gmCta: t("landing.gmCta") || "Sign in to view this week's session",
     faqEyebrow: t("landing.faqEyebrow") || "Questions",
     faqTitle: t("landing.faqTitle") || "Frequently asked questions",
@@ -609,6 +604,9 @@ export default function Landing() {
       <div id="main-content">
         {/* Hero Section */}
         <HeroSection t={t} onLogin={goLogin} />
+
+        {/* ✨ Vision & Mission Section */}
+        <VisionMission t={t} language={language} />
 
         {/* Departments Marquee */}
         <DepartmentsMarquee
