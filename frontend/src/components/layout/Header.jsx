@@ -45,7 +45,7 @@ const NAV_ITEMS = [
 export default function Header({ t, lang, setLang, onAddUserClick }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeSectionState, setActiveSectionState] = useState("");
+  const [activeSection, setActiveSection] = useState("");
 
   // ── Auth ──
   const { logout, user, isAdmin, isSuperAdmin, isLeader, isEmployee } =
@@ -91,7 +91,6 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
 
   // ─── Detect if on Landing Page ───
   const isOnLanding = location.pathname === "/";
-  const activeSection = isOnLanding ? activeSectionState : "";
 
   // ─── Pending scroll target (survives the route change to "/") ───
   const pendingScrollRef = useRef(null);
@@ -107,7 +106,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
       top: offsetPosition,
       behavior: "smooth",
     });
-    setActiveSectionState(sectionId);
+    setActiveSection(sectionId);
     return true;
   };
 
@@ -181,7 +180,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
               (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
             );
           if (visible.length > 0) {
-            setActiveSectionState(visible[0].target.id);
+            setActiveSection(visible[0].target.id);
           }
         },
         { threshold: 0.15, rootMargin: "-88px 0px -60% 0px" },
@@ -197,6 +196,10 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
       if (observer) observer.disconnect();
     };
   }, [isOnLanding]);
+
+  // Do not show a landing-page highlight on other routes. Keeping this
+  // derived avoids synchronously updating state from an effect.
+  const displayedActiveSection = isOnLanding ? activeSection : "";
 
   // ─── Icons Map for Breadcrumb ──
   const icons = {
@@ -472,14 +475,14 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
                   border: "none",
                   padding: "4px 2px",
                   fontSize: "clamp(11px, 1.2vw, 13px)",
-                  fontWeight: activeSection === item.id ? 700 : 500,
-                  color: activeSection === item.id ? C.primary : C.muted,
+                  fontWeight: displayedActiveSection === item.id ? 700 : 500,
+                  color: displayedActiveSection === item.id ? C.primary : C.muted,
                   cursor: "pointer",
                   fontFamily: F.sans,
                   position: "relative",
                   transition: "all 0.2s ease",
                   borderBottom:
-                    activeSection === item.id
+                    displayedActiveSection === item.id
                       ? `2px solid ${C.primary}`
                       : "2px solid transparent",
                 }}
@@ -487,7 +490,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
                   e.currentTarget.style.color = C.primary;
                 }}
                 onMouseLeave={(e) => {
-                  if (activeSection !== item.id) {
+                  if (displayedActiveSection !== item.id) {
                     e.currentTarget.style.color = C.muted;
                   }
                 }}
