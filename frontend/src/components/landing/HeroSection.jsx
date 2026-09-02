@@ -1,5 +1,5 @@
 // src/components/landing/HeroSection.jsx
-// Stunning, premium hero section with unique visual identity
+// ✨ PREMIUM HERO SECTION - Unique, Stunning, Modern
 
 import { useState, useEffect } from "react";
 import {
@@ -11,8 +11,10 @@ import {
   FiCpu,
   FiUsers,
   FiFileText,
-  FiZap,
   FiTrendingUp,
+  FiZap,
+  FiChevronRight,
+  FiSparkles,
 } from "react-icons/fi";
 import { C, F } from "../../styles/theme";
 import mesobLogo from "../../assets/mesoblogo.png";
@@ -40,25 +42,24 @@ const HeroSection = ({ t, onLogin }) => {
         display: "flex",
         alignItems: "center",
         paddingTop: isMobile
-          ? "clamp(30px, 6vw, 50px)"
-          : "clamp(40px, 8vw, 70px)",
+          ? "clamp(20px, 5vw, 40px)"
+          : "clamp(30px, 6vw, 50px)",
         paddingBottom: isMobile
           ? "clamp(30px, 6vw, 50px)"
-          : "clamp(50px, 8vw, 80px)",
+          : "clamp(40px, 6vw, 60px)",
         paddingLeft: "clamp(16px, 5vw, 64px)",
         paddingRight: "clamp(16px, 5vw, 64px)",
         background: `
-          radial-gradient(ellipse at 15% 40%, rgba(245, 197, 24, 0.08) 0%, transparent 60%),
-          radial-gradient(ellipse at 85% 60%, rgba(26, 107, 74, 0.12) 0%, transparent 55%),
-          radial-gradient(ellipse at 50% 10%, rgba(26, 58, 173, 0.06) 0%, transparent 40%),
-          linear-gradient(155deg, #0a1f1a 0%, #0d3327 30%, #1a4a3a 65%, #0a2a1e 100%)
+          radial-gradient(ellipse at 20% 30%, rgba(245, 197, 24, 0.06) 0%, transparent 50%),
+          radial-gradient(ellipse at 80% 70%, rgba(26, 107, 74, 0.08) 0%, transparent 50%),
+          radial-gradient(ellipse at 50% 50%, rgba(26, 58, 173, 0.04) 0%, transparent 60%),
+          linear-gradient(160deg, #0a1f1a 0%, #0d3327 25%, #1a4a3a 55%, #0a2a1e 100%)
         `,
         color: "#fff",
-        borderBottom: "1px solid rgba(245, 197, 24, 0.08)",
       }}
     >
-      {/* Premium Decorative Background */}
-      <PremiumBackground />
+      {/* ✨ Animated Background */}
+      <AnimatedBackground />
 
       <div
         style={{
@@ -75,14 +76,14 @@ const HeroSection = ({ t, onLogin }) => {
       >
         {/* ─── LEFT COLUMN ─── */}
         <div style={{ order: isMobile ? 1 : 0 }}>
-          {/* Premium Badge */}
+          {/* ✨ Premium Badge */}
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: 8,
-              background: "rgba(245, 197, 24, 0.12)",
-              border: "1px solid rgba(245, 197, 24, 0.2)",
+              gap: 10,
+              background: "rgba(245, 197, 24, 0.08)",
+              border: "1px solid rgba(245, 197, 24, 0.15)",
               color: C.goldLight,
               padding: isMobile ? "6px 14px" : "8px 20px",
               borderRadius: 999,
@@ -90,125 +91,176 @@ const HeroSection = ({ t, onLogin }) => {
               fontWeight: 700,
               letterSpacing: 0.5,
               marginBottom: isMobile ? 14 : 20,
-              backdropFilter: "blur(8px)",
-              boxShadow: "0 4px 20px rgba(245, 197, 24, 0.05)",
+              backdropFilter: "blur(10px)",
+              boxShadow: "0 4px 30px rgba(245, 197, 24, 0.05)",
+              position: "relative",
             }}
           >
             <span
               style={{
-                width: 6,
-                height: 6,
+                width: 8,
+                height: 8,
                 borderRadius: "50%",
                 background: C.gold,
                 display: "inline-block",
-                animation: "pulse-dot 2s ease-in-out infinite",
+                animation: "pulse-glow 2s ease-in-out infinite",
+                boxShadow: "0 0 20px rgba(245, 197, 24, 0.3)",
               }}
             />
             {t("landing.eyebrow") || "Digital Ethiopia · Smart Services"}
+            <FiSparkles
+              size={12}
+              style={{
+                opacity: 0.5,
+                animation: "sparkle 3s ease-in-out infinite",
+              }}
+            />
           </div>
 
-          {/* Main Title with Gradient */}
+          {/* ✨ Main Title with Premium Gradient */}
           <h1
             style={{
               fontFamily: F.serif,
               fontSize: isMobile
-                ? "clamp(30px, 9vw, 40px)"
-                : "clamp(42px, 6.5vw, 62px)",
+                ? "clamp(32px, 10vw, 44px)"
+                : "clamp(44px, 7vw, 68px)",
               fontWeight: 900,
-              lineHeight: 1.05,
-              letterSpacing: "-0.02em",
+              lineHeight: 1.02,
+              letterSpacing: "-0.03em",
               margin: 0,
-              background: `linear-gradient(135deg, #ffffff 0%, ${C.goldLight} 40%, ${C.gold} 70%, #ffffff 100%)`,
+              background: `linear-gradient(135deg, #ffffff 0%, ${C.goldLight} 30%, ${C.gold} 60%, #ffffff 100%)`,
               backgroundSize: "300% 300%",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
               backgroundClip: "text",
-              animation: "shimmer-text 6s ease-in-out infinite",
+              animation: "shimmer-slow 8s ease-in-out infinite",
             }}
           >
             {t("landing.heroTitle") || "Every service, in one basket."}
           </h1>
 
-          {/* Subtitle with Enhanced Styling */}
-          <p
+          {/* ✨ Subtitle with Quote Style */}
+          <div
             style={{
-              fontSize: isMobile
-                ? "clamp(14px, 4vw, 16px)"
-                : "clamp(16px, 2.2vw, 19px)",
-              lineHeight: 1.7,
-              color: "#b8c4e8",
-              maxWidth: isMobile ? "100%" : 520,
-              marginTop: isMobile ? 14 : 20,
               position: "relative",
-              paddingLeft: isMobile ? 0 : 16,
-              borderLeft: isMobile ? "none" : `3px solid ${C.gold}55`,
+              marginTop: isMobile ? 16 : 22,
+              maxWidth: isMobile ? "100%" : 540,
             }}
           >
-            {t("landing.heroBody") ||
-              "Addis MESOB unifies government services — registration, evaluation, reporting, documents, and AI — into one seamless digital basket for everyone."}
-          </p>
+            <div
+              style={{
+                position: "absolute",
+                left: -8,
+                top: -10,
+                fontSize: 48,
+                color: C.gold,
+                opacity: 0.15,
+                fontFamily: F.serif,
+                lineHeight: 1,
+              }}
+            >
+              "
+            </div>
+            <p
+              style={{
+                fontSize: isMobile
+                  ? "clamp(14px, 4vw, 16px)"
+                  : "clamp(16px, 2.2vw, 19px)",
+                lineHeight: 1.8,
+                color: "#c9d0f0",
+                paddingLeft: isMobile ? 0 : 20,
+                position: "relative",
+                fontStyle: "italic",
+              }}
+            >
+              {t("landing.heroBody") ||
+                "For generations, a mesob has meant many dishes served from one vessel. Addis MESOB carries that same idea into government service — registration, evaluation, reporting, documents, and AI assistance, gathered into one digital basket for staff and citizens alike."}
+            </p>
+          </div>
 
-          {/* Premium Feature Pills */}
+          {/* ✨ Premium Feature Tags */}
           <div
             style={{
               display: "flex",
               flexWrap: "wrap",
-              gap: isMobile ? 8 : 10,
-              marginTop: isMobile ? 16 : 24,
+              gap: isMobile ? 8 : 12,
+              marginTop: isMobile ? 18 : 26,
             }}
           >
             {[
               {
-                icon: <FiZap size={isMobile ? 12 : 14} />,
+                icon: <FiZap size={isMobile ? 12 : 15} />,
                 label: t("landing.serviceManagement") || "Service Management",
-                color: "#f59e0b",
+                color: C.gold,
+                gradient: "linear-gradient(135deg, #f5c518, #f59e0b)",
               },
               {
-                icon: <FiTrendingUp size={isMobile ? 12 : 14} />,
+                icon: <FiTrendingUp size={isMobile ? 12 : 15} />,
                 label:
                   t("landing.evaluationReporting") || "Evaluation & Reporting",
                 color: "#34d399",
+                gradient: "linear-gradient(135deg, #34d399, #059669)",
               },
               {
-                icon: <FiShield size={isMobile ? 12 : 14} />,
+                icon: <FiShield size={isMobile ? 12 : 15} />,
                 label: t("landing.secureReliable") || "Secure & Reliable",
                 color: "#60a5fa",
+                gradient: "linear-gradient(135deg, #60a5fa, #3b82f6)",
               },
             ].map((item, i) => (
-              <span
+              <div
                 key={i}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: 5,
-                  background: `rgba(255,255,255,0.04)`,
-                  border: `1px solid ${item.color}33`,
-                  borderRadius: 20,
-                  padding: isMobile ? "6px 12px" : "8px 16px",
-                  fontSize: isMobile ? 10 : 12,
-                  color: item.color,
-                  fontWeight: 600,
-                  backdropFilter: "blur(4px)",
-                  transition: "all 0.3s ease",
+                  gap: 8,
+                  background: "rgba(255,255,255,0.03)",
+                  border: `1px solid rgba(255,255,255,0.06)`,
+                  borderRadius: 12,
+                  padding: isMobile ? "8px 14px" : "10px 20px",
+                  backdropFilter: "blur(8px)",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  cursor: "default",
+                  position: "relative",
+                  overflow: "hidden",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = `${item.color}15`;
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow = `0 8px 25px ${item.color}20`;
+                  e.currentTarget.style.transform = "translateY(-3px)";
+                  e.currentTarget.style.borderColor = `${item.color}44`;
+                  e.currentTarget.style.boxShadow = `0 8px 30px ${item.color}15`;
+                  e.currentTarget.style.background = `rgba(255,255,255,0.06)`;
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(255,255,255,0.04)";
                   e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)";
                   e.currentTarget.style.boxShadow = "none";
+                  e.currentTarget.style.background = "rgba(255,255,255,0.03)";
                 }}
               >
-                {item.icon}
-                {item.label}
-              </span>
+                <span
+                  style={{
+                    color: item.color,
+                    fontSize: isMobile ? 12 : 15,
+                    display: "flex",
+                    alignItems: "center",
+                  }}
+                >
+                  {item.icon}
+                </span>
+                <span
+                  style={{
+                    fontSize: isMobile ? 11 : 13,
+                    fontWeight: 600,
+                    color: "#e8ecf5",
+                  }}
+                >
+                  {item.label}
+                </span>
+              </div>
             ))}
           </div>
 
-          {/* Premium CTA Buttons */}
+          {/* ✨ Premium CTA Buttons */}
           <div
             style={{
               display: "flex",
@@ -218,6 +270,7 @@ const HeroSection = ({ t, onLogin }) => {
               width: "100%",
             }}
           >
+            {/* Primary CTA - Login Button */}
             <button
               onClick={onLogin}
               style={{
@@ -225,95 +278,128 @@ const HeroSection = ({ t, onLogin }) => {
                 alignItems: "center",
                 justifyContent: "center",
                 gap: 10,
-                background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
+                background: `linear-gradient(135deg, ${C.gold}, #f59e0b, ${C.goldLight})`,
+                backgroundSize: "200% 200%",
                 color: C.dark,
                 border: "none",
-                padding: isMobile ? "14px 28px" : "15px 32px",
-                borderRadius: 12,
+                padding: isMobile ? "14px 28px" : "16px 36px",
+                borderRadius: 14,
                 fontWeight: 800,
-                fontSize: isMobile ? 14 : 15,
+                fontSize: isMobile ? 14 : 16,
                 cursor: "pointer",
                 fontFamily: F.sans,
-                boxShadow: "0 4px 25px rgba(245, 197, 24, 0.3)",
+                boxShadow: "0 4px 30px rgba(245, 197, 24, 0.25)",
                 transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 width: isMobile ? "100%" : "auto",
                 minHeight: isMobile ? 52 : "auto",
                 position: "relative",
                 overflow: "hidden",
+                animation: "gradient-shift 4s ease-in-out infinite",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform =
-                  "translateY(-3px) scale(1.02)";
+                  "translateY(-4px) scale(1.02)";
                 e.currentTarget.style.boxShadow =
-                  "0 8px 40px rgba(245, 197, 24, 0.4)";
+                  "0 8px 50px rgba(245, 197, 24, 0.4)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0) scale(1)";
                 e.currentTarget.style.boxShadow =
-                  "0 4px 25px rgba(245, 197, 24, 0.3)";
+                  "0 4px 30px rgba(245, 197, 24, 0.25)";
               }}
             >
-              <FiLogIn size={isMobile ? 16 : 18} />
-              {t("landing.ctaPrimary") || "Sign In"}
-              <FiArrowRight
-                size={isMobile ? 14 : 16}
+              <span
                 style={{
-                  transition: "transform 0.3s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
                 }}
+              >
+                <FiLogIn size={isMobile ? 16 : 18} />
+                {t("landing.ctaPrimary") || "Sign In"}
+                <FiArrowRight
+                  size={isMobile ? 14 : 16}
+                  style={{
+                    transition: "transform 0.3s ease",
+                  }}
+                  className="arrow-icon"
+                />
+              </span>
+              <span
+                style={{
+                  position: "absolute",
+                  top: "-50%",
+                  left: "-50%",
+                  width: "200%",
+                  height: "200%",
+                  background:
+                    "radial-gradient(circle, rgba(255,255,255,0.1), transparent 60%)",
+                  opacity: 0,
+                  transition: "opacity 0.5s ease",
+                  pointerEvents: "none",
+                }}
+                className="shine-effect"
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateX(4px)";
+                  e.currentTarget.style.opacity = "1";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateX(0)";
+                  e.currentTarget.style.opacity = "0";
                 }}
               />
             </button>
+
+            {/* Secondary CTA - Explore */}
             <a
               href="#features"
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 8,
+                gap: 10,
                 color: "#fff",
                 textDecoration: "none",
                 fontWeight: 600,
-                fontSize: isMobile ? 14 : 15,
-                border: "1.5px solid rgba(255,255,255,0.15)",
-                padding: isMobile ? "14px 28px" : "15px 32px",
-                borderRadius: 12,
-                background: "rgba(255,255,255,0.05)",
+                fontSize: isMobile ? 14 : 16,
+                border: "1.5px solid rgba(255,255,255,0.12)",
+                padding: isMobile ? "14px 28px" : "16px 36px",
+                borderRadius: 14,
+                background: "rgba(255,255,255,0.03)",
                 transition: "all 0.3s ease",
                 width: isMobile ? "100%" : "auto",
                 minHeight: isMobile ? 52 : "auto",
                 textAlign: "center",
                 backdropFilter: "blur(8px)",
+                position: "relative",
+                overflow: "hidden",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
                 e.currentTarget.style.borderColor = "rgba(255,255,255,0.3)";
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 8px 30px rgba(0,0,0,0.2)";
+                e.currentTarget.style.transform = "translateY(-3px)";
+                e.currentTarget.style.boxShadow = "0 8px 40px rgba(0,0,0,0.2)";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.05)";
-                e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.12)";
                 e.currentTarget.style.transform = "translateY(0)";
                 e.currentTarget.style.boxShadow = "none";
               }}
             >
               {t("landing.ctaSecondary") || "Explore Services"}
+              <FiChevronRight size={isMobile ? 14 : 16} />
             </a>
           </div>
 
-          {/* Enhanced Stats */}
+          {/* ✨ Premium Stats with Icons */}
           <div
             style={{
-              display: "flex",
-              gap: isMobile ? 24 : 48,
-              marginTop: isMobile ? 28 : 40,
-              flexWrap: "wrap",
-              borderTop: "1px solid rgba(255,255,255,0.06)",
+              display: "grid",
+              gridTemplateColumns: isMobile
+                ? "repeat(2, 1fr)"
+                : "repeat(4, auto)",
+              gap: isMobile ? 16 : 32,
+              marginTop: isMobile ? 24 : 36,
+              borderTop: "1px solid rgba(255,255,255,0.05)",
               paddingTop: isMobile ? 16 : 24,
             }}
           >
@@ -321,22 +407,26 @@ const HeroSection = ({ t, onLogin }) => {
               {
                 value: "40+",
                 label: t("landing.statServices") || "Services",
-                icon: <FiGrid size={16} />,
+                icon: <FiGrid size={isMobile ? 14 : 18} />,
+                color: C.gold,
               },
               {
                 value: "12",
                 label: t("landing.statAgencies") || "Agencies",
-                icon: <FiUsers size={16} />,
+                icon: <FiUsers size={isMobile ? 14 : 18} />,
+                color: "#34d399",
               },
               {
                 value: "3",
                 label: t("landing.statLanguages") || "Languages",
-                icon: <FiFileText size={16} />,
+                icon: <FiFileText size={isMobile ? 14 : 18} />,
+                color: "#60a5fa",
               },
               {
                 value: "24/7",
                 label: t("landing.statAI") || "AI Support",
-                icon: <FiCpu size={16} />,
+                icon: <FiCpu size={isMobile ? 14 : 18} />,
+                color: "#a78bfa",
               },
             ].map((stat, i) => (
               <div
@@ -349,15 +439,16 @@ const HeroSection = ({ t, onLogin }) => {
               >
                 <div
                   style={{
-                    width: 36,
-                    height: 36,
+                    width: isMobile ? 32 : 38,
+                    height: isMobile ? 32 : 38,
                     borderRadius: "50%",
-                    background: "rgba(245, 197, 24, 0.08)",
-                    border: "1px solid rgba(245, 197, 24, 0.1)",
+                    background: `rgba(255,255,255,0.04)`,
+                    border: `1px solid rgba(255,255,255,0.06)`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    color: C.goldLight,
+                    color: stat.color,
+                    flexShrink: 0,
                   }}
                 >
                   {stat.icon}
@@ -366,9 +457,9 @@ const HeroSection = ({ t, onLogin }) => {
                   <div
                     style={{
                       fontFamily: F.serif,
-                      fontSize: isMobile ? 20 : 24,
+                      fontSize: isMobile ? 18 : 22,
                       fontWeight: 900,
-                      color: C.goldLight,
+                      color: "#fff",
                       lineHeight: 1.1,
                     }}
                   >
@@ -389,7 +480,7 @@ const HeroSection = ({ t, onLogin }) => {
           </div>
         </div>
 
-        {/* ─── RIGHT COLUMN - Premium Visual ─── */}
+        {/* ─── RIGHT COLUMN - Premium 3D Visual ─── */}
         {!isMobile && (
           <div
             style={{
@@ -399,7 +490,7 @@ const HeroSection = ({ t, onLogin }) => {
               order: isTablet ? 0 : 1,
             }}
           >
-            <PremiumHeroVisual isTablet={isTablet} />
+            <Premium3DVisual isTablet={isTablet} />
           </div>
         )}
       </div>
@@ -412,7 +503,7 @@ const HeroSection = ({ t, onLogin }) => {
             justifyContent: "center",
             alignItems: "center",
             marginTop: 20,
-            padding: "20px 0 10px",
+            padding: "10px 0",
             width: "100%",
           }}
         >
@@ -421,56 +512,59 @@ const HeroSection = ({ t, onLogin }) => {
       )}
 
       <style>{`
-        @keyframes float-slow {
-          0%, 100% { transform: translateY(0px) rotate(0deg); }
-          50% { transform: translateY(-16px) rotate(2deg); }
+        @keyframes pulse-glow {
+          0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 20px rgba(245, 197, 24, 0.3); }
+          50% { opacity: 0.6; transform: scale(0.8); box-shadow: 0 0 40px rgba(245, 197, 24, 0.5); }
         }
-        @keyframes pulse-ring {
-          0%, 100% { transform: scale(1); opacity: 0.3; }
-          50% { transform: scale(1.1); opacity: 0.7; }
+        @keyframes sparkle {
+          0%, 100% { opacity: 0.3; transform: rotate(0deg) scale(1); }
+          50% { opacity: 1; transform: rotate(180deg) scale(1.2); }
         }
-        @keyframes spin-slow {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes shimmer-text {
+        @keyframes shimmer-slow {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
         }
-        @keyframes pulse-dot {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.5; transform: scale(0.8); }
+        @keyframes gradient-shift {
+          0% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+          100% { background-position: 0% 50%; }
         }
-        @keyframes float-badge {
+        @keyframes float-3d {
+          0%, 100% { transform: translateY(0px) rotate(0deg); }
+          50% { transform: translateY(-20px) rotate(2deg); }
+        }
+        @keyframes orbit-reverse {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(-360deg); }
+        }
+        @keyframes pulse-ring-3d {
+          0%, 100% { transform: scale(1); opacity: 0.2; }
+          50% { transform: scale(1.1); opacity: 0.5; }
+        }
+        @keyframes float-card {
           0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-6px); }
+          50% { transform: translateY(-8px); }
         }
-        @keyframes orbit {
-          0% { transform: rotate(0deg) translateX(var(--radius)) rotate(0deg); }
-          100% { transform: rotate(360deg) translateX(var(--radius)) rotate(-360deg); }
+        @keyframes glow-pulse-slow {
+          0%, 100% { opacity: 0.15; }
+          50% { opacity: 0.4; }
         }
-        @keyframes glow-pulse {
-          0%, 100% { opacity: 0.2; }
-          50% { opacity: 0.6; }
+
+        .arrow-icon {
+          transition: transform 0.3s ease;
         }
-        @keyframes shimmer-line {
-          0% { background-position: -200% center; }
-          100% { background-position: 200% center; }
+        button:hover .arrow-icon {
+          transform: translateX(4px);
         }
-        @keyframes mobile-glow {
-          0%, 100% { transform: scale(1); opacity: 0.4; }
-          50% { transform: scale(1.08); opacity: 0.8; }
+
+        .shine-effect {
+          pointer-events: none;
         }
 
         @media (max-width: 768px) {
-          .hero-visual-container {
-            padding: 10px 0;
-          }
-        }
-        @media (max-width: 480px) {
-          .hero-stats {
-            gap: 16px !important;
+          .hero-3d-container {
+            padding: 20px 0;
           }
         }
       `}</style>
@@ -478,8 +572,8 @@ const HeroSection = ({ t, onLogin }) => {
   );
 };
 
-// ─── PREMIUM BACKGROUND ──────────────────────────────────────
-const PremiumBackground = () => {
+// ─── ANIMATED BACKGROUND ──────────────────────────────────────
+const AnimatedBackground = () => {
   return (
     <div
       style={{
@@ -490,42 +584,42 @@ const PremiumBackground = () => {
         zIndex: 1,
       }}
     >
-      {/* Gradient orbs */}
+      {/* Floating orbs */}
       <div
         style={{
           position: "absolute",
-          top: "-20%",
-          right: "-10%",
-          width: "60%",
-          height: "80%",
+          top: "10%",
+          right: "5%",
+          width: "40%",
+          height: "60%",
           background:
             "radial-gradient(ellipse, rgba(245,197,24,0.04), transparent 70%)",
           borderRadius: "50%",
-          animation: "glow-pulse 8s ease-in-out infinite",
+          animation: "glow-pulse-slow 8s ease-in-out infinite",
         }}
       />
       <div
         style={{
           position: "absolute",
-          bottom: "-30%",
-          left: "-10%",
-          width: "50%",
-          height: "70%",
+          bottom: "10%",
+          left: "5%",
+          width: "35%",
+          height: "50%",
           background:
-            "radial-gradient(ellipse, rgba(26,107,74,0.06), transparent 70%)",
+            "radial-gradient(ellipse, rgba(26,107,74,0.05), transparent 70%)",
           borderRadius: "50%",
-          animation: "glow-pulse 10s ease-in-out infinite reverse",
+          animation: "glow-pulse-slow 10s ease-in-out infinite reverse",
         }}
       />
 
       {/* Floating particles */}
-      {Array.from({ length: 20 }, (_, i) => ({
-        size: 2 + (i % 4),
-        x: 5 + ((i * 7) % 90),
-        y: 5 + ((i * 11) % 90),
-        delay: (i * 0.5) % 4,
-        duration: 8 + (i % 6),
-        opacity: 0.05 + ((i * 3) % 10) / 100,
+      {Array.from({ length: 30 }, (_, i) => ({
+        size: 1.5 + (i % 3),
+        x: 2 + ((i * 13) % 96),
+        y: 2 + ((i * 17) % 96),
+        delay: (i * 0.7) % 5,
+        duration: 10 + (i % 8),
+        opacity: 0.03 + ((i * 5) % 15) / 100,
       })).map((p, i) => (
         <div
           key={i}
@@ -537,50 +631,36 @@ const PremiumBackground = () => {
             left: `${p.x}%`,
             top: `${p.y}%`,
             background: i % 2 === 0 ? C.gold : "#fff",
-            animation: `float-slow ${p.duration}s ease-in-out ${p.delay}s infinite`,
+            animation: `float-3d ${p.duration}s ease-in-out ${p.delay}s infinite`,
             opacity: p.opacity,
           }}
         />
       ))}
 
-      {/* Animated shimmer lines */}
+      {/* Grid pattern overlay (subtle) */}
       <div
         style={{
           position: "absolute",
-          top: "15%",
-          left: "10%",
-          right: "10%",
-          height: "1px",
-          background:
-            "linear-gradient(90deg, transparent, rgba(245,197,24,0.05), transparent)",
-          backgroundSize: "200% 100%",
-          animation: "shimmer-line 6s ease-in-out infinite",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          bottom: "25%",
-          left: "15%",
-          right: "15%",
-          height: "1px",
-          background:
-            "linear-gradient(90deg, transparent, rgba(245,197,24,0.04), transparent)",
-          backgroundSize: "200% 100%",
-          animation: "shimmer-line 8s ease-in-out infinite reverse",
+          inset: 0,
+          backgroundImage: `
+            linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px)
+          `,
+          backgroundSize: "60px 60px",
+          opacity: 0.3,
         }}
       />
     </div>
   );
 };
 
-// ─── PREMIUM HERO VISUAL ──────────────────────────────────────
-const PremiumHeroVisual = ({ isTablet }) => {
+// ─── PREMIUM 3D VISUAL ────────────────────────────────────────
+const Premium3DVisual = ({ isTablet }) => {
   const iconSize = isTablet ? 14 : 18;
-  const badgeSize = isTablet ? 34 : 42;
-  const centerSize = isTablet ? 100 : 140;
+  const badgeSize = isTablet ? 36 : 44;
+  const centerSize = isTablet ? 110 : 150;
 
-  const techItems = [
+  const orbitItems = [
     {
       icon: <FiGrid size={iconSize} />,
       label: "React",
@@ -591,45 +671,46 @@ const PremiumHeroVisual = ({ isTablet }) => {
       icon: <FiCpu size={iconSize} />,
       label: "Node.js",
       color: "#68a063",
-      delay: 0.5,
+      delay: 0.6,
     },
     {
       icon: <FiFileText size={iconSize} />,
       label: "Express",
       color: "#fff",
-      delay: 1,
+      delay: 1.2,
     },
     {
       icon: <FiUsers size={iconSize} />,
       label: "MongoDB",
       color: "#4db33d",
-      delay: 1.5,
+      delay: 1.8,
     },
     {
       icon: <FiBarChart2 size={iconSize} />,
       label: "Vite",
       color: "#646cff",
-      delay: 2,
+      delay: 2.4,
     },
   ];
 
-  const serviceItems = [
+  const outerOrbitItems = [
     { icon: "🎤", label: "Presentations" },
     { icon: "📊", label: "Reports" },
     { icon: "📋", label: "Evaluation" },
     { icon: "📁", label: "Documents" },
     { icon: "🤖", label: "AI Assistant" },
+    { icon: "📈", label: "Analytics" },
   ];
 
-  const radius = isTablet ? 50 : 65;
-  const labelRadius = isTablet ? 68 : 85;
+  const radius = isTablet ? 48 : 62;
+  const outerRadius = isTablet ? 65 : 82;
 
   return (
     <div
       style={{
         position: "relative",
         width: "100%",
-        maxWidth: isTablet ? 400 : 500,
+        maxWidth: isTablet ? 420 : 520,
         aspectRatio: "1/1",
         display: "flex",
         alignItems: "center",
@@ -637,7 +718,7 @@ const PremiumHeroVisual = ({ isTablet }) => {
         margin: "0 auto",
       }}
     >
-      {/* Outer glow ring */}
+      {/* 3D Depth Layers */}
       <div
         style={{
           position: "absolute",
@@ -645,77 +726,80 @@ const PremiumHeroVisual = ({ isTablet }) => {
           height: "100%",
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(245,197,24,0.05), transparent 70%)",
-          animation: "pulse-ring 5s ease-in-out infinite",
+            "radial-gradient(circle at 30% 30%, rgba(245,197,24,0.03), transparent 60%)",
+          animation: "pulse-ring-3d 6s ease-in-out infinite",
         }}
       />
 
-      {/* Concentric decorative rings */}
+      {/* Decorative Rings */}
       <div
         style={{
           position: "absolute",
-          width: "92%",
-          height: "92%",
+          width: "94%",
+          height: "94%",
+          borderRadius: "50%",
+          border: "1px solid rgba(245,197,24,0.05)",
+          animation: "orbit-reverse 50s linear infinite",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          width: "78%",
+          height: "78%",
+          borderRadius: "50%",
+          border: "2px solid rgba(245,197,24,0.03)",
+          animation: "float-3d 8s ease-in-out infinite",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          width: "62%",
+          height: "62%",
           borderRadius: "50%",
           border: "1px solid rgba(245,197,24,0.06)",
-          borderStyle: "dashed",
-          animation: "spin-slow 40s linear infinite",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          width: "76%",
-          height: "76%",
-          borderRadius: "50%",
-          border: "2px solid rgba(245,197,24,0.04)",
-          animation: "spin-slow 30s linear infinite reverse",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          width: "60%",
-          height: "60%",
-          borderRadius: "50%",
-          border: "1px solid rgba(245,197,24,0.08)",
-          animation: "spin-slow 20s linear infinite",
+          animation: "orbit-reverse 30s linear infinite reverse",
         }}
       />
 
-      {/* Center basket / mesob */}
+      {/* Center 3D Basket */}
       <div
         style={{
           position: "relative",
           width: centerSize,
           height: centerSize,
           borderRadius: "50%",
-          background: `linear-gradient(145deg, ${C.gold}15, ${C.gold}05)`,
-          border: `2px solid ${C.gold}44`,
+          background: `linear-gradient(145deg, ${C.gold}12, ${C.gold}04)`,
+          border: `2px solid ${C.gold}33`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexDirection: "column",
           gap: 4,
-          boxShadow: `0 0 80px rgba(245,197,24,0.06), inset 0 0 60px rgba(245,197,24,0.04)`,
-          animation: "float-slow 7s ease-in-out infinite",
+          boxShadow: `
+            0 0 80px rgba(245,197,24,0.04),
+            inset 0 0 60px rgba(245,197,24,0.03)
+          `,
+          animation: "float-3d 7s ease-in-out infinite",
+          transform: "perspective(800px) rotateX(5deg)",
         }}
       >
         <img
           src={mesobLogo}
           alt="Addis MESOB"
           style={{
-            width: isTablet ? 36 : 48,
-            height: isTablet ? 36 : 48,
-            borderRadius: 12,
+            width: isTablet ? 38 : 50,
+            height: isTablet ? 38 : 50,
+            borderRadius: 14,
             objectFit: "contain",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
+            boxShadow: "0 4px 30px rgba(0,0,0,0.3)",
           }}
         />
         <span
           style={{
             fontFamily: F.serif,
-            fontSize: isTablet ? 11 : 14,
+            fontSize: isTablet ? 12 : 15,
             fontWeight: 900,
             color: C.goldLight,
             textAlign: "center",
@@ -728,18 +812,29 @@ const PremiumHeroVisual = ({ isTablet }) => {
         <span
           style={{
             fontSize: isTablet ? 7 : 9,
-            color: "rgba(255,255,255,0.3)",
+            color: "rgba(255,255,255,0.25)",
             textTransform: "uppercase",
             letterSpacing: 1.5,
           }}
         >
           One Basket
         </span>
+        {/* Inner glow */}
+        <div
+          style={{
+            position: "absolute",
+            inset: -2,
+            borderRadius: "50%",
+            background:
+              "radial-gradient(circle at 30% 30%, rgba(245,197,24,0.05), transparent 60%)",
+            pointerEvents: "none",
+          }}
+        />
       </div>
 
-      {/* Orbiting tech badges with staggered animation */}
-      {techItems.map((item, i) => {
-        const angle = (i / techItems.length) * Math.PI * 2 - Math.PI / 2;
+      {/* Orbiting Tech Items */}
+      {orbitItems.map((item, i) => {
+        const angle = (i / orbitItems.length) * Math.PI * 2 - Math.PI / 2;
         const x = 50 + Math.cos(angle) * radius;
         const y = 50 + Math.sin(angle) * radius;
 
@@ -755,7 +850,7 @@ const PremiumHeroVisual = ({ isTablet }) => {
               flexDirection: "column",
               alignItems: "center",
               gap: 2,
-              animation: `float-badge ${4 + i * 0.3}s ease-in-out ${i * 0.6}s infinite`,
+              animation: `float-card ${4 + i * 0.3}s ease-in-out ${i * 0.5}s infinite`,
             }}
           >
             <div
@@ -763,26 +858,30 @@ const PremiumHeroVisual = ({ isTablet }) => {
                 width: badgeSize,
                 height: badgeSize,
                 borderRadius: "50%",
-                background: `linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01))`,
+                background: `linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01))`,
                 border: `1px solid ${item.color}22`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: item.color,
-                backdropFilter: "blur(8px)",
+                backdropFilter: "blur(10px)",
                 fontSize: isTablet ? 12 : 16,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-                transition: "all 0.3s ease",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+                transform: "perspective(400px) rotateY(10deg)",
               }}
               onMouseEnter={(e) => {
+                e.currentTarget.style.transform =
+                  "perspective(400px) rotateY(0deg) scale(1.15)";
                 e.currentTarget.style.background = `${item.color}15`;
-                e.currentTarget.style.transform = "scale(1.15)";
-                e.currentTarget.style.boxShadow = `0 8px 30px ${item.color}20`;
+                e.currentTarget.style.boxShadow = `0 8px 40px ${item.color}20`;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = `linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01))`;
-                e.currentTarget.style.transform = "scale(1)";
-                e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.1)";
+                e.currentTarget.style.transform =
+                  "perspective(400px) rotateY(10deg) scale(1)";
+                e.currentTarget.style.background =
+                  "linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01))";
+                e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.15)";
               }}
             >
               {item.icon}
@@ -790,10 +889,10 @@ const PremiumHeroVisual = ({ isTablet }) => {
             <span
               style={{
                 fontSize: isTablet ? 6 : 8,
-                color: "rgba(255,255,255,0.35)",
+                color: "rgba(255,255,255,0.3)",
                 fontWeight: 600,
                 letterSpacing: 0.3,
-                background: "rgba(0,0,0,0.3)",
+                background: "rgba(0,0,0,0.2)",
                 padding: "2px 8px",
                 borderRadius: 4,
                 backdropFilter: "blur(4px)",
@@ -805,11 +904,11 @@ const PremiumHeroVisual = ({ isTablet }) => {
         );
       })}
 
-      {/* Orbiting service labels */}
-      {serviceItems.map((item, i) => {
-        const angle = (i / serviceItems.length) * Math.PI * 2 + Math.PI / 2;
-        const x = 50 + Math.cos(angle) * labelRadius;
-        const y = 50 + Math.sin(angle) * labelRadius;
+      {/* Outer Orbiting Service Labels */}
+      {outerOrbitItems.map((item, i) => {
+        const angle = (i / outerOrbitItems.length) * Math.PI * 2 + Math.PI / 2;
+        const x = 50 + Math.cos(angle) * outerRadius;
+        const y = 50 + Math.sin(angle) * outerRadius;
 
         return (
           <div
@@ -823,7 +922,7 @@ const PremiumHeroVisual = ({ isTablet }) => {
               flexDirection: "column",
               alignItems: "center",
               gap: 1,
-              animation: `float-badge ${5 + i * 0.4}s ease-in-out ${i * 0.7}s infinite`,
+              animation: `float-card ${5 + i * 0.4}s ease-in-out ${i * 0.6}s infinite`,
             }}
           >
             <div
@@ -832,11 +931,11 @@ const PremiumHeroVisual = ({ isTablet }) => {
                 height: isTablet ? 28 : 34,
                 borderRadius: "50%",
                 background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.05)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: isTablet ? 12 : 15,
+                fontSize: isTablet ? 12 : 14,
                 backdropFilter: "blur(4px)",
                 transition: "all 0.3s ease",
               }}
@@ -854,10 +953,10 @@ const PremiumHeroVisual = ({ isTablet }) => {
             <span
               style={{
                 fontSize: isTablet ? 6 : 7,
-                color: "rgba(255,255,255,0.25)",
+                color: "rgba(255,255,255,0.2)",
                 fontWeight: 600,
                 letterSpacing: 0.3,
-                background: "rgba(0,0,0,0.2)",
+                background: "rgba(0,0,0,0.15)",
                 padding: "2px 6px",
                 borderRadius: 3,
                 whiteSpace: "nowrap",
@@ -869,22 +968,22 @@ const PremiumHeroVisual = ({ isTablet }) => {
         );
       })}
 
-      {/* "Digital Ethiopia" label */}
+      {/* Bottom Label */}
       <div
         style={{
           position: "absolute",
-          bottom: isTablet ? 6 : 10,
+          bottom: isTablet ? 4 : 8,
           left: "50%",
           transform: "translateX(-50%)",
-          fontSize: isTablet ? 8 : 10,
+          fontSize: isTablet ? 7 : 9,
           fontWeight: 700,
-          letterSpacing: 2.5,
+          letterSpacing: 3,
           textTransform: "uppercase",
-          color: "rgba(255,255,255,0.12)",
-          background: "rgba(0,0,0,0.15)",
+          color: "rgba(255,255,255,0.08)",
+          background: "rgba(0,0,0,0.1)",
           padding: isTablet ? "4px 14px" : "6px 20px",
           borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.03)",
+          border: "1px solid rgba(255,255,255,0.02)",
           backdropFilter: "blur(4px)",
         }}
       >
@@ -901,7 +1000,7 @@ const MobilePremiumVisual = () => {
       style={{
         position: "relative",
         width: "100%",
-        maxWidth: 260,
+        maxWidth: 240,
         aspectRatio: "1/1",
         display: "flex",
         alignItems: "center",
@@ -917,8 +1016,8 @@ const MobilePremiumVisual = () => {
           height: "100%",
           borderRadius: "50%",
           background:
-            "radial-gradient(circle, rgba(245,197,24,0.06), transparent 70%)",
-          animation: "mobile-glow 4s ease-in-out infinite",
+            "radial-gradient(circle, rgba(245,197,24,0.05), transparent 70%)",
+          animation: "pulse-ring-3d 4s ease-in-out infinite",
         }}
       />
 
@@ -926,20 +1025,20 @@ const MobilePremiumVisual = () => {
       <div
         style={{
           position: "absolute",
-          width: "85%",
-          height: "85%",
+          width: "88%",
+          height: "88%",
           borderRadius: "50%",
-          border: "1px solid rgba(245,197,24,0.06)",
+          border: "1px solid rgba(245,197,24,0.04)",
           borderStyle: "dashed",
         }}
       />
       <div
         style={{
           position: "absolute",
-          width: "70%",
-          height: "70%",
+          width: "72%",
+          height: "72%",
           borderRadius: "50%",
-          border: "1px solid rgba(245,197,24,0.04)",
+          border: "1px solid rgba(245,197,24,0.03)",
         }}
       />
 
@@ -947,26 +1046,26 @@ const MobilePremiumVisual = () => {
       <div
         style={{
           position: "relative",
-          width: "45%",
-          height: "45%",
+          width: "42%",
+          height: "42%",
           borderRadius: "50%",
-          background: `linear-gradient(135deg, ${C.gold}15, ${C.gold}05)`,
-          border: `2px solid ${C.gold}33`,
+          background: `linear-gradient(135deg, ${C.gold}12, ${C.gold}04)`,
+          border: `2px solid ${C.gold}22`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexDirection: "column",
           gap: 2,
           boxShadow: `0 0 40px rgba(245,197,24,0.04)`,
-          animation: "float-slow 6s ease-in-out infinite",
+          animation: "float-3d 6s ease-in-out infinite",
         }}
       >
         <img
           src={mesobLogo}
           alt="Addis MESOB"
           style={{
-            width: 28,
-            height: 28,
+            width: 26,
+            height: 26,
             borderRadius: 8,
             objectFit: "contain",
           }}
@@ -974,7 +1073,7 @@ const MobilePremiumVisual = () => {
         <span
           style={{
             fontFamily: F.serif,
-            fontSize: 9,
+            fontSize: 8,
             fontWeight: 900,
             color: C.goldLight,
             textAlign: "center",
@@ -987,13 +1086,14 @@ const MobilePremiumVisual = () => {
 
       {/* Orbiting labels */}
       {[
-        { icon: "🎤", label: "Present" },
         { icon: "📊", label: "Reports" },
         { icon: "🤖", label: "AI" },
         { icon: "📁", label: "Docs" },
+        { icon: "🎤", label: "Present" },
+        { icon: "📋", label: "Evaluate" },
       ].map((item, i) => {
-        const angle = (i / 4) * Math.PI * 2 - Math.PI / 2;
-        const radius = 60;
+        const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+        const radius = 58;
         const x = 50 + Math.cos(angle) * radius;
         const y = 50 + Math.sin(angle) * radius;
 
@@ -1009,30 +1109,30 @@ const MobilePremiumVisual = () => {
               flexDirection: "column",
               alignItems: "center",
               gap: 1,
-              animation: `float-badge ${3.5 + i * 0.4}s ease-in-out ${i * 0.5}s infinite`,
+              animation: `float-card ${3.5 + i * 0.4}s ease-in-out ${i * 0.5}s infinite`,
             }}
           >
             <div
               style={{
-                width: 26,
-                height: 26,
+                width: 24,
+                height: 24,
                 borderRadius: "50%",
                 background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.04)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 11,
+                fontSize: 10,
               }}
             >
               {item.icon}
             </div>
             <span
               style={{
-                fontSize: 6,
-                color: "rgba(255,255,255,0.2)",
+                fontSize: 5.5,
+                color: "rgba(255,255,255,0.15)",
                 fontWeight: 600,
-                background: "rgba(0,0,0,0.2)",
+                background: "rgba(0,0,0,0.15)",
                 padding: "1px 6px",
                 borderRadius: 3,
                 whiteSpace: "nowrap",
