@@ -45,7 +45,7 @@ const NAV_ITEMS = [
 export default function Header({ t, lang, setLang, onAddUserClick }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState("");
+  const [activeSectionState, setActiveSectionState] = useState("");
 
   // ── Auth ──
   const { logout, user, isAdmin, isSuperAdmin, isLeader, isEmployee } =
@@ -91,43 +91,112 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
 
   // ─── Detect if on Landing Page ───
   const isOnLanding = location.pathname === "/";
+  const activeSection = isOnLanding ? activeSectionState : "";
 
-  // ─── Scroll to Section Handler ───
+  // ─── Pending scroll target (survives the route change to "/") ───
+  const pendingScrollRef = useRef(null);
+
+  // ─── Actually perform the scroll for a given section id ───
+  const performScroll = (sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (!element) return false;
+    const headerOffset = 70;
+    const elementPosition = element.getBoundingClientRect().top;
+    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+    window.scrollTo({
+      top: offsetPosition,
+      behavior: "smooth",
+    });
+    setActiveSectionState(sectionId);
+    return true;
+  };
+
+  // ─── Retry scrolling until the target section exists in the DOM ───
+  // (needed because Landing's sections can still be mounting right
+  // after navigation, especially the first time the route renders)
+  const scrollWhenReady = (sectionId, attemptsLeft = 30) => {
+    if (performScroll(sectionId)) {
+      pendingScrollRef.current = null;
+      return;
+    }
+    if (attemptsLeft <= 0) {
+      pendingScrollRef.current = null;
+      return;
+    }
+    requestAnimationFrame(() => scrollWhenReady(sectionId, attemptsLeft - 1));
+  };
+
+  // ─── Scroll to Section Handler (click on a nav item) ───
   const scrollToSection = (sectionId) => {
-    setActiveSection(sectionId);
-
     if (isOnLanding) {
-      const element = document.getElementById(sectionId);
-      if (element) {
-        const headerOffset = 70;
-        const elementPosition = element.getBoundingClientRect().top;
-        const offsetPosition =
-          elementPosition + window.pageYOffset - headerOffset;
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: "smooth",
-        });
-      }
+      scrollWhenReady(sectionId);
+      // Update the hash without piling up history entries for a click
+      // that just moves you around the same page.
+      navigate(`/#${sectionId}`, { replace: true });
     } else {
-      // If not on landing, navigate to landing and scroll after load
-      navigate("/");
-      // Store the section to scroll to after navigation
-      setTimeout(() => {
-        const element = document.getElementById(sectionId);
-        if (element) {
-          const headerOffset = 70;
-          const elementPosition = element.getBoundingClientRect().top;
-          const offsetPosition =
-            elementPosition + window.pageYOffset - headerOffset;
-          window.scrollTo({
-            top: offsetPosition,
-            behavior: "smooth",
-          });
-        }
-      }, 500);
+      // Not on the Landing page: navigate there (with the hash) and let
+      // the effect below pick up the scroll once the sections exist.
+      pendingScrollRef.current = sectionId;
+      navigate(`/#${sectionId}`);
     }
   };
+
+  // ─── Handle hash-driven scrolling: covers (a) landing on this page
+  // straight from a URL like /#faq, (b) arriving here after
+  // navigate("/#id") from another page, and (c) browser back/forward. ───
+  useEffect(() => {
+    if (!isOnLanding) return;
+    const hashTarget = location.hash ? location.hash.slice(1) : null;
+    const target = hashTarget || pendingScrollRef.current;
+    if (!target) return;
+    scrollWhenReady(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOnLanding, location.pathname, location.hash]);
+
+  // ─── Scroll Spy: keep the active nav item in sync while scrolling ───
+  useEffect(() => {
+    if (!isOnLanding) return;
+
+    let observer;
+    let cancelled = false;
+
+    const setup = (attemptsLeft = 30) => {
+      if (cancelled) return;
+      const elements = NAV_ITEMS.map((item) =>
+        document.getElementById(item.id),
+      ).filter(Boolean);
+
+      if (elements.length === 0) {
+        if (attemptsLeft > 0) {
+          requestAnimationFrame(() => setup(attemptsLeft - 1));
+        }
+        return;
+      }
+
+      observer = new IntersectionObserver(
+        (entries) => {
+          const visible = entries
+            .filter((entry) => entry.isIntersecting)
+            .sort(
+              (a, b) => a.boundingClientRect.top - b.boundingClientRect.top,
+            );
+          if (visible.length > 0) {
+            setActiveSectionState(visible[0].target.id);
+          }
+        },
+        { threshold: 0.15, rootMargin: "-88px 0px -60% 0px" },
+      );
+
+      elements.forEach((el) => observer.observe(el));
+    };
+
+    setup();
+
+    return () => {
+      cancelled = true;
+      if (observer) observer.disconnect();
+    };
+  }, [isOnLanding]);
 
   // ─── Icons Map for Breadcrumb ──
   const icons = {
@@ -382,53 +451,51 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
             flexWrap: "nowrap",
           }}
         >
-          {/* ── Desktop Navigation (only show on Landing page) ── */}
-          {isOnLanding && (
-            <div
-              className="lp-desktop-nav"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "clamp(8px, 1.5vw, 20px)",
-                marginRight: "clamp(4px, 1vw, 12px)",
-                paddingRight: "clamp(4px, 1vw, 12px)",
-                borderRight: "1px solid rgba(0,0,0,0.06)",
-              }}
-            >
-              {NAV_ITEMS.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => scrollToSection(item.id)}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    padding: "4px 2px",
-                    fontSize: "clamp(11px, 1.2vw, 13px)",
-                    fontWeight: activeSection === item.id ? 700 : 500,
-                    color: activeSection === item.id ? C.primary : C.muted,
-                    cursor: "pointer",
-                    fontFamily: F.sans,
-                    position: "relative",
-                    transition: "all 0.2s ease",
-                    borderBottom:
-                      activeSection === item.id
-                        ? `2px solid ${C.primary}`
-                        : "2px solid transparent",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.color = C.primary;
-                  }}
-                  onMouseLeave={(e) => {
-                    if (activeSection !== item.id) {
-                      e.currentTarget.style.color = C.muted;
-                    }
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* ── Desktop Navigation (links to Landing sections, from any page) ── */}
+          <div
+            className="lp-desktop-nav"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "clamp(8px, 1.5vw, 20px)",
+              marginRight: "clamp(4px, 1vw, 12px)",
+              paddingRight: "clamp(4px, 1vw, 12px)",
+              borderRight: "1px solid rgba(0,0,0,0.06)",
+            }}
+          >
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => scrollToSection(item.id)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  padding: "4px 2px",
+                  fontSize: "clamp(11px, 1.2vw, 13px)",
+                  fontWeight: activeSection === item.id ? 700 : 500,
+                  color: activeSection === item.id ? C.primary : C.muted,
+                  cursor: "pointer",
+                  fontFamily: F.sans,
+                  position: "relative",
+                  transition: "all 0.2s ease",
+                  borderBottom:
+                    activeSection === item.id
+                      ? `2px solid ${C.primary}`
+                      : "2px solid transparent",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = C.primary;
+                }}
+                onMouseLeave={(e) => {
+                  if (activeSection !== item.id) {
+                    e.currentTarget.style.color = C.muted;
+                  }
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
 
           {/* ── Date ── */}
           <span

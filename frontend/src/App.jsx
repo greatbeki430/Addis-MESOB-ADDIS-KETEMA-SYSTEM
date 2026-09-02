@@ -386,7 +386,7 @@ function AuthenticatedApp() {
             style={{ maxWidth: "100%", overflowX: "hidden" }}
           >
             <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/" element={<Landing />} />
               <Route
                 path="/dashboard"
                 element={<Dashboard t={t} lang={language} />}
