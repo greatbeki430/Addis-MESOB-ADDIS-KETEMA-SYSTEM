@@ -34,11 +34,102 @@ import {
   FiMail,
 } from "react-icons/fi";
 
+// ─── Navigation Items with Section IDs for Landing Page ───
+const NAV_ITEMS = [
+  { id: "features", label: "Features", href: "#features" },
+  { id: "services", label: "Services", href: "#services" },
+  { id: "how", label: "How it works", href: "#how" },
+  { id: "faq", label: "FAQ", href: "#faq" },
+];
+
 export default function Header({ t, lang, setLang, onAddUserClick }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [activeSection, setActiveSection] = useState("");
 
-  // ── Icons Map for Breadcrumb ──
+  // ── Auth ──
+  const { logout, user, isAdmin, isSuperAdmin, isLeader, isEmployee } =
+    useAuth();
+
+  // ── State ──
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
+
+  // ── Refs ──
+  const dropdownRef = useRef(null);
+  const langDropdownRef = useRef(null);
+
+  // ── Get Current Tab from Location ──
+  const currentTab = useMemo(() => {
+    const path = location.pathname;
+    if (path === "/" || path === "/dashboard") return "dashboard";
+    if (path.startsWith("/forum")) return "forum";
+    if (path.startsWith("/evaluation")) return "evaluation";
+    if (path.startsWith("/report")) return "report";
+    if (path.startsWith("/services")) return "services";
+    if (path.startsWith("/analytics")) return "analytics";
+    if (path.startsWith("/users")) return "users";
+    if (path.startsWith("/teams")) return "teams";
+    if (path.startsWith("/admin/services")) return "admin/services";
+    if (path.startsWith("/documents")) return "documents";
+    if (path.startsWith("/golden-monday")) return "golden-monday";
+    if (path.startsWith("/employees")) return "employees";
+    if (path.startsWith("/digital-attendance")) return "digital-attendance";
+    if (path.startsWith("/admin-attendance")) return "admin-attendance";
+    if (path.startsWith("/admin-digital-attendance"))
+      return "admin-digital-attendance";
+    if (path.startsWith("/admin-alerts")) return "admin-alerts";
+    if (path.startsWith("/admin-evaluations")) return "admin-evaluations";
+    if (path.startsWith("/admin-daily-reports")) return "admin-daily-reports";
+    if (path.startsWith("/admin-forum-reports")) return "admin-forum-reports";
+    if (path.startsWith("/admin-requests")) return "admin-requests";
+    if (path.startsWith("/profile")) return "profile";
+    if (path.startsWith("/settings")) return "settings";
+    if (path.startsWith("/change-password")) return "change-password";
+    return "dashboard";
+  }, [location.pathname]);
+
+  // ─── Detect if on Landing Page ───
+  const isOnLanding = location.pathname === "/";
+
+  // ─── Scroll to Section Handler ───
+  const scrollToSection = (sectionId) => {
+    setActiveSection(sectionId);
+
+    if (isOnLanding) {
+      const element = document.getElementById(sectionId);
+      if (element) {
+        const headerOffset = 70;
+        const elementPosition = element.getBoundingClientRect().top;
+        const offsetPosition =
+          elementPosition + window.pageYOffset - headerOffset;
+
+        window.scrollTo({
+          top: offsetPosition,
+          behavior: "smooth",
+        });
+      }
+    } else {
+      // If not on landing, navigate to landing and scroll after load
+      navigate("/");
+      // Store the section to scroll to after navigation
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) {
+          const headerOffset = 70;
+          const elementPosition = element.getBoundingClientRect().top;
+          const offsetPosition =
+            elementPosition + window.pageYOffset - headerOffset;
+          window.scrollTo({
+            top: offsetPosition,
+            behavior: "smooth",
+          });
+        }
+      }, 500);
+    }
+  };
+
+  // ─── Icons Map for Breadcrumb ──
   const icons = {
     dashboard: <FiHome size={18} />,
     forum: <FiMessageSquare size={18} />,
@@ -91,48 +182,6 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     settings: "Settings",
     "change-password": "Change Password",
   };
-
-  // ── Auth ──
-  const { logout, user, isAdmin, isSuperAdmin, isLeader, isEmployee } =
-    useAuth();
-
-  // ── State ──
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
-
-  // ── Refs ──
-  const dropdownRef = useRef(null);
-  const langDropdownRef = useRef(null);
-
-  // ── Get Current Tab from Location ──
-  const currentTab = useMemo(() => {
-    const path = location.pathname;
-    if (path === "/" || path === "/dashboard") return "dashboard";
-    if (path.startsWith("/forum")) return "forum";
-    if (path.startsWith("/evaluation")) return "evaluation";
-    if (path.startsWith("/report")) return "report";
-    if (path.startsWith("/services")) return "services";
-    if (path.startsWith("/analytics")) return "analytics";
-    if (path.startsWith("/users")) return "users";
-    if (path.startsWith("/teams")) return "teams";
-    if (path.startsWith("/admin/services")) return "admin/services";
-    if (path.startsWith("/documents")) return "documents";
-    if (path.startsWith("/golden-monday")) return "golden-monday";
-    if (path.startsWith("/employees")) return "employees";
-    if (path.startsWith("/digital-attendance")) return "digital-attendance";
-    if (path.startsWith("/admin-attendance")) return "admin-attendance";
-    if (path.startsWith("/admin-digital-attendance"))
-      return "admin-digital-attendance";
-    if (path.startsWith("/admin-alerts")) return "admin-alerts";
-    if (path.startsWith("/admin-evaluations")) return "admin-evaluations";
-    if (path.startsWith("/admin-daily-reports")) return "admin-daily-reports";
-    if (path.startsWith("/admin-forum-reports")) return "admin-forum-reports";
-    if (path.startsWith("/admin-requests")) return "admin-requests";
-    if (path.startsWith("/profile")) return "profile";
-    if (path.startsWith("/settings")) return "settings";
-    if (path.startsWith("/change-password")) return "change-password";
-    return "dashboard";
-  }, [location.pathname]);
 
   // ── Click Outside Handler ──
   useEffect(() => {
@@ -207,6 +256,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
   // ── Toggles ──
   const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
   const toggleLangDropdown = () => setIsLangDropdownOpen(!isLangDropdownOpen);
+
   const handleLangSelect = (code) => {
     setLang(code);
     setIsLangDropdownOpen(false);
@@ -322,7 +372,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
           </span>
         </div>
 
-        {/* ── RIGHT SECTION - Date, Language & User ── */}
+        {/* ── RIGHT SECTION - Navigation, Date, Language & User ── */}
         <div
           style={{
             display: "flex",
@@ -332,6 +382,54 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
             flexWrap: "nowrap",
           }}
         >
+          {/* ── Desktop Navigation (only show on Landing page) ── */}
+          {isOnLanding && (
+            <div
+              className="lp-desktop-nav"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "clamp(8px, 1.5vw, 20px)",
+                marginRight: "clamp(4px, 1vw, 12px)",
+                paddingRight: "clamp(4px, 1vw, 12px)",
+                borderRight: "1px solid rgba(0,0,0,0.06)",
+              }}
+            >
+              {NAV_ITEMS.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => scrollToSection(item.id)}
+                  style={{
+                    background: "none",
+                    border: "none",
+                    padding: "4px 2px",
+                    fontSize: "clamp(11px, 1.2vw, 13px)",
+                    fontWeight: activeSection === item.id ? 700 : 500,
+                    color: activeSection === item.id ? C.primary : C.muted,
+                    cursor: "pointer",
+                    fontFamily: F.sans,
+                    position: "relative",
+                    transition: "all 0.2s ease",
+                    borderBottom:
+                      activeSection === item.id
+                        ? `2px solid ${C.primary}`
+                        : "2px solid transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = C.primary;
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeSection !== item.id) {
+                      e.currentTarget.style.color = C.muted;
+                    }
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* ── Date ── */}
           <span
             className="header-date"
@@ -939,22 +1037,16 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
           .lang-desktop { display: flex !important; }
           .header-date { display: inline-flex !important; }
           .header-appname { display: inline-flex !important; }
+          .lp-desktop-nav { display: flex !important; }
         }
 
-        /* Tablet */
-        @media (min-width: 641px) and (max-width: 768px) {
+        /* Tablet & Mobile */
+        @media (max-width: 768px) {
           .lang-mobile { display: flex !important; }
           .lang-desktop { display: none !important; }
           .header-date { display: none !important; }
           .header-appname { display: none !important; }
-        }
-
-        /* Mobile */
-        @media (max-width: 640px) {
-          .lang-mobile { display: flex !important; }
-          .lang-desktop { display: none !important; }
-          .header-date { display: none !important; }
-          .header-appname { display: none !important; }
+          .lp-desktop-nav { display: none !important; }
         }
 
         /* Extra small */
