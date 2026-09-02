@@ -97,7 +97,7 @@ const SOUND_OPTIONS = [
 ];
 
 const ACCENT_OPTIONS = [
-  { id: "primary", label: "Institutional green", value: null },
+  { id: "primary", label: "Institutional blue", value: null },
   { id: "gold", label: "Gold", value: "#C25A00" },
   { id: "red", label: "Red", value: "#B3352C" },
   { id: "blue", label: "Blue", value: "#2E5FA3" },
