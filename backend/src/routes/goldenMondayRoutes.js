@@ -2,17 +2,11 @@
 
 const express = require("express");
 const router = express.Router();
-// const { protect, anyRole, leaderOrAdmin } = require("../middleware/auth");
-// const {
-//   protect,
-//   anyRole,
-//   leaderOrAdmin,
-//   adminOrSuperAdmin,
-// } = require("../middleware/auth");
 const {
   protect,
   anyRole,
   leaderOrAdmin,
+  adminOrSuperAdmin,
   goldenMondayAdminOrAbove,
 } = require("../middleware/auth");
 const GoldenMondayExperience = require("../models/GoldenMondayExperience");
@@ -78,9 +72,9 @@ const { BUILT_IN_CATEGORIES } = require("../constants/goldenMondayCategories");
 
 // ── Sessions ────────────────────────────────────────────────
 router.get("/", protect, anyRole, getSessions);
-router.get("/suggest-topics", protect, leaderOrAdmin, suggestTopics);
-router.post("/recap", protect, leaderOrAdmin, previewRecap);
-router.post("/", protect, leaderOrAdmin, createSession);
+router.get("/suggest-topics", protect, goldenMondayAdminOrAbove, suggestTopics);
+router.post("/recap", protect, goldenMondayAdminOrAbove, previewRecap);
+router.post("/", protect, goldenMondayAdminOrAbove, createSession);
 
 // ── Sessions - Upcoming & Past ─────────────────────────────
 router.get("/sessions/upcoming", protect, anyRole, async (req, res) => {
@@ -131,9 +125,14 @@ router.get("/recordings/live", protect, anyRole, getLiveRecordings);
 
 // ── Rotation roster ─────────────────────────────────────────
 router.get("/roster", protect, anyRole, getRoster);
-router.post("/roster", protect, leaderOrAdmin, addToRoster);
-router.put("/roster/:id", protect, leaderOrAdmin, updateRosterEntry);
-router.delete("/roster/:id", protect, leaderOrAdmin, removeFromRoster);
+router.post("/roster", protect, goldenMondayAdminOrAbove, addToRoster);
+router.put("/roster/:id", protect, goldenMondayAdminOrAbove, updateRosterEntry);
+router.delete(
+  "/roster/:id",
+  protect,
+  goldenMondayAdminOrAbove,
+  removeFromRoster,
+);
 
 // ── Rotation engine ─────────────────────────────────────────
 router.get("/rotation/preview", protect, anyRole, previewRotation);
@@ -149,11 +148,16 @@ router.get("/rotation/next", protect, anyRole, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-router.post("/rotation/assign", protect, leaderOrAdmin, assignRotation);
+router.post(
+  "/rotation/assign",
+  protect,
+  goldenMondayAdminOrAbove,
+  assignRotation,
+);
 router.post(
   "/rotation/:sessionId/reassign",
   protect,
-  leaderOrAdmin,
+  goldenMondayAdminOrAbove,
   reassignRotation,
 );
 
@@ -162,13 +166,13 @@ router.put("/:sessionId/title", protect, anyRole, setPresentationTitle);
 router.post(
   "/:sessionId/recording",
   protect,
-  leaderOrAdmin,
+  goldenMondayAdminOrAbove,
   uploadSessionRecording,
 );
 router.delete(
   "/:sessionId/recording",
   protect,
-  leaderOrAdmin,
+  goldenMondayAdminOrAbove,
   removeSessionRecording,
 );
 
@@ -309,7 +313,6 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
 });
 
 // POST /api/golden-monday/:sessionId/attendance
-// POST /api/golden-monday/:sessionId/attendance
 router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
   try {
     const {
@@ -360,7 +363,6 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       console.log("📝 [ATTENDANCE] Updating existing record");
       attendance.attended = true;
       attendance.checkedInAt = new Date();
-      // ✅ IMPORTANT: Save signature even if it's a string
       if (signature && signature.length > 0) {
         attendance.signature = signature;
         attendance.signatureType = signatureType || "draw";
@@ -405,7 +407,6 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
       }
     }
 
-    // Also update session attendees
     const existingAttendee = session.attendees.find(
       (a) => a.user.toString() === userId,
     );
@@ -443,7 +444,7 @@ router.post("/:sessionId/attendance", protect, anyRole, async (req, res) => {
 router.post(
   "/:sessionId/attendance/bulk",
   protect,
-  leaderOrAdmin,
+  goldenMondayAdminOrAbove,
   async (req, res) => {
     try {
       const { attendees } = req.body;
@@ -525,7 +526,6 @@ router.get("/gallery/folders", protect, anyRole, async (req, res) => {
       GoldenMondayFolder.countDocuments(filter),
     ]);
 
-    // Get counts from child type folders
     const folderIds = weekFolders.map((f) => f._id);
     const childFolders = await GoldenMondayFolder.find({
       parentFolder: { $in: folderIds },
@@ -569,139 +569,133 @@ router.get("/gallery/folders", protect, anyRole, async (req, res) => {
   }
 });
 
-// POST /api/golden-monday/gallery/folders - FIXED
-router.post("/gallery/folders", protect, leaderOrAdmin, async (req, res) => {
-  try {
-    const { name, ethiopianDate, topic, category } = req.body;
+// POST /api/golden-monday/gallery/folders
+router.post(
+  "/gallery/folders",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const { name, ethiopianDate, topic, category } = req.body;
 
-    console.log("📁 [CREATE FOLDER] Request:", {
-      name: name?.substring(0, 50),
-      ethiopianDate,
-      topic,
-      category,
-      userId: req.user?._id,
-      userName: req.user?.name,
-    });
-
-    // ✅ Validate we actually have an authenticated user with the fields
-    // this folder will require — surfaces auth/middleware problems as a
-    // clear 401 instead of a confusing downstream ValidationError → 500.
-    if (!req.user || !req.user._id || !req.user.name) {
-      console.error("❌ [CREATE FOLDER] Missing req.user fields:", {
-        hasUser: !!req.user,
-        hasId: !!req.user?._id,
-        hasName: !!req.user?.name,
+      console.log("📁 [CREATE FOLDER] Request:", {
+        name: name?.substring(0, 50),
+        ethiopianDate,
+        topic,
+        category,
+        userId: req.user?._id,
+        userName: req.user?.name,
       });
-      return res.status(401).json({
-        success: false,
-        error: "Authenticated user is missing required fields (id/name)",
-      });
-    }
 
-    // Validate required fields
-    if (!name || !topic) {
-      return res.status(400).json({
-        success: false,
-        error: "Folder name and topic are required",
-      });
-    }
-
-    // Use the existing service to get or create a week folder
-    const weekFolder = await getOrCreateWeekFolder({
-      uploadDate: new Date(),
-      topic: topic.trim(),
-      weekOfEthiopianDate: ethiopianDate || "",
-      userId: req.user._id,
-      userName: req.user.name,
-    });
-
-    console.log("✅ [CREATE FOLDER] Week folder:", weekFolder._id);
-
-    // Also create a file-type subfolder for "other" or the specified category
-    // This ensures the folder structure is complete
-    const fileType = "image"; // Default to image since we're uploading images
-    const typeFolder = await getOrCreateTypeFolder({
-      weekFolder: weekFolder,
-      fileType: fileType,
-      userId: req.user._id,
-      userName: req.user.name,
-    });
-
-    console.log("✅ [CREATE FOLDER] Type folder:", typeFolder._id);
-
-    res.status(201).json({
-      success: true,
-      folderId: weekFolder._id,
-      _id: weekFolder._id,
-      folder: {
-        _id: weekFolder._id,
-        title:
-          weekFolder.title || weekFolder.weekOfEthiopianDate || "Week Folder",
-        weekOf: weekFolder.weekOf,
-        topics: weekFolder.topics,
-        count: weekFolder.count || 0,
-      },
-      typeFolderId: typeFolder._id,
-      message: "Folder created successfully",
-    });
-  } catch (error) {
-    // ✅ Much more detailed error surfacing — name, message, Mongoose
-    // validation field-by-field detail, and the stack, so the next 500
-    // tells us exactly what broke instead of a bare message.
-    console.error("❌ [CREATE FOLDER] Error name:", error.name);
-    console.error("❌ [CREATE FOLDER] Error message:", error.message);
-    if (error.errors) {
-      console.error(
-        "❌ [CREATE FOLDER] Validation details:",
-        Object.fromEntries(
-          Object.entries(error.errors).map(([k, v]) => [k, v.message]),
-        ),
-      );
-    }
-    console.error("❌ [CREATE FOLDER] Stack:", error.stack);
-
-    // Try to find existing folder as fallback (duplicate key error)
-    if (error.code === 11000) {
-      try {
-        const weekOf = mondayOf(new Date());
-        const existing = await GoldenMondayFolder.findOne({
-          folderType: "week",
-          weekOf: weekOf,
-          createdBy: req.user._id,
+      if (!req.user || !req.user._id || !req.user.name) {
+        console.error("❌ [CREATE FOLDER] Missing req.user fields:", {
+          hasUser: !!req.user,
+          hasId: !!req.user?._id,
+          hasName: !!req.user?.name,
         });
-
-        if (existing) {
-          console.log(
-            "✅ [CREATE FOLDER] Found existing folder:",
-            existing._id,
-          );
-          return res.status(200).json({
-            success: true,
-            folderId: existing._id,
-            _id: existing._id,
-            folder: existing,
-            message: "Folder already exists",
-          });
-        }
-      } catch (findError) {
-        console.error("Error finding existing folder:", findError.message);
+        return res.status(401).json({
+          success: false,
+          error: "Authenticated user is missing required fields (id/name)",
+        });
       }
-    }
 
-    res.status(500).json({
-      success: false,
-      error: error.message || "Failed to create folder",
-      ...(process.env.NODE_ENV !== "production" && {
-        errorName: error.name,
-        validationErrors: error.errors
-          ? Object.fromEntries(
-              Object.entries(error.errors).map(([k, v]) => [k, v.message]),
-            )
-          : undefined,
-      }),
-    });
-  }
-});
+      if (!name || !topic) {
+        return res.status(400).json({
+          success: false,
+          error: "Folder name and topic are required",
+        });
+      }
+
+      const weekFolder = await getOrCreateWeekFolder({
+        uploadDate: new Date(),
+        topic: topic.trim(),
+        weekOfEthiopianDate: ethiopianDate || "",
+        userId: req.user._id,
+        userName: req.user.name,
+      });
+
+      console.log("✅ [CREATE FOLDER] Week folder:", weekFolder._id);
+
+      const fileType = "image";
+      const typeFolder = await getOrCreateTypeFolder({
+        weekFolder: weekFolder,
+        fileType: fileType,
+        userId: req.user._id,
+        userName: req.user.name,
+      });
+
+      console.log("✅ [CREATE FOLDER] Type folder:", typeFolder._id);
+
+      res.status(201).json({
+        success: true,
+        folderId: weekFolder._id,
+        _id: weekFolder._id,
+        folder: {
+          _id: weekFolder._id,
+          title:
+            weekFolder.title || weekFolder.weekOfEthiopianDate || "Week Folder",
+          weekOf: weekFolder.weekOf,
+          topics: weekFolder.topics,
+          count: weekFolder.count || 0,
+        },
+        typeFolderId: typeFolder._id,
+        message: "Folder created successfully",
+      });
+    } catch (error) {
+      console.error("❌ [CREATE FOLDER] Error name:", error.name);
+      console.error("❌ [CREATE FOLDER] Error message:", error.message);
+      if (error.errors) {
+        console.error(
+          "❌ [CREATE FOLDER] Validation details:",
+          Object.fromEntries(
+            Object.entries(error.errors).map(([k, v]) => [k, v.message]),
+          ),
+        );
+      }
+      console.error("❌ [CREATE FOLDER] Stack:", error.stack);
+
+      if (error.code === 11000) {
+        try {
+          const weekOf = mondayOf(new Date());
+          const existing = await GoldenMondayFolder.findOne({
+            folderType: "week",
+            weekOf: weekOf,
+            createdBy: req.user._id,
+          });
+
+          if (existing) {
+            console.log(
+              "✅ [CREATE FOLDER] Found existing folder:",
+              existing._id,
+            );
+            return res.status(200).json({
+              success: true,
+              folderId: existing._id,
+              _id: existing._id,
+              folder: existing,
+              message: "Folder already exists",
+            });
+          }
+        } catch (findError) {
+          console.error("Error finding existing folder:", findError.message);
+        }
+      }
+
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to create folder",
+        ...(process.env.NODE_ENV !== "production" && {
+          errorName: error.name,
+          validationErrors: error.errors
+            ? Object.fromEntries(
+                Object.entries(error.errors).map(([k, v]) => [k, v.message]),
+              )
+            : undefined,
+        }),
+      });
+    }
+  },
+);
 
 // ──────────────────────────────────────────────────────────────
 // 🖼️ GALLERY ROUTES - UPDATED Multi-file upload
@@ -746,7 +740,7 @@ router.get("/gallery", protect, anyRole, async (req, res) => {
 router.post(
   "/gallery",
   protect,
-  leaderOrAdmin,
+  goldenMondayAdminOrAbove,
   galleryUpload.array("image", 20),
   async (req, res) => {
     try {
@@ -770,7 +764,6 @@ router.post(
 
       for (const file of req.files) {
         try {
-          // ── 1. DETECT TRUE FILE TYPE ──────────────────────────
           const fileTypeResult = await fileTypeFromBuffer(file.buffer);
           const trueMime =
             fileTypeResult?.mime || file.mimetype || "application/octet-stream";
@@ -804,7 +797,6 @@ router.post(
             cloudinaryResourceType = "video";
           }
 
-          // ── 2. ENFORCE SIZE LIMITS ────────────────────────────
           const sizeLimit =
             SIZE_LIMITS_BYTES[fileType] || SIZE_LIMITS_BYTES.other;
           if (file.size > sizeLimit) {
@@ -815,7 +807,6 @@ router.post(
             continue;
           }
 
-          // ── 3. GET OR CREATE WEEK FOLDER ──────────────────────
           if (!weekFolder) {
             weekFolder = await getOrCreateWeekFolder({
               uploadDate: new Date(),
@@ -825,7 +816,6 @@ router.post(
             });
           }
 
-          // ── 4. GET OR CREATE FILE-TYPE SUBFOLDER ──────────────
           if (!typeFolders[fileType]) {
             typeFolders[fileType] = await getOrCreateTypeFolder({
               weekFolder,
@@ -836,7 +826,6 @@ router.post(
           }
           const targetFolder = typeFolders[fileType];
 
-          // ── 5. DEDUPLICATION CHECK ─────────────────────────────
           const contentHash = computeContentHash(file.buffer);
           let perceptualHash = null;
           if (fileType === "image") {
@@ -868,7 +857,6 @@ router.post(
             continue;
           }
 
-          // ── 6. AI CATEGORIZATION ──────────────────────────────
           let category = providedCategory || "other";
           let categoryConfidence = null;
           let categorySource = "manual";
@@ -945,7 +933,6 @@ router.post(
             }
           }
 
-          // ── 7. RESOLVE CATEGORY ────────────────────────────────
           let resolvedCategory = "other";
           let resolvedSource = categorySource;
           let resolvedConfidence = categoryConfidence;
@@ -969,7 +956,6 @@ router.post(
             resolvedCategory = allSlugs.includes(category) ? category : "other";
           }
 
-          // ── 8. UPLOAD TO CLOUDINARY ──────────────────────────
           const baseOptions = {
             folder: "golden-monday-gallery",
             public_id: `gm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1058,7 +1044,6 @@ router.post(
             }
           }
 
-          // ── 9. SAVE TO DATABASE ──────────────────────────────
           const galleryItem = new GoldenMondayGallery({
             session: sessionId || null,
             folder: targetFolder._id,
@@ -1093,7 +1078,6 @@ router.post(
 
           await galleryItem.save();
 
-          // ── 10. UPDATE FOLDER COUNTS ──────────────────────────
           targetFolder.count = (targetFolder.count || 0) + 1;
           if (!targetFolder.coverPhoto) {
             targetFolder.coverPhoto =
@@ -1163,57 +1147,62 @@ router.post(
 );
 
 // DELETE /api/golden-monday/gallery/:photoId
-router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
-  try {
-    const photo = await GoldenMondayGallery.findById(req.params.photoId);
-    if (!photo) {
-      return res.status(404).json({ error: "Photo not found" });
-    }
-
-    const cloudinary = require("../config/cloudinary");
-    const resourceType = photo.cloudinaryResourceType || "image";
-
+router.delete(
+  "/gallery/:photoId",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
     try {
-      await cloudinary.uploader.destroy(photo.publicId, {
-        resource_type: resourceType,
-      });
-      if (photo.thumbnailPublicId) {
-        await cloudinary.uploader.destroy(photo.thumbnailPublicId, {
-          resource_type: "image",
-        });
+      const photo = await GoldenMondayGallery.findById(req.params.photoId);
+      if (!photo) {
+        return res.status(404).json({ error: "Photo not found" });
       }
-    } catch (cloudinaryErr) {
-      console.error(
-        `❌ [DELETE GALLERY] Cloudinary destroy failed for ${photo.publicId} (resource_type: ${resourceType}):`,
-        cloudinaryErr.message,
-      );
-    }
 
-    const folderId = photo.folder;
-    await photo.deleteOne();
+      const cloudinary = require("../config/cloudinary");
+      const resourceType = photo.cloudinaryResourceType || "image";
 
-    if (folderId) {
-      const folder = await GoldenMondayFolder.findById(folderId);
-      if (folder) {
-        folder.count = Math.max(0, folder.count - 1);
-        if (folder.count === 0) {
-          await folder.deleteOne();
-        } else {
-          const latest = await GoldenMondayGallery.findOne({
-            folder: folderId,
-          }).sort({ createdAt: -1 });
-          folder.coverPhoto = latest?.thumbnailUrl || "";
-          await folder.save();
+      try {
+        await cloudinary.uploader.destroy(photo.publicId, {
+          resource_type: resourceType,
+        });
+        if (photo.thumbnailPublicId) {
+          await cloudinary.uploader.destroy(photo.thumbnailPublicId, {
+            resource_type: "image",
+          });
+        }
+      } catch (cloudinaryErr) {
+        console.error(
+          `❌ [DELETE GALLERY] Cloudinary destroy failed for ${photo.publicId} (resource_type: ${resourceType}):`,
+          cloudinaryErr.message,
+        );
+      }
+
+      const folderId = photo.folder;
+      await photo.deleteOne();
+
+      if (folderId) {
+        const folder = await GoldenMondayFolder.findById(folderId);
+        if (folder) {
+          folder.count = Math.max(0, folder.count - 1);
+          if (folder.count === 0) {
+            await folder.deleteOne();
+          } else {
+            const latest = await GoldenMondayGallery.findOne({
+              folder: folderId,
+            }).sort({ createdAt: -1 });
+            folder.coverPhoto = latest?.thumbnailUrl || "";
+            await folder.save();
+          }
         }
       }
-    }
 
-    res.json({ success: true, message: "Photo deleted successfully" });
-  } catch (error) {
-    console.error("❌ [DELETE GALLERY] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+      res.json({ success: true, message: "Photo deleted successfully" });
+    } catch (error) {
+      console.error("❌ [DELETE GALLERY] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 // ──────────────────────────────────────────────────────────────
 // 🤖 AI PHOTO ANALYSIS
@@ -1222,7 +1211,7 @@ router.delete("/gallery/:photoId", protect, leaderOrAdmin, async (req, res) => {
 router.post(
   "/gallery/analyze",
   protect,
-  leaderOrAdmin,
+  goldenMondayAdminOrAbove,
   analyzeAndCategorizePhoto,
 );
 
@@ -1230,7 +1219,6 @@ router.post(
 // 🔍 DEBUG ROUTES
 // ──────────────────────────────────────────────────────────────
 
-// router.get("/debug/roster", protect, async (req, res) => {
 router.get("/debug/roster", protect, adminOrSuperAdmin, async (req, res) => {
   try {
     console.log("🔍 [DEBUG] Fetching roster...");
@@ -1257,7 +1245,6 @@ router.get("/debug/roster", protect, adminOrSuperAdmin, async (req, res) => {
   }
 });
 
-// router.get("/debug/attendance/:sessionId", protect, async (req, res) => {
 router.get(
   "/debug/attendance/:sessionId",
   protect,
@@ -1293,7 +1280,6 @@ router.get(
   },
 );
 
-// router.get("/debug/users", protect, async (req, res) => {
 router.get("/debug/users", protect, adminOrSuperAdmin, async (req, res) => {
   try {
     console.log("🔍 [DEBUG] Fetching all users...");
@@ -1346,27 +1332,32 @@ router.get(
   },
 );
 
-router.post("/:sessionId/slides", protect, leaderOrAdmin, async (req, res) => {
-  try {
-    const { slides } = req.body;
-    if (!slides) {
-      return res.status(400).json({ error: "Slides data is required" });
+router.post(
+  "/:sessionId/slides",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const { slides } = req.body;
+      if (!slides) {
+        return res.status(400).json({ error: "Slides data is required" });
+      }
+
+      const session = await GoldenMondaySession.findById(req.params.sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      session.presentationSlides = slides;
+      await session.save();
+
+      res.json({ success: true, session });
+    } catch (error) {
+      console.error("❌ [POST SLIDES] Error:", error);
+      res.status(500).json({ error: error.message });
     }
-
-    const session = await GoldenMondaySession.findById(req.params.sessionId);
-    if (!session) {
-      return res.status(404).json({ error: "Session not found" });
-    }
-
-    session.presentationSlides = slides;
-    await session.save();
-
-    res.json({ success: true, session });
-  } catch (error) {
-    console.error("❌ [POST SLIDES] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+  },
+);
 
 // ──────────────────────────────────────────────────────────────
 // ✅ NEW — EXPERIENCES SHARED (Kirkpatrick Levels 1-2)
@@ -1637,51 +1628,56 @@ router.delete("/results/:id", protect, anyRole, async (req, res) => {
 // ──────────────────────────────────────────────────────────────
 
 // GET /api/golden-monday/reports/rotation
-router.get("/reports/rotation", protect, leaderOrAdmin, async (req, res) => {
-  try {
-    const [ranking, presentedSessions] = await Promise.all([
-      rotationService.previewRotation
-        ? rotationService.previewRotation()
-        : Promise.resolve([]),
-      GoldenMondaySession.find({ presenter: { $ne: null } })
-        .sort({ date: -1 })
-        .limit(200)
-        .populate("presenter", "name department"),
-    ]);
+router.get(
+  "/reports/rotation",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const [ranking, presentedSessions] = await Promise.all([
+        rotationService.previewRotation
+          ? rotationService.previewRotation()
+          : Promise.resolve([]),
+        GoldenMondaySession.find({ presenter: { $ne: null } })
+          .sort({ date: -1 })
+          .limit(200)
+          .populate("presenter", "name department"),
+      ]);
 
-    const history = presentedSessions.map((s) => ({
-      sessionId: s._id,
-      date: s.date,
-      presenterId: s.presenter?._id || null,
-      presenterName: s.presenterName || s.presenter?.name || "Unknown",
-      department: s.presenterDepartment || s.presenter?.department || "",
-      title: s.presentationTitle || s.title || "Untitled",
-      averageRating: s.averageRating || 0,
-    }));
+      const history = presentedSessions.map((s) => ({
+        sessionId: s._id,
+        date: s.date,
+        presenterId: s.presenter?._id || null,
+        presenterName: s.presenterName || s.presenter?.name || "Unknown",
+        department: s.presenterDepartment || s.presenter?.department || "",
+        title: s.presentationTitle || s.title || "Untitled",
+        averageRating: s.averageRating || 0,
+      }));
 
-    const presentedCounts = {};
-    history.forEach((h) => {
-      const key = h.presenterId ? h.presenterId.toString() : h.presenterName;
-      presentedCounts[key] = (presentedCounts[key] || 0) + 1;
-    });
+      const presentedCounts = {};
+      history.forEach((h) => {
+        const key = h.presenterId ? h.presenterId.toString() : h.presenterName;
+        presentedCounts[key] = (presentedCounts[key] || 0) + 1;
+      });
 
-    res.json({
-      ranking: Array.isArray(ranking) ? ranking : ranking?.ranking || [],
-      history,
-      presentedCounts,
-      generatedAt: new Date(),
-    });
-  } catch (error) {
-    console.error("❌ [ROTATION REPORT] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+      res.json({
+        ranking: Array.isArray(ranking) ? ranking : ranking?.ranking || [],
+        history,
+        presentedCounts,
+        generatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error("❌ [ROTATION REPORT] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 // GET /api/golden-monday/reports/employee-performance
 router.get(
   "/reports/employee-performance",
   protect,
-  leaderOrAdmin,
+  goldenMondayAdminOrAbove,
   async (req, res) => {
     try {
       const roster = await GoldenMondayPresenter.find().populate(
@@ -1733,114 +1729,127 @@ router.get(
 );
 
 // GET /api/golden-monday/reports/dashboard
-router.get("/reports/dashboard", protect, leaderOrAdmin, async (req, res) => {
-  try {
-    const [
-      totalSessions,
-      totalPresenters,
-      totalExperiences,
-      totalResults,
-      resultsByCategory,
-      recentExperiences,
-      recentResults,
-      allExperiencesForTags,
-    ] = await Promise.all([
-      GoldenMondaySession.countDocuments(),
-      GoldenMondayPresenter.countDocuments({ isEligible: true }),
-      GoldenMondayExperience.countDocuments(),
-      GoldenMondayResult.countDocuments(),
-      GoldenMondayResult.aggregate([
-        { $group: { _id: "$outcomeCategory", count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-      ]),
-      GoldenMondayExperience.find().sort({ createdAt: -1 }).limit(5),
-      GoldenMondayResult.find().sort({ createdAt: -1 }).limit(5),
-      GoldenMondayExperience.find().select("tags aiSuggestedTags"),
-    ]);
+router.get(
+  "/reports/dashboard",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const [
+        totalSessions,
+        totalPresenters,
+        totalExperiences,
+        totalResults,
+        resultsByCategory,
+        recentExperiences,
+        recentResults,
+        allExperiencesForTags,
+      ] = await Promise.all([
+        GoldenMondaySession.countDocuments(),
+        GoldenMondayPresenter.countDocuments({ isEligible: true }),
+        GoldenMondayExperience.countDocuments(),
+        GoldenMondayResult.countDocuments(),
+        GoldenMondayResult.aggregate([
+          { $group: { _id: "$outcomeCategory", count: { $sum: 1 } } },
+          { $sort: { count: -1 } },
+        ]),
+        GoldenMondayExperience.find().sort({ createdAt: -1 }).limit(5),
+        GoldenMondayResult.find().sort({ createdAt: -1 }).limit(5),
+        GoldenMondayExperience.find().select("tags aiSuggestedTags"),
+      ]);
 
-    const tagFreq = {};
-    allExperiencesForTags.forEach((doc) => {
-      [...(doc.tags || []), ...(doc.aiSuggestedTags || [])].forEach((tag) => {
-        tagFreq[tag] = (tagFreq[tag] || 0) + 1;
+      const tagFreq = {};
+      allExperiencesForTags.forEach((doc) => {
+        [...(doc.tags || []), ...(doc.aiSuggestedTags || [])].forEach((tag) => {
+          tagFreq[tag] = (tagFreq[tag] || 0) + 1;
+        });
       });
-    });
-    const topTags = Object.entries(tagFreq)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 10)
-      .map(([tag, count]) => ({ tag, count }));
+      const topTags = Object.entries(tagFreq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([tag, count]) => ({ tag, count }));
 
-    const recommendCount = await GoldenMondayExperience.countDocuments({
-      wouldRecommend: true,
-    });
-    const recommendRate =
-      totalExperiences > 0
-        ? Math.round((recommendCount / totalExperiences) * 100)
-        : null;
+      const recommendCount = await GoldenMondayExperience.countDocuments({
+        wouldRecommend: true,
+      });
+      const recommendRate =
+        totalExperiences > 0
+          ? Math.round((recommendCount / totalExperiences) * 100)
+          : null;
 
-    res.json({
-      totals: {
-        sessions: totalSessions,
-        presenters: totalPresenters,
-        experiences: totalExperiences,
-        results: totalResults,
-      },
-      resultsByCategory,
-      topTags,
-      recommendRate,
-      recentExperiences,
-      recentResults,
-      generatedAt: new Date(),
-    });
-  } catch (error) {
-    console.error("❌ [DASHBOARD REPORT] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+      res.json({
+        totals: {
+          sessions: totalSessions,
+          presenters: totalPresenters,
+          experiences: totalExperiences,
+          results: totalResults,
+        },
+        resultsByCategory,
+        topTags,
+        recommendRate,
+        recentExperiences,
+        recentResults,
+        generatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error("❌ [DASHBOARD REPORT] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 // GET /api/golden-monday/reports/ai-insights
-router.get("/reports/ai-insights", protect, leaderOrAdmin, async (req, res) => {
-  try {
-    const experiences = await GoldenMondayExperience.find()
-      .sort({ createdAt: -1 })
-      .limit(100);
-    const results = await GoldenMondayResult.find()
-      .sort({ createdAt: -1 })
-      .limit(100);
+router.get(
+  "/reports/ai-insights",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const experiences = await GoldenMondayExperience.find()
+        .sort({ createdAt: -1 })
+        .limit(100);
+      const results = await GoldenMondayResult.find()
+        .sort({ createdAt: -1 })
+        .limit(100);
 
-    const tagFreq = {};
-    [...experiences, ...results].forEach((doc) => {
-      [...(doc.tags || []), ...(doc.aiSuggestedTags || [])].forEach((tag) => {
-        tagFreq[tag] = (tagFreq[tag] || 0) + 1;
+      const tagFreq = {};
+      [...experiences, ...results].forEach((doc) => {
+        [...(doc.tags || []), ...(doc.aiSuggestedTags || [])].forEach((tag) => {
+          tagFreq[tag] = (tagFreq[tag] || 0) + 1;
+        });
       });
-    });
-    const themes = Object.entries(tagFreq)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 12)
-      .map(([theme, mentions]) => ({ theme, mentions }));
+      const themes = Object.entries(tagFreq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 12)
+        .map(([theme, mentions]) => ({ theme, mentions }));
 
-    const avgRelevance =
-      experiences.length > 0
-        ? experiences.reduce((sum, e) => sum + (e.relevanceRating || 0), 0) /
-          experiences.length
-        : null;
+      const avgRelevance =
+        experiences.length > 0
+          ? experiences.reduce((sum, e) => sum + (e.relevanceRating || 0), 0) /
+            experiences.length
+          : null;
 
-    const outcomeCategoryCounts = {};
-    results.forEach((r) => {
-      outcomeCategoryCounts[r.outcomeCategory] =
-        (outcomeCategoryCounts[r.outcomeCategory] || 0) + 1;
-    });
+      const outcomeCategoryCounts = {};
+      results.forEach((r) => {
+        outcomeCategoryCounts[r.outcomeCategory] =
+          (outcomeCategoryCounts[r.outcomeCategory] || 0) + 1;
+      });
 
-    res.json({
-      themes,
-      avgRelevance: avgRelevance ? Math.round(avgRelevance * 10) / 10 : null,
-      outcomeCategoryCounts,
-      sampleSize: { experiences: experiences.length, results: results.length },
-      generatedAt: new Date(),
-    });
-  } catch (error) {
-    console.error("❌ [AI INSIGHTS REPORT] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
+      res.json({
+        themes,
+        avgRelevance: avgRelevance ? Math.round(avgRelevance * 10) / 10 : null,
+        outcomeCategoryCounts,
+        sampleSize: {
+          experiences: experiences.length,
+          results: results.length,
+        },
+        generatedAt: new Date(),
+      });
+    } catch (error) {
+      console.error("❌ [AI INSIGHTS REPORT] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
 
 module.exports = router;
