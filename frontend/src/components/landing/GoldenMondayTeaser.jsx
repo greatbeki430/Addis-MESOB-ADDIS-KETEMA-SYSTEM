@@ -9,7 +9,7 @@ const T = {
   ink: "#081d17",
 };
 
-const GoldenMondayTeaser = forwardRef(({ t, copy, onLogin, ...props }, ref) => {
+const GoldenMondayTeaser = forwardRef(({ copy, onLogin, ...props }, ref) => {
   const SectionHeading = ({ eyebrow, title, sub, dark }) => (
     <div>
       <div

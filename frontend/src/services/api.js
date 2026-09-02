@@ -507,6 +507,34 @@ export const goldenMondayAPI = {
   // 👤 USER DETAILS
   // ──────────────────────────────────────────────────────────────
   getUserDetails: (userId) => api.get(`/auth/users/${userId}`),
+
+  // ─── Resources ──────────────────────────────────────────────────
+  getSessionResources: (sessionId) =>
+    api.get(`/golden-monday/resources/session/${sessionId}`),
+  uploadSessionResource: (sessionId, formData) =>
+    api.post(`/golden-monday/resources/session/${sessionId}`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  deleteSessionResource: (resourceId) =>
+    api.delete(`/golden-monday/resources/${resourceId}`),
+  downloadResource: (resourceId) =>
+    api.put(`/golden-monday/resources/${resourceId}/download`),
+  updateSessionResource: (resourceId, data) =>
+    api.put(`/golden-monday/resources/${resourceId}`, data),
+
+  // ─── Notifications ─────────────────────────────────────────────
+  getNotifications: (params) =>
+    api.get("/golden-monday/notifications", { params }),
+  markNotificationRead: (id) =>
+    api.put(`/golden-monday/notifications/${id}/read`),
+  markAllNotificationsRead: () =>
+    api.put("/golden-monday/notifications/read-all"),
+  dismissNotification: (id) =>
+    api.put(`/golden-monday/notifications/${id}/dismiss`),
+
+  // ─── QR Check-in ──────────────────────────────────────────────
+  generateQRCheckIn: (sessionId) =>
+    api.post(`/golden-monday/qr-checkin/${sessionId}`),
 };
 
 // ✅ Helper: dataURL to Blob
