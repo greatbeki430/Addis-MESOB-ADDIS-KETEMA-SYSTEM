@@ -19,6 +19,9 @@ import ReportExport from "../components/golden-monday/ReportExport";
 import ExperiencesAndResults from "../components/golden-monday/ExperiencesAndResults";
 import PresenterSpotlight from "../components/golden-monday/PresenterSpotlight";
 import ConfirmModal from "../components/common/ConfirmModal";
+import ResourceLibrary from "../components/golden-monday/ResourceLibrary";
+import NotificationBell from "../components/golden-monday/NotificationBell";
+import QRCheckIn from "../components/golden-monday/QRCheckIn";
 import {
   FiSunrise,
   FiUsers,
@@ -51,6 +54,7 @@ import {
   FiFileText,
   FiClipboard,
   FiMessageCircle,
+  FiFile,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
@@ -1066,13 +1070,18 @@ export default function GoldenMonday() {
         icon: <FiCamera size={16} />,
       },
       {
+        id: "resources",
+        label: t.tabResources || "Resources",
+        icon: <FiFile size={16} />,
+      },
+      {
         id: "reports",
         label: t.tabReports || "Reports",
         icon: <FiFileText size={16} />,
       },
       {
         id: "experience-result",
-        label: "Experiences & Results",
+        label: t.tabExperienceResult || "Experiences & Results",
         icon: <FiMessageCircle size={16} />,
       },
     ],
@@ -1584,6 +1593,7 @@ export default function GoldenMonday() {
               gap: 12,
               marginTop: 28,
               flexWrap: "wrap",
+              alignItems: "center",
             }}
           >
             <a
@@ -1634,6 +1644,9 @@ export default function GoldenMonday() {
                   : t.refresh || "Refresh"}
               </button>
             )}
+
+            {/* ✅ ADD NOTIFICATION BELL HERE */}
+            <NotificationBell />
           </div>
         </div>
       </section>
@@ -2408,6 +2421,7 @@ export default function GoldenMonday() {
           </div>
         )}
 
+        {/* ─── EXPERIENCE & RESULT TAB ─── */}
         {activeTab === "experience-result" && (
           <div>
             <ExperiencesAndResults sessionId={selectedSessionId} />
@@ -2460,6 +2474,16 @@ export default function GoldenMonday() {
               </div>
             )}
 
+            {/* ✅ QR CHECK-IN */}
+            {selectedSessionId && (
+              <div style={{ marginBottom: 20 }}>
+                <QRCheckIn
+                  sessionId={selectedSessionId}
+                  onCheckIn={refreshData}
+                />
+              </div>
+            )}
+
             {selectedSessionId ? (
               <AttendancePanel
                 sessionId={selectedSessionId}
@@ -2482,6 +2506,16 @@ export default function GoldenMonday() {
                 </p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* ─── RESOURCES TAB ─── */}
+        {activeTab === "resources" && (
+          <div>
+            <ResourceLibrary
+              sessionId={selectedSessionId}
+              onRefresh={refreshData}
+            />
           </div>
         )}
 
