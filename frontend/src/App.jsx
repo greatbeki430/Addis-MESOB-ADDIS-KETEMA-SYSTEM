@@ -4,7 +4,6 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { initPDFFonts } from "./utils/pdf/fontPreloader";
 import { C, F } from "./styles/theme";
 import Sidebar from "./components/layout/Sidebar";
-import Header from "./components/layout/Header";
 import Dashboard from "./pages/Dashboard";
 import ForumReport from "./pages/ForumReport";
 import Evaluation from "./pages/Evaluation";
@@ -20,7 +19,7 @@ import Report from "./pages/Report";
 import { setToastFunction } from "./utils/toastHelper";
 import { ToastContainer } from "./components/ui/Modal";
 import { useToast } from "./hooks/useToast";
-import { useLanguage } from "./hooks/useLanguage"; // ✅ Fixed import
+import { useLanguage } from "./hooks/useLanguage";
 import AdminServiceManager from "./pages/admin/AdminServiceManager";
 
 // AI Feature imports
@@ -47,7 +46,7 @@ import ChangePassword from "./pages/ChangePassword";
 import { FiUserPlus } from "react-icons/fi";
 
 // =============================================
-// ANIMATED A-MESOB TITLE COMPONENT
+// ANIMATED A-MESOB TITLE COMPONENT (Only used in Sidebar)
 // =============================================
 export const AnimatedTitle = ({ t, collapsed }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -272,15 +271,6 @@ function AuthenticatedApp() {
           select { font-size: 16px !important; }
           input[type="number"] { min-height: 32px; }
         }
-        @media (max-width: 600px) { .header-date    { display: none !important; } }
-        @media (max-width: 480px) { .header-appname { display: none !important; } }
-        @media (max-width: 400px) {
-          .header-lang-btn { padding: 2px 5px !important; font-size: 9px !important; }
-        }
-        @media (max-width: 550px) {
-          header       { gap: 6px !important; }
-          header > div { gap: 6px !important; }
-        }
 
         .pdf-status {
           display: inline-flex;
@@ -338,6 +328,7 @@ function AuthenticatedApp() {
 
       <ToastContainer toasts={toasts} removeToast={removeToast} />
 
+      {/* ✅ Sidebar - contains everything: logo, navigation, language switcher */}
       <Sidebar
         tab={currentTab}
         lang={language}
@@ -349,6 +340,7 @@ function AuthenticatedApp() {
         setSelectedTeam={setSelectedTeam}
       />
 
+      {/* ✅ Main Content - NO separate Header component */}
       <div
         className="main-content"
         style={{
@@ -363,13 +355,7 @@ function AuthenticatedApp() {
           transition: "width 0.3s ease, max-width 0.3s ease",
         }}
       >
-        <Header
-          tab={currentTab}
-          t={t}
-          lang={language}
-          setLang={changeLanguage}
-          onAddUserClick={() => setShowRegister(true)}
-        />
+        {/* ❌ REMOVED: <Header ... /> - Sidebar already has everything */}
 
         <main
           style={{
@@ -379,6 +365,7 @@ function AuthenticatedApp() {
             padding: 0,
             maxWidth: "100%",
             width: "100%",
+            marginTop: 0, // No need for margin since there's no header
           }}
         >
           <div

@@ -476,7 +476,8 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
                   padding: "4px 2px",
                   fontSize: "clamp(11px, 1.2vw, 13px)",
                   fontWeight: displayedActiveSection === item.id ? 700 : 500,
-                  color: displayedActiveSection === item.id ? C.primary : C.muted,
+                  color:
+                    displayedActiveSection === item.id ? C.primary : C.muted,
                   cursor: "pointer",
                   fontFamily: F.sans,
                   position: "relative",
