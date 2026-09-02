@@ -11,10 +11,10 @@ import {
   FiCpu,
   FiUsers,
   FiFileText,
+  FiStar,
   FiTrendingUp,
   FiZap,
   FiChevronRight,
-  FiSparkles,
 } from "react-icons/fi";
 import { C, F } from "../../styles/theme";
 import mesobLogo from "../../assets/mesoblogo.png";
@@ -108,7 +108,7 @@ const HeroSection = ({ t, onLogin }) => {
               }}
             />
             {t("landing.eyebrow") || "Digital Ethiopia · Smart Services"}
-            <FiSparkles
+            <FiStar
               size={12}
               style={{
                 opacity: 0.5,
@@ -192,20 +192,17 @@ const HeroSection = ({ t, onLogin }) => {
                 icon: <FiZap size={isMobile ? 12 : 15} />,
                 label: t("landing.serviceManagement") || "Service Management",
                 color: C.gold,
-                gradient: "linear-gradient(135deg, #f5c518, #f59e0b)",
               },
               {
                 icon: <FiTrendingUp size={isMobile ? 12 : 15} />,
                 label:
                   t("landing.evaluationReporting") || "Evaluation & Reporting",
                 color: "#34d399",
-                gradient: "linear-gradient(135deg, #34d399, #059669)",
               },
               {
                 icon: <FiShield size={isMobile ? 12 : 15} />,
                 label: t("landing.secureReliable") || "Secure & Reliable",
                 color: "#60a5fa",
-                gradient: "linear-gradient(135deg, #60a5fa, #3b82f6)",
               },
             ].map((item, i) => (
               <div
@@ -987,7 +984,7 @@ const Premium3DVisual = ({ isTablet }) => {
           backdropFilter: "blur(4px)",
         }}
       >
-        Digital Ethiopia
+        Digital Ethiopia{" "}
       </div>
     </div>
   );
