@@ -10,7 +10,6 @@ import ForumReport from "./pages/ForumReport";
 import Evaluation from "./pages/Evaluation";
 import DailyReport from "./pages/DailyReport";
 import Services from "./pages/Services";
-import { AuthProvider } from "./context/AuthProvider";
 import { useAuth } from "./hooks/useAuth";
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
@@ -21,9 +20,7 @@ import Report from "./pages/Report";
 import { setToastFunction } from "./utils/toastHelper";
 import { ToastContainer } from "./components/ui/Modal";
 import { useToast } from "./hooks/useToast";
-import { LanguageProvider } from "./context/LanguageProvider";
-// import { useLanguage } from "./hooks/useLanguage";
-import { useLanguage } from "./context/LanguageContext";
+import { useLanguage } from "./hooks/useLanguage"; // ✅ Fixed import
 import AdminServiceManager from "./pages/admin/AdminServiceManager";
 
 // AI Feature imports
@@ -43,11 +40,10 @@ import DigitalAttendance from "./components/DigitalAttendance";
 import AttendanceManagement from "./pages/admin/AttendanceManagement";
 import AlertsManagement from "./pages/admin/AlertsManagement";
 
-// Admin Data Management - Only import the main component, not wrappers
+// Admin Data Management
 import AdminDataManagement from "./pages/admin/AdminDataManagement";
 import ChangePassword from "./pages/ChangePassword";
 
-// ✅ ADD THIS IMPORT
 import { FiUserPlus } from "react-icons/fi";
 
 // =============================================
@@ -167,7 +163,7 @@ function AuthenticatedApp() {
   const [showRegister, setShowRegister] = useState(false);
   const [pdfReady, setPdfReady] = useState(false);
 
-  // ✅ Initialize PDF fonts when app loads
+  // Initialize PDF fonts when app loads
   useEffect(() => {
     const initializePDF = async () => {
       try {
@@ -286,7 +282,6 @@ function AuthenticatedApp() {
           header > div { gap: 6px !important; }
         }
 
-        /* PDF Status Indicator */
         .pdf-status {
           display: inline-flex;
           align-items: center;
@@ -391,22 +386,15 @@ function AuthenticatedApp() {
             style={{ maxWidth: "100%", overflowX: "hidden" }}
           >
             <Routes>
-              {/* Redirect root to dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
-
-              {/* Dashboard */}
               <Route
                 path="/dashboard"
                 element={<Dashboard t={t} lang={language} />}
               />
-
-              {/* Golden Monday */}
               <Route
                 path="/golden-monday"
                 element={<GoldenMonday lang={language} />}
               />
-
-              {/* Forum Report - User facing */}
               <Route
                 path="/forum"
                 element={
@@ -421,22 +409,14 @@ function AuthenticatedApp() {
                   />
                 }
               />
-
-              {/* Evaluation - User facing */}
               <Route
                 path="/evaluation"
                 element={<Evaluation t={t} lang={language} />}
               />
-
-              {/* Daily Report - every authenticated user logs & shares their
-                  own report; the page itself scopes what each role can see
-                  (own report, team feed, cross-team admin view). */}
               <Route
                 path="/report"
                 element={<DailyReport t={t} lang={language} />}
               />
-
-              {/* Services - User facing (Admins and Super Admins) */}
               <Route
                 path="/services"
                 element={
@@ -447,8 +427,6 @@ function AuthenticatedApp() {
                   )
                 }
               />
-
-              {/* Admin Service Manager - Only Super Admins */}
               <Route
                 path="/admin/services"
                 element={
@@ -459,8 +437,6 @@ function AuthenticatedApp() {
                   )
                 }
               />
-
-              {/* User Management - Admins and Super Admins */}
               <Route
                 path="/users"
                 element={
@@ -476,8 +452,6 @@ function AuthenticatedApp() {
                   )
                 }
               />
-
-              {/* Team Management - Only Super Admins */}
               <Route
                 path="/teams"
                 element={
@@ -492,8 +466,6 @@ function AuthenticatedApp() {
                   )
                 }
               />
-
-              {/* Employee Management - Admins and Super Admins */}
               <Route
                 path="/employees"
                 element={
@@ -504,8 +476,6 @@ function AuthenticatedApp() {
                   )
                 }
               />
-
-              {/* Analytics - Team Leaders and above */}
               <Route
                 path="/analytics"
                 element={
@@ -516,17 +486,11 @@ function AuthenticatedApp() {
                   )
                 }
               />
-
-              {/* Document Vault - All authenticated users */}
               <Route path="/documents" element={<DocumentVault />} />
-
-              {/* Digital Attendance - All authenticated users */}
               <Route
                 path="/digital-attendance"
                 element={<DigitalAttendance />}
               />
-
-              {/* Attendance Management - Admins and Super Admins */}
               <Route
                 path="/admin-attendance"
                 element={
@@ -537,8 +501,6 @@ function AuthenticatedApp() {
                   )
                 }
               />
-
-              {/* Digital Attendance Logs - Super Admins only */}
               <Route
                 path="/admin-digital-attendance"
                 element={
@@ -549,8 +511,6 @@ function AuthenticatedApp() {
                   )
                 }
               />
-
-              {/* Alerts & Notifications - Admins and Super Admins */}
               <Route
                 path="/admin-alerts"
                 element={
@@ -561,8 +521,6 @@ function AuthenticatedApp() {
                   )
                 }
               />
-
-              {/* ✅ ADMIN DATA MANAGEMENT ROUTES */}
               <Route
                 path="/admin-evaluations"
                 element={
@@ -603,29 +561,21 @@ function AuthenticatedApp() {
                   )
                 }
               />
-
-              {/* Profile - All authenticated users */}
               <Route
                 path="/profile"
                 element={<Profile t={t} lang={language} />}
               />
-
-              {/* Settings - All authenticated users */}
               <Route
                 path="/settings"
                 element={<Settings t={t} lang={language} />}
               />
-
-              {/* Catch all - redirect to dashboard */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-
               <Route path="/change-password" element={<ChangePassword />} />
+              <Route path="*" element={<Navigate to="/dashboard" replace />} />
             </Routes>
           </div>
         </main>
       </div>
 
-      {/* Register Modal - with higher z-index than chatbot to prevent overlap */}
       {isAdminOrSuperAdmin && showRegister && (
         <div
           style={{
@@ -646,7 +596,6 @@ function AuthenticatedApp() {
         </div>
       )}
 
-      {/* ✅ FIXED: Add User FAB - Same size as Chatbot */}
       {isAdminOrSuperAdmin && (
         <button
           onClick={() => setShowRegister(true)}
@@ -687,7 +636,6 @@ function AuthenticatedApp() {
         </button>
       )}
 
-      {/* AI Chatbot Widget - hidden when register modal is open */}
       {!showRegister && <ChatbotWidget />}
     </div>
   );
@@ -726,28 +674,11 @@ function AppRouter() {
     );
   }
 
-  // Show Landing page for unauthenticated users
   if (!isAuthenticated) {
     return (
       <Routes>
-        {/* <Route path="/" element={<Landing />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="*" element={<Navigate to="/" replace />} /> */}
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
-        {/* ⚠️ SECURITY: "/register" used to be publicly reachable here and
-            rendered the same "Add New User" form the admin panel uses,
-            which posts directly to POST /api/auth/register — an endpoint
-            that lets the caller pick their own role, including admin/
-            superadmin. Anyone who found this URL while logged out could
-            mint themselves a super admin account. Employee self-signup is
-            handled separately via the Telegram OTP + admin-approval flow
-            (PendingRegistration), so there is no legitimate use for this
-            route while logged out. The in-app "Add New User" modal
-            (already gated behind isAdminOrSuperAdmin, see below) remains
-            the only way to reach the Register form. */}
-        {/* Redirect all other routes, including /register, to landing for unauthenticated users */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -757,14 +688,9 @@ function AppRouter() {
 }
 
 // =============================================
-// MAIN APP
+// MAIN APP - NO PROVIDER WRAPPING
 // =============================================
 export default function App() {
-  return (
-    <AuthProvider>
-      <LanguageProvider>
-        <AppRouter />
-      </LanguageProvider>
-    </AuthProvider>
-  );
+  // ✅ Just return the router - providers are in main.jsx
+  return <AppRouter />;
 }
