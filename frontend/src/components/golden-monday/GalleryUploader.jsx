@@ -96,35 +96,85 @@ export default function GalleryUploader({
       const folderName = `${dateStr} - ${uploadTopic}`;
 
       let folderId = null;
-      try {
-        const folderRes = await goldenMondayAPI.createFolder({
-          name: folderName,
-          ethiopianDate: dateStr,
-          topic: uploadTopic,
-          category: category !== "all" ? category : "other",
-        });
-        folderId = folderRes.data.folderId || folderRes.data._id;
-      } catch (error) {
-        if (error.response?.data?.folderId) {
-          folderId = error.response.data.folderId;
-        } else if (error.response?.data?._id) {
-          folderId = error.response.data._id;
-        } else {
-          const backendMessage = error.response?.data?.error;
-          throw new Error(
-            backendMessage || error.message || "Failed to create folder",
-            { cause: error },
+      let retries = 3;
+      let lastError = null;
+
+      while (retries > 0 && !folderId) {
+        try {
+          const folderRes = await goldenMondayAPI.createFolder({
+            name: folderName,
+            ethiopianDate: dateStr,
+            topic: uploadTopic,
+            category: category !== "all" ? category : "other",
+          });
+
+          // Handle different response shapes
+          folderId =
+            folderRes.data?.folderId ||
+            folderRes.data?._id ||
+            folderRes.data?.folder?._id;
+
+          if (!folderId) {
+            throw new Error("No folder ID returned from server");
+          }
+          break;
+        } catch (error) {
+          lastError = error;
+          console.error(
+            `Folder creation attempt failed (${retries} retries left):`,
+            error,
           );
+
+          // Check if it's a duplicate key error (E11000)
+          if (
+            error.response?.status === 409 ||
+            error.response?.data?.code === 11000 ||
+            error.message?.includes("duplicate")
+          ) {
+            // Try to find existing folder
+            try {
+              const existingFolders = await goldenMondayAPI.getFolders({
+                limit: 50,
+                search: uploadTopic,
+              });
+              // Look for matching folder
+              const existing = existingFolders.data?.folders?.find((f) =>
+                f.topics?.some(
+                  (t) => t.toLowerCase() === uploadTopic.toLowerCase(),
+                ),
+              );
+              if (existing) {
+                folderId = existing._id;
+                console.log("✅ Found existing folder:", folderId);
+                break;
+              }
+            } catch (findError) {
+              console.warn("Could not find existing folder:", findError);
+            }
+          }
+
+          retries--;
+          if (retries > 0) {
+            // Wait before retry with exponential backoff
+            await new Promise((resolve) =>
+              setTimeout(resolve, 500 * (4 - retries)),
+            );
+          }
         }
       }
 
       if (!folderId) {
-        throw new Error("Failed to create folder");
+        throw new Error(
+          lastError?.response?.data?.error ||
+            lastError?.message ||
+            "Failed to create or find folder after multiple attempts",
+        );
       }
 
       // ✅ FIX: Pass the topic to upload complete callback
       const topic = uploadTopic.trim();
 
+      // Close modal first to show progress in main UI
       onClose();
       setUploadTopic("");
 
@@ -132,10 +182,12 @@ export default function GalleryUploader({
       await onUploadComplete(folderId, topic);
     } catch (error) {
       console.error("Upload process error:", error);
-      showToast(
-        error.message || "Failed to upload. Please try again.",
-        "error",
-      );
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to upload. Please try again.";
+      showToast(errorMessage, "error");
       setIsCreating(false);
     } finally {
       isSubmittingRef.current = false;

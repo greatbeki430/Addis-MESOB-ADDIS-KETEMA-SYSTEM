@@ -514,24 +514,44 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             );
           }
 
-          // ✅ FIX: Use FormData for file upload
+          // ✅ FIX: Use FormData for file upload with proper error handling
           const blob = dataURLtoBlob(imageData);
           const ext = blob.type.split("/")[1]?.split("+")[0] || "bin";
           const formData = new FormData();
-          formData.append("image", blob, `upload.${ext}`);
+
+          // Append the file with proper filename
+          const filename = item.file.name || `upload.${ext}`;
+          formData.append("image", blob, filename);
           formData.append("folderId", folderId);
           formData.append("category", detectedCategory);
           if (sessionId) formData.append("sessionId", sessionId);
           formData.append("lang", language);
 
-          // Upload with progress tracking using FormData
-          await goldenMondayAPI.uploadGalleryPhoto(formData, (progress) => {
-            setUploadQueue((prev) =>
-              prev.map((q) =>
-                q.id === item.id ? { ...q, progress: 50 + progress * 0.4 } : q,
-              ),
+          console.log(`📤 Uploading ${filename} to folder ${folderId}`);
+
+          // Upload with progress tracking
+          const uploadPromise = goldenMondayAPI.uploadGalleryPhoto(
+            formData,
+            (progress) => {
+              setUploadQueue((prev) =>
+                prev.map((q) =>
+                  q.id === item.id
+                    ? { ...q, progress: 50 + progress * 0.4 }
+                    : q,
+                ),
+              );
+            },
+          );
+
+          // Add timeout wrapper
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(
+              () => reject(new Error("Upload timeout after 120 seconds")),
+              120000,
             );
           });
+
+          await Promise.race([uploadPromise, timeoutPromise]);
 
           processed++;
           setUploadQueue((prev) =>
@@ -551,11 +571,26 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         } catch (error) {
           console.error(`Upload error for ${item.file.name}:`, error);
           failed++;
+
+          // Get more detailed error info
+          let errorMessage = error.message || "Upload failed";
+          if (error.response?.data?.error) {
+            errorMessage = error.response.data.error;
+          } else if (error.response?.data?.message) {
+            errorMessage = error.response.data.message;
+          }
+
           setUploadQueue((prev) =>
             prev.map((q) =>
-              q.id === item.id ? { ...q, status: "error", progress: 0 } : q,
+              q.id === item.id
+                ? { ...q, status: "error", progress: 0, errorMessage }
+                : q,
             ),
           );
+
+          // Show toast for the specific failure
+          showToast(`Failed: ${item.file.name} - ${errorMessage}`, "error");
+
           return { success: false, item, error };
         }
       };
