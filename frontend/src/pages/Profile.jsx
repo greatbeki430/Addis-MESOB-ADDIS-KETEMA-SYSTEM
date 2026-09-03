@@ -51,6 +51,22 @@ export default function Profile() {
   const [activeTab, setActiveTab] = useState("overview");
   const [hoveredStat, setHoveredStat] = useState(null);
 
+  // ─── Translation Helper ─────────────────────────────────────
+  const tp = useCallback(
+    (key, fallback = "") => {
+      return t?.(`profile.${key}`) || fallback;
+    },
+    [t],
+  );
+
+  const tc = useCallback(
+    (key, fallback = "") => {
+      return t?.(`common.${key}`) || fallback;
+    },
+    [t],
+  );
+
+  // ─── Form Data ──────────────────────────────────────────────
   const getInitialFormData = () => ({
     name: user?.name || "",
     email: user?.email || "",
@@ -71,7 +87,7 @@ export default function Profile() {
     user?.profilePhotoUrl || null,
   );
 
-  const resetFormData = () => {
+  const resetFormData = useCallback(() => {
     setFormData({
       name: user?.name || "",
       email: user?.email || "",
@@ -87,33 +103,33 @@ export default function Profile() {
       linkedin: user?.linkedin || "",
     });
     setPhotoPreviewState(user?.profilePhotoUrl || null);
-  };
+  }, [user]);
 
   const photoPreview = photoPreviewState;
 
-  // Get user's role with translation
-  const getUserRole = () => {
-    if (isSuperAdmin) return t("profile.roleSuperAdmin") || "Super Admin";
-    if (isAdmin) return t("profile.roleAdmin") || "Admin";
-    if (isLeader) return t("profile.roleTeamLeader") || "Team Leader";
-    return t("profile.roleEmployee") || "Employee";
-  };
+  // ─── User Role Helpers ──────────────────────────────────────
+  const getUserRole = useCallback(() => {
+    if (isSuperAdmin) return tp("roleSuperAdmin", "Super Admin");
+    if (isAdmin) return tp("roleAdmin", "Admin");
+    if (isLeader) return tp("roleTeamLeader", "Team Leader");
+    return tp("roleEmployee", "Employee");
+  }, [isSuperAdmin, isAdmin, isLeader, tp]);
 
-  const getRoleIcon = () => {
+  const getRoleIcon = useCallback(() => {
     if (isSuperAdmin) return "👑";
     if (isAdmin) return "⚙️";
     if (isLeader) return "⭐";
     return "👤";
-  };
+  }, [isSuperAdmin, isAdmin, isLeader]);
 
-  const getRoleColor = () => {
+  const getRoleColor = useCallback(() => {
     if (isSuperAdmin) return "#8b5cf6";
     if (isAdmin) return C.primary;
     if (isLeader) return C.gold;
     return "#10b981";
-  };
+  }, [isSuperAdmin, isAdmin, isLeader]);
 
-  const getUserInitials = () => {
+  const getUserInitials = useCallback(() => {
     if (!formData.name) return "U";
     return formData.name
       .split(" ")
@@ -121,100 +137,114 @@ export default function Profile() {
       .join("")
       .toUpperCase()
       .slice(0, 2);
-  };
+  }, [formData.name]);
 
-  // Photo handlers
-  const handlePhotoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        showToast(t("profile.photoTooLarge"), "error");
-        e.target.value = "";
-        return;
+  // ─── Photo Handlers ─────────────────────────────────────────
+  const handlePhotoChange = useCallback(
+    (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.size > 5 * 1024 * 1024) {
+          showToast(
+            tp("photoTooLarge", "Photo must be less than 5MB"),
+            "error",
+          );
+          e.target.value = "";
+          return;
+        }
+        setPhotoFile(file);
+        const reader = new FileReader();
+        reader.onload = () => setPhotoPreviewState(reader.result);
+        reader.readAsDataURL(file);
       }
-      setPhotoFile(file);
-      const reader = new FileReader();
-      reader.onload = () => setPhotoPreviewState(reader.result);
-      reader.readAsDataURL(file);
-    }
-  };
+    },
+    [showToast, tp],
+  );
 
-  const removePhoto = () => {
+  const removePhoto = useCallback(() => {
     setPhotoFile(null);
     setPhotoPreviewState(null);
     setFormData((f) => ({ ...f, profilePhotoUrl: "" }));
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  };
+  }, []);
 
-  const handleFormChange = (field, value) => {
+  const handleFormChange = useCallback((field, value) => {
     setFormData((f) => ({ ...f, [field]: value }));
-  };
+  }, []);
 
-  // Submit handler
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
+  // ─── Submit Handler ─────────────────────────────────────────
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setSaving(true);
 
-    try {
-      let profilePhotoUrl = formData.profilePhotoUrl;
+      try {
+        let profilePhotoUrl = formData.profilePhotoUrl;
 
-      if (photoFile) {
-        setUploadingPhoto(true);
-        const formDataObj = new FormData();
-        formDataObj.append("photo", photoFile);
-        const response = await uploadAPI.uploadProfilePhoto(formDataObj);
-        profilePhotoUrl = response.data.url;
+        if (photoFile) {
+          setUploadingPhoto(true);
+          const formDataObj = new FormData();
+          formDataObj.append("photo", photoFile);
+          const response = await uploadAPI.uploadProfilePhoto(formDataObj);
+          profilePhotoUrl = response.data.url;
+          setUploadingPhoto(false);
+        }
+
+        const updateData = {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          profilePhotoUrl: profilePhotoUrl || formData.profilePhotoUrl,
+          bio: formData.bio,
+          position: formData.position,
+          department: formData.department,
+          location: formData.location,
+          website: formData.website,
+          twitter: formData.twitter,
+          github: formData.github,
+          linkedin: formData.linkedin,
+        };
+
+        await authAPI.updateProfile(updateData);
+        showToast(
+          tp("updateSuccess", "Profile updated successfully!"),
+          "success",
+        );
+        setIsEditing(false);
+        setPhotoFile(null);
+
+        await refreshUser();
+        // Use navigate instead of reload for better UX
+        window.location.reload();
+      } catch (error) {
+        console.error("Failed to update profile:", error);
+        showToast(
+          error.response?.data?.message ||
+            tp("updateError", "Failed to update profile"),
+          "error",
+        );
+      } finally {
+        setSaving(false);
         setUploadingPhoto(false);
       }
+    },
+    [formData, photoFile, uploadAPI, authAPI, showToast, tp, refreshUser],
+  );
 
-      const updateData = {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        profilePhotoUrl: profilePhotoUrl || formData.profilePhotoUrl,
-        bio: formData.bio,
-        position: formData.position,
-        department: formData.department,
-        location: formData.location,
-        website: formData.website,
-        twitter: formData.twitter,
-        github: formData.github,
-        linkedin: formData.linkedin,
-      };
-
-      await authAPI.updateProfile(updateData);
-      showToast(t("profile.updateSuccess"), "success");
-      setIsEditing(false);
-      setPhotoFile(null);
-
-      await refreshUser();
-      window.location.reload();
-    } catch (error) {
-      console.error("Failed to update profile:", error);
-      showToast(
-        error.response?.data?.message || t("profile.updateError"),
-        "error",
-      );
-    } finally {
-      setSaving(false);
-      setUploadingPhoto(false);
-    }
-  };
-
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     setIsEditing(false);
     resetFormData();
     setPhotoFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
-  };
+  }, [resetFormData]);
 
-  // Format date for member since
+  // ─── Format Date ────────────────────────────────────────────
   const formatMemberSince = useCallback(() => {
-    if (!user?.createdAt) return t("profile.noData");
+    if (!user?.createdAt) return tp("noData", "Not set");
     try {
       return new Date(user.createdAt).toLocaleDateString("en-US", {
         year: "numeric",
@@ -222,48 +252,48 @@ export default function Profile() {
         day: "numeric",
       });
     } catch {
-      return t("profile.noData");
+      return tp("noData", "Not set");
     }
-  }, [user, t]);
+  }, [user, tp]);
 
-  // Stats data
+  // ─── Stats Data ─────────────────────────────────────────────
   const stats = useMemo(() => {
     const baseStats = [
       {
         id: "tasks",
         icon: <FiCheckCircle size={18} />,
         value: user?.totalTasks || 0,
-        label: t("profile.tasksCompleted") || "Tasks Completed",
+        label: tp("tasksCompleted", "Tasks Completed"),
         color: "#3b82f6",
         gradient: "linear-gradient(135deg, #eff6ff, #dbeafe)",
-        subtitle: "This month",
+        subtitle: tp("thisMonth", "This month"),
       },
       {
         id: "earnings",
         icon: <FiAward size={18} />,
         value: `$${user?.totalEarnings || "0.00"}`,
-        label: t("profile.totalEarnings") || "Total Earnings",
+        label: tp("totalEarnings", "Total Earnings"),
         color: "#f59e0b",
         gradient: "linear-gradient(135deg, #fffbeb, #fef3c7)",
-        subtitle: "Lifetime",
+        subtitle: tp("lifetime", "Lifetime"),
       },
       {
         id: "member",
         icon: <FiClock size={18} />,
         value: formatMemberSince(),
-        label: t("profile.memberSince") || "Member Since",
+        label: tp("memberSince", "Member Since"),
         color: "#10b981",
         gradient: "linear-gradient(135deg, #f0fdf4, #dcfce7)",
-        subtitle: "Active member",
+        subtitle: tp("activeMember", "Active member"),
       },
       {
         id: "reports",
         icon: <FiTrendingUp size={18} />,
         value: user?.totalReports || 0,
-        label: t("profile.reportsSubmitted") || "Reports Submitted",
+        label: tp("reportsSubmitted", "Reports Submitted"),
         color: "#8b5cf6",
         gradient: "linear-gradient(135deg, #f5f3ff, #ede9fe)",
-        subtitle: "Total reports",
+        subtitle: tp("totalReports", "Total reports"),
       },
     ];
 
@@ -273,26 +303,53 @@ export default function Profile() {
         id: "team",
         icon: <FiUsers size={18} />,
         value: user?.teamSize || 0,
-        label: t("profile.teamSize") || "Team Size",
+        label: tp("teamSize", "Team Size"),
         color: "#ec4899",
         gradient: "linear-gradient(135deg, #fdf2f8, #fce7f3)",
-        subtitle: "Team members",
+        subtitle: tp("teamMembers", "Team members"),
       });
     }
 
     return baseStats;
-  }, [user, t, isLeader, isAdmin, isSuperAdmin, formatMemberSince]);
+  }, [user, tp, isLeader, isAdmin, isSuperAdmin, formatMemberSince]);
 
-  // Social links
-  const socialLinks = [
-    { key: "website", icon: <FiLink size={16} />, label: "Website" },
-    { key: "twitter", icon: <FiTwitter size={16} />, label: "Twitter" },
-    { key: "github", icon: <FiGithub size={16} />, label: "GitHub" },
-    { key: "linkedin", icon: <FiLinkedin size={16} />, label: "LinkedIn" },
-  ];
+  // ─── Social Links ───────────────────────────────────────────
+  const socialLinks = useMemo(
+    () => [
+      { key: "website", icon: <FiLink size={16} />, label: "Website" },
+      { key: "twitter", icon: <FiTwitter size={16} />, label: "Twitter" },
+      { key: "github", icon: <FiGithub size={16} />, label: "GitHub" },
+      { key: "linkedin", icon: <FiLinkedin size={16} />, label: "LinkedIn" },
+    ],
+    [],
+  );
 
-  const hasSocialLinks = socialLinks.some(
-    (link) => formData[link.key] && formData[link.key].trim() !== "",
+  const hasSocialLinks = useMemo(() => {
+    return socialLinks.some(
+      (link) => formData[link.key] && formData[link.key].trim() !== "",
+    );
+  }, [socialLinks, formData]);
+
+  // ─── Tabs ────────────────────────────────────────────────────
+  const tabs = useMemo(
+    () => [
+      {
+        id: "overview",
+        label: tp("overview", "Overview"),
+        icon: <FiUser size={16} />,
+      },
+      {
+        id: "details",
+        label: tp("details", "Details"),
+        icon: <FiSettings size={16} />,
+      },
+      {
+        id: "activity",
+        label: tp("activity", "Activity"),
+        icon: <FiTrendingUp size={16} />,
+      },
+    ],
+    [tp],
   );
 
   return (
@@ -317,22 +374,28 @@ export default function Profile() {
       `}</style>
 
       <div className="profile-container">
-        {/* Header with subtle gradient */}
+        {/* ─── Header ──────────────────────────────────────────── */}
         <div className="profile-header">
           <div className="profile-header-content">
             <div>
               <div className="profile-breadcrumb">
-                <span className="profile-breadcrumb-item">Dashboard</span>
+                <span className="profile-breadcrumb-item">
+                  {tc("dashboard", "Dashboard")}
+                </span>
                 <FiChevronRight size={14} className="profile-breadcrumb-sep" />
-                <span className="profile-breadcrumb-item active">Profile</span>
+                <span className="profile-breadcrumb-item active">
+                  {tp("title", "Profile")}
+                </span>
               </div>
               <h1 className="profile-title">
                 <FiUser size={24} className="profile-title-icon" />
-                {t("profile.title") || "My Profile"}
+                {tp("title", "My Profile")}
               </h1>
               <p className="profile-subtitle">
-                {t("profile.subtitle") ||
-                  "Manage your personal information and preferences"}
+                {tp(
+                  "subtitle",
+                  "Manage your personal information and preferences",
+                )}
               </p>
             </div>
             <div className="profile-header-actions">
@@ -342,12 +405,12 @@ export default function Profile() {
                   className="profile-btn profile-btn-primary"
                 >
                   <FiEdit2 size={16} />
-                  {t("profile.editProfileBtn") || "Edit Profile"}
+                  {tp("editProfileBtn", "Edit Profile")}
                 </button>
               ) : (
                 <div className="profile-header-actions-edit">
                   <span className="profile-unsaved-pill">
-                    <FiZap size={12} /> Editing
+                    <FiZap size={12} /> {tp("editing", "Editing")}
                   </span>
                   <button
                     onClick={handleCancel}
@@ -355,7 +418,7 @@ export default function Profile() {
                     disabled={saving}
                   >
                     <FiX size={16} />
-                    Cancel
+                    {tp("cancelBtn", "Cancel")}
                   </button>
                   <button
                     onClick={handleSubmit}
@@ -366,13 +429,13 @@ export default function Profile() {
                       <>
                         <FiLoader size={16} className="profile-spin" />
                         {uploadingPhoto
-                          ? t("profile.uploadingPhoto") || "Uploading..."
-                          : t("profile.saving") || "Saving..."}
+                          ? tp("uploadingPhoto", "Uploading...")
+                          : tp("saving", "Saving...")}
                       </>
                     ) : (
                       <>
                         <FiSave size={16} />
-                        {t("profile.saveChanges") || "Save Changes"}
+                        {tp("saveChanges", "Save Changes")}
                       </>
                     )}
                   </button>
@@ -382,10 +445,10 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Main Layout */}
+        {/* ─── Body ────────────────────────────────────────────── */}
         <div className="profile-body">
           <div className="profile-layout">
-            {/* Sidebar - Profile Card */}
+            {/* ─── Sidebar ──────────────────────────────────────── */}
             <aside className="profile-sidebar">
               <div className="profile-card profile-card-profile">
                 {/* Avatar Section */}
@@ -394,7 +457,7 @@ export default function Profile() {
                     {photoPreview ? (
                       <img
                         src={photoPreview}
-                        alt={t("profile.title") || "Profile"}
+                        alt={tp("title", "Profile")}
                         className="profile-avatar-img"
                       />
                     ) : (
@@ -434,7 +497,7 @@ export default function Profile() {
                       className="profile-avatar-remove"
                     >
                       <FiTrash2 size={12} />
-                      {t("profile.removePhoto") || "Remove"}
+                      {tp("removePhoto", "Remove")}
                     </button>
                   )}
                 </div>
@@ -442,12 +505,12 @@ export default function Profile() {
                 {/* User Info */}
                 <div className="profile-user-info">
                   <h2 className="profile-user-name">
-                    {formData.name || t("profile.noName") || "No Name"}
+                    {formData.name || tp("noName", "No Name")}
                   </h2>
                   <p className="profile-user-title">
                     {formData.position || formData.department
                       ? `${formData.position || ""}${formData.position && formData.department ? " · " : ""}${formData.department || ""}`
-                      : t("profile.noRole") || "No role specified"}
+                      : tp("noRole", "No role specified")}
                   </p>
                   <div className="profile-user-role">
                     <span
@@ -464,9 +527,7 @@ export default function Profile() {
                 <div className="profile-quick-info">
                   <div className="profile-quick-item">
                     <FiMail size={14} className="profile-quick-icon" />
-                    <span>
-                      {formData.email || t("profile.noEmail") || "No email"}
-                    </span>
+                    <span>{formData.email || tp("noEmail", "No email")}</span>
                   </div>
                   {formData.phone && (
                     <div className="profile-quick-item">
@@ -483,7 +544,7 @@ export default function Profile() {
                   <div className="profile-quick-item">
                     <FiCalendar size={14} className="profile-quick-icon" />
                     <span>
-                      {t("profile.joined") || "Joined"}: {formatMemberSince()}
+                      {tp("joined", "Joined")}: {formatMemberSince()}
                     </span>
                   </div>
                 </div>
@@ -492,7 +553,7 @@ export default function Profile() {
                 {hasSocialLinks && (
                   <div className="profile-social-links">
                     <span className="profile-social-label">
-                      {t("profile.connect") || "Connect"}
+                      {tp("connect", "Connect")}
                     </span>
                     <div className="profile-social-icons">
                       {socialLinks.map(
@@ -517,27 +578,11 @@ export default function Profile() {
               </div>
             </aside>
 
-            {/* Main Content */}
+            {/* ─── Main Content ────────────────────────────────── */}
             <main className="profile-content">
               {/* Navigation Tabs */}
               <div className="profile-tabs">
-                {[
-                  {
-                    id: "overview",
-                    label: t("profile.overview") || "Overview",
-                    icon: <FiUser size={16} />,
-                  },
-                  {
-                    id: "details",
-                    label: t("profile.details") || "Details",
-                    icon: <FiSettings size={16} />,
-                  },
-                  {
-                    id: "activity",
-                    label: t("profile.activity") || "Activity",
-                    icon: <FiTrendingUp size={16} />,
-                  },
-                ].map((tab) => (
+                {tabs.map((tab) => (
                   <button
                     key={tab.id}
                     className={`profile-tab ${activeTab === tab.id ? "active" : ""}`}
@@ -551,7 +596,7 @@ export default function Profile() {
 
               {/* Tab Content */}
               <div className="profile-tab-content">
-                {/* Overview Tab */}
+                {/* ─── Overview Tab ────────────────────────────── */}
                 {activeTab === "overview" && (
                   <>
                     {/* Stats Grid */}
@@ -599,7 +644,7 @@ export default function Profile() {
                       <div className="profile-section">
                         <h3 className="profile-section-title">
                           <FiMessageSquare size={18} />
-                          {t("profile.about") || "About Me"}
+                          {tp("about", "About Me")}
                         </h3>
                         <p className="profile-section-text">{formData.bio}</p>
                       </div>
@@ -609,7 +654,7 @@ export default function Profile() {
                     <div className="profile-quick-actions">
                       <h3 className="profile-section-title">
                         <FiZap size={18} />
-                        {t("profile.quickActions") || "Quick Actions"}
+                        {tp("quickActions", "Quick Actions")}
                       </h3>
                       <div className="profile-actions-grid">
                         <button
@@ -617,9 +662,7 @@ export default function Profile() {
                           onClick={() => (window.location.href = "/settings")}
                         >
                           <FiSettings size={18} />
-                          <span>
-                            {t("profile.goToSettings") || "Go to Settings"}
-                          </span>
+                          <span>{tp("goToSettings", "Go to Settings")}</span>
                           <FiChevronRight
                             size={14}
                             className="profile-action-arrow"
@@ -632,9 +675,7 @@ export default function Profile() {
                           }
                         >
                           <FiShield size={18} />
-                          <span>
-                            {t("profile.changePassword") || "Change Password"}
-                          </span>
+                          <span>{tp("changePassword", "Change Password")}</span>
                           <FiChevronRight
                             size={14}
                             className="profile-action-arrow"
@@ -645,9 +686,7 @@ export default function Profile() {
                           onClick={() => (window.location.href = "/dashboard")}
                         >
                           <FiTrendingUp size={18} />
-                          <span>
-                            {t("profile.goToDashboard") || "Go to Dashboard"}
-                          </span>
+                          <span>{tp("goToDashboard", "Go to Dashboard")}</span>
                           <FiChevronRight
                             size={14}
                             className="profile-action-arrow"
@@ -658,19 +697,19 @@ export default function Profile() {
                   </>
                 )}
 
-                {/* Details Tab */}
+                {/* ─── Details Tab ─────────────────────────────── */}
                 {activeTab === "details" && (
                   <div className="profile-section">
                     <h3 className="profile-section-title">
                       <FiSettings size={18} />
-                      {t("profile.personalDetails") || "Personal Details"}
+                      {tp("personalDetails", "Personal Details")}
                     </h3>
 
                     <div className="profile-details-grid">
                       <div className="profile-detail-item">
                         <label className="profile-detail-label">
                           <FiUser size={14} />
-                          {t("profile.fullName") || "Full Name"}
+                          {tp("fullName", "Full Name")}
                         </label>
                         {isEditing ? (
                           <input
@@ -680,14 +719,14 @@ export default function Profile() {
                               handleFormChange("name", e.target.value)
                             }
                             className="profile-input"
-                            placeholder={
-                              t("profile.fullNamePlaceholder") ||
-                              "Enter your full name"
-                            }
+                            placeholder={tp(
+                              "fullNamePlaceholder",
+                              "Enter your full name",
+                            )}
                           />
                         ) : (
                           <span className="profile-detail-value">
-                            {formData.name || t("profile.noData") || "No data"}
+                            {formData.name || tp("noData", "Not set")}
                           </span>
                         )}
                       </div>
@@ -695,7 +734,7 @@ export default function Profile() {
                       <div className="profile-detail-item">
                         <label className="profile-detail-label">
                           <FiMail size={14} />
-                          {t("profile.email") || "Email"}
+                          {tp("email", "Email")}
                         </label>
                         {isEditing ? (
                           <input
@@ -705,14 +744,14 @@ export default function Profile() {
                               handleFormChange("email", e.target.value)
                             }
                             className="profile-input"
-                            placeholder={
-                              t("profile.emailPlaceholder") ||
-                              "Enter your email"
-                            }
+                            placeholder={tp(
+                              "emailPlaceholder",
+                              "Enter your email",
+                            )}
                           />
                         ) : (
                           <span className="profile-detail-value">
-                            {formData.email || t("profile.noData") || "No data"}
+                            {formData.email || tp("noData", "Not set")}
                           </span>
                         )}
                       </div>
@@ -720,7 +759,7 @@ export default function Profile() {
                       <div className="profile-detail-item">
                         <label className="profile-detail-label">
                           <FiPhone size={14} />
-                          {t("profile.phone") || "Phone"}
+                          {tp("phone", "Phone")}
                         </label>
                         {isEditing ? (
                           <input
@@ -730,14 +769,14 @@ export default function Profile() {
                               handleFormChange("phone", e.target.value)
                             }
                             className="profile-input"
-                            placeholder={
-                              t("profile.phonePlaceholder") ||
-                              "+251 9XX XXX XXX"
-                            }
+                            placeholder={tp(
+                              "phonePlaceholder",
+                              "+251 9XX XXX XXX",
+                            )}
                           />
                         ) : (
                           <span className="profile-detail-value">
-                            {formData.phone || t("profile.noData") || "No data"}
+                            {formData.phone || tp("noData", "Not set")}
                           </span>
                         )}
                       </div>
@@ -745,7 +784,7 @@ export default function Profile() {
                       <div className="profile-detail-item">
                         <label className="profile-detail-label">
                           <FiBriefcase size={14} />
-                          {t("profile.position") || "Position"}
+                          {tp("position", "Position")}
                         </label>
                         {isEditing ? (
                           <input
@@ -755,16 +794,14 @@ export default function Profile() {
                               handleFormChange("position", e.target.value)
                             }
                             className="profile-input"
-                            placeholder={
-                              t("profile.positionPlaceholder") ||
-                              "e.g., Team Leader"
-                            }
+                            placeholder={tp(
+                              "positionPlaceholder",
+                              "e.g., Team Leader",
+                            )}
                           />
                         ) : (
                           <span className="profile-detail-value">
-                            {formData.position ||
-                              t("profile.noData") ||
-                              "No data"}
+                            {formData.position || tp("noData", "Not set")}
                           </span>
                         )}
                       </div>
@@ -772,7 +809,7 @@ export default function Profile() {
                       <div className="profile-detail-item">
                         <label className="profile-detail-label">
                           <FiBriefcase size={14} />
-                          {t("profile.department") || "Department"}
+                          {tp("department", "Department")}
                         </label>
                         {isEditing ? (
                           <input
@@ -782,16 +819,14 @@ export default function Profile() {
                               handleFormChange("department", e.target.value)
                             }
                             className="profile-input"
-                            placeholder={
-                              t("profile.departmentPlaceholder") ||
-                              "e.g., IT & Systems"
-                            }
+                            placeholder={tp(
+                              "departmentPlaceholder",
+                              "e.g., IT & Systems",
+                            )}
                           />
                         ) : (
                           <span className="profile-detail-value">
-                            {formData.department ||
-                              t("profile.noData") ||
-                              "No data"}
+                            {formData.department || tp("noData", "Not set")}
                           </span>
                         )}
                       </div>
@@ -799,7 +834,7 @@ export default function Profile() {
                       <div className="profile-detail-item">
                         <label className="profile-detail-label">
                           <FiMapPin size={14} />
-                          {t("profile.location") || "Location"}
+                          {tp("location", "Location")}
                         </label>
                         {isEditing ? (
                           <input
@@ -809,16 +844,14 @@ export default function Profile() {
                               handleFormChange("location", e.target.value)
                             }
                             className="profile-input"
-                            placeholder={
-                              t("profile.locationPlaceholder") ||
-                              "e.g., Addis Ababa"
-                            }
+                            placeholder={tp(
+                              "locationPlaceholder",
+                              "e.g., Addis Ababa",
+                            )}
                           />
                         ) : (
                           <span className="profile-detail-value">
-                            {formData.location ||
-                              t("profile.noData") ||
-                              "No data"}
+                            {formData.location || tp("noData", "Not set")}
                           </span>
                         )}
                       </div>
@@ -826,7 +859,7 @@ export default function Profile() {
                       <div className="profile-detail-item profile-detail-full">
                         <label className="profile-detail-label">
                           <FiMessageSquare size={14} />
-                          {t("profile.bio") || "Bio"}
+                          {tp("bio", "Bio")}
                         </label>
                         {isEditing ? (
                           <textarea
@@ -836,15 +869,15 @@ export default function Profile() {
                             }
                             className="profile-textarea"
                             rows={4}
-                            placeholder={
-                              t("profile.bioPlaceholder") ||
-                              "Tell us about yourself..."
-                            }
+                            placeholder={tp(
+                              "bioPlaceholder",
+                              "Tell us about yourself...",
+                            )}
                             maxLength={200}
                           />
                         ) : (
                           <span className="profile-detail-value">
-                            {formData.bio || t("profile.noData") || "No data"}
+                            {formData.bio || tp("noData", "Not set")}
                           </span>
                         )}
                       </div>
@@ -854,7 +887,7 @@ export default function Profile() {
                     <div className="profile-section-sub">
                       <h4 className="profile-section-subtitle">
                         <FiGlobe size={16} />
-                        {t("profile.socialLinks") || "Social Links"}
+                        {tp("socialLinks", "Social Links")}
                       </h4>
                       <div className="profile-details-grid profile-social-grid">
                         {socialLinks.map((link) => (
@@ -865,13 +898,13 @@ export default function Profile() {
                             </label>
                             {isEditing ? (
                               <input
-                                type="text"
+                                type="url"
                                 value={formData[link.key]}
                                 onChange={(e) =>
                                   handleFormChange(link.key, e.target.value)
                                 }
                                 className="profile-input"
-                                placeholder={`https://${link.key}.com/username`}
+                                placeholder={`https://${link.key.toLowerCase()}.com/username`}
                               />
                             ) : (
                               <span className="profile-detail-value">
@@ -885,7 +918,7 @@ export default function Profile() {
                                     {formData[link.key]}
                                   </a>
                                 ) : (
-                                  t("profile.noData") || "No data"
+                                  tp("noData", "Not set")
                                 )}
                               </span>
                             )}
@@ -896,12 +929,12 @@ export default function Profile() {
                   </div>
                 )}
 
-                {/* Activity Tab */}
+                {/* ─── Activity Tab ────────────────────────────── */}
                 {activeTab === "activity" && (
                   <div className="profile-section">
                     <h3 className="profile-section-title">
                       <FiTrendingUp size={18} />
-                      {t("profile.recentActivity") || "Recent Activity"}
+                      {tp("recentActivity", "Recent Activity")}
                     </h3>
                     <div className="profile-activity-list">
                       <div className="profile-activity-item">
@@ -913,11 +946,10 @@ export default function Profile() {
                         </div>
                         <div className="profile-activity-content">
                           <p className="profile-activity-text">
-                            {t("profile.activityTaskCompleted") ||
-                              "Completed a task"}
+                            {tp("activityTaskCompleted", "Completed a task")}
                           </p>
                           <span className="profile-activity-time">
-                            {t("profile.justNow") || "Just now"}
+                            {tp("justNow", "Just now")}
                           </span>
                         </div>
                       </div>
@@ -930,11 +962,13 @@ export default function Profile() {
                         </div>
                         <div className="profile-activity-content">
                           <p className="profile-activity-text">
-                            {t("profile.activityReportSubmitted") ||
-                              "Submitted a daily report"}
+                            {tp(
+                              "activityReportSubmitted",
+                              "Submitted a daily report",
+                            )}
                           </p>
                           <span className="profile-activity-time">
-                            {t("profile.twoHoursAgo") || "2 hours ago"}
+                            {tp("twoHoursAgo", "2 hours ago")}
                           </span>
                         </div>
                       </div>
@@ -947,11 +981,10 @@ export default function Profile() {
                         </div>
                         <div className="profile-activity-content">
                           <p className="profile-activity-text">
-                            {t("profile.activityJoinedTeam") ||
-                              "Joined a team meeting"}
+                            {tp("activityJoinedTeam", "Joined a team meeting")}
                           </p>
                           <span className="profile-activity-time">
-                            {t("profile.yesterday") || "Yesterday"}
+                            {tp("yesterday", "Yesterday")}
                           </span>
                         </div>
                       </div>
@@ -964,11 +997,13 @@ export default function Profile() {
                         </div>
                         <div className="profile-activity-content">
                           <p className="profile-activity-text">
-                            {t("profile.activityEvaluationReceived") ||
-                              "Received evaluation feedback"}
+                            {tp(
+                              "activityEvaluationReceived",
+                              "Received evaluation feedback",
+                            )}
                           </p>
                           <span className="profile-activity-time">
-                            {t("profile.threeDaysAgo") || "3 days ago"}
+                            {tp("threeDaysAgo", "3 days ago")}
                           </span>
                         </div>
                       </div>
