@@ -6,11 +6,11 @@ import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
 import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
+import { RiQrCodeLine } from "react-icons/ri";
 import {
   FiCheck,
   FiCamera,
   FiRefreshCw,
-  FiQrcode,
   FiClock,
   FiCheckCircle,
   FiXCircle,
@@ -185,7 +185,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
               : `0 4px 16px ${C.primary}44`,
           }}
         >
-          <FiQrcode size={20} />
+          <RiQrCodeLine size={22} />
         </div>
         <div>
           <h4
@@ -280,7 +280,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             />
           ) : (
             <div style={{ textAlign: "center", color: C.muted }}>
-              <FiQrcode size={40} style={{ opacity: 0.3 }} />
+              <RiQrCodeLine size={40} style={{ opacity: 0.3 }} />
               <p style={{ fontSize: 12, marginTop: 8 }}>No QR available</p>
             </div>
           )}
