@@ -54,9 +54,10 @@ import {
   FiClipboard,
   FiMessageCircle,
   FiFile,
-  FiSparkles,
+  // FiSparkles,
   FiPlay,
 } from "react-icons/fi";
+import { LuSparkles } from "react-icons/lu";
 
 // ─────────────────────────────────────────────────────────────
 // SAFE DATA HELPERS
@@ -2370,7 +2371,7 @@ export default function GoldenMonday() {
                             color: C.dark,
                           }}
                         >
-                          <FiSparkles size={22} />
+                          <LuSparkles size={22} />
                         </div>
                         <div>
                           <h3
