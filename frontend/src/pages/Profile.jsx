@@ -195,7 +195,6 @@ export default function Profile() {
             console.log("✅ Upload response:", response);
 
             // ─── Extract URL from response ────────────────────
-            // The backend returns: { url: "...", publicId: "..." }
             if (response?.data?.url) {
               profilePhotoUrl = response.data.url;
             } else if (response?.data?.data?.url) {
@@ -219,7 +218,6 @@ export default function Profile() {
           } catch (uploadError) {
             console.error("❌ Photo upload failed:", uploadError);
 
-            // ─── Better error message ─────────────────────────
             let errorMsg = "Failed to upload photo. Please try again.";
             if (uploadError.response?.data?.error) {
               errorMsg = uploadError.response.data.error;
@@ -257,8 +255,8 @@ export default function Profile() {
         console.log("📤 Updating profile with data:", updateData);
 
         // ─── Update profile ────────────────────────────────────
-        const response = await authAPI.updateProfile(updateData);
-        console.log("✅ Profile update response:", response);
+        await authAPI.updateProfile(updateData);
+        console.log("✅ Profile updated successfully");
 
         showToast(
           tp("updateSuccess", "Profile updated successfully!"),
@@ -268,7 +266,20 @@ export default function Profile() {
         setPhotoFile(null);
 
         // ─── Refresh user data ─────────────────────────────────
-        await refreshUser();
+        // ✅ FIX: Safely call refreshUser
+        if (refreshUser && typeof refreshUser === "function") {
+          try {
+            await refreshUser();
+            console.log("✅ User data refreshed");
+          } catch (refreshError) {
+            console.warn("⚠️ Failed to refresh user data:", refreshError);
+            // Don't show error to user, just reload
+          }
+        } else {
+          console.warn(
+            "⚠️ refreshUser is not available, reloading page instead",
+          );
+        }
 
         // ─── Reload after a short delay ────────────────────────
         setTimeout(() => {
@@ -293,7 +304,7 @@ export default function Profile() {
         setUploadingPhoto(false);
       }
     },
-    [formData, photoFile, showToast, tp, refreshUser],
+    [formData, photoFile, uploadAPI, authAPI, showToast, tp, refreshUser],
   );
 
   const handleCancel = useCallback(() => {
@@ -662,7 +673,6 @@ export default function Profile() {
                 {/* ─── Overview Tab ────────────────────────────── */}
                 {activeTab === "overview" && (
                   <>
-                    {/* Stats Grid */}
                     <div className="profile-stats-grid">
                       {stats.map((stat) => (
                         <div
@@ -702,7 +712,6 @@ export default function Profile() {
                       ))}
                     </div>
 
-                    {/* Bio Section */}
                     {formData.bio && (
                       <div className="profile-section">
                         <h3 className="profile-section-title">
@@ -713,7 +722,6 @@ export default function Profile() {
                       </div>
                     )}
 
-                    {/* Quick Actions */}
                     <div className="profile-quick-actions">
                       <h3 className="profile-section-title">
                         <FiZap size={18} />
