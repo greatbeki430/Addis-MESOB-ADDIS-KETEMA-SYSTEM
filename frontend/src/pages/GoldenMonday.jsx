@@ -1,10 +1,11 @@
 // src/pages/GoldenMonday.jsx
 // ════════════════════════════════════════════════════════════
-// COMPLETE Golden Monday Management System - Using goldenMondayTranslations
+// COMPLETE Golden Monday Management System - Premium Redesign
 // ════════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { C, F } from "../styles/theme";
 import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../hooks/useLanguage";
@@ -40,7 +41,6 @@ import {
   FiLoader,
   FiPlus,
   FiX,
-  FiSun,
   FiStar,
   FiRefreshCw,
   FiInfo,
@@ -48,13 +48,14 @@ import {
   FiUserPlus,
   FiUserCheck,
   FiUserX,
-  FiVideo,
   FiBell,
   FiCamera,
   FiFileText,
   FiClipboard,
   FiMessageCircle,
   FiFile,
+  FiSparkles,
+  FiPlay,
 } from "react-icons/fi";
 
 // ─────────────────────────────────────────────────────────────
@@ -68,6 +69,16 @@ const safeArray = (data, fallback = []) => {
     if (Array.isArray(Object.values(data)[0])) return Object.values(data)[0];
   }
   return fallback;
+};
+
+// ─────────────────────────────────────────────────────────────
+// GLASSMORPHISM STYLES
+// ─────────────────────────────────────────────────────────────
+const glass = {
+  background: "rgba(255, 255, 255, 0.8)",
+  backdropFilter: "blur(20px)",
+  border: "1px solid rgba(255, 255, 255, 0.2)",
+  boxShadow: "0 8px 32px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)",
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -153,21 +164,23 @@ const FALLBACK_MESOB_POINTS = [
 // ─────────────────────────────────────────────────────────────
 const inputStyle = {
   width: "100%",
-  padding: "10px 12px",
-  borderRadius: 8,
+  padding: "10px 14px",
+  borderRadius: 10,
   border: "1.5px solid " + C.border,
   fontSize: 13,
   fontFamily: F.sans,
   outline: "none",
   boxSizing: "border-box",
+  transition: "all 0.3s ease",
+  background: "rgba(255,255,255,0.8)",
 };
 
 const btnStyle = (bg = C.primary, color = "#fff") => ({
   display: "inline-flex",
   alignItems: "center",
   gap: 6,
-  padding: "8px 16px",
-  borderRadius: 8,
+  padding: "8px 18px",
+  borderRadius: 10,
   border: "none",
   background: bg,
   color: color,
@@ -175,15 +188,15 @@ const btnStyle = (bg = C.primary, color = "#fff") => ({
   fontSize: 13,
   cursor: "pointer",
   fontFamily: F.sans,
-  transition: "all 0.2s ease",
+  transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
 });
 
 // ─────────────────────────────────────────────────────────────
 // SECTION HEADING COMPONENT
 // ─────────────────────────────────────────────────────────────
-function SectionHeading({ eyebrow, title, sub, dark }) {
+function SectionHeading({ eyebrow, title, sub, dark, centered }) {
   return (
-    <div>
+    <div style={{ textAlign: centered ? "center" : "left" }}>
       <div
         style={{
           display: "inline-flex",
@@ -214,7 +227,7 @@ function SectionHeading({ eyebrow, title, sub, dark }) {
           marginTop: 8,
           fontSize: 14,
           color: dark ? "#a9b3e0" : C.muted,
-          maxWidth: 520,
+          maxWidth: centered ? "none" : 520,
         }}
       >
         {sub}
@@ -231,14 +244,26 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
     return (
       <div
         style={{
-          background: C.white,
+          ...glass,
           borderRadius: 16,
           padding: "24px 32px",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
           textAlign: "center",
         }}
       >
-        <p style={{ color: C.muted }}>{t.loading || "Loading stats..."}</p>
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            border: `3px solid ${C.border}`,
+            borderTopColor: C.primary,
+            animation: "spin 1s linear infinite",
+            margin: "0 auto",
+          }}
+        />
+        <p style={{ color: C.muted, marginTop: 12 }}>
+          {t.loading || "Loading stats..."}
+        </p>
       </div>
     );
   }
@@ -248,16 +273,19 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
       label: t.statTotalSessions || "Total Sessions",
       value: stats.totalSessions || 0,
       icon: <FiCalendar size={20} />,
+      color: C.primary,
     },
     {
       label: t.statPresenters || "Presenters",
       value: stats.totalPresenters || 0,
       icon: <FiUsers size={20} />,
+      color: "#10b981",
     },
     {
       label: t.statUpcoming || "Upcoming",
       value: stats.upcomingSessions || 0,
       icon: <FiClock size={20} />,
+      color: "#f59e0b",
     },
     {
       label: t.statAvgRating || "Avg Rating",
@@ -265,50 +293,62 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
         ? stats.averageRating.toFixed(1)
         : t.statNoRating || "N/A",
       icon: <FiStar size={20} />,
+      color: "#f5c518",
     },
   ];
 
   return (
     <div
       style={{
-        background: C.white,
-        borderRadius: 16,
-        padding: "24px 32px",
-        boxShadow: "0 4px 12px rgba(0,0,0,0.06)",
+        ...glass,
+        borderRadius: 20,
+        padding: "clamp(20px, 3vw, 32px)",
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
         gap: 16,
       }}
     >
       {statItems.map((item, i) => (
-        <div key={i} style={{ textAlign: "center" }}>
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: i * 0.1, duration: 0.4 }}
+          style={{ textAlign: "center" }}
+        >
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               borderRadius: "50%",
-              background: C.bg,
-              color: C.primary,
+              background: `${item.color}15`,
+              color: item.color,
               marginBottom: 8,
             }}
           >
             {item.icon}
           </div>
-          <div style={{ fontSize: 24, fontWeight: 800, color: C.dark }}>
+          <div
+            style={{
+              fontSize: "clamp(20px, 2.5vw, 28px)",
+              fontWeight: 800,
+              color: C.dark,
+            }}
+          >
             {item.value}
           </div>
           <div style={{ fontSize: 12, color: C.muted }}>{item.label}</div>
-        </div>
+        </motion.div>
       ))}
 
       {nextPresenter && nextPresenter.name && (
         <div
           style={{
             textAlign: "center",
-            borderLeft: `2px solid ${C.border}`,
+            borderLeft: `1px solid ${C.border}`,
             paddingLeft: 16,
           }}
         >
@@ -320,7 +360,7 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: 8,
+              gap: 10,
             }}
           >
             {nextPresenter.profilePhotoUrl ? (
@@ -328,17 +368,18 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
                 src={nextPresenter.profilePhotoUrl}
                 alt={nextPresenter.name}
                 style={{
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                   borderRadius: "50%",
                   objectFit: "cover",
+                  border: `2px solid ${C.gold}`,
                 }}
               />
             ) : (
               <div
                 style={{
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                   borderRadius: "50%",
                   background: C.primary,
                   color: "#fff",
@@ -352,8 +393,8 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
                 {nextPresenter.name?.charAt(0) || "?"}
               </div>
             )}
-            <div>
-              <div style={{ fontWeight: 600, color: C.dark, fontSize: 14 }}>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ fontWeight: 600, color: C.dark, fontSize: 13 }}>
                 {nextPresenter.name}
               </div>
               <div style={{ fontSize: 11, color: C.muted }}>
@@ -408,7 +449,7 @@ function TelegramPostButton({ sessionId, onPosted, t }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// SESSION CARD COMPONENT
+// SESSION CARD COMPONENT - ENHANCED
 // ─────────────────────────────────────────────────────────────
 function SessionCard({ session, language, isAdmin, onRefresh, t }) {
   const [expanded, setExpanded] = useState(false);
@@ -422,23 +463,56 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
     [language],
   );
 
-  if (!session) {
-    return null;
-  }
+  if (!session) return null;
 
   const date = session.date ? new Date(session.date) : new Date();
   const isUpcoming = session.status === "scheduled" || date > new Date();
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
       style={{
         background: C.white,
-        borderRadius: 12,
+        borderRadius: 14,
         padding: "16px 20px",
-        border: `1px solid ${isUpcoming ? C.gold + "66" : C.border}`,
-        transition: "all 0.2s ease",
+        border: `1px solid ${isUpcoming ? `${C.gold}66` : C.border}`,
+        transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        cursor: "pointer",
+        position: "relative",
+        overflow: "hidden",
       }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = C.primary;
+        e.currentTarget.style.boxShadow = "0 4px 20px rgba(13,26,94,0.10)";
+        e.currentTarget.style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = isUpcoming
+          ? `${C.gold}66`
+          : C.border;
+        e.currentTarget.style.boxShadow = "none";
+        e.currentTarget.style.transform = "translateY(0)";
+      }}
+      onClick={() => setExpanded(!expanded)}
     >
+      {/* Glow accent for upcoming */}
+      {isUpcoming && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 3,
+            background: `linear-gradient(90deg, ${C.gold}, ${C.goldLight}, ${C.gold})`,
+            backgroundSize: "200% 100%",
+            animation: "gm-sweep 3s ease-in-out infinite",
+          }}
+        />
+      )}
+
       <div
         style={{
           display: "flex",
@@ -446,17 +520,17 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
           alignItems: "center",
           flexWrap: "wrap",
           gap: 10,
-          cursor: "pointer",
         }}
-        onClick={() => setExpanded(!expanded)}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div
             style={{
-              width: 40,
-              height: 40,
+              width: 44,
+              height: 44,
               borderRadius: "50%",
-              background: isUpcoming ? C.gold : C.primary,
+              background: isUpcoming
+                ? `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`
+                : C.primary,
               color: isUpcoming ? C.dark : "#fff",
               display: "flex",
               alignItems: "center",
@@ -469,45 +543,76 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
             {date.getDate()}
           </div>
           <div>
-            <div style={{ fontWeight: 600, color: C.dark }}>
+            <div
+              style={{
+                fontWeight: 600,
+                color: C.dark,
+                fontSize: 14,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
+              }}
+            >
               {getTranslatedText(session.presentationTitle) ||
                 session.title ||
                 t.untitledSession ||
                 "Untitled Session"}
-            </div>
-            <div style={{ fontSize: 12, color: C.muted }}>
-              {getTranslatedText(session.presenterName) ||
-                t.noPresenter ||
-                "No presenter"}{" "}
-              ·{" "}
-              {date.toLocaleDateString(t.locale || "en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
               {isUpcoming && (
                 <span
                   style={{
-                    marginLeft: 8,
-                    fontSize: 10,
-                    fontWeight: 600,
-                    padding: "2px 8px",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: "1px 10px",
                     borderRadius: 999,
-                    background: C.gold + "33",
+                    background: `${C.gold}33`,
                     color: C.gold,
                   }}
                 >
                   {t.upcomingBadge || "Upcoming"}
                 </span>
               )}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                color: C.muted,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ fontWeight: 500, color: C.dark }}>
+                {getTranslatedText(session.presenterName) ||
+                  t.noPresenter ||
+                  "No presenter"}
+              </span>
+              <span>·</span>
+              <span>
+                {date.toLocaleDateString(t.locale || "en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </span>
               {session.averageRating > 0 && (
-                <span style={{ marginLeft: 8, fontSize: 12, color: C.gold }}>
-                  ★ {session.averageRating.toFixed(1)}
+                <span
+                  style={{
+                    fontSize: 12,
+                    color: C.gold,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 2,
+                  }}
+                >
+                  <FiStar size={12} /> {session.averageRating.toFixed(1)}
                 </span>
               )}
             </div>
           </div>
         </div>
+
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {session.recordingUrl && (
             <a
@@ -515,27 +620,43 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
                 fontSize: 12,
                 color: C.primary,
                 textDecoration: "none",
                 fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "4px 10px",
+                borderRadius: 6,
+                background: `${C.primary}11`,
+                transition: "all 0.2s ease",
               }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = `${C.primary}22`)
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = `${C.primary}11`)
+              }
+              onClick={(e) => e.stopPropagation()}
             >
-              <FiVideo size={14} /> {t.watchLabel || "Watch"}
+              <FiPlay size={12} /> {t.watchLabel || "Watch"}
             </a>
           )}
           {isAdmin && isUpcoming && (
-            <TelegramPostButton
-              sessionId={session._id}
-              onPosted={onRefresh}
-              t={t}
-            />
+            <div onClick={(e) => e.stopPropagation()}>
+              <TelegramPostButton
+                sessionId={session._id}
+                onPosted={onRefresh}
+                t={t}
+              />
+            </div>
           )}
           <button
-            onClick={() => setExpanded(!expanded)}
+            onClick={(e) => {
+              e.stopPropagation();
+              setExpanded(!expanded);
+            }}
             style={{
               background: "none",
               border: "none",
@@ -546,113 +667,157 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
           >
             <FiChevronDown
               size={18}
-              style={{ transform: expanded ? "rotate(180deg)" : "none" }}
+              style={{
+                transform: expanded ? "rotate(180deg)" : "none",
+                transition: "transform 0.3s ease",
+              }}
             />
           </button>
         </div>
       </div>
 
-      {expanded && (
-        <div
-          style={{
-            marginTop: 14,
-            paddingTop: 14,
-            borderTop: `1px solid ${C.border}`,
-          }}
-        >
-          {session.presentationDescription && (
-            <p style={{ fontSize: 13, color: C.dark, marginBottom: 8 }}>
-              {getTranslatedText(session.presentationDescription)}
-            </p>
-          )}
-          {session.suggestedTopics &&
-            Array.isArray(session.suggestedTopics) &&
-            session.suggestedTopics.length > 0 && (
-              <div style={{ marginBottom: 8 }}>
-                <span style={{ fontSize: 11, color: C.muted }}>
-                  {t.aiSuggestedLabel || "AI Suggested:"}
-                </span>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              overflow: "hidden",
+              marginTop: 14,
+              paddingTop: 14,
+              borderTop: `1px solid ${C.border}`,
+            }}
+          >
+            {session.presentationDescription && (
+              <p style={{ fontSize: 13, color: C.dark, marginBottom: 8 }}>
+                {getTranslatedText(session.presentationDescription)}
+              </p>
+            )}
+            {session.suggestedTopics &&
+              Array.isArray(session.suggestedTopics) &&
+              session.suggestedTopics.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: C.muted,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <FiCpu size={12} /> {t.aiSuggestedLabel || "AI Suggested:"}
+                  </span>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 4,
+                      marginTop: 4,
+                    }}
+                  >
+                    {session.suggestedTopics.slice(0, 5).map((topic, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          fontSize: 10,
+                          background: `${C.primary}11`,
+                          padding: "2px 12px",
+                          borderRadius: 999,
+                          color: C.primary,
+                        }}
+                      >
+                        {topic}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            {session.recapEn && (
+              <details style={{ marginTop: 8 }}>
+                <summary
+                  style={{
+                    fontSize: 12,
+                    color: C.primary,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  <FiInfo size={12} /> {t.viewAiRecap || "View AI Recap"}
+                </summary>
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: C.dark,
+                    marginTop: 8,
+                    padding: 12,
+                    background: C.bg,
+                    borderRadius: 8,
+                    lineHeight: 1.6,
+                  }}
+                >
+                  {getTranslatedText(session.recapEn)}
+                </p>
+              </details>
+            )}
+            {session.photos &&
+              Array.isArray(session.photos) &&
+              session.photos.length > 0 && (
                 <div
                   style={{
                     display: "flex",
+                    gap: 8,
+                    marginTop: 8,
                     flexWrap: "wrap",
-                    gap: 4,
-                    marginTop: 4,
                   }}
                 >
-                  {session.suggestedTopics.slice(0, 3).map((topic, i) => (
-                    <span
+                  {session.photos.slice(0, 4).map((photo, i) => (
+                    <img
                       key={i}
+                      src={photo.url}
+                      alt={photo.caption || "Session photo"}
                       style={{
-                        fontSize: 11,
+                        width: 64,
+                        height: 64,
+                        objectFit: "cover",
+                        borderRadius: 8,
+                        border: `1px solid ${C.border}`,
+                      }}
+                    />
+                  ))}
+                  {session.photos.length > 4 && (
+                    <div
+                      style={{
+                        width: 64,
+                        height: 64,
+                        borderRadius: 8,
                         background: C.bg,
-                        padding: "2px 10px",
-                        borderRadius: 999,
-                        color: C.dark,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: C.muted,
                       }}
                     >
-                      {topic}
-                    </span>
-                  ))}
+                      +{session.photos.length - 4}
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-          {session.recapEn && (
-            <details style={{ marginTop: 8 }}>
-              <summary
-                style={{ fontSize: 12, color: C.primary, cursor: "pointer" }}
-              >
-                <FiInfo size={12} style={{ marginRight: 4 }} />
-                {t.viewAiRecap || "View AI Recap"}
-              </summary>
-              <p
-                style={{
-                  fontSize: 13,
-                  color: C.dark,
-                  marginTop: 8,
-                  padding: 12,
-                  background: C.bg,
-                  borderRadius: 8,
-                }}
-              >
-                {getTranslatedText(session.recapEn)}
-              </p>
-            </details>
-          )}
-          {session.photos &&
-            Array.isArray(session.photos) &&
-            session.photos.length > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  marginTop: 8,
-                  flexWrap: "wrap",
-                }}
-              >
-                {session.photos.slice(0, 3).map((photo, i) => (
-                  <img
-                    key={i}
-                    src={photo.url}
-                    alt={photo.caption || "Session photo"}
-                    style={{
-                      width: 60,
-                      height: 60,
-                      objectFit: "cover",
-                      borderRadius: 8,
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-        </div>
-      )}
-    </div>
+              )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-// MODAL COMPONENT WITH PHOTO UPLOAD
+// MODAL COMPONENT WITH PHOTO UPLOAD - ENHANCED
 // ─────────────────────────────────────────────────────────────
 function EmployeeRegistrationModal({
   show,
@@ -677,11 +842,15 @@ function EmployeeRegistrationModal({
   if (!show) return null;
 
   return createPortal(
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       style={{
         position: "fixed",
         inset: 0,
         background: "rgba(0,0,0,0.6)",
+        backdropFilter: "blur(8px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -689,29 +858,54 @@ function EmployeeRegistrationModal({
       }}
       onClick={onClose}
     >
-      <div
+      <motion.div
+        initial={{ scale: 0.9, y: 20, opacity: 0 }}
+        animate={{ scale: 1, y: 0, opacity: 1 }}
+        exit={{ scale: 0.9, y: 20, opacity: 0 }}
+        transition={{ duration: 0.3, type: "spring", damping: 25 }}
         style={{
           background: "#ffffff",
-          borderRadius: 16,
+          borderRadius: 24,
           padding: 32,
-          maxWidth: 500,
+          maxWidth: 520,
           width: "92%",
           maxHeight: "90vh",
           overflow: "auto",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.3)",
           position: "relative",
         }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Decorative header */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 4,
+            background: `linear-gradient(90deg, ${C.primary}, ${C.gold}, ${C.primary})`,
+            backgroundSize: "200% 100%",
+            animation: "gm-sweep 4s ease-in-out infinite",
+          }}
+        />
+
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: 20,
+            marginBottom: 24,
           }}
         >
-          <h3 style={{ margin: 0, color: C.dark, fontFamily: F.serif }}>
+          <h3
+            style={{
+              margin: 0,
+              color: C.dark,
+              fontFamily: F.serif,
+              fontSize: 22,
+            }}
+          >
             {t.registerEmployeeTitle || "Register Employee"}
           </h3>
           <button
@@ -725,11 +919,11 @@ function EmployeeRegistrationModal({
               padding: "4px 8px",
             }}
           >
-            ✕
+            <FiX size={22} />
           </button>
         </div>
 
-        <div style={{ display: "grid", gap: 14 }}>
+        <div style={{ display: "grid", gap: 18 }}>
           {/* Employee Selection */}
           <div>
             <label
@@ -737,10 +931,12 @@ function EmployeeRegistrationModal({
                 fontSize: 13,
                 color: C.muted,
                 display: "block",
-                marginBottom: 4,
+                marginBottom: 6,
+                fontWeight: 500,
               }}
             >
-              {t.employeeLabel || "Employee"} *
+              {t.employeeLabel || "Employee"}{" "}
+              <span style={{ color: "#ef4444" }}>*</span>
             </label>
             {selectedUser ? (
               <div
@@ -748,30 +944,33 @@ function EmployeeRegistrationModal({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  padding: "8px 12px",
-                  borderRadius: 8,
-                  border: `1.5px solid ${C.border}`,
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  border: `1.5px solid ${C.primary}`,
+                  background: `${C.primary}06`,
                 }}
               >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div
                     style={{
-                      width: 28,
-                      height: 28,
+                      width: 36,
+                      height: 36,
                       borderRadius: "50%",
                       background: C.primary,
                       color: "#fff",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
-                      fontSize: 13,
+                      fontSize: 14,
                       fontWeight: 700,
                     }}
                   >
                     {selectedUser.name?.charAt(0) || "?"}
                   </div>
                   <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>
+                    <div
+                      style={{ fontWeight: 600, fontSize: 13, color: C.dark }}
+                    >
                       {selectedUser.name}
                     </div>
                     <div style={{ fontSize: 11, color: C.muted }}>
@@ -789,9 +988,10 @@ function EmployeeRegistrationModal({
                     border: "none",
                     cursor: "pointer",
                     color: C.muted,
+                    padding: "4px",
                   }}
                 >
-                  <FiX size={16} />
+                  <FiX size={18} />
                 </button>
               </div>
             ) : (
@@ -806,16 +1006,24 @@ function EmployeeRegistrationModal({
                 />
                 <div
                   style={{
-                    maxHeight: 160,
+                    maxHeight: 180,
                     overflowY: "auto",
                     marginTop: 6,
                     border: `1px solid ${C.border}`,
-                    borderRadius: 8,
+                    borderRadius: 10,
+                    background: C.white,
                   }}
                 >
                   {filteredUsers.length === 0 ? (
-                    <div style={{ padding: 10, fontSize: 12, color: C.muted }}>
-                      {t.noMatchingUsers || "No matching users"}
+                    <div
+                      style={{
+                        padding: 14,
+                        fontSize: 13,
+                        color: C.muted,
+                        textAlign: "center",
+                      }}
+                    >
+                      {t.noMatchingUsers || "No matching users found"}
                     </div>
                   ) : (
                     filteredUsers.map((u) => (
@@ -823,10 +1031,14 @@ function EmployeeRegistrationModal({
                         key={u._id}
                         onClick={() => handleSelectUser(u)}
                         style={{
-                          padding: "8px 12px",
+                          padding: "10px 14px",
                           cursor: "pointer",
                           fontSize: 13,
                           borderBottom: `1px solid ${C.border}`,
+                          transition: "background 0.2s ease",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
                         }}
                         onMouseEnter={(e) =>
                           (e.currentTarget.style.background = C.bg)
@@ -835,9 +1047,29 @@ function EmployeeRegistrationModal({
                           (e.currentTarget.style.background = "transparent")
                         }
                       >
-                        <div style={{ fontWeight: 600 }}>{u.name}</div>
-                        <div style={{ fontSize: 11, color: C.muted }}>
-                          {u.email}
+                        <div
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: "50%",
+                            background: C.primary,
+                            color: "#fff",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: 12,
+                            fontWeight: 700,
+                          }}
+                        >
+                          {u.name?.charAt(0) || "?"}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, color: C.dark }}>
+                            {u.name}
+                          </div>
+                          <div style={{ fontSize: 11, color: C.muted }}>
+                            {u.email}
+                          </div>
                         </div>
                       </div>
                     ))
@@ -854,7 +1086,8 @@ function EmployeeRegistrationModal({
                 fontSize: 13,
                 color: C.muted,
                 display: "block",
-                marginBottom: 4,
+                marginBottom: 6,
+                fontWeight: 500,
               }}
             >
               {t.departmentLabel || "Department"}
@@ -876,7 +1109,8 @@ function EmployeeRegistrationModal({
                 fontSize: 13,
                 color: C.muted,
                 display: "block",
-                marginBottom: 4,
+                marginBottom: 6,
+                fontWeight: 500,
               }}
             >
               {t.positionLabel || "Position"}
@@ -898,7 +1132,8 @@ function EmployeeRegistrationModal({
                 fontSize: 13,
                 color: C.muted,
                 display: "block",
-                marginBottom: 4,
+                marginBottom: 6,
+                fontWeight: 500,
               }}
             >
               {t.profilePhotoLabel || "Profile Photo"}
@@ -935,21 +1170,21 @@ function EmployeeRegistrationModal({
             {photoPreview && (
               <div
                 style={{
-                  marginTop: 8,
+                  marginTop: 10,
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
+                  gap: 14,
                 }}
               >
                 <img
                   src={photoPreview}
                   alt="Preview"
                   style={{
-                    width: 60,
-                    height: 60,
+                    width: 64,
+                    height: 64,
                     borderRadius: "50%",
                     objectFit: "cover",
-                    border: `2px solid ${C.border}`,
+                    border: `2px solid ${C.primary}`,
                   }}
                 />
                 <button
@@ -963,26 +1198,28 @@ function EmployeeRegistrationModal({
                     color: "#ef4444",
                     cursor: "pointer",
                     fontSize: 12,
+                    fontWeight: 500,
                   }}
                 >
                   {t.removeBtn || "Remove"}
                 </button>
               </div>
             )}
-            <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 6 }}>
               {t.photoUploadHint ||
                 "Upload a photo from your computer (JPG, PNG, GIF) - Max 5MB"}
             </div>
           </div>
 
-          {/* OR: Keep URL option as fallback */}
+          {/* Photo URL */}
           <div>
             <label
               style={{
                 fontSize: 13,
                 color: C.muted,
                 display: "block",
-                marginBottom: 4,
+                marginBottom: 6,
+                fontWeight: 500,
               }}
             >
               {t.photoUrlLabel || "Photo URL"} ({t.optional || "optional"})
@@ -1009,32 +1246,71 @@ function EmployeeRegistrationModal({
               gap: 10,
               justifyContent: "flex-end",
               marginTop: 8,
-              paddingTop: 16,
+              paddingTop: 18,
               borderTop: `1px solid ${C.border}`,
             }}
           >
-            <button onClick={onClose} style={btnStyle("#e5e7eb", "#444")}>
+            <button
+              onClick={onClose}
+              style={{
+                padding: "10px 22px",
+                borderRadius: 10,
+                border: `1px solid ${C.border}`,
+                background: "transparent",
+                color: C.muted,
+                fontWeight: 600,
+                fontSize: 13,
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = C.bg)}
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "transparent")
+              }
+            >
               {t.cancelBtn || "Cancel"}
             </button>
             <button
               onClick={onRegister}
               disabled={registering || !employeeForm.userId || uploadingPhoto}
               style={{
-                ...btnStyle(C.primary),
+                padding: "10px 28px",
+                borderRadius: 10,
+                border: "none",
+                background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                color: "#fff",
+                fontWeight: 700,
+                fontSize: 13,
+                cursor:
+                  registering || !employeeForm.userId || uploadingPhoto
+                    ? "not-allowed"
+                    : "pointer",
                 opacity:
                   registering || !employeeForm.userId || uploadingPhoto
                     ? 0.6
                     : 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                transition: "all 0.3s ease",
               }}
             >
+              {registering || uploadingPhoto ? (
+                <FiLoader
+                  size={16}
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+              ) : (
+                <FiUserPlus size={16} />
+              )}
               {registering || uploadingPhoto
                 ? t.processingBtn || "Processing..."
                 : t.registerBtn || "Register Employee"}
             </button>
           </div>
         </div>
-      </div>
-    </div>,
+      </motion.div>
+    </motion.div>,
     document.body,
   );
 }
@@ -1120,8 +1396,6 @@ export default function GoldenMonday() {
     description: "",
   });
   const [generating, setGenerating] = useState(false);
-  const [topics, setTopics] = useState([]);
-  const [loadingTopics, setLoadingTopics] = useState(false);
 
   // ── Admin Panel State ──
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
@@ -1350,24 +1624,6 @@ export default function GoldenMonday() {
     }
   };
 
-  const handleSuggestTopics = async () => {
-    try {
-      setLoadingTopics(true);
-      const response = await goldenMondayAPI.suggestTopics();
-      const topicsData = response.data?.topics;
-      if (Array.isArray(topicsData)) {
-        setTopics(topicsData);
-      } else {
-        setTopics([]);
-      }
-    } catch {
-      showToast(t.failedSuggestTopics || "Failed to suggest topics", "error");
-      setTopics([]);
-    } finally {
-      setLoadingTopics(false);
-    }
-  };
-
   // ── Admin Handlers ──
   const handleRegisterEmployee = async () => {
     if (!employeeForm.userId) {
@@ -1473,7 +1729,7 @@ export default function GoldenMonday() {
   }));
 
   return (
-    <div style={{ fontFamily: F.sans, background: C.gray }}>
+    <div style={{ fontFamily: F.sans, background: C.gray, minHeight: "100vh" }}>
       <style>{`
         @keyframes gm-rise {
           0% { transform: translateY(6px); opacity: 0.85; }
@@ -1486,7 +1742,7 @@ export default function GoldenMonday() {
         }
         @keyframes gm-pulse-ring {
           0% { box-shadow: 0 0 0 0 ${C.gold}55; }
-          70% { box-shadow: 0 0 0 14px ${C.gold}00; }
+          70% { box-shadow: 0 0 0 20px ${C.gold}00; }
           100% { box-shadow: 0 0 0 0 ${C.gold}00; }
         }
         @keyframes spin {
@@ -1497,11 +1753,62 @@ export default function GoldenMonday() {
           from { opacity: 0; transform: translateY(-10px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .gm-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(13,26,94,0.14); }
-        .gm-mesob-point:hover { background: ${C.bg}; }
-        .gm-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 26px ${C.primary}55; }
-        .gm-refresh-btn:hover { transform: rotate(180deg); }
-        .fade-in { animation: fadeIn 0.3s ease forwards; }
+        @keyframes shimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        .gm-card {
+          transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .gm-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 16px 48px rgba(13,26,94,0.12);
+        }
+        .gm-cta {
+          transition: all 0.3s ease;
+        }
+        .gm-cta:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(245,197,24,0.4);
+        }
+        .gm-refresh-btn {
+          transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .gm-refresh-btn:hover {
+          transform: rotate(180deg);
+        }
+        .glass-card {
+          background: rgba(255, 255, 255, 0.8);
+          backdrop-filter: blur(20px);
+          border: 1px solid rgba(255, 255, 255, 0.2);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+        .tab-btn {
+          transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+          position: relative;
+        }
+        .tab-btn.active {
+          background: ${C.primary};
+          color: #fff;
+          box-shadow: 0 4px 16px ${C.primary}44;
+        }
+        .tab-btn:not(.active):hover {
+          background: rgba(13,26,94,0.06);
+          transform: translateY(-1px);
+        }
+        .shimmer-text {
+          background: linear-gradient(90deg, #f5c518, #d4a017, #f5c518);
+          background-size: 200% 100%;
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          animation: shimmer 3s ease-in-out infinite;
+        }
+        .hero-glow {
+          animation: gm-pulse-ring 3s ease-in-out infinite;
+        }
+        .fade-in {
+          animation: fadeIn 0.4s ease forwards;
+        }
       `}</style>
 
       {/* ── HERO SECTION ── */}
@@ -1509,154 +1816,292 @@ export default function GoldenMonday() {
         style={{
           position: "relative",
           overflow: "hidden",
-          background: `linear-gradient(120deg, ${C.dark} 0%, ${C.primary} 45%, #b8860b 100%)`,
-          backgroundSize: "220% 220%",
-          animation: "gm-sweep 14s ease infinite alternate",
+          background: `linear-gradient(135deg, ${C.dark} 0%, ${C.primary} 50%, #1a1a4e 100%)`,
           padding:
-            "clamp(56px, 10vw, 96px) clamp(20px, 6vw, 64px) clamp(64px, 8vw, 88px)",
+            "clamp(60px, 10vw, 100px) clamp(20px, 6vw, 64px) clamp(40px, 6vw, 60px)",
           color: "#fff",
         }}
       >
+        {/* Animated background orbs */}
         <div
-          aria-hidden
           style={{
             position: "absolute",
-            top: "-120px",
-            right: "-80px",
-            width: 340,
-            height: 340,
+            top: "-200px",
+            right: "-100px",
+            width: 400,
+            height: 400,
             borderRadius: "50%",
-            background: `radial-gradient(circle, ${C.gold}88 0%, ${C.gold}22 55%, transparent 75%)`,
-            filter: "blur(2px)",
-            animation: "gm-rise 6s ease-in-out infinite",
+            background: `radial-gradient(circle, ${C.gold}33, transparent 70%)`,
+            animation: "gm-rise 8s ease-in-out infinite",
+            pointerEvents: "none",
           }}
         />
-        <div style={{ maxWidth: 760, position: "relative", zIndex: 1 }}>
-          <div
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 8,
-              background: "rgba(245,197,24,0.16)",
-              border: `1px solid ${C.gold}55`,
-              color: C.goldLight,
-              padding: "6px 14px",
-              borderRadius: 999,
-              fontSize: 12,
-              fontWeight: 700,
-              letterSpacing: 0.4,
-              marginBottom: 22,
-            }}
-          >
-            <FiClock size={13} />
-            {t.eyebrow || "Every Monday · 2:00 – 2:50"}
-          </div>
+        <div
+          style={{
+            position: "absolute",
+            bottom: "-150px",
+            left: "-100px",
+            width: 350,
+            height: 350,
+            borderRadius: "50%",
+            background: `radial-gradient(circle, rgba(245,197,24,0.15), transparent 70%)`,
+            animation: "gm-rise 10s ease-in-out infinite reverse",
+            pointerEvents: "none",
+          }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: "20%",
+            left: "30%",
+            width: 200,
+            height: 200,
+            borderRadius: "50%",
+            background: `radial-gradient(circle, rgba(255,255,255,0.03), transparent 70%)`,
+            animation: "gm-rise 12s ease-in-out infinite 2s",
+            pointerEvents: "none",
+          }}
+        />
 
-          <h1
-            style={{
-              fontFamily: F.serif,
-              fontSize: "clamp(38px, 7vw, 64px)",
-              fontWeight: 900,
-              lineHeight: 1.05,
-              margin: 0,
-              display: "flex",
-              alignItems: "center",
-              gap: 16,
-              flexWrap: "wrap",
-            }}
-          >
-            <span
-              style={{
-                display: "inline-flex",
-                width: 58,
-                height: 58,
-                borderRadius: 16,
-                background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-                color: C.dark,
-                alignItems: "center",
-                justifyContent: "center",
-                animation: "gm-pulse-ring 2.4s ease-in-out infinite",
-                flexShrink: 0,
-              }}
-            >
-              <FiSunrise size={30} />
-            </span>
-            {t.title || "Golden Monday"}
-          </h1>
-
-          <p
-            style={{
-              fontSize: "clamp(15px, 2.4vw, 19px)",
-              lineHeight: 1.65,
-              color: "#eaeeff",
-              maxWidth: 620,
-              marginTop: 22,
-            }}
-          >
-            {t.subtitle ||
-              "The organization's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all."}
-          </p>
-
+        <div
+          style={{
+            maxWidth: 1100,
+            margin: "0 auto",
+            position: "relative",
+            zIndex: 1,
+          }}
+        >
           <div
             style={{
               display: "flex",
-              gap: 12,
-              marginTop: 28,
-              flexWrap: "wrap",
               alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: 20,
             }}
           >
-            <a
-              href="#gm-pillars"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 8,
-                color: C.goldLight,
-                textDecoration: "none",
-                fontWeight: 700,
-                fontSize: 14,
-                borderBottom: `1.5px solid ${C.gold}66`,
-                paddingBottom: 4,
-              }}
-            >
-              {t.scroll || "Explore the story"}
-              <FiChevronDown size={16} />
-            </a>
-
-            {(isAdminOrAbove || isSuperAdmin) && (
-              <button
-                onClick={refreshData}
-                disabled={refreshing}
-                className="gm-refresh-btn"
+            <div style={{ flex: 1, minWidth: 280 }}>
+              <div
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: 6,
-                  background: "rgba(255,255,255,0.1)",
-                  border: `1px solid rgba(255,255,255,0.2)`,
-                  borderRadius: 8,
-                  padding: "6px 14px",
-                  color: "#fff",
+                  gap: 8,
+                  background: "rgba(245,197,24,0.15)",
+                  border: `1px solid ${C.gold}44`,
+                  padding: "6px 18px",
+                  borderRadius: 999,
                   fontSize: 12,
-                  cursor: "pointer",
-                  transition: "transform 0.3s ease",
+                  fontWeight: 700,
+                  color: C.goldLight,
+                  marginBottom: 18,
                 }}
               >
-                <FiRefreshCw
-                  size={14}
-                  style={{
-                    animation: refreshing ? "spin 1s linear infinite" : "none",
-                  }}
-                />
-                {refreshing
-                  ? t.refreshing || "Refreshing..."
-                  : t.refresh || "Refresh"}
-              </button>
-            )}
+                <FiClock size={13} />
+                {t.eyebrow || "Every Monday · 2:00 – 2:50"}
+              </div>
 
-            {/* Notification Bell */}
-            <NotificationBell />
+              <h1
+                style={{
+                  fontFamily: F.serif,
+                  fontSize: "clamp(36px, 7vw, 64px)",
+                  fontWeight: 900,
+                  lineHeight: 1.05,
+                  margin: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 16,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span
+                  className="hero-glow"
+                  style={{
+                    display: "inline-flex",
+                    width: 60,
+                    height: 60,
+                    borderRadius: 16,
+                    background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
+                    color: C.dark,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  <FiSunrise size={32} />
+                </span>
+                <span
+                  className="shimmer-text"
+                  style={{ WebkitTextFillColor: "transparent" }}
+                >
+                  {t.title || "Golden Monday"}
+                </span>
+              </h1>
+
+              <p
+                style={{
+                  fontSize: "clamp(15px, 2vw, 20px)",
+                  lineHeight: 1.7,
+                  color: "#c8d0f0",
+                  maxWidth: 600,
+                  marginTop: 16,
+                }}
+              >
+                {t.subtitle ||
+                  "The organization's weekly ritual for shared learning — and the philosophy behind why Addis MESOB exists at all."}
+              </p>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  marginTop: 24,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                <a
+                  href="#gm-pillars"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 8,
+                    color: C.goldLight,
+                    textDecoration: "none",
+                    fontWeight: 700,
+                    fontSize: 14,
+                    borderBottom: `1.5px solid ${C.gold}66`,
+                    paddingBottom: 4,
+                    transition: "all 0.3s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderBottomColor = C.gold;
+                    e.currentTarget.style.transform = "translateX(4px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderBottomColor = `${C.gold}66`;
+                    e.currentTarget.style.transform = "translateX(0)";
+                  }}
+                >
+                  {t.scroll || "Explore the story"} <FiChevronDown size={16} />
+                </a>
+
+                {(isAdminOrAbove || isSuperAdmin) && (
+                  <button
+                    onClick={refreshData}
+                    disabled={refreshing}
+                    className="gm-refresh-btn"
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      background: "rgba(255,255,255,0.08)",
+                      border: `1px solid rgba(255,255,255,0.15)`,
+                      borderRadius: 8,
+                      padding: "6px 16px",
+                      color: "#fff",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      transition: "all 0.3s ease",
+                    }}
+                  >
+                    <FiRefreshCw
+                      size={14}
+                      style={{
+                        animation: refreshing
+                          ? "spin 1s linear infinite"
+                          : "none",
+                      }}
+                    />
+                    {refreshing
+                      ? t.refreshing || "Refreshing..."
+                      : t.refresh || "Refresh"}
+                  </button>
+                )}
+
+                <NotificationBell />
+              </div>
+            </div>
+
+            {/* Stats Mini-Card */}
+            {stats && (
+              <div
+                style={{
+                  ...glass,
+                  borderRadius: 16,
+                  padding: "20px 24px",
+                  minWidth: 200,
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 12,
+                  }}
+                >
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{
+                        fontSize: 28,
+                        fontWeight: 800,
+                        color: C.goldLight,
+                      }}
+                    >
+                      {stats.totalSessions || 0}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#a9b3e0" }}>
+                      {t.statTotalSessions || "Sessions"}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{
+                        fontSize: 28,
+                        fontWeight: 800,
+                        color: C.goldLight,
+                      }}
+                    >
+                      {stats.totalPresenters || 0}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#a9b3e0" }}>
+                      {t.statPresenters || "Presenters"}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{
+                        fontSize: 28,
+                        fontWeight: 800,
+                        color: C.goldLight,
+                      }}
+                    >
+                      {stats.upcomingSessions || 0}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#a9b3e0" }}>
+                      {t.statUpcoming || "Upcoming"}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{
+                        fontSize: 28,
+                        fontWeight: 800,
+                        color: C.goldLight,
+                      }}
+                    >
+                      {stats.averageRating
+                        ? stats.averageRating.toFixed(1)
+                        : "—"}
+                    </div>
+                    <div style={{ fontSize: 10, color: "#a9b3e0" }}>
+                      {t.statAvgRating || "Rating"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -1690,44 +2135,65 @@ export default function GoldenMonday() {
         style={{
           maxWidth: 1000,
           margin: "0 auto",
-          padding: "clamp(20px, 4vw, 32px) clamp(20px, 6vw, 40px) 0",
+          padding: "clamp(16px, 3vw, 24px) clamp(20px, 6vw, 40px) 0",
         }}
       >
         <div
           style={{
+            ...glass,
+            borderRadius: 16,
+            padding: "6px",
             display: "flex",
             gap: 4,
-            borderBottom: `2px solid ${C.border}`,
-            paddingBottom: 8,
             flexWrap: "wrap",
-            background: C.white,
-            borderRadius: 12,
-            padding: "8px 12px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+            position: "sticky",
+            top: 0,
+            zIndex: 100,
+            transition: "all 0.3s ease",
           }}
         >
           {tabs.map((tab) => (
             <button
               key={tab.id}
+              className={`tab-btn ${activeTab === tab.id ? "active" : ""}`}
               onClick={() => setActiveTab(tab.id)}
               style={{
+                flex: 1,
+                minWidth: 80,
                 display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
                 gap: 6,
-                padding: "8px 16px",
-                borderRadius: 8,
+                padding: "10px 16px",
+                borderRadius: 10,
                 background: activeTab === tab.id ? C.primary : "transparent",
                 color: activeTab === tab.id ? "#fff" : C.muted,
                 border: "none",
-                fontSize: 13,
-                fontWeight: activeTab === tab.id ? 600 : 400,
+                fontSize: 12,
+                fontWeight: activeTab === tab.id ? 700 : 500,
                 cursor: "pointer",
-                transition: "all 0.2s ease",
+                transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                 fontFamily: F.sans,
               }}
             >
               {tab.icon}
-              {tab.label}
+              <span
+                style={{ display: window.innerWidth < 600 ? "none" : "inline" }}
+              >
+                {tab.label}
+              </span>
+              {activeTab === tab.id && (
+                <span
+                  style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: "50%",
+                    background: "#fff",
+                    marginLeft: 2,
+                    animation: "gm-pulse-ring 2s ease-in-out infinite",
+                  }}
+                />
+              )}
             </button>
           ))}
         </div>
@@ -1738,300 +2204,141 @@ export default function GoldenMonday() {
         style={{
           maxWidth: 1000,
           margin: "0 auto",
-          padding: "clamp(20px, 4vw, 32px) clamp(20px, 6vw, 40px)",
+          padding: "clamp(16px, 3vw, 24px) clamp(20px, 6vw, 40px)",
         }}
       >
-        {/* ─── OVERVIEW TAB ─── */}
-        {activeTab === "overview" && (
-          <div>
-            {/* PILLARS */}
-            <div
-              id="gm-pillars"
-              ref={registerRef("pillars")}
-              data-reveal="pillars"
-              style={{
-                marginBottom: 32,
-                ...revealStyle("pillars"),
-              }}
+        <AnimatePresence mode="wait">
+          {/* ─── OVERVIEW TAB ─── */}
+          {activeTab === "overview" && (
+            <motion.div
+              key="overview"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
             >
-              <SectionHeading
-                eyebrow={<FiCompass size={14} />}
-                title={t.pillarsTitle || "Why a golden morning"}
-                sub={
-                  t.pillarsSub || "Three things every session comes back to."
-                }
-              />
+              {/* PILLARS */}
               <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-                  gap: 20,
-                  marginTop: 28,
-                }}
-              >
-                {Array.isArray(pillars) && pillars.length > 0 ? (
-                  pillars.map((pillar, i) => {
-                    const IconComponent = PILLAR_ICONS[pillar.icon] || (
-                      <FiCompass size={22} />
-                    );
-                    const translatedTitle = getTranslatedText(pillar.title);
-                    const translatedBody = getTranslatedText(pillar.body);
-
-                    return (
-                      <div
-                        key={i}
-                        className="gm-card"
-                        style={{
-                          background: C.white,
-                          borderRadius: 16,
-                          padding: 24,
-                          border: `1px solid ${C.border}`,
-                          transition:
-                            "transform 0.25s ease, box-shadow 0.25s ease",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 42,
-                            height: 42,
-                            borderRadius: 12,
-                            background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-                            color: "#fff",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            marginBottom: 16,
-                          }}
-                        >
-                          {IconComponent}
-                        </div>
-                        <h3
-                          style={{
-                            margin: "0 0 8px",
-                            fontSize: 16,
-                            color: C.dark,
-                            fontFamily: F.serif,
-                          }}
-                        >
-                          {translatedTitle || pillar.title?.en || "Untitled"}
-                        </h3>
-                        <p
-                          style={{
-                            margin: 0,
-                            fontSize: 13.5,
-                            lineHeight: 1.6,
-                            color: C.muted,
-                          }}
-                        >
-                          {translatedBody || pillar.body?.en || ""}
-                        </p>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div
-                    style={{
-                      gridColumn: "1 / -1",
-                      textAlign: "center",
-                      color: C.muted,
-                      padding: "40px 0",
-                    }}
-                  >
-                    <FiCompass
-                      size={32}
-                      style={{ marginBottom: 12, opacity: 0.5 }}
-                    />
-                    <p>{t.loading || "Loading pillars..."}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* AI SESSION STUDIO (Leader/Admin only) */}
-            {isLeaderOrAbove && (
-              <div
-                ref={registerRef("aiStudio")}
-                data-reveal="aiStudio"
+                id="gm-pillars"
+                ref={registerRef("pillars")}
+                data-reveal="pillars"
                 style={{
                   marginBottom: 32,
-                  ...revealStyle("aiStudio"),
+                  ...revealStyle("pillars"),
                 }}
               >
                 <SectionHeading
-                  eyebrow={<FiCpu size={14} />}
-                  title={t.aiTitle || "AI session recap"}
+                  eyebrow={<FiCompass size={14} />}
+                  title={t.pillarsTitle || "Why a golden morning"}
                   sub={
-                    t.aiSub ||
-                    "Log a session in plain notes — AI turns it into a polished bilingual recap in seconds."
+                    t.pillarsSub || "Three things every session comes back to."
                   }
                 />
-
                 <div
                   style={{
-                    marginTop: 24,
                     display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
                     gap: 20,
+                    marginTop: 28,
                   }}
                 >
-                  {/* Composer card */}
-                  <div
-                    style={{
-                      background: C.white,
-                      borderRadius: 16,
-                      border: `1px solid ${C.border}`,
-                      padding: 22,
-                    }}
-                  >
-                    {!showComposer ? (
-                      <button
-                        onClick={() => setShowComposer(true)}
-                        style={{
-                          width: "100%",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          gap: 8,
-                          padding: "14px 18px",
-                          borderRadius: 10,
-                          border: `1.5px dashed ${C.primary}66`,
-                          background: C.bg,
-                          color: C.primary,
-                          fontWeight: 700,
-                          fontSize: 14,
-                          cursor: "pointer",
-                          fontFamily: F.sans,
-                        }}
-                      >
-                        <FiPlus size={16} />
-                        {t.aiNewSession || "Log a new session"}
-                      </button>
-                    ) : (
-                      <div style={{ display: "grid", gap: 10 }}>
-                        <input
-                          placeholder={t.aiFormTitle || "Session title"}
-                          value={form.title}
-                          onChange={handleFormChange("title")}
-                          style={inputStyle}
-                        />
-                        <div
+                  {Array.isArray(pillars) && pillars.length > 0 ? (
+                    pillars.map((pillar, i) => {
+                      const IconComponent = PILLAR_ICONS[pillar.icon] || (
+                        <FiCompass size={22} />
+                      );
+                      const translatedTitle = getTranslatedText(pillar.title);
+                      const translatedBody = getTranslatedText(pillar.body);
+
+                      return (
+                        <motion.div
+                          key={i}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: i * 0.1, duration: 0.4 }}
+                          className="gm-card"
                           style={{
-                            display: "flex",
-                            gap: 10,
-                            flexWrap: "wrap",
+                            background: C.white,
+                            borderRadius: 16,
+                            padding: 24,
+                            border: `1px solid ${C.border}`,
+                            transition:
+                              "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease",
                           }}
                         >
-                          <input
-                            placeholder={t.aiFormOrg || "Organization"}
-                            value={form.organization}
-                            onChange={handleFormChange("organization")}
-                            style={{ ...inputStyle, flex: "1 1 160px" }}
-                          />
-                          <input
-                            placeholder={
-                              t.aiFormSpeaker || "Speaker / facilitator"
-                            }
-                            value={form.speaker}
-                            onChange={handleFormChange("speaker")}
-                            style={{ ...inputStyle, flex: "1 1 160px" }}
-                          />
-                        </div>
-                        <input
-                          type="date"
-                          value={form.date}
-                          onChange={handleFormChange("date")}
-                          style={inputStyle}
-                        />
-                        <textarea
-                          placeholder={
-                            t.aiFormNotes ||
-                            "Raw notes — write it however you like, AI will clean it up"
-                          }
-                          value={form.rawNotes}
-                          onChange={handleFormChange("rawNotes")}
-                          rows={5}
-                          style={{
-                            ...inputStyle,
-                            resize: "vertical",
-                            fontFamily: F.sans,
-                          }}
-                        />
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: 10,
-                            justifyContent: "flex-end",
-                          }}
-                        >
-                          <button
-                            onClick={() => setShowComposer(false)}
-                            disabled={generating}
+                          <div
                             style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 6,
-                              padding: "9px 16px",
-                              borderRadius: 8,
-                              border: "none",
-                              background: "#e5e7eb",
-                              color: "#444",
-                              fontWeight: 600,
-                              fontSize: 13,
-                              cursor: generating ? "not-allowed" : "pointer",
-                              fontFamily: F.sans,
-                            }}
-                          >
-                            <FiX size={14} />
-                            {t.aiCancel || "Cancel"}
-                          </button>
-                          <button
-                            onClick={handleGenerateAndSave}
-                            disabled={generating}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              padding: "9px 18px",
-                              borderRadius: 8,
-                              border: "none",
+                              width: 46,
+                              height: 46,
+                              borderRadius: 12,
                               background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
                               color: "#fff",
-                              fontWeight: 700,
-                              fontSize: 13,
-                              cursor: generating ? "not-allowed" : "pointer",
-                              opacity: generating ? 0.75 : 1,
-                              fontFamily: F.sans,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginBottom: 16,
                             }}
                           >
-                            {generating ? (
-                              <>
-                                <FiLoader
-                                  size={14}
-                                  style={{
-                                    animation: "spin 1s linear infinite",
-                                  }}
-                                />
-                                {t.aiGenerating || "Writing recap…"}
-                              </>
-                            ) : (
-                              <>
-                                <FiSend size={14} />
-                                {t.aiGenerate || "Generate & save with AI"}
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                            {IconComponent}
+                          </div>
+                          <h3
+                            style={{
+                              margin: "0 0 8px",
+                              fontSize: 16,
+                              color: C.dark,
+                              fontFamily: F.serif,
+                            }}
+                          >
+                            {translatedTitle || pillar.title?.en || "Untitled"}
+                          </h3>
+                          <p
+                            style={{
+                              margin: 0,
+                              fontSize: 13.5,
+                              lineHeight: 1.7,
+                              color: C.muted,
+                            }}
+                          >
+                            {translatedBody || pillar.body?.en || ""}
+                          </p>
+                        </motion.div>
+                      );
+                    })
+                  ) : (
+                    <div
+                      style={{
+                        gridColumn: "1 / -1",
+                        textAlign: "center",
+                        color: C.muted,
+                        padding: "40px 0",
+                      }}
+                    >
+                      <FiCompass
+                        size={32}
+                        style={{ marginBottom: 12, opacity: 0.5 }}
+                      />
+                      <p>{t.loading || "Loading pillars..."}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
 
-                  {/* Topic suggestions card */}
+              {/* AI SESSION STUDIO (Leader/Admin only) */}
+              {isLeaderOrAbove && (
+                <div
+                  ref={registerRef("aiStudio")}
+                  data-reveal="aiStudio"
+                  style={{
+                    marginBottom: 32,
+                    ...revealStyle("aiStudio"),
+                  }}
+                >
                   <div
                     style={{
-                      background: C.dark,
-                      color: "#fff",
-                      borderRadius: 16,
-                      padding: 22,
+                      ...glass,
+                      borderRadius: 20,
+                      padding: "clamp(20px, 3vw, 28px)",
+                      overflow: "hidden",
                     }}
                   >
                     <div
@@ -2039,514 +2346,800 @@ export default function GoldenMonday() {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "space-between",
-                        gap: 10,
                         flexWrap: "wrap",
+                        gap: 12,
+                        marginBottom: 16,
                       }}
                     >
                       <div
                         style={{
                           display: "flex",
                           alignItems: "center",
-                          gap: 8,
-                          fontWeight: 700,
-                          fontSize: 14,
+                          gap: 12,
                         }}
                       >
-                        <FiSun size={16} color={C.gold} />
-                        {t.aiTopicsTitle || "AI: suggest next topics"}
-                      </div>
-                      <button
-                        onClick={handleSuggestTopics}
-                        disabled={loadingTopics}
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "7px 14px",
-                          borderRadius: 999,
-                          border: `1px solid ${C.gold}88`,
-                          background: "transparent",
-                          color: C.gold,
-                          fontWeight: 700,
-                          fontSize: 12,
-                          cursor: loadingTopics ? "not-allowed" : "pointer",
-                          fontFamily: F.sans,
-                        }}
-                      >
-                        {loadingTopics ? (
-                          <FiLoader
-                            size={13}
-                            style={{ animation: "spin 1s linear infinite" }}
-                          />
-                        ) : (
-                          <FiCpu size={13} />
-                        )}
-                        {loadingTopics
-                          ? t.aiTopicsLoading || "Thinking of topics…"
-                          : t.aiTopicsBtn || "Suggest topics"}
-                      </button>
-                    </div>
-
-                    <div style={{ marginTop: 16, display: "grid", gap: 10 }}>
-                      {(!Array.isArray(topics) || topics.length === 0) && (
-                        <p
+                        <div
                           style={{
-                            fontSize: 12.5,
-                            color: "#a9b3e0",
-                            margin: 0,
+                            width: 44,
+                            height: 44,
+                            borderRadius: 12,
+                            background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: C.dark,
                           }}
                         >
-                          {t.aiTopicsEmpty ||
-                            "Log a couple of sessions first so AI has something to build on."}
-                        </p>
-                      )}
-                      {Array.isArray(topics) &&
-                        topics.map((topic, i) => (
-                          <div
-                            key={i}
+                          <FiSparkles size={22} />
+                        </div>
+                        <div>
+                          <h3
                             style={{
-                              background: "rgba(255,255,255,0.06)",
-                              border: "1px solid rgba(255,255,255,0.1)",
-                              borderRadius: 10,
-                              padding: "10px 14px",
+                              margin: 0,
+                              fontSize: 17,
+                              color: C.dark,
+                              fontFamily: F.serif,
                             }}
+                          >
+                            {t.aiTitle || "AI Session Studio"}
+                          </h3>
+                          <p
+                            style={{ margin: 0, fontSize: 12, color: C.muted }}
+                          >
+                            {t.aiSub ||
+                              "Log notes — AI turns them into a polished recap"}
+                          </p>
+                        </div>
+                      </div>
+                      {!showComposer && (
+                        <button
+                          onClick={() => setShowComposer(true)}
+                          style={{
+                            padding: "8px 22px",
+                            borderRadius: 10,
+                            border: "none",
+                            background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
+                            color: C.dark,
+                            fontWeight: 700,
+                            fontSize: 13,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            transition: "all 0.3s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = "scale(1.03)";
+                            e.currentTarget.style.boxShadow =
+                              "0 4px 16px rgba(245,197,24,0.3)";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = "scale(1)";
+                            e.currentTarget.style.boxShadow = "none";
+                          }}
+                        >
+                          <FiPlus size={16} /> {t.aiNewSession || "New Session"}
+                        </button>
+                      )}
+                    </div>
+
+                    <AnimatePresence>
+                      {showComposer && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.3 }}
+                          style={{ overflow: "hidden" }}
+                        >
+                          <div
+                            style={{ display: "grid", gap: 12, paddingTop: 8 }}
                           >
                             <div
                               style={{
-                                fontSize: 13,
-                                fontWeight: 700,
-                                color: C.goldLight,
-                                marginBottom: 4,
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: 12,
                               }}
                             >
-                              {topic.title}
+                              <input
+                                placeholder={t.aiFormTitle || "Session title"}
+                                value={form.title}
+                                onChange={handleFormChange("title")}
+                                style={inputStyle}
+                              />
+                              <input
+                                placeholder={t.aiFormOrg || "Organization"}
+                                value={form.organization}
+                                onChange={handleFormChange("organization")}
+                                style={inputStyle}
+                              />
                             </div>
                             <div
                               style={{
-                                fontSize: 12,
-                                color: "#c9d0f0",
-                                lineHeight: 1.5,
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                gap: 12,
                               }}
                             >
-                              {topic.rationale}
+                              <input
+                                placeholder={t.aiFormSpeaker || "Speaker"}
+                                value={form.speaker}
+                                onChange={handleFormChange("speaker")}
+                                style={inputStyle}
+                              />
+                              <input
+                                type="date"
+                                value={form.date}
+                                onChange={handleFormChange("date")}
+                                style={inputStyle}
+                              />
+                            </div>
+                            <textarea
+                              placeholder={
+                                t.aiFormNotes ||
+                                "Raw notes — AI will clean it up"
+                              }
+                              value={form.rawNotes}
+                              onChange={handleFormChange("rawNotes")}
+                              rows={4}
+                              style={{
+                                ...inputStyle,
+                                resize: "vertical",
+                                fontFamily: F.sans,
+                              }}
+                            />
+                            <div
+                              style={{
+                                display: "flex",
+                                gap: 10,
+                                justifyContent: "flex-end",
+                              }}
+                            >
+                              <button
+                                onClick={() => setShowComposer(false)}
+                                style={{
+                                  padding: "8px 22px",
+                                  borderRadius: 10,
+                                  border: `1px solid ${C.border}`,
+                                  background: "transparent",
+                                  color: C.muted,
+                                  fontWeight: 600,
+                                  fontSize: 13,
+                                  cursor: "pointer",
+                                  transition: "all 0.2s ease",
+                                }}
+                                onMouseEnter={(e) =>
+                                  (e.currentTarget.style.background = C.bg)
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.currentTarget.style.background =
+                                    "transparent")
+                                }
+                              >
+                                {t.aiCancel || "Cancel"}
+                              </button>
+                              <button
+                                onClick={handleGenerateAndSave}
+                                disabled={generating}
+                                style={{
+                                  padding: "8px 28px",
+                                  borderRadius: 10,
+                                  border: "none",
+                                  background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                                  color: "#fff",
+                                  fontWeight: 700,
+                                  fontSize: 13,
+                                  cursor: generating
+                                    ? "not-allowed"
+                                    : "pointer",
+                                  opacity: generating ? 0.7 : 1,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 8,
+                                  transition: "all 0.3s ease",
+                                }}
+                              >
+                                {generating ? (
+                                  <FiLoader
+                                    size={16}
+                                    style={{
+                                      animation: "spin 1s linear infinite",
+                                    }}
+                                  />
+                                ) : (
+                                  <FiSend size={16} />
+                                )}
+                                {generating
+                                  ? t.aiGenerating || "Generating..."
+                                  : t.aiGenerate || "Generate & Save"}
+                              </button>
                             </div>
                           </div>
-                        ))}
-                    </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
+              )}
+
+              {/* ROTATION PANEL */}
+              <div style={{ marginBottom: 32 }}>
+                <GoldenMondayRotationPanel onRefresh={refreshData} />
               </div>
-            )}
 
-            {/* ROTATION PANEL */}
-            <div style={{ marginBottom: 32 }}>
-              <GoldenMondayRotationPanel onRefresh={refreshData} />
-            </div>
-
-            {/* UPCOMING & PAST SESSIONS TIMELINE */}
-            <div
-              ref={registerRef("timeline")}
-              data-reveal="timeline"
-              style={revealStyle("timeline")}
-            >
-              <SectionHeading
-                eyebrow={<FiCalendar size={14} />}
-                title={t.timelineTitle || "Sessions Timeline"}
-                sub={t.timelineSub || "A running record, not a one-off event."}
-              />
-
-              {/* Upcoming Sessions */}
-              {upcomingSessions.length > 0 && (
-                <div style={{ marginTop: 30 }}>
-                  <h3
-                    style={{ color: C.primary, fontSize: 16, marginBottom: 16 }}
-                  >
-                    <FiClock size={16} style={{ marginRight: 8 }} />
-                    {t.upcomingSessionsHeader || "Upcoming Sessions"}
-                  </h3>
-                  <div style={{ display: "grid", gap: 12 }}>
-                    {upcomingSessions.map((session) => (
-                      <SessionCard
-                        key={session._id}
-                        session={session}
-                        language={language}
-                        isAdmin={isAdminOrAbove}
-                        onRefresh={refreshData}
-                        t={t}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Past Sessions */}
-              {pastSessions.length > 0 && (
-                <div style={{ marginTop: 40 }}>
-                  <h3
-                    style={{ color: C.muted, fontSize: 16, marginBottom: 16 }}
-                  >
-                    <FiStar size={16} style={{ marginRight: 8 }} />
-                    {t.pastSessionsHeader || "Past Sessions"}
-                  </h3>
-                  <div style={{ display: "grid", gap: 12 }}>
-                    {pastSessions.slice(0, 10).map((session) => (
-                      <SessionCard
-                        key={session._id}
-                        session={session}
-                        language={language}
-                        isAdmin={isAdminOrAbove}
-                        onRefresh={refreshData}
-                        t={t}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {upcomingSessions.length === 0 && pastSessions.length === 0 && (
-                <p
-                  style={{
-                    color: C.muted,
-                    textAlign: "center",
-                    padding: "40px 0",
-                  }}
-                >
-                  {t.noSessionsYet ||
-                    "No sessions recorded yet. Start by logging a session with AI!"}
-                </p>
-              )}
-            </div>
-
-            {/* ADMIN PANEL (Admin/SuperAdmin only) */}
-            {isAdminOrAbove && (
+              {/* UPCOMING & PAST SESSIONS TIMELINE */}
               <div
-                ref={registerRef("admin")}
-                data-reveal="admin"
-                style={{
-                  marginTop: 40,
-                  ...revealStyle("admin"),
-                }}
+                ref={registerRef("timeline")}
+                data-reveal="timeline"
+                style={revealStyle("timeline")}
               >
-                <SectionHeading
-                  eyebrow={<FiUsers size={14} />}
-                  title={t.adminPanelTitle || "Employee Management"}
-                  sub={
-                    t.adminPanelSub ||
-                    "Register and manage employees for Golden Monday rotation"
-                  }
-                />
-
                 <div
                   style={{
-                    background: C.white,
-                    borderRadius: 16,
-                    padding: 24,
-                    border: `1px solid ${C.border}`,
+                    ...glass,
+                    borderRadius: 20,
+                    padding: "clamp(20px, 3vw, 28px)",
                   }}
                 >
                   <div
                     style={{
                       display: "flex",
-                      justifyContent: "space-between",
                       alignItems: "center",
-                      marginBottom: 16,
+                      gap: 10,
+                      marginBottom: 20,
                     }}
                   >
-                    <div>
-                      <span style={{ fontWeight: 600, color: C.dark }}>
-                        {t.registeredEmployeesLabel || "Registered Employees"}:{" "}
-                        {employees.length}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setShowEmployeeModal(true)}
-                      style={btnStyle(C.primary)}
+                    <div
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        background: `${C.primary}15`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: C.primary,
+                      }}
                     >
-                      <FiUserPlus size={14} />{" "}
-                      {t.registerEmployeeBtn || "Register Employee"}
-                    </button>
+                      <FiCalendar size={18} />
+                    </div>
+                    <h3
+                      style={{
+                        margin: 0,
+                        fontSize: 18,
+                        color: C.dark,
+                        fontFamily: F.serif,
+                      }}
+                    >
+                      {t.timelineTitle || "Session Timeline"}
+                    </h3>
                   </div>
 
-                  <div style={{ display: "grid", gap: 8 }}>
-                    {employees.length === 0 ? (
-                      <p
+                  {/* Upcoming Sessions */}
+                  {upcomingSessions.length > 0 && (
+                    <>
+                      <div
                         style={{
-                          color: C.muted,
-                          textAlign: "center",
-                          padding: "20px 0",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginBottom: 12,
+                          marginTop: 8,
                         }}
                       >
-                        {t.noEmployeesYet ||
-                          'No employees registered yet. Click "Register Employee" to add.'}
-                      </p>
-                    ) : (
-                      employees.map((emp) => (
                         <div
-                          key={emp.user?._id || emp._id}
                           style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            padding: "10px 14px",
-                            borderRadius: 8,
-                            background: emp.isEligible ? C.bg : "#fef2f2",
-                            border: `1px solid ${emp.isEligible ? C.border : "#fecaca"}`,
-                            flexWrap: "wrap",
-                            gap: 8,
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            background: C.gold,
+                            animation: "gm-pulse-ring 2s ease-in-out infinite",
+                          }}
+                        />
+                        <h4 style={{ fontSize: 14, color: C.dark, margin: 0 }}>
+                          {t.upcomingSessionsHeader || "Upcoming Sessions"}
+                        </h4>
+                      </div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {upcomingSessions.map((session) => (
+                          <SessionCard
+                            key={session._id}
+                            session={session}
+                            language={language}
+                            isAdmin={isAdminOrAbove}
+                            onRefresh={refreshData}
+                            t={t}
+                          />
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {/* Past Sessions */}
+                  {pastSessions.length > 0 && (
+                    <>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                          marginTop: upcomingSessions.length > 0 ? 28 : 0,
+                          marginBottom: 12,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 6,
+                            height: 6,
+                            borderRadius: "50%",
+                            background: C.muted,
+                          }}
+                        />
+                        <h4 style={{ fontSize: 14, color: C.muted, margin: 0 }}>
+                          {t.pastSessionsHeader || "Past Sessions"}
+                        </h4>
+                      </div>
+                      <div style={{ display: "grid", gap: 10 }}>
+                        {pastSessions.slice(0, 10).map((session) => (
+                          <SessionCard
+                            key={session._id}
+                            session={session}
+                            language={language}
+                            isAdmin={isAdminOrAbove}
+                            onRefresh={refreshData}
+                            t={t}
+                          />
+                        ))}
+                        {pastSessions.length > 10 && (
+                          <p
+                            style={{
+                              textAlign: "center",
+                              fontSize: 12,
+                              color: C.muted,
+                              marginTop: 4,
+                            }}
+                          >
+                            +{pastSessions.length - 10} more sessions
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  )}
+
+                  {upcomingSessions.length === 0 &&
+                    pastSessions.length === 0 && (
+                      <div
+                        style={{
+                          textAlign: "center",
+                          padding: "40px 0",
+                          color: C.muted,
+                        }}
+                      >
+                        <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
+                        <p
+                          style={{
+                            fontSize: 15,
+                            fontWeight: 600,
+                            color: C.dark,
                           }}
                         >
+                          {t.noSessionsYet || "No sessions recorded yet"}
+                        </p>
+                        <p style={{ fontSize: 13 }}>
+                          {t.noSessionsSub ||
+                            "Start by logging a session with AI!"}
+                        </p>
+                      </div>
+                    )}
+                </div>
+              </div>
+
+              {/* ADMIN PANEL (Admin/SuperAdmin only) */}
+              {isAdminOrAbove && (
+                <div
+                  ref={registerRef("admin")}
+                  data-reveal="admin"
+                  style={{
+                    marginTop: 40,
+                    ...revealStyle("admin"),
+                  }}
+                >
+                  <div
+                    style={{
+                      ...glass,
+                      borderRadius: 20,
+                      padding: "clamp(20px, 3vw, 28px)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        gap: 12,
+                        marginBottom: 20,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 10,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 10,
+                            background: `${C.primary}15`,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            color: C.primary,
+                          }}
+                        >
+                          <FiUsers size={18} />
+                        </div>
+                        <div>
+                          <h3
+                            style={{
+                              margin: 0,
+                              fontSize: 17,
+                              color: C.dark,
+                              fontFamily: F.serif,
+                            }}
+                          >
+                            {t.adminPanelTitle || "Employee Management"}
+                          </h3>
+                          <p
+                            style={{ margin: 0, fontSize: 12, color: C.muted }}
+                          >
+                            {t.adminPanelSub ||
+                              "Register and manage employees for Golden Monday rotation"}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setShowEmployeeModal(true)}
+                        style={btnStyle(C.primary)}
+                      >
+                        <FiUserPlus size={14} />{" "}
+                        {t.registerEmployeeBtn || "Register Employee"}
+                      </button>
+                    </div>
+
+                    <div style={{ display: "grid", gap: 8 }}>
+                      {employees.length === 0 ? (
+                        <div
+                          style={{
+                            textAlign: "center",
+                            padding: "30px 0",
+                            color: C.muted,
+                            border: `1.5px dashed ${C.border}`,
+                            borderRadius: 12,
+                          }}
+                        >
+                          <p style={{ fontSize: 13 }}>
+                            {t.noEmployeesYet ||
+                              'No employees registered yet. Click "Register Employee" to add.'}
+                          </p>
+                        </div>
+                      ) : (
+                        employees.map((emp) => (
                           <div
+                            key={emp.user?._id || emp._id}
                             style={{
                               display: "flex",
                               alignItems: "center",
-                              gap: 12,
+                              justifyContent: "space-between",
+                              padding: "10px 16px",
+                              borderRadius: 10,
+                              background: emp.isEligible ? C.bg : "#fef2f2",
+                              border: `1px solid ${emp.isEligible ? C.border : "#fecaca"}`,
+                              flexWrap: "wrap",
+                              gap: 8,
+                              transition: "all 0.2s ease",
                             }}
                           >
-                            {emp.profilePhotoUrl ? (
-                              <img
-                                src={emp.profilePhotoUrl}
-                                alt={emp.name}
-                                style={{
-                                  width: 32,
-                                  height: 32,
-                                  borderRadius: "50%",
-                                  objectFit: "cover",
-                                }}
-                              />
-                            ) : (
-                              <div
-                                style={{
-                                  width: 32,
-                                  height: 32,
-                                  borderRadius: "50%",
-                                  background: C.primary,
-                                  color: "#fff",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  fontSize: 14,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {emp.name?.charAt(0) || "?"}
-                              </div>
-                            )}
-                            <div>
-                              <div
-                                style={{
-                                  fontWeight: 600,
-                                  color: C.dark,
-                                  fontSize: 14,
-                                }}
-                              >
-                                {emp.name}
-                              </div>
-                              <div style={{ fontSize: 12, color: C.muted }}>
-                                {emp.department ||
-                                  t.noDepartment ||
-                                  "No department"}{" "}
-                                ·{" "}
-                                {emp.position || t.noPosition || "No position"}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 12,
+                              }}
+                            >
+                              {emp.profilePhotoUrl ? (
+                                <img
+                                  src={emp.profilePhotoUrl}
+                                  alt={emp.name}
+                                  style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: "50%",
+                                    objectFit: "cover",
+                                    border: `2px solid ${emp.isEligible ? C.primary : "#ef4444"}`,
+                                  }}
+                                />
+                              ) : (
+                                <div
+                                  style={{
+                                    width: 36,
+                                    height: 36,
+                                    borderRadius: "50%",
+                                    background: emp.isEligible
+                                      ? C.primary
+                                      : "#ef4444",
+                                    color: "#fff",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    fontSize: 14,
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  {emp.name?.charAt(0) || "?"}
+                                </div>
+                              )}
+                              <div>
+                                <div
+                                  style={{
+                                    fontWeight: 600,
+                                    color: C.dark,
+                                    fontSize: 14,
+                                  }}
+                                >
+                                  {emp.name}
+                                </div>
+                                <div style={{ fontSize: 12, color: C.muted }}>
+                                  {emp.department ||
+                                    t.noDepartment ||
+                                    "No department"}{" "}
+                                  ·{" "}
+                                  {emp.position ||
+                                    t.noPosition ||
+                                    "No position"}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                          <div
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              flexWrap: "wrap",
-                            }}
-                          >
-                            <span
+
+                            <div
                               style={{
-                                fontSize: 11,
-                                fontWeight: 600,
-                                padding: "2px 10px",
-                                borderRadius: 999,
-                                background: emp.isEligible
-                                  ? "#d1fae5"
-                                  : "#fef2f2",
-                                color: emp.isEligible ? "#065f46" : "#991b1b",
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                flexWrap: "wrap",
                               }}
                             >
-                              {emp.isEligible
-                                ? t.activeLabel || "Active"
-                                : t.inactiveLabel || "Inactive"}
-                            </span>
-                            <span style={{ fontSize: 11, color: C.muted }}>
-                              {t.presentedLabel || "Presented"}:{" "}
-                              {emp.timesPresented || 0}x
-                            </span>
-                            <button
-                              onClick={() =>
-                                handleToggleEligibility(
-                                  emp.user?._id || emp._id,
-                                  emp.isEligible,
-                                )
-                              }
-                              style={{
-                                ...btnStyle(
-                                  emp.isEligible ? "#f59e0b" : "#10b981",
-                                  "#fff",
-                                ),
-                                fontSize: 11,
-                                padding: "4px 10px",
-                              }}
-                            >
-                              {emp.isEligible ? (
-                                <FiUserX size={12} />
-                              ) : (
-                                <FiUserCheck size={12} />
-                              )}
-                              {emp.isEligible
-                                ? t.deactivateBtn || "Deactivate"
-                                : t.activateBtn || "Activate"}
-                            </button>
-                            {isSuperAdmin && (
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  padding: "2px 12px",
+                                  borderRadius: 999,
+                                  background: emp.isEligible
+                                    ? "#d1fae5"
+                                    : "#fef2f2",
+                                  color: emp.isEligible ? "#065f46" : "#991b1b",
+                                }}
+                              >
+                                {emp.isEligible
+                                  ? t.activeLabel || "Active"
+                                  : t.inactiveLabel || "Inactive"}
+                              </span>
+                              <span style={{ fontSize: 11, color: C.muted }}>
+                                {t.presentedLabel || "Presented"}:{" "}
+                                {emp.timesPresented || 0}x
+                              </span>
                               <button
                                 onClick={() =>
-                                  handleRemoveEmployee(
+                                  handleToggleEligibility(
                                     emp.user?._id || emp._id,
-                                    emp.name,
+                                    emp.isEligible,
                                   )
                                 }
                                 style={{
-                                  ...btnStyle("#ef4444", "#fff"),
+                                  ...btnStyle(
+                                    emp.isEligible ? "#f59e0b" : "#10b981",
+                                    "#fff",
+                                  ),
                                   fontSize: 11,
-                                  padding: "4px 10px",
+                                  padding: "4px 12px",
                                 }}
                               >
-                                <FiTrash2 size={12} />
-                                {t.removeBtn || "Remove"}
+                                {emp.isEligible ? (
+                                  <FiUserX size={12} />
+                                ) : (
+                                  <FiUserCheck size={12} />
+                                )}
+                                {emp.isEligible
+                                  ? t.deactivateBtn || "Deactivate"
+                                  : t.activateBtn || "Activate"}
                               </button>
-                            )}
+                              {isSuperAdmin && (
+                                <button
+                                  onClick={() =>
+                                    handleRemoveEmployee(
+                                      emp.user?._id || emp._id,
+                                      emp.name,
+                                    )
+                                  }
+                                  style={{
+                                    ...btnStyle("#ef4444", "#fff"),
+                                    fontSize: 11,
+                                    padding: "4px 12px",
+                                  }}
+                                >
+                                  <FiTrash2 size={12} />{" "}
+                                  {t.removeBtn || "Remove"}
+                                </button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))
-                    )}
+                        ))
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </motion.div>
+          )}
 
-        {/* ─── EXPERIENCE & RESULT TAB ─── */}
-        {activeTab === "experience-result" && (
-          <div>
-            <ExperiencesAndResults sessionId={selectedSessionId} />
-          </div>
-        )}
+          {/* ─── EXPERIENCE & RESULT TAB ─── */}
+          {activeTab === "experience-result" && (
+            <motion.div
+              key="experience-result"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+            >
+              <ExperiencesAndResults sessionId={selectedSessionId} />
+            </motion.div>
+          )}
 
-        {/* ─── ATTENDANCE TAB ─── */}
-        {activeTab === "attendance" && (
-          <div>
-            {/* Session Selector */}
-            {sessionOptions.length > 0 && (
-              <div
-                style={{
-                  marginBottom: 16,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 12,
-                  flexWrap: "wrap",
-                }}
-              >
-                <label
+          {/* ─── ATTENDANCE TAB ─── */}
+          {activeTab === "attendance" && (
+            <motion.div
+              key="attendance"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+            >
+              {sessionOptions.length > 0 && (
+                <div
                   style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: C.dark,
+                    ...glass,
+                    borderRadius: 16,
+                    padding: "16px 20px",
+                    marginBottom: 16,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    flexWrap: "wrap",
                   }}
                 >
-                  {t.selectSession || "Select Session:"}
-                </label>
-                <select
-                  value={selectedSessionId || ""}
-                  onChange={(e) => setSelectedSessionId(e.target.value)}
+                  <label
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: C.dark,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <FiCalendar size={16} />{" "}
+                    {t.selectSession || "Select Session:"}
+                  </label>
+                  <select
+                    value={selectedSessionId || ""}
+                    onChange={(e) => setSelectedSessionId(e.target.value)}
+                    style={{
+                      padding: "8px 14px",
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 10,
+                      fontSize: 13,
+                      background: C.white,
+                      outline: "none",
+                      flex: 1,
+                      minWidth: 180,
+                    }}
+                  >
+                    {sessionOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {selectedSessionId && (
+                <>
+                  <div style={{ marginBottom: 16 }}>
+                    <QRCheckIn
+                      sessionId={selectedSessionId}
+                      onCheckIn={refreshData}
+                    />
+                  </div>
+                  <AttendancePanel
+                    sessionId={selectedSessionId}
+                    onRefresh={refreshData}
+                  />
+                </>
+              )}
+
+              {!selectedSessionId && (
+                <div
                   style={{
-                    padding: "8px 12px",
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    background: C.white,
-                    outline: "none",
-                    minWidth: 200,
-                    flex: 1,
+                    ...glass,
+                    borderRadius: 20,
+                    padding: "60px 20px",
+                    textAlign: "center",
+                    color: C.muted,
                   }}
                 >
-                  {sessionOptions.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+                  <p style={{ fontSize: 16, marginBottom: 4 }}>
+                    {t.noSessionsAvailable || "No sessions available"}
+                  </p>
+                  <p style={{ fontSize: 13, color: "#999" }}>
+                    {t.createSessionFirst ||
+                      "Create a session first to record attendance"}
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
 
-            {/* QR CHECK-IN */}
-            {selectedSessionId && (
-              <div style={{ marginBottom: 20 }}>
-                <QRCheckIn
-                  sessionId={selectedSessionId}
-                  onCheckIn={refreshData}
-                />
-              </div>
-            )}
-
-            {selectedSessionId ? (
-              <AttendancePanel
+          {/* ─── RESOURCES TAB ─── */}
+          {activeTab === "resources" && (
+            <motion.div
+              key="resources"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+            >
+              <ResourceLibrary
                 sessionId={selectedSessionId}
                 onRefresh={refreshData}
               />
-            ) : (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "60px 20px",
-                  color: C.muted,
-                }}
-              >
-                <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-                <p style={{ fontSize: 16, marginBottom: 4 }}>
-                  {t.noSessionsAvailable || "No sessions available"}
-                </p>
-                <p style={{ fontSize: 13, color: "#999" }}>
-                  {t.createSessionFirst ||
-                    "Create a session first to record attendance"}
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+            </motion.div>
+          )}
 
-        {/* ─── RESOURCES TAB ─── */}
-        {activeTab === "resources" && (
-          <div>
-            <ResourceLibrary
-              sessionId={selectedSessionId}
-              onRefresh={refreshData}
-            />
-          </div>
-        )}
+          {/* ─── GALLERY TAB ─── */}
+          {activeTab === "gallery" && (
+            <motion.div
+              key="gallery"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+            >
+              <GalleryGrid
+                sessionId={selectedSessionId}
+                onRefresh={refreshData}
+              />
+            </motion.div>
+          )}
 
-        {/* ─── GALLERY TAB ─── */}
-        {activeTab === "gallery" && (
-          <div>
-            <GalleryGrid
-              sessionId={selectedSessionId}
-              onRefresh={refreshData}
-            />
-          </div>
-        )}
-
-        {/* ─── REPORTS TAB ─── */}
-        {activeTab === "reports" && (
-          <div>
-            <ReportExport sessionId={selectedSessionId} />
-          </div>
-        )}
+          {/* ─── REPORTS TAB ─── */}
+          {activeTab === "reports" && (
+            <motion.div
+              key="reports"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.4 }}
+            >
+              <ReportExport sessionId={selectedSessionId} />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </section>
 
       {/* ── MESOB PLATFORM ── */}
@@ -2590,12 +3183,12 @@ export default function GoldenMonday() {
                   gap: 8,
                   background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
                   color: C.dark,
-                  padding: "12px 22px",
-                  borderRadius: 10,
+                  padding: "12px 28px",
+                  borderRadius: 12,
                   fontWeight: 800,
                   fontSize: 14,
                   textDecoration: "none",
-                  transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                  transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                 }}
               >
                 {t.mesobCta || "Open Document Vault"}
@@ -2611,16 +3204,29 @@ export default function GoldenMonday() {
                   style={{
                     display: "flex",
                     gap: 14,
-                    padding: "14px 16px",
+                    padding: "14px 18px",
                     borderRadius: 12,
-                    border: "1px solid rgba(255,255,255,0.12)",
-                    transition: "background 0.2s ease",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    transition: "all 0.3s ease",
+                    cursor: "default",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                    e.currentTarget.style.borderColor =
+                      "rgba(255,255,255,0.15)";
+                    e.currentTarget.style.transform = "translateX(4px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.borderColor =
+                      "rgba(255,255,255,0.08)";
+                    e.currentTarget.style.transform = "translateX(0)";
                   }}
                 >
                   <div
                     style={{
-                      width: 36,
-                      height: 36,
+                      width: 40,
+                      height: 40,
                       borderRadius: 10,
                       background: "rgba(245,197,24,0.15)",
                       color: C.gold,
@@ -2636,7 +3242,7 @@ export default function GoldenMonday() {
                     style={{
                       margin: 0,
                       fontSize: 13.5,
-                      lineHeight: 1.55,
+                      lineHeight: 1.6,
                       color: "#dfe4ff",
                     }}
                   >
@@ -2656,27 +3262,48 @@ export default function GoldenMonday() {
           padding: "clamp(40px, 7vw, 60px) 20px clamp(56px, 9vw, 80px)",
         }}
       >
-        <h3
-          style={{
-            fontFamily: F.serif,
-            fontSize: "clamp(20px, 3vw, 26px)",
-            color: C.dark,
-            margin: "0 0 8px",
-          }}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
         >
-          {t.closingTitle || "Start your week here"}
-        </h3>
-        <p
-          style={{
-            color: C.muted,
-            fontSize: 14,
-            maxWidth: 440,
-            margin: "0 auto",
-          }}
-        >
-          {t.closingBody ||
-            "Golden Monday is a standing fixture — check back weekly for the next session's write-up."}
-        </p>
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              background: `${C.gold}22`,
+              color: C.gold,
+              marginBottom: 12,
+            }}
+          >
+            <FiSunrise size={24} />
+          </div>
+          <h3
+            style={{
+              fontFamily: F.serif,
+              fontSize: "clamp(20px, 3vw, 26px)",
+              color: C.dark,
+              margin: "0 0 8px",
+            }}
+          >
+            {t.closingTitle || "Start your week here"}
+          </h3>
+          <p
+            style={{
+              color: C.muted,
+              fontSize: 14,
+              maxWidth: 440,
+              margin: "0 auto",
+            }}
+          >
+            {t.closingBody ||
+              "Golden Monday is a standing fixture — check back weekly for the next session's write-up."}
+          </p>
+        </motion.div>
       </section>
 
       {/* ── REGISTER EMPLOYEE MODAL ── */}
@@ -2707,7 +3334,7 @@ export default function GoldenMonday() {
         t={t}
       />
 
-      {/* Remove Confirmation Modal */}
+      {/* ── REMOVE CONFIRMATION MODAL ── */}
       <ConfirmModal
         isOpen={removeConfirm.isOpen}
         onClose={() =>
