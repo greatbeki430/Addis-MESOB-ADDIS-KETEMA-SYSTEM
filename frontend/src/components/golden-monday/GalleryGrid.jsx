@@ -756,7 +756,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     document.body.style.overflow = "hidden";
   };
 
-  const closeLightbox = () => {
+  const closeLightbox = useCallback(() => {
     setSelectedPhoto(null);
     setZoomLevel(1);
     setDragOffset({ x: 0, y: 0 });
@@ -765,20 +765,23 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       document.exitFullscreen?.();
       setIsFullscreen(false);
     }
-  };
+  }, [isFullscreen]);
 
-  const navigateLightbox = (direction) => {
-    const photoItems = items.filter((item) => item.url);
-    if (photoItems.length === 0) return;
-    const newIndex =
-      (lightboxIndex + direction + photoItems.length) % photoItems.length;
-    setLightboxIndex(newIndex);
-    setSelectedPhoto(photoItems[newIndex]);
-    setZoomLevel(1);
-    setDragOffset({ x: 0, y: 0 });
-  };
+  const navigateLightbox = useCallback(
+    (direction) => {
+      const photoItems = items.filter((item) => item.url);
+      if (photoItems.length === 0) return;
+      const newIndex =
+        (lightboxIndex + direction + photoItems.length) % photoItems.length;
+      setLightboxIndex(newIndex);
+      setSelectedPhoto(photoItems[newIndex]);
+      setZoomLevel(1);
+      setDragOffset({ x: 0, y: 0 });
+    },
+    [items, lightboxIndex],
+  );
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = useCallback(() => {
     if (!isFullscreen) {
       document.documentElement.requestFullscreen?.();
       setIsFullscreen(true);
@@ -786,15 +789,20 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       document.exitFullscreen?.();
       setIsFullscreen(false);
     }
-  };
+  }, [isFullscreen]);
 
-  const handleZoomIn = () => setZoomLevel((prev) => Math.min(prev + 0.25, 3));
-  const handleZoomOut = () =>
-    setZoomLevel((prev) => Math.max(prev - 0.25, 0.5));
-  const handleZoomReset = () => {
+  const handleZoomIn = useCallback(
+    () => setZoomLevel((prev) => Math.min(prev + 0.25, 3)),
+    [],
+  );
+  const handleZoomOut = useCallback(
+    () => setZoomLevel((prev) => Math.max(prev - 0.25, 0.5)),
+    [],
+  );
+  const handleZoomReset = useCallback(() => {
     setZoomLevel(1);
     setDragOffset({ x: 0, y: 0 });
-  };
+  }, []);
 
   // ─── Keyboard Shortcuts ──
   useEffect(() => {
