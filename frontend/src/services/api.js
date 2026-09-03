@@ -343,21 +343,24 @@ export const goldenMondayAPI = {
   uploadGalleryPhoto: (data, onProgress) => {
     const formData = new FormData();
 
-    // Handle base64 file data (any type: image, pdf, pptx, docx, video, etc.)
+    // Handle base64 file data
     if (data.image && data.image.startsWith("data:")) {
       try {
         const blob = dataURLtoBlob(data.image);
         const ext = blob.type.split("/")[1]?.split("+")[0] || "bin";
-        formData.append("image", blob, `upload.${ext}`);
+        const filename = data.filename || `upload.${ext}`;
+        formData.append("image", blob, filename);
         console.log(
-          `📸 [UPLOAD] File prepared: upload.${ext}, size: ${blob.size} bytes`,
+          `📸 [UPLOAD] File prepared: ${filename}, size: ${blob.size} bytes`,
         );
       } catch (blobError) {
         console.error(
           "❌ [UPLOAD] Failed to convert dataURL to blob:",
           blobError,
         );
-        return Promise.reject(new Error("Failed to process image data"));
+        return Promise.reject(
+          new Error("Failed to process image data: " + blobError.message),
+        );
       }
     } else if (data.image) {
       formData.append("image", data.image);
@@ -372,6 +375,7 @@ export const goldenMondayAPI = {
       console.log(`📤 [UPLOAD] folderId: ${data.folderId}`);
     } else {
       console.warn("⚠️ [UPLOAD] No folderId provided - backend requires this");
+      return Promise.reject(new Error("folderId is required for upload"));
     }
 
     if (data.category) formData.append("category", data.category);
@@ -383,20 +387,35 @@ export const goldenMondayAPI = {
       ...formData.keys(),
     ]);
 
-    return api.post("/golden-monday/gallery", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      timeout: 180000,
-      onUploadProgress: (progressEvent) => {
-        if (onProgress) {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total,
-          );
-          onProgress(percentCompleted);
+    return api
+      .post("/golden-monday/gallery", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        timeout: 180000,
+        onUploadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total,
+            );
+            onProgress(Math.min(percentCompleted, 100));
+          }
+        },
+      })
+      .catch((error) => {
+        // Enhance error with more context
+        console.error(
+          "❌ [UPLOAD] Request failed:",
+          error.response?.data || error.message,
+        );
+        if (error.response?.data?.error) {
+          const enhancedError = new Error(error.response.data.error);
+          enhancedError.status = error.response.status;
+          enhancedError.code = error.response.data.code;
+          return Promise.reject(enhancedError);
         }
-      },
-    });
+        return Promise.reject(error);
+      });
   },
 
   deleteGalleryPhoto: (photoId) =>

@@ -44,53 +44,91 @@ const getOrCreateWeekFolder = async ({
 
   console.log("🔍 [getOrCreateWeekFolder] weekOf:", weekOf.toISOString());
 
-  let folder;
-  try {
-    folder = await GoldenMondayFolder.findOneAndUpdate(
-      { folderType: "week", weekOf },
-      {
-        $setOnInsert: {
+  let folder = null;
+  let retries = 3;
+
+  while (retries > 0 && !folder) {
+    try {
+      folder = await GoldenMondayFolder.findOneAndUpdate(
+        {
           folderType: "week",
           weekOf,
-          weekOfEthiopianDate: weekOfEthiopianDate || "",
           createdBy: userId,
-          createdByName: userName,
         },
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
-    console.log(
-      "🔍 [getOrCreateWeekFolder] upsert succeeded, folder:",
-      folder ? folder._id : "NULL/UNDEFINED",
-    );
-  } catch (err) {
-    // ✅ Log the FULL error, not just err.code, so we can see exactly
-    // what MongoDB rejected — which index, which constraint, etc.
-    console.error("🔍 [getOrCreateWeekFolder] upsert threw. Full error:", {
-      name: err.name,
-      code: err.code,
-      message: err.message,
-      keyPattern: err.keyPattern,
-      keyValue: err.keyValue,
-    });
-
-    if (err.code === 11000) {
-      folder = await GoldenMondayFolder.findOne({ folderType: "week", weekOf });
-      console.log(
-        "🔍 [getOrCreateWeekFolder] post-E11000 findOne result:",
-        folder ? folder._id : "NULL",
+        {
+          $setOnInsert: {
+            folderType: "week",
+            weekOf,
+            weekOfEthiopianDate: weekOfEthiopianDate || "",
+            createdBy: userId,
+            createdByName: userName,
+          },
+        },
+        {
+          upsert: true,
+          new: true,
+          setDefaultsOnInsert: true,
+          // Use lean to reduce overhead
+          lean: true,
+        },
       );
-    } else {
-      throw err;
+      console.log(
+        "✅ [getOrCreateWeekFolder] upsert succeeded, folder:",
+        folder?._id,
+      );
+      break;
+    } catch (err) {
+      console.error(
+        `❌ [getOrCreateWeekFolder] upsert attempt failed (${retries} retries):`,
+        {
+          code: err.code,
+          message: err.message,
+          keyPattern: err.keyPattern,
+        },
+      );
+
+      if (err.code === 11000) {
+        // Duplicate key - try to find existing
+        try {
+          folder = await GoldenMondayFolder.findOne({
+            folderType: "week",
+            weekOf,
+            createdBy: userId,
+          });
+          if (folder) {
+            console.log(
+              "✅ [getOrCreateWeekFolder] found existing folder:",
+              folder._id,
+            );
+            break;
+          }
+        } catch (findErr) {
+          console.warn(
+            "⚠️ [getOrCreateWeekFolder] find existing failed:",
+            findErr,
+          );
+        }
+      }
+
+      retries--;
+      if (retries > 0) {
+        // Wait before retry with exponential backoff
+        await new Promise((resolve) =>
+          setTimeout(resolve, 500 * (4 - retries)),
+        );
+      } else {
+        throw err;
+      }
     }
   }
 
   if (!folder) {
     throw new Error(
-      `getOrCreateWeekFolder: upsert returned no document for weekOf=${weekOf.toISOString()}`,
+      `getOrCreateWeekFolder: Could not create or find folder for weekOf=${weekOf.toISOString()}`,
     );
   }
 
+  // Add topic if provided
   if (trimmedTopic) {
     const alreadyPresent = (folder.topics || []).some(
       (t) => t.toLowerCase() === trimmedTopic.toLowerCase(),
@@ -99,7 +137,7 @@ const getOrCreateWeekFolder = async ({
       folder = await GoldenMondayFolder.findByIdAndUpdate(
         folder._id,
         { $addToSet: { topics: trimmedTopic } },
-        { new: true },
+        { new: true, lean: true },
       );
     }
   }
