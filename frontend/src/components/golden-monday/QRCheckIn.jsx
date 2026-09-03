@@ -10,7 +10,7 @@ import {
   FiCheck,
   FiCamera,
   FiRefreshCw,
-  FiQrCode,
+  FiQrcode,
   FiClock,
   FiCheckCircle,
   FiXCircle,
@@ -185,7 +185,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
               : `0 4px 16px ${C.primary}44`,
           }}
         >
-          <FiQrCode size={20} />
+          <FiQrcode size={20} />
         </div>
         <div>
           <h4
@@ -280,7 +280,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             />
           ) : (
             <div style={{ textAlign: "center", color: C.muted }}>
-              <FiQrCode size={40} style={{ opacity: 0.3 }} />
+              <FiQrcode size={40} style={{ opacity: 0.3 }} />
               <p style={{ fontSize: 12, marginTop: 8 }}>No QR available</p>
             </div>
           )}
