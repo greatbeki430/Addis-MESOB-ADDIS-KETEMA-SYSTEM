@@ -2,7 +2,7 @@
 // ════════════════════════════════════════════════════════════
 // pages/Evaluation - With Dynamic Comments & Database Storage
 // ════════════════════════════════════════════════════════════
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { btn, card, C, F, inp } from "../styles/theme";
 import { CRITERIA } from "../constants/criteria";
 import { exportEvaluationReportToPDF } from "../utils/pdfExport";
@@ -54,6 +54,7 @@ import {
   FiEye,
   FiTrash2,
   FiLock,
+  FiChevronUp,
 } from "react-icons/fi";
 
 // ─── Format AI Narrative - Removes markdown and formats nicely ──
@@ -137,6 +138,12 @@ function EvaluationForm({ t, lang }) {
   const [teamMembersSynced, setTeamMembersSynced] = useState(false);
   const [refreshingMembers, setRefreshingMembers] = useState(false);
 
+  // ─── Admin/Super Admin: Team selection ──────────────────────────
+  const [allTeams, setAllTeams] = useState([]);
+  const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+  const [showTeamSelector, setShowTeamSelector] = useState(false);
+
   // ─── Tab Management ──────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("form"); // "form" | "history"
   const [savedEvaluations, setSavedEvaluations] = useState([]);
@@ -151,6 +158,8 @@ function EvaluationForm({ t, lang }) {
   const memberInputRefs = useRef([]);
   const isMountedRef = useRef(true);
 
+  const isAdminUser = isAdminOrAbove(user);
+
   // ─── Cleanup on unmount ─────────────────────────────────
   useEffect(() => {
     isMountedRef.current = true;
@@ -159,34 +168,86 @@ function EvaluationForm({ t, lang }) {
     };
   }, []);
 
-  // ─── Load team roster from Team Management (leader excluded — the
-  // leader is the one filling out the evaluation, not being scored) ──
-  const loadTeamRoster = async (teamId) => {
-    const response = await teamAPI.getById(teamId);
-    const teamData = response?.data;
-    if (!teamData) return;
+  // ─── Load team roster from Team Management ──────────────────────
+  const loadTeamRoster = useCallback(async (teamId) => {
+    if (!teamId) {
+      setMembers(["", "", ""]);
+      setTeamName("");
+      setTeamMembersSynced(false);
+      return;
+    }
 
-    setTeamName(teamData.name || teamData.department || "");
+    try {
+      const response = await teamAPI.getById(teamId);
+      const teamData = response?.data;
+      if (!teamData) {
+        setMembers(["", "", ""]);
+        setTeamName("");
+        setTeamMembersSynced(false);
+        return;
+      }
 
-    const leaderId = (
-      teamData.leader?._id ||
-      teamData.leader ||
-      ""
-    )?.toString();
-    const rosterNames = (teamData.members || [])
-      .filter((m) => (m._id || m)?.toString() !== leaderId)
-      .map((m) => m.name || m)
-      .filter(Boolean);
+      setTeamName(teamData.name || teamData.department || "");
 
-    if (rosterNames.length > 0) {
-      setMembers(rosterNames);
-      setTeamMembersSynced(true);
-    } else {
-      // No members assigned to this team yet in Team Management — fall
-      // back to manual entry rather than locking the form onto an
-      // empty roster.
+      // For Admin/Super Admin evaluating any team, include ALL members
+      // including the leader (since admin is not the leader of this team)
+      const rosterNames = (teamData.members || [])
+        .map((m) => m.name || m)
+        .filter(Boolean);
+
+      if (rosterNames.length > 0) {
+        setMembers(rosterNames);
+        setTeamMembersSynced(true);
+      } else {
+        setMembers(["", "", ""]);
+        setTeamMembersSynced(false);
+      }
+    } catch (error) {
+      console.error("Failed to load team roster:", error);
+      setMembers(["", "", ""]);
+      setTeamName("");
       setTeamMembersSynced(false);
     }
+  }, []);
+
+  // ─── Load all teams (for Admin/Super Admin) ──────────────────────
+  const loadAllTeams = useCallback(async () => {
+    if (!isAdminUser) return;
+    setLoadingTeams(true);
+    try {
+      const response = await teamAPI.getAll();
+      const teams = response?.data || [];
+      setAllTeams(teams);
+      // If no team selected and there are teams, select the first one
+      if (teams.length > 0 && !selectedTeamId) {
+        setSelectedTeamId(teams[0]._id);
+        // Load the team roster
+        await loadTeamRoster(teams[0]._id);
+        setCanEvaluate(true);
+      }
+    } catch (error) {
+      console.error("Failed to load teams:", error);
+      showToast("Failed to load teams list", "error");
+    } finally {
+      setLoadingTeams(false);
+    }
+  }, [isAdminUser, selectedTeamId, showToast, loadTeamRoster]);
+
+  // ─── Handle team selection (Admin/Super Admin) ──────────────────
+  const handleTeamSelect = async (teamId) => {
+    setSelectedTeamId(teamId);
+    setEvaluationId(null);
+    setScores({});
+    setComments({});
+    setSignatures({});
+    localStorage.removeItem("currentEvaluation");
+    await loadTeamRoster(teamId);
+    setCanEvaluate(true);
+    setShowTeamSelector(false);
+    showToast(
+      `Switched to team: ${allTeams.find((t) => t._id === teamId)?.name || "Selected team"}`,
+      "success",
+    );
   };
 
   // ─── Load user's team and set permissions ──────────────────────
@@ -194,6 +255,15 @@ function EvaluationForm({ t, lang }) {
     const loadUserTeam = async () => {
       try {
         setLoading(true);
+
+        if (isAdminUser) {
+          // Admin/Super Admin: Load all teams
+          await loadAllTeams();
+          setLoading(false);
+          return;
+        }
+
+        // Team Leader: Load only their own team
         const teamId = getUserTeamId(user);
         if (teamId) {
           setUserTeamId(teamId);
@@ -208,21 +278,20 @@ function EvaluationForm({ t, lang }) {
         }
       } catch (error) {
         console.error("Failed to load team:", error);
-        // Don't show error toast here to avoid confusion
       } finally {
         setLoading(false);
       }
     };
     loadUserTeam();
-  }, [user]);
+  }, [user, isAdminUser, loadAllTeams]);
 
-  // ─── Manually re-pull the roster (e.g. after Team Management was
-  // updated with new hires) without leaving the evaluation form ──────
+  // ─── Manually re-pull the roster ────────────────────────────────
   const refreshTeamMembers = async () => {
-    if (!userTeamId) return;
+    const teamId = isAdminUser ? selectedTeamId : userTeamId;
+    if (!teamId) return;
     setRefreshingMembers(true);
     try {
-      await loadTeamRoster(userTeamId);
+      await loadTeamRoster(teamId);
       showToast(te.membersRefreshed || "Team roster refreshed", "success");
     } catch (error) {
       console.error("Failed to refresh team roster:", error);
@@ -235,7 +304,7 @@ function EvaluationForm({ t, lang }) {
     }
   };
 
-  // ─── Effect to load history when tab changes ──────────────
+  // ─── Effect to load history when tab changes ────────────────────
   useEffect(() => {
     let isActive = true;
 
@@ -243,10 +312,14 @@ function EvaluationForm({ t, lang }) {
       if (activeTab === "history" && isActive) {
         setLoadingHistory(true);
         try {
-          // Load history for user's team or all if admin
           let response;
-          if (isAdminOrAbove(user) && !userTeamId) {
-            response = await evaluationAPI.getAll();
+          if (isAdminUser) {
+            // Admin/Super Admin: Load all evaluations or by selected team
+            if (selectedTeamId) {
+              response = await evaluationAPI.getByTeam(selectedTeamId);
+            } else {
+              response = await evaluationAPI.getAll();
+            }
           } else if (userTeamId) {
             response = await evaluationAPI.getByTeam(userTeamId);
           } else {
@@ -276,14 +349,19 @@ function EvaluationForm({ t, lang }) {
     return () => {
       isActive = false;
     };
-  }, [activeTab, showToast, te.loadError, userTeamId, user]);
+  }, [
+    activeTab,
+    showToast,
+    te.loadError,
+    userTeamId,
+    user,
+    isAdminUser,
+    selectedTeamId,
+  ]);
 
-  // ─── Load an evaluation from history ──────────────────────
+  // ─── Load an evaluation from history ────────────────────────────
   const loadEvaluation = (evalData) => {
     setMembers(evalData.members || ["", "", ""]);
-    // A loaded historical evaluation is a point-in-time snapshot, which
-    // may no longer match the live team roster — show it as editable
-    // rather than implying it's still synced.
     setTeamMembersSynced(false);
     setScores(evalData.scores || {});
     setComments(evalData.comments || {});
@@ -350,7 +428,7 @@ function EvaluationForm({ t, lang }) {
     }
   };
 
-  // ─── Pass to Super Admin ────────────────────────────────────
+  // ─── Pass to Super Admin ──────────────────────────────────────
   const passToSuperAdmin = async () => {
     if (!evaluationId) {
       showToast(
@@ -360,7 +438,6 @@ function EvaluationForm({ t, lang }) {
       return;
     }
 
-    // Check permission
     if (!canEvaluate) {
       showToast(
         "You don't have permission to submit this evaluation",
@@ -444,6 +521,7 @@ function EvaluationForm({ t, lang }) {
       teamName,
       evaluationId,
       signatures,
+      selectedTeamId: isAdminUser ? selectedTeamId : undefined,
       lastUpdated: new Date().toISOString(),
     };
 
@@ -452,7 +530,16 @@ function EvaluationForm({ t, lang }) {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [members, scores, comments, teamName, evaluationId, signatures]);
+  }, [
+    members,
+    scores,
+    comments,
+    teamName,
+    evaluationId,
+    signatures,
+    isAdminUser,
+    selectedTeamId,
+  ]);
 
   // ─── Load saved evaluation ─────────────────────────────────
   useEffect(() => {
@@ -466,9 +553,6 @@ function EvaluationForm({ t, lang }) {
           if (isMounted) {
             if (data.members) {
               setMembers(data.members);
-              // Same reasoning as loadEvaluation() above — a locally
-              // cached draft may have been hand-edited, so don't claim
-              // it's still in sync with the team roster.
               setTeamMembersSynced(false);
             }
             if (data.scores) setScores(data.scores);
@@ -476,6 +560,9 @@ function EvaluationForm({ t, lang }) {
             if (data.teamName) setTeamName(data.teamName);
             if (data.evaluationId) setEvaluationId(data.evaluationId);
             if (data.signatures) setSignatures(data.signatures);
+            if (isAdminUser && data.selectedTeamId) {
+              setSelectedTeamId(data.selectedTeamId);
+            }
 
             if (data.evaluationId) {
               evaluationAPI
@@ -504,7 +591,7 @@ function EvaluationForm({ t, lang }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isAdminUser]);
 
   // ─── Member management ──────────────────────────────────────
   const addMember = () => {
@@ -553,7 +640,6 @@ function EvaluationForm({ t, lang }) {
 
   // ─── Score management ──────────────────────────────────────
   const setScore = (cId, iIdx, m, v) => {
-    // Check permission - only allow if user can evaluate
     if (!canEvaluate) {
       showToast("You don't have permission to evaluate this team", "warning");
       return;
@@ -608,9 +694,13 @@ function EvaluationForm({ t, lang }) {
     }));
   };
 
+  // ─── Get team ID for saving ────────────────────────────────────
+  const getCurrentTeamId = () => {
+    return isAdminUser ? selectedTeamId : userTeamId;
+  };
+
   // ─── Save evaluation ──────────────────────────────────────
   const saveEvaluation = async () => {
-    // Check permission
     if (!canEvaluate) {
       showToast(
         "You don't have permission to save evaluations for this team",
@@ -625,6 +715,12 @@ function EvaluationForm({ t, lang }) {
         te.noMembers || "Please add at least one team member",
         "warning",
       );
+      return;
+    }
+
+    const teamId = getCurrentTeamId();
+    if (!teamId && isAdminUser) {
+      showToast("Please select a team first", "warning");
       return;
     }
 
@@ -657,7 +753,8 @@ function EvaluationForm({ t, lang }) {
         highestScore: highestScore,
         lowestScore: lowestScore,
         totalMembers: totalMembers,
-        teamId: userTeamId,
+        team: teamId,
+        teamId: teamId,
       };
 
       let response;
@@ -697,11 +794,10 @@ function EvaluationForm({ t, lang }) {
     setSignatures({});
     localStorage.removeItem("currentEvaluation");
 
-    // Re-sync from the team roster instead of leaving blank manual
-    // inputs, since that's the normal starting state now.
-    if (userTeamId) {
+    const teamId = isAdminUser ? selectedTeamId : userTeamId;
+    if (teamId) {
       try {
-        await loadTeamRoster(userTeamId);
+        await loadTeamRoster(teamId);
       } catch (error) {
         console.error("Failed to reload team roster after reset:", error);
         setMembers(["", "", ""]);
@@ -822,7 +918,7 @@ function EvaluationForm({ t, lang }) {
   }
 
   // ─── No Team Access ─────────────────────────────────────────────────
-  if (!userTeamId && !isAdminOrAbove(user)) {
+  if (!isAdminUser && !userTeamId) {
     return (
       <div
         style={{
@@ -838,7 +934,7 @@ function EvaluationForm({ t, lang }) {
           You are not currently assigned to any team. Please contact your
           administrator to be added to a team.
         </p>
-        {isAdminOrAbove(user) && (
+        {isAdminUser && (
           <p style={{ color: C.primary, fontSize: 13, marginTop: 8 }}>
             As an admin, you can view all evaluations in the history tab.
           </p>
@@ -848,7 +944,7 @@ function EvaluationForm({ t, lang }) {
   }
 
   // ─── No Permission ──────────────────────────────────────────────────
-  if (!canViewEvaluationForm(user, userTeamId) && !isAdminOrAbove(user)) {
+  if (!isAdminUser && !canViewEvaluationForm(user, userTeamId)) {
     return (
       <div
         style={{
@@ -916,8 +1012,131 @@ function EvaluationForm({ t, lang }) {
             flexWrap: "wrap",
           }}
         >
-          {/* ✅ LANGUAGE SELECTOR */}
-          {/* <LanguageSelector variant="default" /> */}
+          {/* Admin/Super Admin: Team Selector */}
+          {isAdminUser && (
+            <div style={{ position: "relative" }}>
+              <button
+                onClick={() => setShowTeamSelector(!showTeamSelector)}
+                style={{
+                  background: C.primary,
+                  color: "#fff",
+                  padding: "4px 14px",
+                  borderRadius: 20,
+                  fontSize: "clamp(10px, 2vw, 12px)",
+                  fontWeight: 600,
+                  border: "none",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <FiUsers size={14} />
+                {teamName || "Select Team"}
+                {showTeamSelector ? (
+                  <FiChevronUp size={12} />
+                ) : (
+                  <FiChevronDown size={12} />
+                )}
+              </button>
+
+              {showTeamSelector && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 4px)",
+                    right: 0,
+                    minWidth: 220,
+                    maxWidth: 320,
+                    maxHeight: 300,
+                    overflowY: "auto",
+                    background: C.white,
+                    borderRadius: 10,
+                    boxShadow: "0 8px 32px rgba(0,0,0,0.15)",
+                    border: `1px solid ${C.border}`,
+                    zIndex: 100,
+                    padding: "6px",
+                  }}
+                >
+                  {loadingTeams ? (
+                    <div
+                      style={{
+                        padding: 20,
+                        textAlign: "center",
+                        color: C.muted,
+                      }}
+                    >
+                      <FiLoader
+                        size={20}
+                        style={{ animation: "spin 1s linear infinite" }}
+                      />
+                    </div>
+                  ) : allTeams.length === 0 ? (
+                    <div
+                      style={{
+                        padding: 20,
+                        textAlign: "center",
+                        color: C.muted,
+                        fontSize: 13,
+                      }}
+                    >
+                      No teams available
+                    </div>
+                  ) : (
+                    allTeams.map((team) => (
+                      <div
+                        key={team._id}
+                        onClick={() => handleTeamSelect(team._id)}
+                        style={{
+                          padding: "8px 12px",
+                          borderRadius: 6,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          background:
+                            selectedTeamId === team._id
+                              ? `${C.primary}11`
+                              : "transparent",
+                          transition: "all 0.2s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          if (selectedTeamId !== team._id) {
+                            e.currentTarget.style.background = C.bg;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (selectedTeamId !== team._id) {
+                            e.currentTarget.style.background = "transparent";
+                          }
+                        }}
+                      >
+                        <div>
+                          <div
+                            style={{
+                              fontSize: 13,
+                              fontWeight: 600,
+                              color: C.dark,
+                            }}
+                          >
+                            {team.name}
+                          </div>
+                          <div style={{ fontSize: 10, color: C.muted }}>
+                            {team.department || "No department"} •{" "}
+                            {team.members?.length || 0} members
+                          </div>
+                        </div>
+                        {selectedTeamId === team._id && (
+                          <FiCheck size={16} color={C.primary} />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Permission badge */}
           {!canEvaluate && userTeamId && (
@@ -951,7 +1170,7 @@ function EvaluationForm({ t, lang }) {
                 gap: 4,
               }}
             >
-              <FiCheck size={12} /> Team Leader
+              <FiCheck size={12} /> {isAdminUser ? "Admin" : "Team Leader"}
             </span>
           )}
 
@@ -1001,7 +1220,9 @@ function EvaluationForm({ t, lang }) {
           fontFamily: F.sans,
         }}
       >
-        {teKey("subtitle", "Addis Ababa City Admin · Public Service Bureau")}
+        {isAdminUser && teamName
+          ? `Evaluating: ${teamName} • ${members.filter((m) => m.trim()).length} members`
+          : teKey("subtitle", "Addis Ababa City Admin · Public Service Bureau")}
       </p>
 
       {/* ─── Tab Navigation ───*/}
@@ -1326,8 +1547,17 @@ function EvaluationForm({ t, lang }) {
               )}
               value={teamName}
               onChange={(e) => setTeamName(e.target.value)}
-              disabled={!canEvaluate}
+              disabled={!canEvaluate || teamMembersSynced}
             />
+            {teamMembersSynced && (
+              <p style={{ fontSize: "11px", color: C.muted, marginTop: 4 }}>
+                <FiCheck
+                  size={12}
+                  style={{ marginRight: 4, color: "#10b981" }}
+                />
+                Team name is synced from Team Management
+              </p>
+            )}
             {!canEvaluate && (
               <p style={{ fontSize: "11px", color: "#ef4444", marginTop: 4 }}>
                 <FiLock size={12} style={{ marginRight: 4 }} />
@@ -1445,7 +1675,7 @@ function EvaluationForm({ t, lang }) {
 
               {canEvaluate && !teamMembersSynced && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {userTeamId && (
+                  {getCurrentTeamId() && (
                     <button
                       onClick={refreshTeamMembers}
                       disabled={refreshingMembers}
@@ -2281,7 +2511,7 @@ function EvaluationForm({ t, lang }) {
                 background: "linear-gradient(135deg, #fff, #fffdf0)",
               }}
             >
-              {/* Best Performer Announcement (unchanged) */}
+              {/* Best Performer Announcement */}
               <div
                 style={{
                   textAlign: "center",
@@ -2683,7 +2913,6 @@ function EvaluationForm({ t, lang }) {
                     }),
                   }}
                   onApplyFeedback={(feedback) => {
-                    // Apply AI feedback to each member's comment
                     if (feedback && feedback.individualFeedback) {
                       feedback.individualFeedback.forEach((item) => {
                         const memberIndex = members.findIndex(
@@ -2719,10 +2948,10 @@ function EvaluationForm({ t, lang }) {
                       console.log("AI Feedback:", feedback);
                     }
                   }}
-                  language={currentLang} // ✅ Pass the selected language
+                  language={currentLang}
                 />
 
-                {/* ✅ Enhanced AI Performance Insights - Responsive Cards */}
+                {/* Enhanced AI Performance Insights */}
                 {sortedMembers.length > 0 && (
                   <div style={{ marginTop: "20px" }}>
                     <div
@@ -3172,18 +3401,12 @@ function EvaluationForm({ t, lang }) {
                 const bestPerformerName =
                   sortedMembers.length > 0 ? sortedMembers[0].name : null;
 
-                // ✅ Build comments object from totals (which already has the comments)
                 const commentsByName = {};
                 totals.forEach((m) => {
                   if (m.name && m.name.trim()) {
                     commentsByName[m.name] = m.comment || "";
                   }
                 });
-
-                console.log(
-                  "📝 commentsByName built from totals:",
-                  commentsByName,
-                );
 
                 exportEvaluationReportToPDF(
                   scores,
@@ -3281,7 +3504,6 @@ function EvaluationForm({ t, lang }) {
               {includeAINarrative && (
                 <AISummary
                   fetchFn={async (id) => {
-                    // ✅ Pass the current language to the AI API
                     return aiAPI.getEvaluationSummary({
                       evaluationId: id,
                       language: currentLang,
@@ -3321,7 +3543,7 @@ function EvaluationForm({ t, lang }) {
             ? signatures.teamLeader
             : signatures[signatureModal.memberName] || null
         }
-        required={false} // Allow signing without a signature (optional)
+        required={false}
       />
     </div>
   );
