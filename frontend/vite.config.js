@@ -13,7 +13,6 @@ export default defineConfig({
       },
     },
   },
-  // Add this: Pre-bundle framer-motion for better resolution
   optimizeDeps: {
     include: [
       "framer-motion",
@@ -27,27 +26,13 @@ export default defineConfig({
   },
   build: {
     outDir: "dist",
-    // Add this: Ensure commonjs modules are properly handled
     commonjsOptions: {
-      include: [
-        /xlsx/,
-        /file-saver/,
-        /jspdf/,
-        /jspdf-autotable/,
-        /framer-motion/,
-      ],
+      include: [/xlsx/, /file-saver/, /jspdf/, /jspdf-autotable/],
     },
     rollupOptions: {
       output: {
         manualChunks: undefined,
       },
-    },
-  },
-  // Add this: Help resolve framer-motion correctly
-  resolve: {
-    alias: {
-      // Ensure framer-motion resolves to the correct entry point
-      "framer-motion": "framer-motion/dist/es/index.mjs",
     },
   },
 });
