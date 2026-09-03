@@ -304,7 +304,7 @@ export default function Profile() {
         setUploadingPhoto(false);
       }
     },
-    [formData, photoFile, uploadAPI, authAPI, showToast, tp, refreshUser],
+    [formData, photoFile, showToast, tp, refreshUser],
   );
 
   const handleCancel = useCallback(() => {
