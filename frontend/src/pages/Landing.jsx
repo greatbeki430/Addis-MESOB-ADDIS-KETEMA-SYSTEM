@@ -1,878 +1,1020 @@
-// src/pages/Landing.jsx
-// ════════════════════════════════════════════════════════════
-// Public system-wide landing page for Addis MESOB.
-// Shown to unauthenticated visitors at "/". Introduces the whole
-// platform (not a single feature) and funnels into /login.
-// ════════════════════════════════════════════════════════════
-
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { C, F } from "../styles/theme";
+// frontend/src/pages/Profile.jsx
+import { useState, useRef, useMemo, useCallback } from "react";
+import { C } from "../styles/theme";
+import { useAuth } from "../hooks/useAuth";
+import { useToast } from "../hooks/useToast";
 import { useLanguage } from "../hooks/useLanguage";
-import { LANGUAGES } from "../constants/translations/index";
-import { publicAPI } from "../services/api";
-import mesobLogo from "../assets/mesoblogo.png";
-
-// Import modular components
-import HeroSection from "../components/landing/HeroSection";
-import DepartmentsMarquee from "../components/landing/DepartmentsMarquee";
-import FeaturesGrid from "../components/landing/FeaturesGrid";
-import ServicesSection from "../components/landing/ServicesSection";
-import HowItWorks from "../components/landing/HowItWorks";
-import GoldenMondayTeaser from "../components/landing/GoldenMondayTeaser";
-import FAQSection from "../components/landing/FAQSection";
-import SiteFooter from "../components/landing/SiteFooter";
-import VisionMission from "../components/landing/VisionMission";
-
+import { authAPI, uploadAPI } from "../services/api";
 import {
-  FiMenu,
-  FiX,
-  FiArrowUp,
-  FiGrid,
-  FiBarChart2,
-  FiFileText,
-  FiUsers,
+  FiUser,
+  FiMail,
+  FiPhone,
   FiShield,
-  FiCpu,
+  FiEdit2,
+  FiSave,
+  FiX,
+  FiLoader,
+  FiClock,
+  FiCheckCircle,
+  FiFileText,
+  FiAward,
+  FiCalendar,
+  FiBriefcase,
+  FiMapPin,
+  FiGlobe,
+  FiLink,
+  FiTwitter,
+  FiGithub,
+  FiLinkedin,
+  FiChevronRight,
+  FiSettings,
+  FiCamera,
+  FiTrash2,
+  FiStar,
+  FiTrendingUp,
+  FiUsers,
+  FiMessageSquare,
+  FiZap,
 } from "react-icons/fi";
+import "./Profile.css";
 
-// ─────────────────────────────────────────────────────────────
-// MAIN LANDING COMPONENT
-// ─────────────────────────────────────────────────────────────
-export default function Landing() {
-  const { language, changeLanguage, t } = useLanguage();
-  const navigate = useNavigate();
-  const [visible, setVisible] = useState({});
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState("");
-  const [showBackToTop, setShowBackToTop] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+export default function Profile() {
+  const { user, isAdmin, isSuperAdmin, isLeader, refreshUser } = useAuth();
+  const { showToast } = useToast();
+  const { t } = useLanguage();
+  const fileInputRef = useRef(null);
 
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterDept, setFilterDept] = useState("All");
-  const [departments, setDepartments] = useState(["All"]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [itemsPerPage] = useState(12);
+  const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [photoFile, setPhotoFile] = useState(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [hoveredStat, setHoveredStat] = useState(null);
 
-  const sectionRefs = useRef({});
-  const abortControllerRef = useRef(null);
-  const hasLoadedRef = useRef(false);
-  const isInitialMount = useRef(true);
-
-  // ─── Check if mobile ──────────────────────────────────────
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  // ─── Load services from database ──────────────────────────
-  const loadServices = useCallback(async () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await publicAPI.getServices({
-        page: currentPage,
-        limit: itemsPerPage,
-        search: searchTerm || undefined,
-        department: filterDept !== "All" ? filterDept : undefined,
-      });
-
-      if (response.data.success) {
-        setServices(response.data.data);
-        setTotalItems(response.data.pagination.total);
-        setTotalPages(response.data.pagination.totalPages);
-      }
-    } catch (error) {
-      if (error.name !== "AbortError" && error.code !== "ERR_CANCELED") {
-        console.error("Failed to load services:", error);
-        setError(
-          t("landing.servicesLoadError") ||
-            "Failed to load services. Please try again.",
-        );
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [currentPage, itemsPerPage, searchTerm, filterDept, t]);
-
-  // ─── Load departments ──────────────────────────────────────
-  const loadDepartments = useCallback(async () => {
-    try {
-      const response = await publicAPI.getDepartments();
-      if (response.data.success) {
-        setDepartments(["All", ...response.data.data]);
-      }
-    } catch (error) {
-      console.error("Failed to load departments:", error);
-    }
-  }, []);
-
-  // ─── Initial load ──────────────────────────────────────────
-  useEffect(() => {
-    if (hasLoadedRef.current) return;
-    hasLoadedRef.current = true;
-
-    const loadInitialData = async () => {
-      await loadDepartments();
-      await loadServices();
-    };
-
-    loadInitialData();
-
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // ─── Handle page, search, and filter changes ──────────────
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-
-    const timer = setTimeout(() => {
-      loadServices();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [currentPage, searchTerm, filterDept, loadServices]);
-
-  // ─── Departments list for marquee ──────────────────────────
-  const departmentsList = useMemo(() => {
-    const seen = new Set();
-    const list = [];
-    (services || []).forEach((s) => {
-      const dept = s.dept || s.deptEn;
-      if (dept && !seen.has(dept)) {
-        seen.add(dept);
-        list.push(dept);
-      }
-    });
-    return list;
-  }, [services]);
-
-  // ─── Get service icon ──────────────────────────────────────
-  const getServiceIcon = (index) => {
-    const icons = [
-      <FiGrid size={isMobile ? 20 : 24} />,
-      <FiBarChart2 size={isMobile ? 20 : 24} />,
-      <FiFileText size={isMobile ? 20 : 24} />,
-      <FiUsers size={isMobile ? 20 : 24} />,
-      <FiShield size={isMobile ? 20 : 24} />,
-      <FiCpu size={isMobile ? 20 : 24} />,
-    ];
-    return icons[index % icons.length];
-  };
-
-  // ─── Register refs ──────────────────────────────────────────
-  const registerRef = useCallback(
-    (key) => (el) => {
-      if (el) sectionRefs.current[key] = el;
+  // ─── Translation Helper ─────────────────────────────────────
+  const tp = useCallback(
+    (key, fallback = "") => {
+      return t?.(`profile.${key}`) || fallback;
     },
+    [t],
+  );
+
+  const tc = useCallback(
+    (key, fallback = "") => {
+      return t?.(`common.${key}`) || fallback;
+    },
+    [t],
+  );
+
+  // ─── Form Data ──────────────────────────────────────────────
+  const getInitialFormData = () => ({
+    name: user?.name || "",
+    email: user?.email || "",
+    phone: user?.phone || "",
+    profilePhotoUrl: user?.profilePhotoUrl || "",
+    bio: user?.bio || "",
+    position: user?.position || "",
+    department: user?.department || "",
+    location: user?.location || "",
+    website: user?.website || "",
+    twitter: user?.twitter || "",
+    github: user?.github || "",
+    linkedin: user?.linkedin || "",
+  });
+
+  const [formData, setFormData] = useState(getInitialFormData);
+  const [photoPreviewState, setPhotoPreviewState] = useState(
+    user?.profilePhotoUrl || null,
+  );
+
+  const resetFormData = useCallback(() => {
+    setFormData({
+      name: user?.name || "",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      profilePhotoUrl: user?.profilePhotoUrl || "",
+      bio: user?.bio || "",
+      position: user?.position || "",
+      department: user?.department || "",
+      location: user?.location || "",
+      website: user?.website || "",
+      twitter: user?.twitter || "",
+      github: user?.github || "",
+      linkedin: user?.linkedin || "",
+    });
+    setPhotoPreviewState(user?.profilePhotoUrl || null);
+  }, [user]);
+
+  const photoPreview = photoPreviewState;
+
+  // ─── User Role Helpers ──────────────────────────────────────
+  const getUserRole = useCallback(() => {
+    if (isSuperAdmin) return tp("roleSuperAdmin", "Super Admin");
+    if (isAdmin) return tp("roleAdmin", "Admin");
+    if (isLeader) return tp("roleTeamLeader", "Team Leader");
+    return tp("roleEmployee", "Employee");
+  }, [isSuperAdmin, isAdmin, isLeader, tp]);
+
+  const getRoleIcon = useCallback(() => {
+    if (isSuperAdmin) return "👑";
+    if (isAdmin) return "⚙️";
+    if (isLeader) return "⭐";
+    return "👤";
+  }, [isSuperAdmin, isAdmin, isLeader]);
+
+  const getRoleColor = useCallback(() => {
+    if (isSuperAdmin) return "#8b5cf6";
+    if (isAdmin) return C.primary;
+    if (isLeader) return C.gold;
+    return "#10b981";
+  }, [isSuperAdmin, isAdmin, isLeader]);
+
+  const getUserInitials = useCallback(() => {
+    if (!formData.name) return "U";
+    return formData.name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 2);
+  }, [formData.name]);
+
+  // ─── Photo Handlers ─────────────────────────────────────────
+  const handlePhotoChange = useCallback(
+    (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        if (file.size > 5 * 1024 * 1024) {
+          showToast(
+            tp("photoTooLarge", "Photo must be less than 5MB"),
+            "error",
+          );
+          e.target.value = "";
+          return;
+        }
+        setPhotoFile(file);
+        const reader = new FileReader();
+        reader.onload = () => setPhotoPreviewState(reader.result);
+        reader.readAsDataURL(file);
+      }
+    },
+    [showToast, tp],
+  );
+
+  const removePhoto = useCallback(() => {
+    setPhotoFile(null);
+    setPhotoPreviewState(null);
+    setFormData((f) => ({ ...f, profilePhotoUrl: "" }));
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, []);
+
+  const handleFormChange = useCallback((field, value) => {
+    setFormData((f) => ({ ...f, [field]: value }));
+  }, []);
+
+  // ─── Submit Handler ─────────────────────────────────────────
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
+      setSaving(true);
+
+      try {
+        let profilePhotoUrl = formData.profilePhotoUrl;
+
+        if (photoFile) {
+          setUploadingPhoto(true);
+          const formDataObj = new FormData();
+          formDataObj.append("photo", photoFile);
+          const response = await uploadAPI.uploadProfilePhoto(formDataObj);
+          profilePhotoUrl = response.data.url;
+          setUploadingPhoto(false);
+        }
+
+        const updateData = {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          profilePhotoUrl: profilePhotoUrl || formData.profilePhotoUrl,
+          bio: formData.bio,
+          position: formData.position,
+          department: formData.department,
+          location: formData.location,
+          website: formData.website,
+          twitter: formData.twitter,
+          github: formData.github,
+          linkedin: formData.linkedin,
+        };
+
+        await authAPI.updateProfile(updateData);
+        showToast(
+          tp("updateSuccess", "Profile updated successfully!"),
+          "success",
+        );
+        setIsEditing(false);
+        setPhotoFile(null);
+
+        await refreshUser();
+        // Use navigate instead of reload for better UX
+        window.location.reload();
+      } catch (error) {
+        console.error("Failed to update profile:", error);
+        showToast(
+          error.response?.data?.message ||
+            tp("updateError", "Failed to update profile"),
+          "error",
+        );
+      } finally {
+        setSaving(false);
+        setUploadingPhoto(false);
+      }
+    },
+    [formData, photoFile, showToast, tp, refreshUser],
+  );
+
+  const handleCancel = useCallback(() => {
+    setIsEditing(false);
+    resetFormData();
+    setPhotoFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }, [resetFormData]);
+
+  // ─── Format Date ────────────────────────────────────────────
+  const formatMemberSince = useCallback(() => {
+    if (!user?.createdAt) return tp("noData", "Not set");
+    try {
+      return new Date(user.createdAt).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      return tp("noData", "Not set");
+    }
+  }, [user, tp]);
+
+  // ─── Stats Data ─────────────────────────────────────────────
+  const stats = useMemo(() => {
+    const baseStats = [
+      {
+        id: "tasks",
+        icon: <FiCheckCircle size={18} />,
+        value: user?.totalTasks || 0,
+        label: tp("tasksCompleted", "Tasks Completed"),
+        color: "#3b82f6",
+        gradient: "linear-gradient(135deg, #eff6ff, #dbeafe)",
+        subtitle: tp("thisMonth", "This month"),
+      },
+      {
+        id: "earnings",
+        icon: <FiAward size={18} />,
+        value: `$${user?.totalEarnings || "0.00"}`,
+        label: tp("totalEarnings", "Total Earnings"),
+        color: "#f59e0b",
+        gradient: "linear-gradient(135deg, #fffbeb, #fef3c7)",
+        subtitle: tp("lifetime", "Lifetime"),
+      },
+      {
+        id: "member",
+        icon: <FiClock size={18} />,
+        value: formatMemberSince(),
+        label: tp("memberSince", "Member Since"),
+        color: "#10b981",
+        gradient: "linear-gradient(135deg, #f0fdf4, #dcfce7)",
+        subtitle: tp("activeMember", "Active member"),
+      },
+      {
+        id: "reports",
+        icon: <FiTrendingUp size={18} />,
+        value: user?.totalReports || 0,
+        label: tp("reportsSubmitted", "Reports Submitted"),
+        color: "#8b5cf6",
+        gradient: "linear-gradient(135deg, #f5f3ff, #ede9fe)",
+        subtitle: tp("totalReports", "Total reports"),
+      },
+    ];
+
+    // Add role-specific stats
+    if (isLeader || isAdmin || isSuperAdmin) {
+      baseStats.push({
+        id: "team",
+        icon: <FiUsers size={18} />,
+        value: user?.teamSize || 0,
+        label: tp("teamSize", "Team Size"),
+        color: "#ec4899",
+        gradient: "linear-gradient(135deg, #fdf2f8, #fce7f3)",
+        subtitle: tp("teamMembers", "Team members"),
+      });
+    }
+
+    return baseStats;
+  }, [user, tp, isLeader, isAdmin, isSuperAdmin, formatMemberSince]);
+
+  // ─── Social Links ───────────────────────────────────────────
+  const socialLinks = useMemo(
+    () => [
+      { key: "website", icon: <FiLink size={16} />, label: "Website" },
+      { key: "twitter", icon: <FiTwitter size={16} />, label: "Twitter" },
+      { key: "github", icon: <FiGithub size={16} />, label: "GitHub" },
+      { key: "linkedin", icon: <FiLinkedin size={16} />, label: "LinkedIn" },
+    ],
     [],
   );
 
-  // ─── Scroll observer ────────────────────────────────────────
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const key = entry.target.dataset.reveal;
-          if (entry.isIntersecting) {
-            setVisible((v) => ({ ...v, [key]: true }));
-            if (key === "features" || key === "how") {
-              setActiveSection(key);
-            }
-          }
-        });
-      },
-      { threshold: 0.12, rootMargin: "-72px 0px -60% 0px" },
+  const hasSocialLinks = useMemo(() => {
+    return socialLinks.some(
+      (link) => formData[link.key] && formData[link.key].trim() !== "",
     );
-    const currentRefs = { ...sectionRefs.current };
-    const elements = Object.values(currentRefs).filter(Boolean);
-    elements.forEach((el) => observer.observe(el));
-    return () => elements.forEach((el) => observer.unobserve(el));
-  }, []);
+  }, [socialLinks, formData]);
 
-  // ─── Back-to-top ────────────────────────────────────────────
-  useEffect(() => {
-    const onScroll = () => setShowBackToTop(window.scrollY > 640);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // ─── Mobile nav close ──────────────────────────────────────
-  useEffect(() => {
-    if (!mobileNavOpen) return;
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") setMobileNavOpen(false);
-    };
-    document.addEventListener("keydown", onKeyDown);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [mobileNavOpen]);
-
-  const revealStyle = (key) => ({
-    opacity: visible[key] ? 1 : 0,
-    transform: visible[key] ? "translateY(0)" : "translateY(24px)",
-    transition: "opacity 0.7s ease, transform 0.7s ease",
-  });
-
-  const goLogin = () => navigate("/login");
-  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
-
-  // ─── Pagination handlers ──────────────────────────────────
-  const goToPage = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-      const gridElement = document.getElementById("services-grid");
-      if (gridElement) {
-        gridElement.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    }
-  };
-
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
-
-  // ─── Define landing copy using t() ────────────────────────
-  const LANDING_COPY = {
-    eyebrow: t("landing.eyebrow") || "Digital Ethiopia · Addis MESOB Platform",
-    heroTitle: t("landing.heroTitle") || "Every service, in one basket.",
-    heroBody:
-      t("landing.heroBody") ||
-      "For generations, a mesob has meant many dishes served from one vessel. Addis MESOB carries that same idea into government service — registration, evaluation, reporting, documents, and AI assistance, gathered into one digital basket for staff and citizens alike.",
-    ctaPrimary: t("landing.ctaPrimary") || "Sign in to your account",
-    ctaSecondary: t("landing.ctaSecondary") || "See what's inside",
-    statServices: t("landing.statServices") || "Services",
-    statAgencies: t("landing.statAgencies") || "Agencies",
-    statLanguages: t("landing.statLanguages") || "Languages",
-    statAI: t("landing.statAI") || "AI-assisted",
-    deptsEyebrow: t("landing.deptsEyebrow") || "One login, every department",
-    featuresEyebrow: t("landing.featuresEyebrow") || "What's inside the basket",
-    featuresTitle:
-      t("landing.featuresTitle") ||
-      "Everything your organization needs, in one place",
-    featuresSub:
-      t("landing.featuresSub") ||
-      "Access adapts automatically to your role — employee, team leader, admin, or super admin.",
-    howEyebrow: t("landing.howEyebrow") || "How it works",
-    howTitle: t("landing.howTitle") || "Three steps from login to done",
-    gmEyebrow: t("landing.gmEyebrow") || "The philosophy behind it",
-    gmTitle: t("landing.gmTitle") || "Built on the Golden Monday mindset",
-    gmBody:
-      t("landing.gmBody") ||
-      "Ethiopia's weekly Golden Monday (ወርቃማ ሰኞ) sessions push every employee toward multiskilling and peer-led learning. Addis MESOB carries that same drive for less friction into how citizens actually get things done — and the program itself now lives inside the platform for every signed-in team.",
-    gmCta: t("landing.gmCta") || "Sign in to view this week's session",
-    faqEyebrow: t("landing.faqEyebrow") || "Questions",
-    faqTitle: t("landing.faqTitle") || "Frequently asked questions",
-    footerTagline:
-      t("landing.footerTagline") ||
-      "A one-stop digital service platform for Digital Ethiopia.",
-    footerPrivacy: t("landing.footerPrivacy") || "Privacy Policy",
-    footerTerms: t("landing.footerTerms") || "Terms of Service",
-    footerContact: t("landing.footerContact") || "Contact Us",
-    skipToContent: t("landing.skipToContent") || "Skip to content",
-    backToTop: t("landing.backToTop") || "Back to top",
-  };
+  // ─── Tabs ────────────────────────────────────────────────────
+  const tabs = useMemo(
+    () => [
+      {
+        id: "overview",
+        label: tp("overview", "Overview"),
+        icon: <FiUser size={16} />,
+      },
+      {
+        id: "details",
+        label: tp("details", "Details"),
+        icon: <FiSettings size={16} />,
+      },
+      {
+        id: "activity",
+        label: tp("activity", "Activity"),
+        icon: <FiTrendingUp size={16} />,
+      },
+    ],
+    [tp],
+  );
 
   return (
-    <div
-      style={{
-        fontFamily: F.sans,
-        background: "#fbfaf6",
-        minHeight: "100vh",
-        overflowX: "hidden",
-      }}
-    >
+    <div className="profile-page">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Ethiopic:wght@400;600;700;800&family=Noto+Serif+Ethiopic:wght@700;900&display=swap');
-        * { box-sizing: border-box; }
-        html, body, #root { margin: 0; padding: 0; }
-
-        @keyframes lp-fade-in {
-          from { opacity: 0; transform: translateY(8px); }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
           to { opacity: 1; transform: translateY(0); }
         }
-
-        .lp-skip-link {
-          position: absolute;
-          top: -48px;
-          left: 12px;
-          background: ${C.gold};
-          color: ${C.dark};
-          padding: 10px 16px;
-          border-radius: 8px;
-          font-weight: 700;
-          font-size: 13px;
-          text-decoration: none;
-          z-index: 100;
-          transition: top 0.2s ease;
+        @keyframes pulseGlow {
+          0%, 100% { box-shadow: 0 0 20px rgba(26,58,173,0.15); }
+          50% { box-shadow: 0 0 40px rgba(26,58,173,0.25); }
         }
-        .lp-skip-link:focus { top: 12px; }
-
-        .lp-desktop-only { display: flex; }
-        .lp-mobile-toggle { display: none; }
-
-        @media (max-width: 768px) {
-          .lp-desktop-only { display: none !important; }
-          .lp-mobile-toggle { display: inline-flex !important; }
+        @keyframes shimmer {
+          0% { background-position: -200% center; }
+          100% { background-position: 200% center; }
         }
-
-        @media (max-width: 480px) {
-          .lp-skip-link {
-            font-size: 11px;
-            padding: 8px 12px;
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
-        }
-
-        .lp-nav-link { transition: opacity 0.15s ease, color 0.15s ease; position: relative; }
-        .lp-nav-link:hover { opacity: 0.72; }
-        .lp-nav-link.active { color: ${C.gold} !important; }
-        .lp-nav-link.active::after {
-          content: "";
-          position: absolute;
-          left: 0;
-          right: 0;
-          bottom: -6px;
-          height: 2px;
-          background: ${C.gold};
-          border-radius: 2px;
-        }
-        .lp-lang-btn { transition: opacity 0.15s ease, transform 0.15s ease; }
-        .lp-lang-btn:hover { opacity: 0.85; }
-
-        .lp-back-to-top { transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease; }
-        .lp-back-to-top:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(6,11,46,0.35); }
-
-        /* Mobile optimizations */
-        @media (max-width: 768px) {
-          .lp-back-to-top {
-            bottom: 16px !important;
-            right: 16px !important;
-            width: 40px !important;
-            height: 40px !important;
-          }
-          .lp-back-to-top svg {
-            width: 16px !important;
-            height: 16px !important;
-          }
-        }
-        @media (max-width: 480px) {
-          .lp-back-to-top {
-            bottom: 12px !important;
-            right: 12px !important;
-            width: 36px !important;
-            height: 36px !important;
-          }
-          .lp-back-to-top svg {
-            width: 14px !important;
-            height: 14px !important;
-          }
-        }
-
-        /* Smooth scroll for mobile */
-        @media (max-width: 768px) {
-          html {
-            scroll-behavior: smooth;
-          }
-        }
-
-        /* Prevent horizontal scroll on mobile */
-        #root, #main-content {
-          overflow-x: hidden;
-          max-width: 100vw;
-        }
-
-        /* Touch-friendly button sizes */
-        @media (max-width: 768px) {
-          button, 
-          .lp-cta,
-          .lp-lang-btn,
-          .lp-mobile-toggle {
-            min-height: 44px;
-            min-width: 44px;
-          }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
       `}</style>
 
-      {/* ── SKIP LINK ───────────────────────────────────── */}
-      <a href="#main-content" className="lp-skip-link">
-        {LANDING_COPY.skipToContent}
-      </a>
-
-      {/* ── TOP NAV ─────────────────────────────────────── */}
-      <header
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 30,
-          background: "rgba(6,11,46,0.9)",
-          backdropFilter: "blur(10px)",
-          WebkitBackdropFilter: "blur(10px)",
-          borderBottom: "1px solid rgba(255,255,255,0.08)",
-          padding: isMobile
-            ? "10px clamp(12px, 4vw, 16px)"
-            : "12px clamp(16px, 5vw, 48px)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: isMobile ? 8 : 16,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: isMobile ? 8 : 10,
-          }}
-        >
-          <img
-            src={mesobLogo}
-            alt="Addis MESOB"
-            style={{
-              width: isMobile ? 28 : 34,
-              height: isMobile ? 28 : 34,
-              borderRadius: 8,
-            }}
-          />
-          <span
-            style={{
-              fontFamily: F.serif,
-              fontWeight: 800,
-              fontSize: isMobile ? 14 : 18,
-              color: "#fff",
-            }}
-          >
-            Addis MESOB
-          </span>
-        </div>
-
-        <div
-          className="lp-desktop-only"
-          style={{ alignItems: "center", gap: isMobile ? 12 : 20 }}
-        >
-          <a
-            href="#features"
-            className={`lp-nav-link${activeSection === "features" ? " active" : ""}`}
-            style={{
-              color: activeSection === "features" ? C.gold : "#c9d0f0",
-              textDecoration: "none",
-              fontSize: isMobile ? 12 : 13,
-              fontWeight: 600,
-            }}
-          >
-            Features
-          </a>
-          <a
-            href="#services"
-            className="lp-nav-link"
-            style={{
-              color: "#c9d0f0",
-              textDecoration: "none",
-              fontSize: isMobile ? 12 : 13,
-              fontWeight: 600,
-            }}
-          >
-            Services
-          </a>
-          <a
-            href="#how"
-            className={`lp-nav-link${activeSection === "how" ? " active" : ""}`}
-            style={{
-              color: activeSection === "how" ? C.gold : "#c9d0f0",
-              textDecoration: "none",
-              fontSize: isMobile ? 12 : 13,
-              fontWeight: 600,
-            }}
-          >
-            How it works
-          </a>
-          <a
-            href="#faq"
-            className="lp-nav-link"
-            style={{
-              color: "#c9d0f0",
-              textDecoration: "none",
-              fontSize: isMobile ? 12 : 13,
-              fontWeight: 600,
-            }}
-          >
-            FAQ
-          </a>
-          <div style={{ display: "flex", gap: isMobile ? 2 : 4 }}>
-            {LANGUAGES.map((l) => (
-              <button
-                key={l.code}
-                className="lp-lang-btn"
-                onClick={() => changeLanguage(l.code)}
-                title={l.label}
-                style={{
-                  background:
-                    language === l.code ? C.gold : "rgba(255,255,255,0.08)",
-                  color: language === l.code ? C.dark : "#c9d0f0",
-                  border: "none",
-                  borderRadius: 6,
-                  padding: isMobile ? "4px 6px" : "5px 9px",
-                  fontSize: isMobile ? 10 : 11,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  fontFamily: F.sans,
-                }}
-              >
-                {l.flag}
-              </button>
-            ))}
+      <div className="profile-container">
+        {/* ─── Header ──────────────────────────────────────────── */}
+        <div className="profile-header">
+          <div className="profile-header-content">
+            <div>
+              <div className="profile-breadcrumb">
+                <span className="profile-breadcrumb-item">
+                  {tc("dashboard", "Dashboard")}
+                </span>
+                <FiChevronRight size={14} className="profile-breadcrumb-sep" />
+                <span className="profile-breadcrumb-item active">
+                  {tp("title", "Profile")}
+                </span>
+              </div>
+              <h1 className="profile-title">
+                <FiUser size={24} className="profile-title-icon" />
+                {tp("title", "My Profile")}
+              </h1>
+              <p className="profile-subtitle">
+                {tp(
+                  "subtitle",
+                  "Manage your personal information and preferences",
+                )}
+              </p>
+            </div>
+            <div className="profile-header-actions">
+              {!isEditing ? (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="profile-btn profile-btn-primary"
+                >
+                  <FiEdit2 size={16} />
+                  {tp("editProfileBtn", "Edit Profile")}
+                </button>
+              ) : (
+                <div className="profile-header-actions-edit">
+                  <span className="profile-unsaved-pill">
+                    <FiZap size={12} /> {tp("editing", "Editing")}
+                  </span>
+                  <button
+                    onClick={handleCancel}
+                    className="profile-btn profile-btn-quiet"
+                    disabled={saving}
+                  >
+                    <FiX size={16} />
+                    {tp("cancelBtn", "Cancel")}
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    className="profile-btn profile-btn-primary"
+                    disabled={saving || uploadingPhoto}
+                  >
+                    {saving || uploadingPhoto ? (
+                      <>
+                        <FiLoader size={16} className="profile-spin" />
+                        {uploadingPhoto
+                          ? tp("uploadingPhoto", "Uploading...")
+                          : tp("saving", "Saving...")}
+                      </>
+                    ) : (
+                      <>
+                        <FiSave size={16} />
+                        {tp("saveChanges", "Save Changes")}
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-          <button
-            onClick={goLogin}
-            className="lp-cta"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: 6,
-              minWidth: isMobile ? "120px" : "clamp(140px, 15vw, 180px)",
-              background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-              color: C.dark,
-              border: "none",
-              borderRadius: 8,
-              padding: isMobile ? "8px 14px" : "9px 16px",
-              fontWeight: 800,
-              fontSize: isMobile ? 12 : 13,
-              cursor: "pointer",
-              fontFamily: F.sans,
-              whiteSpace: "nowrap",
-              transition: "transform 0.2s ease, box-shadow 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)";
-              e.currentTarget.style.boxShadow =
-                "0 12px 28px rgba(245,197,24,0.3)";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = "translateY(0)";
-              e.currentTarget.style.boxShadow = "none";
-            }}
-          >
-            <FiMenu size={isMobile ? 12 : 14} />
-            {LANDING_COPY.ctaPrimary}
-          </button>
         </div>
 
-        <button
-          className="lp-mobile-toggle"
-          onClick={() => setMobileNavOpen((v) => !v)}
-          aria-label="Toggle menu"
-          style={{
-            background: "rgba(255,255,255,0.08)",
-            border: "none",
-            borderRadius: 8,
-            width: isMobile ? 36 : 38,
-            height: isMobile ? 36 : 38,
-            color: "#fff",
-            cursor: "pointer",
-            alignItems: "center",
-            justifyContent: "center",
-            display: "flex",
-          }}
-        >
-          {mobileNavOpen ? (
-            <FiX size={isMobile ? 16 : 18} />
-          ) : (
-            <FiMenu size={isMobile ? 16 : 18} />
-          )}
-        </button>
-      </header>
+        {/* ─── Body ────────────────────────────────────────────── */}
+        <div className="profile-body">
+          <div className="profile-layout">
+            {/* ─── Sidebar ──────────────────────────────────────── */}
+            <aside className="profile-sidebar">
+              <div className="profile-card profile-card-profile">
+                {/* Avatar Section */}
+                <div className="profile-avatar-section">
+                  <div className="profile-avatar-wrapper">
+                    {photoPreview ? (
+                      <img
+                        src={photoPreview}
+                        alt={tp("title", "Profile")}
+                        className="profile-avatar-img"
+                      />
+                    ) : (
+                      <div
+                        className="profile-avatar-placeholder"
+                        style={{
+                          background: `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+                        }}
+                      >
+                        {getUserInitials()}
+                      </div>
+                    )}
+                    {isEditing && (
+                      <>
+                        <label className="profile-avatar-upload">
+                          <FiCamera size={16} />
+                          <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoChange}
+                            disabled={uploadingPhoto}
+                          />
+                        </label>
+                        {uploadingPhoto && (
+                          <div className="profile-avatar-loading">
+                            <FiLoader size={24} className="profile-spin" />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {isEditing && photoPreview && (
+                    <button
+                      type="button"
+                      onClick={removePhoto}
+                      className="profile-avatar-remove"
+                    >
+                      <FiTrash2 size={12} />
+                      {tp("removePhoto", "Remove")}
+                    </button>
+                  )}
+                </div>
 
-      {/* ── MOBILE NAV ────────────────────────────────────── */}
-      {mobileNavOpen && (
-        <div
-          style={{
-            background: "#081d17",
-            padding: isMobile
-              ? "12px clamp(12px, 4vw, 16px) 20px"
-              : "16px clamp(16px, 5vw, 48px) 24px",
-            display: "flex",
-            flexDirection: "column",
-            gap: isMobile ? 12 : 14,
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
-            animation: "lp-fade-in 0.2s ease",
-            maxHeight: "80vh",
-            overflowY: "auto",
-          }}
-        >
-          <a
-            href="#features"
-            style={{
-              color: "#c9d0f0",
-              fontSize: isMobile ? 13 : 14,
-              fontWeight: 600,
-            }}
-            onClick={() => setMobileNavOpen(false)}
-          >
-            Features
-          </a>
-          <a
-            href="#services"
-            style={{
-              color: "#c9d0f0",
-              fontSize: isMobile ? 13 : 14,
-              fontWeight: 600,
-            }}
-            onClick={() => setMobileNavOpen(false)}
-          >
-            Services
-          </a>
-          <a
-            href="#how"
-            style={{
-              color: "#c9d0f0",
-              fontSize: isMobile ? 13 : 14,
-              fontWeight: 600,
-            }}
-            onClick={() => setMobileNavOpen(false)}
-          >
-            How it works
-          </a>
-          <a
-            href="#faq"
-            style={{
-              color: "#c9d0f0",
-              fontSize: isMobile ? 13 : 14,
-              fontWeight: 600,
-            }}
-            onClick={() => setMobileNavOpen(false)}
-          >
-            FAQ
-          </a>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {LANGUAGES.map((l) => (
-              <button
-                key={l.code}
-                onClick={() => changeLanguage(l.code)}
-                style={{
-                  background:
-                    language === l.code ? C.gold : "rgba(255,255,255,0.08)",
-                  color: language === l.code ? C.dark : "#c9d0f0",
-                  border: "none",
-                  borderRadius: 6,
-                  padding: isMobile ? "6px 10px" : "6px 10px",
-                  fontSize: isMobile ? 11 : 12,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                  minHeight: 44,
-                  minWidth: 44,
-                }}
-              >
-                {l.flag}
-              </button>
-            ))}
+                {/* User Info */}
+                <div className="profile-user-info">
+                  <h2 className="profile-user-name">
+                    {formData.name || tp("noName", "No Name")}
+                  </h2>
+                  <p className="profile-user-title">
+                    {formData.position || formData.department
+                      ? `${formData.position || ""}${formData.position && formData.department ? " · " : ""}${formData.department || ""}`
+                      : tp("noRole", "No role specified")}
+                  </p>
+                  <div className="profile-user-role">
+                    <span
+                      className="profile-role-badge"
+                      style={{ background: getRoleColor() }}
+                    >
+                      <span className="profile-role-icon">{getRoleIcon()}</span>
+                      {getUserRole()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Info */}
+                <div className="profile-quick-info">
+                  <div className="profile-quick-item">
+                    <FiMail size={14} className="profile-quick-icon" />
+                    <span>{formData.email || tp("noEmail", "No email")}</span>
+                  </div>
+                  {formData.phone && (
+                    <div className="profile-quick-item">
+                      <FiPhone size={14} className="profile-quick-icon" />
+                      <span>{formData.phone}</span>
+                    </div>
+                  )}
+                  {formData.location && (
+                    <div className="profile-quick-item">
+                      <FiMapPin size={14} className="profile-quick-icon" />
+                      <span>{formData.location}</span>
+                    </div>
+                  )}
+                  <div className="profile-quick-item">
+                    <FiCalendar size={14} className="profile-quick-icon" />
+                    <span>
+                      {tp("joined", "Joined")}: {formatMemberSince()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Social Links */}
+                {hasSocialLinks && (
+                  <div className="profile-social-links">
+                    <span className="profile-social-label">
+                      {tp("connect", "Connect")}
+                    </span>
+                    <div className="profile-social-icons">
+                      {socialLinks.map(
+                        (link) =>
+                          formData[link.key] &&
+                          formData[link.key].trim() !== "" && (
+                            <a
+                              key={link.key}
+                              href={formData[link.key]}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="profile-social-link"
+                              title={link.label}
+                            >
+                              {link.icon}
+                            </a>
+                          ),
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </aside>
+
+            {/* ─── Main Content ────────────────────────────────── */}
+            <main className="profile-content">
+              {/* Navigation Tabs */}
+              <div className="profile-tabs">
+                {tabs.map((tab) => (
+                  <button
+                    key={tab.id}
+                    className={`profile-tab ${activeTab === tab.id ? "active" : ""}`}
+                    onClick={() => setActiveTab(tab.id)}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Tab Content */}
+              <div className="profile-tab-content">
+                {/* ─── Overview Tab ────────────────────────────── */}
+                {activeTab === "overview" && (
+                  <>
+                    {/* Stats Grid */}
+                    <div className="profile-stats-grid">
+                      {stats.map((stat) => (
+                        <div
+                          key={stat.id}
+                          className="profile-stat-card"
+                          style={{
+                            background: stat.gradient,
+                            borderColor:
+                              hoveredStat === stat.id
+                                ? stat.color
+                                : "transparent",
+                          }}
+                          onMouseEnter={() => setHoveredStat(stat.id)}
+                          onMouseLeave={() => setHoveredStat(null)}
+                        >
+                          <div
+                            className="profile-stat-icon"
+                            style={{ color: stat.color }}
+                          >
+                            {stat.icon}
+                          </div>
+                          <div className="profile-stat-content">
+                            <div
+                              className="profile-stat-value"
+                              style={{ color: stat.color }}
+                            >
+                              {stat.value}
+                            </div>
+                            <div className="profile-stat-label">
+                              {stat.label}
+                            </div>
+                            <div className="profile-stat-subtitle">
+                              {stat.subtitle}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Bio Section */}
+                    {formData.bio && (
+                      <div className="profile-section">
+                        <h3 className="profile-section-title">
+                          <FiMessageSquare size={18} />
+                          {tp("about", "About Me")}
+                        </h3>
+                        <p className="profile-section-text">{formData.bio}</p>
+                      </div>
+                    )}
+
+                    {/* Quick Actions */}
+                    <div className="profile-quick-actions">
+                      <h3 className="profile-section-title">
+                        <FiZap size={18} />
+                        {tp("quickActions", "Quick Actions")}
+                      </h3>
+                      <div className="profile-actions-grid">
+                        <button
+                          className="profile-action-btn"
+                          onClick={() => (window.location.href = "/settings")}
+                        >
+                          <FiSettings size={18} />
+                          <span>{tp("goToSettings", "Go to Settings")}</span>
+                          <FiChevronRight
+                            size={14}
+                            className="profile-action-arrow"
+                          />
+                        </button>
+                        <button
+                          className="profile-action-btn"
+                          onClick={() =>
+                            (window.location.href = "/change-password")
+                          }
+                        >
+                          <FiShield size={18} />
+                          <span>{tp("changePassword", "Change Password")}</span>
+                          <FiChevronRight
+                            size={14}
+                            className="profile-action-arrow"
+                          />
+                        </button>
+                        <button
+                          className="profile-action-btn"
+                          onClick={() => (window.location.href = "/dashboard")}
+                        >
+                          <FiTrendingUp size={18} />
+                          <span>{tp("goToDashboard", "Go to Dashboard")}</span>
+                          <FiChevronRight
+                            size={14}
+                            className="profile-action-arrow"
+                          />
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ─── Details Tab ─────────────────────────────── */}
+                {activeTab === "details" && (
+                  <div className="profile-section">
+                    <h3 className="profile-section-title">
+                      <FiSettings size={18} />
+                      {tp("personalDetails", "Personal Details")}
+                    </h3>
+
+                    <div className="profile-details-grid">
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiUser size={14} />
+                          {tp("fullName", "Full Name")}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.name}
+                            onChange={(e) =>
+                              handleFormChange("name", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={tp(
+                              "fullNamePlaceholder",
+                              "Enter your full name",
+                            )}
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.name || tp("noData", "Not set")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiMail size={14} />
+                          {tp("email", "Email")}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="email"
+                            value={formData.email}
+                            onChange={(e) =>
+                              handleFormChange("email", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={tp(
+                              "emailPlaceholder",
+                              "Enter your email",
+                            )}
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.email || tp("noData", "Not set")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiPhone size={14} />
+                          {tp("phone", "Phone")}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="tel"
+                            value={formData.phone}
+                            onChange={(e) =>
+                              handleFormChange("phone", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={tp(
+                              "phonePlaceholder",
+                              "+251 9XX XXX XXX",
+                            )}
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.phone || tp("noData", "Not set")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiBriefcase size={14} />
+                          {tp("position", "Position")}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.position}
+                            onChange={(e) =>
+                              handleFormChange("position", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={tp(
+                              "positionPlaceholder",
+                              "e.g., Team Leader",
+                            )}
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.position || tp("noData", "Not set")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiBriefcase size={14} />
+                          {tp("department", "Department")}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.department}
+                            onChange={(e) =>
+                              handleFormChange("department", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={tp(
+                              "departmentPlaceholder",
+                              "e.g., IT & Systems",
+                            )}
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.department || tp("noData", "Not set")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item">
+                        <label className="profile-detail-label">
+                          <FiMapPin size={14} />
+                          {tp("location", "Location")}
+                        </label>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={formData.location}
+                            onChange={(e) =>
+                              handleFormChange("location", e.target.value)
+                            }
+                            className="profile-input"
+                            placeholder={tp(
+                              "locationPlaceholder",
+                              "e.g., Addis Ababa",
+                            )}
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.location || tp("noData", "Not set")}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="profile-detail-item profile-detail-full">
+                        <label className="profile-detail-label">
+                          <FiMessageSquare size={14} />
+                          {tp("bio", "Bio")}
+                        </label>
+                        {isEditing ? (
+                          <textarea
+                            value={formData.bio}
+                            onChange={(e) =>
+                              handleFormChange("bio", e.target.value)
+                            }
+                            className="profile-textarea"
+                            rows={4}
+                            placeholder={tp(
+                              "bioPlaceholder",
+                              "Tell us about yourself...",
+                            )}
+                            maxLength={200}
+                          />
+                        ) : (
+                          <span className="profile-detail-value">
+                            {formData.bio || tp("noData", "Not set")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Social Links */}
+                    <div className="profile-section-sub">
+                      <h4 className="profile-section-subtitle">
+                        <FiGlobe size={16} />
+                        {tp("socialLinks", "Social Links")}
+                      </h4>
+                      <div className="profile-details-grid profile-social-grid">
+                        {socialLinks.map((link) => (
+                          <div key={link.key} className="profile-detail-item">
+                            <label className="profile-detail-label">
+                              {link.icon}
+                              {link.label}
+                            </label>
+                            {isEditing ? (
+                              <input
+                                type="url"
+                                value={formData[link.key]}
+                                onChange={(e) =>
+                                  handleFormChange(link.key, e.target.value)
+                                }
+                                className="profile-input"
+                                placeholder={`https://${link.key.toLowerCase()}.com/username`}
+                              />
+                            ) : (
+                              <span className="profile-detail-value">
+                                {formData[link.key] ? (
+                                  <a
+                                    href={formData[link.key]}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="profile-social-link-text"
+                                  >
+                                    {formData[link.key]}
+                                  </a>
+                                ) : (
+                                  tp("noData", "Not set")
+                                )}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ─── Activity Tab ────────────────────────────── */}
+                {activeTab === "activity" && (
+                  <div className="profile-section">
+                    <h3 className="profile-section-title">
+                      <FiTrendingUp size={18} />
+                      {tp("recentActivity", "Recent Activity")}
+                    </h3>
+                    <div className="profile-activity-list">
+                      <div className="profile-activity-item">
+                        <div
+                          className="profile-activity-icon"
+                          style={{ background: "#eff6ff", color: "#3b82f6" }}
+                        >
+                          <FiCheckCircle size={16} />
+                        </div>
+                        <div className="profile-activity-content">
+                          <p className="profile-activity-text">
+                            {tp("activityTaskCompleted", "Completed a task")}
+                          </p>
+                          <span className="profile-activity-time">
+                            {tp("justNow", "Just now")}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="profile-activity-item">
+                        <div
+                          className="profile-activity-icon"
+                          style={{ background: "#f5f3ff", color: "#8b5cf6" }}
+                        >
+                          <FiFileText size={16} />
+                        </div>
+                        <div className="profile-activity-content">
+                          <p className="profile-activity-text">
+                            {tp(
+                              "activityReportSubmitted",
+                              "Submitted a daily report",
+                            )}
+                          </p>
+                          <span className="profile-activity-time">
+                            {tp("twoHoursAgo", "2 hours ago")}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="profile-activity-item">
+                        <div
+                          className="profile-activity-icon"
+                          style={{ background: "#f0fdf4", color: "#10b981" }}
+                        >
+                          <FiUsers size={16} />
+                        </div>
+                        <div className="profile-activity-content">
+                          <p className="profile-activity-text">
+                            {tp("activityJoinedTeam", "Joined a team meeting")}
+                          </p>
+                          <span className="profile-activity-time">
+                            {tp("yesterday", "Yesterday")}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="profile-activity-item">
+                        <div
+                          className="profile-activity-icon"
+                          style={{ background: "#fffbeb", color: "#f59e0b" }}
+                        >
+                          <FiStar size={16} />
+                        </div>
+                        <div className="profile-activity-content">
+                          <p className="profile-activity-text">
+                            {tp(
+                              "activityEvaluationReceived",
+                              "Received evaluation feedback",
+                            )}
+                          </p>
+                          <span className="profile-activity-time">
+                            {tp("threeDaysAgo", "3 days ago")}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </main>
           </div>
-          <button
-            onClick={goLogin}
-            style={{
-              background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-              color: C.dark,
-              border: "none",
-              borderRadius: 8,
-              padding: isMobile ? "12px 16px" : "10px 16px",
-              fontWeight: 800,
-              fontSize: isMobile ? 14 : 13,
-              cursor: "pointer",
-              minHeight: 44,
-            }}
-          >
-            {LANDING_COPY.ctaPrimary}
-          </button>
         </div>
-      )}
-
-      {/* ── MAIN CONTENT ──────────────────────────────────── */}
-      <div id="main-content" style={{ overflowX: "hidden", maxWidth: "100vw" }}>
-        {/* Hero Section */}
-        <HeroSection t={t} onLogin={goLogin} />
-
-        {/* ✨ Vision & Mission Section */}
-        <VisionMission t={t} language={language} />
-
-        {/* Departments Marquee */}
-        <DepartmentsMarquee
-          departments={departmentsList}
-          loading={loading}
-          label={LANDING_COPY.deptsEyebrow}
-        />
-
-        {/* Features Grid */}
-        <FeaturesGrid
-          ref={registerRef("features")}
-          data-reveal="features"
-          style={revealStyle("features")}
-          t={t}
-          copy={{
-            eyebrow: LANDING_COPY.featuresEyebrow,
-            title: LANDING_COPY.featuresTitle,
-            sub: LANDING_COPY.featuresSub,
-          }}
-        />
-
-        {/* Services Section */}
-        <ServicesSection
-          ref={registerRef("services")}
-          data-reveal="services"
-          style={revealStyle("services")}
-          t={t}
-          services={services}
-          loading={loading}
-          error={error}
-          departments={departments}
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          filterDept={filterDept}
-          onFilterChange={(val) => {
-            setFilterDept(val);
-            setCurrentPage(1);
-          }}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
-          startIndex={startIndex}
-          endIndex={endIndex}
-          onPageChange={goToPage}
-          copy={{
-            searchPlaceholder:
-              t("landing.searchServices") || "Search services...",
-            showing: t("landing.showingServices") || "Showing",
-            of: t("landing.of") || "of",
-            services: t("landing.services") || "services",
-            page: t("landing.page") || "Page",
-            previous: t("landing.previous") || "Previous",
-            next: t("landing.next") || "Next",
-            active: t("landing.active") || "Active",
-            inactive: t("landing.inactive") || "Inactive",
-            loading: t("landing.loadingServices") || "Loading services...",
-            noServices: t("landing.noServicesFound") || "No services found",
-            service: t("landing.service") || "service",
-            available: t("landing.available") || "available",
-          }}
-          getServiceIcon={getServiceIcon}
-          language={language}
-        />
-
-        {/* How It Works */}
-        <HowItWorks
-          ref={registerRef("how")}
-          data-reveal="how"
-          style={revealStyle("how")}
-          t={t}
-          copy={{
-            eyebrow: LANDING_COPY.howEyebrow,
-            title: LANDING_COPY.howTitle,
-          }}
-        />
-
-        {/* Golden Monday Teaser */}
-        <GoldenMondayTeaser
-          ref={registerRef("gm")}
-          data-reveal="gm"
-          style={revealStyle("gm")}
-          t={t}
-          copy={{
-            eyebrow: LANDING_COPY.gmEyebrow,
-            title: LANDING_COPY.gmTitle,
-            body: LANDING_COPY.gmBody,
-            cta: LANDING_COPY.gmCta,
-          }}
-          onLogin={goLogin}
-        />
-
-        {/* FAQ Section */}
-        <FAQSection
-          ref={registerRef("faq")}
-          data-reveal="faq"
-          style={revealStyle("faq")}
-          t={t}
-          copy={{
-            eyebrow: LANDING_COPY.faqEyebrow,
-            title: LANDING_COPY.faqTitle,
-          }}
-          language={language}
-        />
       </div>
-
-      {/* ── FOOTER ───────────────────────────────────────── */}
-      <SiteFooter
-        tagline={LANDING_COPY.footerTagline}
-        privacyLabel={LANDING_COPY.footerPrivacy}
-        termsLabel={LANDING_COPY.footerTerms}
-        contactLabel={LANDING_COPY.footerContact}
-      />
-
-      {/* ── BACK TO TOP ──────────────────────────────────── */}
-      <button
-        onClick={scrollToTop}
-        aria-label={LANDING_COPY.backToTop}
-        className="lp-back-to-top"
-        style={{
-          position: "fixed",
-          bottom: isMobile ? 16 : 24,
-          right: isMobile ? 16 : 24,
-          width: isMobile ? 40 : 44,
-          height: isMobile ? 40 : 44,
-          borderRadius: "50%",
-          background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-          color: C.dark,
-          border: "none",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          boxShadow: "0 6px 18px rgba(6,11,46,0.3)",
-          zIndex: 40,
-          opacity: showBackToTop ? 1 : 0,
-          pointerEvents: showBackToTop ? "auto" : "none",
-          transition:
-            "transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-3px)";
-          e.currentTarget.style.boxShadow = "0 10px 24px rgba(6,11,46,0.35)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "translateY(0)";
-          e.currentTarget.style.boxShadow = "0 6px 18px rgba(6,11,46,0.3)";
-        }}
-      >
-        <FiArrowUp size={isMobile ? 16 : 18} />
-      </button>
     </div>
   );
 }
