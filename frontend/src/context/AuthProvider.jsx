@@ -8,6 +8,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(localStorage.getItem("token"));
 
+  // ─── Logout ────────────────────────────────────────────────────
   const logout = useCallback(() => {
     localStorage.removeItem("token");
     setToken(null);
@@ -15,10 +16,12 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  // ─── Load User ─────────────────────────────────────────────────
   const loadUser = useCallback(async () => {
     try {
       const response = await authAPI.getMe();
       setUser(response.data);
+      return response.data;
     } catch (error) {
       console.error("Failed to load user:", error);
       if (error.response?.status === 401) {
@@ -26,11 +29,36 @@ export const AuthProvider = ({ children }) => {
       } else {
         setUser(null);
       }
+      return null;
     } finally {
       setLoading(false);
     }
   }, [logout]);
 
+  // ✅ NEW: refreshUser function
+  const refreshUser = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        setUser(null);
+        return null;
+      }
+
+      const response = await authAPI.getMe();
+      const userData = response.data;
+      setUser(userData);
+      localStorage.setItem("user", JSON.stringify(userData));
+      return userData;
+    } catch (error) {
+      console.error("Failed to refresh user:", error);
+      if (error.response?.status === 401) {
+        logout();
+      }
+      return null;
+    }
+  }, [logout]);
+
+  // ─── Token Check ──────────────────────────────────────────────
   useEffect(() => {
     let isMounted = true;
 
@@ -62,7 +90,7 @@ export const AuthProvider = ({ children }) => {
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ✅ FIX: Wrap register in useCallback
+  // ─── Register ──────────────────────────────────────────────────
   const register = useCallback(async (userData) => {
     try {
       const response = await authAPI.register(userData);
@@ -73,9 +101,9 @@ export const AuthProvider = ({ children }) => {
         error: error.response?.data?.message || "Registration failed",
       };
     }
-  }, []); // No dependencies needed
+  }, []);
 
-  // ✅ FIX: Wrap login in useCallback
+  // ─── Login ─────────────────────────────────────────────────────
   const login = useCallback(async (credentials) => {
     try {
       const response = await authAPI.login(credentials);
@@ -106,7 +134,7 @@ export const AuthProvider = ({ children }) => {
         error: error.response?.data?.message || "Login failed",
       };
     }
-  }, []); // No dependencies needed
+  }, []);
 
   const isAdmin = user?.role === "admin";
   const isSuperAdmin = user?.role === "superadmin";
@@ -115,7 +143,7 @@ export const AuthProvider = ({ children }) => {
   const isAdminOrSuperAdmin = isAdmin || isSuperAdmin;
   const isLeaderOrAbove = isLeader || isAdmin || isSuperAdmin;
 
-  // ✅ Memoize context value to prevent unnecessary re-renders
+  // ─── Context Value ─────────────────────────────────────────────
   const value = useMemo(
     () => ({
       user,
@@ -131,6 +159,7 @@ export const AuthProvider = ({ children }) => {
       register,
       login,
       logout,
+      refreshUser, // ✅ ADDED: refreshUser function
     }),
     [
       user,
@@ -145,6 +174,7 @@ export const AuthProvider = ({ children }) => {
       register,
       login,
       logout,
+      refreshUser,
     ],
   );
 
