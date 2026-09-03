@@ -93,6 +93,24 @@ export const uploadAPI = {
 };
 
 // ============================================================
+// NOTIFICATIONS API
+// ============================================================
+export const notificationAPI = {
+  getAll: (params = {}) => {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append("page", params.page);
+    if (params.limit) queryParams.append("limit", params.limit);
+    if (params.includeRead !== undefined)
+      queryParams.append("includeRead", params.includeRead);
+    return api.get(`/notifications?${queryParams.toString()}`);
+  },
+  getUnreadCount: () => api.get("/notifications/unread-count"),
+  markRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllRead: () => api.put("/notifications/read-all"),
+  dismiss: (id) => api.delete(`/notifications/${id}/dismiss`),
+};
+
+// ============================================================
 // MEETINGS API (Forum Reports)
 // ============================================================
 export const meetingAPI = {

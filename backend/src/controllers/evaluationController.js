@@ -1,4 +1,6 @@
+// backend/src/controllers/evaluationController.js
 const Evaluation = require("../models/Evaluation");
+const { notifyAdmins } = require("../services/notificationService");
 
 const isAdminTier = (role) => role === "admin" || role === "superadmin";
 const isLeaderTier = (role) =>
@@ -31,6 +33,22 @@ const createEvaluation = async (req, res) => {
 
     // If teamName is provided but no team ID, we keep it as is
     const evaluation = await Evaluation.create(evaluationData);
+
+    // ✅ NOTIFICATION: New evaluation created
+    const teamName = evaluation.teamName || "Untitled Team";
+    await notifyAdmins(
+      "evaluation_submitted",
+      `📋 New Evaluation Submitted`,
+      `${req.user.name || "A team leader"} submitted an evaluation for "${teamName}" with ${evaluation.members?.length || 0} members.`,
+      `/evaluation/${evaluation._id}`,
+      {
+        evaluationId: evaluation._id,
+        teamName: teamName,
+        memberCount: evaluation.members?.length || 0,
+        submittedBy: req.user.name || req.user.email,
+      },
+    );
+
     res.status(201).json(evaluation);
   } catch (error) {
     console.error("Create evaluation error:", error);
@@ -110,11 +128,34 @@ const updateEvaluation = async (req, res) => {
       });
     }
 
+    // ✅ Check if this is a "Pass to Super Admin" action
+    const isPassToSuperAdmin =
+      req.body.submittedTo === "superadmin" && !evaluation.submittedTo; // Only notify once
+
     const updated = await Evaluation.findByIdAndUpdate(
       req.params.id,
       { ...req.body, updatedAt: Date.now() },
       { new: true, runValidators: true },
     );
+
+    // ✅ NOTIFICATION: Evaluation passed to Super Admin
+    if (isPassToSuperAdmin) {
+      const teamName = updated.teamName || "Untitled Team";
+      await notifyAdmins(
+        "evaluation_passed_to_superadmin",
+        `📤 Evaluation Passed to Super Admin`,
+        `${req.user.name || "A team leader"} passed the evaluation for "${teamName}" to Super Admin for review.`,
+        `/evaluation/${updated._id}`,
+        {
+          evaluationId: updated._id,
+          teamName: teamName,
+          memberCount: updated.members?.length || 0,
+          passedBy: req.user.name || req.user.email,
+          passedAt: new Date().toISOString(),
+        },
+      );
+    }
+
     res.json(updated);
   } catch (error) {
     console.error("Update evaluation error:", error);

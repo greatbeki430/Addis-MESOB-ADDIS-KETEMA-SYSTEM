@@ -1,5 +1,6 @@
 // frontend/src/pages/admin/TeamManagement.jsx
 // Complete Team Management - Fixed leader dropdown to show only Admin, Super Admin, Team Leader roles
+// WITH member multi-select support
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -21,6 +22,7 @@ import {
   FiCalendar,
   FiBriefcase,
   FiAlertTriangle,
+  FiUser,
 } from "react-icons/fi";
 
 // ✅ Stat Card Component
@@ -257,6 +259,8 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         departmentPlaceholder: "e.g., Customer Service",
         teamLeader: "Team Leader",
         selectLeader: "Select Team Leader",
+        selectMembers: "Select Team Members",
+        noAvailableMembers: "No available members to add",
         update: "Update",
         create: "Create",
         cancel: "Cancel",
@@ -278,6 +282,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
         admin: "Admin",
         superAdmin: "Super Admin",
         employee: "Employee",
+        membersCount: "members",
       };
       return fallback[key] || key;
     },
@@ -293,6 +298,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     name: "",
     department: "",
     leader: "",
+    members: [],
   });
 
   const [confirmModal, setConfirmModal] = useState({
@@ -328,13 +334,6 @@ export default function TeamManagement({ t, isSuperAdmin }) {
 
     if (usersResult.status === "fulfilled") {
       console.log("📊 [TeamManagement] Users loaded:", usersResult.value.data);
-      const eligibleUsers = usersResult.value.data.filter((u) =>
-        ["admin", "superadmin", "leader"].includes(u.role),
-      );
-      console.log(
-        "📊 [TeamManagement] Eligible users (Admin/SuperAdmin/Leader):",
-        eligibleUsers.map((u) => `${u.name} (${u.role})`),
-      );
       setUsers(usersResult.value.data);
     } else {
       console.error(
@@ -386,16 +385,23 @@ export default function TeamManagement({ t, isSuperAdmin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const submitData = {
+        name: formData.name,
+        department: formData.department,
+        leader: formData.leader,
+        members: formData.members || [],
+      };
+
       if (editingTeam) {
-        await teamAPI.update(editingTeam._id, formData);
+        await teamAPI.update(editingTeam._id, submitData);
         showToast(getTranslation("updateSuccess"), "success");
       } else {
-        await teamAPI.create(formData);
+        await teamAPI.create(submitData);
         showToast(getTranslation("createSuccess"), "success");
       }
       setShowModal(false);
       setEditingTeam(null);
-      setFormData({ name: "", department: "", leader: "" });
+      setFormData({ name: "", department: "", leader: "", members: [] });
       await refreshData();
     } catch (error) {
       console.error("Failed to save team:", error);
@@ -446,49 +452,67 @@ export default function TeamManagement({ t, isSuperAdmin }) {
       .filter(Boolean)
       .map((id) => id.toString());
 
-    console.log("🔍 [TeamManagement] Leader IDs:", ids);
     return ids;
   }, [teams]);
 
-  // ✅ FIXED: Get users who can be team leaders: Admin, Super Admin, Team Leader
-  const availableLeaderUsers = useMemo(() => {
-    console.log("🔍 [TeamManagement] Calculating available leader users...");
-    console.log("🔍 [TeamManagement] Total users:", users.length);
-    console.log("🔍 [TeamManagement] Leader IDs:", leaderIds);
-    console.log(
-      "🔍 [TeamManagement] Editing team:",
-      editingTeam?.name || "None",
-    );
+  // ✅ Get all member IDs from all teams (for filtering available members)
+  const assignedMemberIds = useMemo(() => {
+    const ids = teams
+      .flatMap((team) => team.members || [])
+      .filter(Boolean)
+      .map((m) => m._id || m)
+      .filter(Boolean)
+      .map((id) => id.toString());
 
-    const result = users.filter((user) => {
+    return ids;
+  }, [teams]);
+
+  // ✅ Get users who can be team leaders: Admin, Super Admin, Team Leader
+  const availableLeaderUsers = useMemo(() => {
+    return users.filter((user) => {
       const isEligibleRole = ["admin", "superadmin", "leader"].includes(
         user.role,
       );
       if (!isEligibleRole) return false;
 
       if (editingTeam && editingTeam.leader?._id === user._id) {
-        console.log(
-          `✅ User ${user.name} (${user.role}) - current leader of team being edited`,
-        );
         return true;
       }
 
       const isAlreadyLeader = leaderIds.includes(user._id.toString());
-      if (isAlreadyLeader) {
-        console.log(`❌ User ${user.name} (${user.role}) - already a leader`);
+      if (isAlreadyLeader) return false;
+
+      return true;
+    });
+  }, [users, leaderIds, editingTeam]);
+
+  // ✅ Get users who can be team members: Employees only (or any non-admin/leader)
+  const availableMemberUsers = useMemo(() => {
+    const currentMemberIds = editingTeam
+      ? (editingTeam.members || [])
+          .map((m) => m._id || m)
+          .filter(Boolean)
+          .map((id) => id.toString())
+      : [];
+
+    return users.filter((user) => {
+      // Exclude users who are leaders, admins, or superadmins
+      if (["admin", "superadmin", "leader"].includes(user.role)) {
         return false;
       }
 
-      console.log(`✅ User ${user.name} (${user.role}) - available`);
+      // If editing, include current members
+      if (currentMemberIds.includes(user._id.toString())) {
+        return true;
+      }
+
+      // Exclude users already assigned to any team (unless editing and they're in this team)
+      const isAlreadyAssigned = assignedMemberIds.includes(user._id.toString());
+      if (isAlreadyAssigned) return false;
+
       return true;
     });
-
-    console.log(
-      "🔍 [TeamManagement] Available leader users:",
-      result.map((u) => `${u.name} (${u.role})`),
-    );
-    return result;
-  }, [users, leaderIds, editingTeam]);
+  }, [users, assignedMemberIds, editingTeam]);
 
   const eligibleRoleUsers = useMemo(
     () =>
@@ -522,11 +546,19 @@ export default function TeamManagement({ t, isSuperAdmin }) {
     },
   };
 
-  // ✅ Delete Confirmation Modal — portaled to document.body so its
-  // `position: fixed` always anchors to the real viewport, regardless of
-  // whether some ancestor in the layout (sidebar wrapper, scroll
-  // container, etc.) has a transform/filter/perspective that would
-  // otherwise turn "fixed" into "fixed relative to that ancestor".
+  // ✅ Helper to get selected member names for display
+  const getSelectedMemberNames = (memberIds) => {
+    if (!memberIds || memberIds.length === 0) return "";
+    const names = memberIds
+      .map((id) => {
+        const user = users.find((u) => u._id === id);
+        return user ? user.name : null;
+      })
+      .filter(Boolean);
+    return names.join(", ");
+  };
+
+  // ✅ Delete Confirmation Modal — portaled to document.body
   const deleteConfirmModal = confirmModal.isOpen
     ? createPortal(
         <div
@@ -676,7 +708,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
       )
     : null;
 
-  // ✅ Add/Edit Team Modal — same portal treatment as above, same reason.
+  // ✅ Add/Edit Team Modal — with member multi-select
   const teamFormModal =
     isSuperAdmin && showModal
       ? createPortal(
@@ -703,7 +735,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                 borderRadius: 16,
                 padding: "clamp(20px, 3vw, 28px)",
                 width: "90%",
-                maxWidth: 500,
+                maxWidth: 600,
                 maxHeight: "90vh",
                 overflow: "auto",
                 boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
@@ -744,10 +776,11 @@ export default function TeamManagement({ t, isSuperAdmin }) {
               >
                 {editingTeam
                   ? `Update information for ${editingTeam.name}`
-                  : "Create a new team and assign a leader"}
+                  : "Create a new team and assign a leader and members"}
               </p>
 
               <form onSubmit={handleSubmit}>
+                {/* Team Name */}
                 <div style={{ marginBottom: 14 }}>
                   <label
                     style={{
@@ -789,6 +822,7 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                   />
                 </div>
 
+                {/* Department */}
                 <div style={{ marginBottom: 14 }}>
                   <label
                     style={{
@@ -828,7 +862,8 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                   />
                 </div>
 
-                <div style={{ marginBottom: 18 }}>
+                {/* Team Leader */}
+                <div style={{ marginBottom: 14 }}>
                   <label
                     style={{
                       display: "block",
@@ -838,13 +873,15 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                       color: C.dark,
                     }}
                   >
-                    {getTranslation("teamLeader")}
+                    {getTranslation("teamLeader")}{" "}
+                    <span style={{ color: "#ef4444" }}>*</span>
                   </label>
                   <select
                     value={formData.leader}
                     onChange={(e) =>
                       setFormData({ ...formData, leader: e.target.value })
                     }
+                    required
                     style={{
                       width: "100%",
                       padding: "10px 14px",
@@ -878,6 +915,164 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                     </p>
                   )}
                   <RoleDescription role={formData.leader ? "leader" : ""} />
+                </div>
+
+                {/* Team Members - Multi-select */}
+                <div style={{ marginBottom: 18 }}>
+                  <label
+                    style={{
+                      display: "block",
+                      marginBottom: 4,
+                      fontWeight: 600,
+                      fontSize: 12,
+                      color: C.dark,
+                    }}
+                  >
+                    {getTranslation("selectMembers")}
+                    <span
+                      style={{
+                        fontSize: 10,
+                        color: C.muted,
+                        fontWeight: 400,
+                        marginLeft: 6,
+                      }}
+                    >
+                      ({getTranslation("membersCount")})
+                    </span>
+                  </label>
+
+                  {availableMemberUsers.length === 0 &&
+                  (!editingTeam || (editingTeam.members || []).length === 0) ? (
+                    <p
+                      style={{
+                        fontSize: 12,
+                        color: C.muted,
+                        padding: "8px 12px",
+                        background: C.bg,
+                        borderRadius: 6,
+                        fontStyle: "italic",
+                      }}
+                    >
+                      {getTranslation("noAvailableMembers")}
+                    </p>
+                  ) : (
+                    <div
+                      style={{
+                        border: `1.5px solid ${C.border}`,
+                        borderRadius: 8,
+                        padding: "8px",
+                        maxHeight: 180,
+                        overflowY: "auto",
+                        background: C.white,
+                      }}
+                    >
+                      {availableMemberUsers.map((user) => {
+                        const isSelected = (formData.members || []).includes(
+                          user._id,
+                        );
+                        return (
+                          <div
+                            key={user._id}
+                            onClick={() => {
+                              const currentMembers = formData.members || [];
+                              let newMembers;
+                              if (isSelected) {
+                                newMembers = currentMembers.filter(
+                                  (id) => id !== user._id,
+                                );
+                              } else {
+                                newMembers = [...currentMembers, user._id];
+                              }
+                              setFormData({
+                                ...formData,
+                                members: newMembers,
+                              });
+                            }}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 10,
+                              padding: "6px 10px",
+                              borderRadius: 6,
+                              cursor: "pointer",
+                              background: isSelected
+                                ? `${C.primary}11`
+                                : "transparent",
+                              transition: "all 0.2s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background = C.bg;
+                              }
+                            }}
+                            onMouseLeave={(e) => {
+                              if (!isSelected) {
+                                e.currentTarget.style.background =
+                                  "transparent";
+                              }
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 20,
+                                height: 20,
+                                borderRadius: 4,
+                                border: `2px solid ${isSelected ? C.primary : C.border}`,
+                                background: isSelected
+                                  ? C.primary
+                                  : "transparent",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                transition: "all 0.2s ease",
+                              }}
+                            >
+                              {isSelected && <FiCheck size={12} color="#fff" />}
+                            </div>
+                            <FiUser size={14} color={C.muted} />
+                            <span
+                              style={{
+                                fontSize: 13,
+                                color: C.dark,
+                                flex: 1,
+                              }}
+                            >
+                              {user.name}
+                            </span>
+                            <span
+                              style={{
+                                fontSize: 10,
+                                color: C.muted,
+                                background: C.bg,
+                                padding: "1px 8px",
+                                borderRadius: 10,
+                              }}
+                            >
+                              {getRoleDisplayName(user.role)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Show selected members count */}
+                  {(formData.members || []).length > 0 && (
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: C.primary,
+                        marginTop: 4,
+                        fontWeight: 500,
+                      }}
+                    >
+                      {formData.members.length} member
+                      {formData.members.length !== 1 ? "s" : ""} selected
+                      {formData.members.length > 0 &&
+                        `: ${getSelectedMemberNames(formData.members)}`}
+                    </div>
+                  )}
                 </div>
 
                 <div
@@ -1003,7 +1198,12 @@ export default function TeamManagement({ t, isSuperAdmin }) {
           <button
             onClick={() => {
               setEditingTeam(null);
-              setFormData({ name: "", department: "", leader: "" });
+              setFormData({
+                name: "",
+                department: "",
+                leader: "",
+                members: [],
+              });
               setShowModal(true);
             }}
             style={{
@@ -1259,6 +1459,31 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                           : "N/A"}
                       </p>
                     </div>
+
+                    {/* Member names preview */}
+                    {team.members && team.members.length > 0 && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: C.muted,
+                          marginTop: 4,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <FiUser size={11} />
+                        <span>
+                          {team.members
+                            .slice(0, 5)
+                            .map((m) => m.name || m)
+                            .join(", ")}
+                          {team.members.length > 5 &&
+                            ` +${team.members.length - 5} more`}
+                        </span>
+                      </div>
+                    )}
                   </div>
 
                   {isSuperAdmin && (
@@ -1273,11 +1498,16 @@ export default function TeamManagement({ t, isSuperAdmin }) {
                     >
                       <TeamActionButtons
                         onEdit={() => {
+                          const memberIds = (team.members || [])
+                            .map((m) => m._id || m)
+                            .filter(Boolean)
+                            .map((id) => id.toString());
                           setEditingTeam(team);
                           setFormData({
                             name: team.name,
                             department: team.department || "",
                             leader: team.leader?._id || "",
+                            members: memberIds,
                           });
                           setShowModal(true);
                         }}

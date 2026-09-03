@@ -34,6 +34,9 @@ import {
   FiMail,
 } from "react-icons/fi";
 
+// ✅ ADD THIS IMPORT
+import NotificationBell from "../notifications/NotificationBell";
+
 export default function Header({ t, lang, setLang, onAddUserClick }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -323,7 +326,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
           </span>
         </div>
 
-        {/* ── RIGHT SECTION - Date, Language & User ── */}
+        {/* ── RIGHT SECTION - Date, Language, Notifications & User ── */}
         <div
           style={{
             display: "flex",
@@ -536,6 +539,10 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
               </div>
             )}
           </div>
+
+          {/* ✅ ── NOTIFICATION BELL ── ✅ */}
+          {/* Show only for Admin and Super Admin */}
+          {(isAdmin || isSuperAdmin) && <NotificationBell />}
 
           {/* ── User Avatar with Dropdown ── */}
           <div
