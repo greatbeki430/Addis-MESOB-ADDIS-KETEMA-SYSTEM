@@ -18,6 +18,7 @@ import {
   FiVideo,
   FiCheckCircle,
   FiClock,
+  FiLoader,
 } from "react-icons/fi";
 
 const card = {
@@ -236,7 +237,18 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
         </div>
 
         {loading ? (
-          <p style={{ color: C.muted }}>
+          <p
+            style={{
+              color: C.muted,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <FiLoader
+              size={16}
+              style={{ animation: "spin 1s linear infinite" }}
+            />
             {t.loadingRotation || "Loading rotation…"}
           </p>
         ) : currentSession?.presenter ? (
@@ -436,6 +448,15 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
               accept="video/*"
               onChange={(e) => setRecordingFile(e.target.files?.[0] || null)}
               aria-label={t.uploadRecordingFile || "Upload recording file"}
+              style={{
+                flex: 1,
+                minWidth: 200,
+                padding: "8px",
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                fontSize: 12,
+                background: C.white,
+              }}
             />
             <button
               style={btn()}

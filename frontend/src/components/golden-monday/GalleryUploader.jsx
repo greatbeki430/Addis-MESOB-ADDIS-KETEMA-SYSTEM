@@ -3,7 +3,7 @@ import { useState, useRef } from "react";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
 import { C } from "../../styles/theme";
-import { FiCalendar, FiUpload, FiLoader } from "react-icons/fi";
+import { FiCalendar, FiUpload, FiLoader, FiX } from "react-icons/fi";
 
 // Ethiopian calendar conversion
 const ETHIOPIAN_MONTHS_AM = [
@@ -72,8 +72,6 @@ export default function GalleryUploader({
 }) {
   const [uploadTopic, setUploadTopic] = useState("");
   const [isCreating, setIsCreating] = useState(false);
-
-  // Synchronous submit lock to prevent double-clicks
   const isSubmittingRef = useRef(false);
 
   const getEthiopianDateString = () => formatEthiopianDateAmharic(new Date());
@@ -124,22 +122,18 @@ export default function GalleryUploader({
         throw new Error("Failed to create folder");
       }
 
+      // ✅ FIX: Pass the topic to upload complete callback
+      const topic = uploadTopic.trim();
+
       onClose();
       setUploadTopic("");
 
-      onUploadComplete(folderId, uploadTopic).catch((error) => {
-        console.error("Upload process error:", error);
-        showToast(
-          "Some files failed to upload. Check the queue for details.",
-          "error",
-        );
-      });
+      // ✅ FIX: Call upload complete with folderId and topic
+      await onUploadComplete(folderId, topic);
     } catch (error) {
-      console.error("Folder creation failed:", error);
+      console.error("Upload process error:", error);
       showToast(
-        error.message && error.message !== "Failed to create folder"
-          ? `Folder creation failed: ${error.message}`
-          : "Failed to create folder. Please try again.",
+        error.message || "Failed to upload. Please try again.",
         "error",
       );
       setIsCreating(false);
@@ -150,7 +144,7 @@ export default function GalleryUploader({
 
   const handleClose = () => {
     if (isCreating) {
-      showToast("Please wait for folder creation to complete", "warning");
+      showToast("Please wait for upload to complete", "warning");
       return;
     }
     setUploadTopic("");
@@ -180,9 +174,26 @@ export default function GalleryUploader({
           width: "100%",
           padding: 24,
           boxShadow: "0 24px 64px rgba(0,0,0,0.3)",
+          position: "relative",
         }}
       >
-        <h3 style={{ marginTop: 0, marginBottom: 12 }}>Create New Folder</h3>
+        <button
+          onClick={handleClose}
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 16,
+            background: "none",
+            border: "none",
+            fontSize: 20,
+            cursor: "pointer",
+            color: "#999",
+          }}
+        >
+          <FiX size={20} />
+        </button>
+
+        <h3 style={{ marginTop: 0, marginBottom: 8 }}>Create New Folder</h3>
         <p style={{ fontSize: 13, color: "#666", marginBottom: 12 }}>
           <FiCalendar size={14} style={{ marginRight: 4 }} />
           Date: <strong>{getEthiopianDateString()}</strong>
@@ -196,7 +207,7 @@ export default function GalleryUploader({
             fontSize: 13,
           }}
         >
-          Topic / Presenter Name
+          Topic / Presenter Name <span style={{ color: "#ef4444" }}>*</span>
         </label>
         <input
           type="text"
@@ -277,7 +288,7 @@ export default function GalleryUploader({
                   size={16}
                   style={{ animation: "spin 1s linear infinite" }}
                 />
-                Creating...
+                Processing...
               </>
             ) : (
               <>

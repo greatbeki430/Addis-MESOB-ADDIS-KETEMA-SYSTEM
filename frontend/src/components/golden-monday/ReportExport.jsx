@@ -2,8 +2,9 @@
 // Export reports for Golden Monday (attendance, sessions, gallery) - PDF, Excel, Word
 // ✅ FIXED: Complete table data for ALL report types with Amharic as default
 // ✅ Uses setSmartFont pattern from dailyReport.js for consistent font handling
+// ✅ Enhanced UI with better visual design and animations
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { C, F } from "../../styles/theme";
 import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../services/api";
@@ -24,6 +25,11 @@ import {
   FiTrendingUp,
   FiBriefcase,
   FiCpu,
+  FiChevronDown,
+  FiChevronUp,
+  FiAward,
+  FiBarChart2,
+  FiX,
 } from "react-icons/fi";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -252,6 +258,11 @@ export default function ReportExport({ sessionId }) {
   const [exporting, setExporting] = useState(false);
   const [reportType, setReportType] = useState("attendance");
   const [exportFormat, setExportFormat] = useState("pdf");
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const exportRef = useRef(null);
 
   // Force Amharic as default, allow other languages
   const reportLang = language || "am";
@@ -278,44 +289,73 @@ export default function ReportExport({ sessionId }) {
     {
       value: "attendance",
       label: t("attendanceReport", "Attendance Report"),
-      icon: <FiUsers size={14} />,
+      icon: <FiUsers size={16} />,
+      color: "#3b82f6",
+      bgColor: "#eff6ff",
     },
     {
       value: "sessions",
       label: t("sessionsReport", "Sessions Report"),
-      icon: <FiFileText size={14} />,
+      icon: <FiFileText size={16} />,
+      color: "#8b5cf6",
+      bgColor: "#f5f3ff",
     },
     {
       value: "gallery",
       label: t("galleryReport", "Gallery Report"),
-      icon: <FiCamera size={14} />,
+      icon: <FiCamera size={16} />,
+      color: "#10b981",
+      bgColor: "#ecfdf5",
     },
     {
       value: "experiences",
       label: t("experiencesReport", "Experiences Shared"),
-      icon: <FiMessageCircle size={14} />,
+      icon: <FiMessageCircle size={16} />,
+      color: "#f59e0b",
+      bgColor: "#fffbeb",
     },
     {
       value: "results",
       label: t("resultsReport", "Results Gained"),
-      icon: <FiTrendingUp size={14} />,
+      icon: <FiTrendingUp size={16} />,
+      color: "#ef4444",
+      bgColor: "#fef2f2",
     },
     {
       value: "employee-performance",
       label: t("performanceReport", "Employee Performance"),
-      icon: <FiBriefcase size={14} />,
+      icon: <FiBriefcase size={16} />,
+      color: "#06b6d4",
+      bgColor: "#ecfeff",
     },
     {
       value: "dashboard-insights",
       label: t("insightsReport", "Dashboard & AI Insights"),
-      icon: <FiCpu size={14} />,
+      icon: <FiCpu size={16} />,
+      color: "#ec4899",
+      bgColor: "#fdf2f8",
     },
   ];
 
   const formatOptions = [
-    { value: "pdf", label: "PDF", icon: <FiFile size={14} /> },
-    { value: "excel", label: "Excel", icon: <FiFileText size={14} /> },
-    { value: "word", label: "Word", icon: <FiFileText size={14} /> },
+    {
+      value: "pdf",
+      label: "PDF",
+      icon: <FiFile size={14} />,
+      color: "#dc2626",
+    },
+    {
+      value: "excel",
+      label: "Excel",
+      icon: <FiFileText size={14} />,
+      color: "#16a34a",
+    },
+    {
+      value: "word",
+      label: "Word",
+      icon: <FiFileText size={14} />,
+      color: "#2563eb",
+    },
   ];
 
   // ── Helper: Get report data ──
@@ -432,6 +472,21 @@ export default function ReportExport({ sessionId }) {
     }
   };
 
+  // ─── Preview Report ──────────────────────────────────────────
+  const handlePreview = async () => {
+    setPreviewLoading(true);
+    setShowPreview(true);
+    try {
+      const data = await getReportData(reportType);
+      setPreviewData(data);
+    } catch (error) {
+      console.error("Preview failed:", error);
+      showToast("Failed to load preview", "error");
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   // ─── EXPORT AS PDF ──────────────────────────────────────────
   const exportAsPDF = async (data, filename) => {
     try {
@@ -439,7 +494,6 @@ export default function ReportExport({ sessionId }) {
 
       const engine = createPDF({ orientation: "landscape", theme: "report" });
       const doc = engine.getDoc();
-      // Load fonts properly
       loadFonts(doc, { silent: false });
 
       const pageWidth = doc.internal.pageSize.getWidth();
@@ -472,7 +526,6 @@ export default function ReportExport({ sessionId }) {
 
       let yPos = 35;
 
-      // ── Helper: Create table with proper font support ──
       const createTable = (headers, rows, startY, options = {}) => {
         const {
           title = null,
@@ -493,7 +546,6 @@ export default function ReportExport({ sessionId }) {
           currentY += 6;
         }
 
-        // Ensure we have enough space
         const requiredSpace = rows.length * rowHeight + 30;
         if (currentY + requiredSpace > doc.internal.pageSize.getHeight() - 40) {
           doc.addPage();
@@ -542,7 +594,6 @@ export default function ReportExport({ sessionId }) {
         const absentCount = total - present;
         const rate = total > 0 ? Math.round((present / total) * 100) : 0;
 
-        // Summary
         const summaryRows = [
           [t("total", "Total"), total],
           [t("present", "Present"), present],
@@ -560,7 +611,6 @@ export default function ReportExport({ sessionId }) {
           },
         );
 
-        // Detailed Attendance
         const presentWithSignatures = data.attendance.filter(
           (a) => a.attended && a.signature && a.signature.length > 100,
         );
@@ -774,7 +824,6 @@ export default function ReportExport({ sessionId }) {
 
       // ─── DASHBOARD INSIGHTS REPORT ──────────────────────────
       if (data.insights || data.metrics) {
-        // Metrics
         if (data.metrics && Object.keys(data.metrics).length > 0) {
           const metricsRows = Object.entries(data.metrics).map(([key, val]) => [
             key,
@@ -793,7 +842,6 @@ export default function ReportExport({ sessionId }) {
           );
         }
 
-        // AI Insights
         if (data.insights && data.insights.length > 0) {
           const insightRows = data.insights.map((insight) => [
             insight.title || "",
@@ -866,7 +914,6 @@ export default function ReportExport({ sessionId }) {
         `${ethiopianDateStr} | ${gregorianDateStr}`,
       ];
 
-      // ─── Attendance ──────────────────────────────────────────
       if (data.attendance) {
         const attendanceRows = [
           generatedRow,
@@ -904,7 +951,6 @@ export default function ReportExport({ sessionId }) {
           t("attendanceReport", "Attendance"),
         );
 
-        // Stats sheet
         const total = data.attendance.length;
         const present = data.attendance.filter((a) => a.attended).length;
         const absentCount = total - present;
@@ -921,7 +967,6 @@ export default function ReportExport({ sessionId }) {
         XLSX.utils.book_append_sheet(wb, statsWs, "Stats");
       }
 
-      // ─── Sessions ────────────────────────────────────────────
       if (data.sessions) {
         const sessionRows = [
           generatedRow,
@@ -952,7 +997,6 @@ export default function ReportExport({ sessionId }) {
         XLSX.utils.book_append_sheet(wb, ws, t("sessionsReport", "Sessions"));
       }
 
-      // ─── Gallery ─────────────────────────────────────────────
       if (data.photos) {
         const galleryRows = [
           generatedRow,
@@ -977,7 +1021,6 @@ export default function ReportExport({ sessionId }) {
         XLSX.utils.book_append_sheet(wb, ws, t("galleryReport", "Gallery"));
       }
 
-      // ─── Experiences ─────────────────────────────────────────
       if (data.experiences) {
         const expRows = [
           generatedRow,
@@ -1010,7 +1053,6 @@ export default function ReportExport({ sessionId }) {
         );
       }
 
-      // ─── Results ─────────────────────────────────────────────
       if (data.results) {
         const resRows = [
           generatedRow,
@@ -1039,7 +1081,6 @@ export default function ReportExport({ sessionId }) {
         XLSX.utils.book_append_sheet(wb, ws, t("resultsReport", "Results"));
       }
 
-      // ─── Employee Performance ───────────────────────────────
       if (data.performance) {
         const perfRows = [
           generatedRow,
@@ -1072,7 +1113,6 @@ export default function ReportExport({ sessionId }) {
         );
       }
 
-      // ─── Insights ────────────────────────────────────────────
       if (data.insights || data.metrics) {
         const insightRows = [generatedRow, []];
         if (data.metrics) {
@@ -1100,7 +1140,6 @@ export default function ReportExport({ sessionId }) {
         XLSX.utils.book_append_sheet(wb, ws, t("insightsReport", "Insights"));
       }
 
-      // Write file
       const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
       const blob = new Blob([wbout], { type: "application/octet-stream" });
       saveAs(blob, filename);
@@ -1178,7 +1217,6 @@ export default function ReportExport({ sessionId }) {
           </div>
       `;
 
-      // ─── Attendance ──────────────────────────────────────────
       if (data.attendance) {
         const total = data.attendance.length;
         const present = data.attendance.filter((a) => a.attended).length;
@@ -1235,7 +1273,6 @@ export default function ReportExport({ sessionId }) {
         htmlContent += `</table>`;
       }
 
-      // ─── Sessions ────────────────────────────────────────────
       if (data.sessions) {
         const headers = [
           t("title", "Title"),
@@ -1260,7 +1297,6 @@ export default function ReportExport({ sessionId }) {
         );
       }
 
-      // ─── Gallery ─────────────────────────────────────────────
       if (data.photos) {
         const headers = [
           t("title", "Title"),
@@ -1281,7 +1317,6 @@ export default function ReportExport({ sessionId }) {
         );
       }
 
-      // ─── Experiences ─────────────────────────────────────────
       if (data.experiences) {
         const headers = [
           t("name", "Name"),
@@ -1306,7 +1341,6 @@ export default function ReportExport({ sessionId }) {
         );
       }
 
-      // ─── Results ─────────────────────────────────────────────
       if (data.results) {
         const headers = [
           t("name", "Name"),
@@ -1331,7 +1365,6 @@ export default function ReportExport({ sessionId }) {
         );
       }
 
-      // ─── Employee Performance ───────────────────────────────
       if (data.performance) {
         const headers = [
           t("name", "Name"),
@@ -1356,7 +1389,6 @@ export default function ReportExport({ sessionId }) {
         );
       }
 
-      // ─── Insights ────────────────────────────────────────────
       if (data.insights || data.metrics) {
         htmlContent += `<h2>🤖 ${t("insightsReport", "Dashboard & AI Insights")}</h2>`;
 
@@ -1382,7 +1414,6 @@ export default function ReportExport({ sessionId }) {
         }
       }
 
-      // ─── Footer ──────────────────────────────────────────────
       htmlContent += `
           <div class="footer">
             <p>${t("footerText", "Generated by Addis MESOB Golden Monday System")} • ${new Date().toLocaleString()}</p>
@@ -1440,53 +1471,196 @@ export default function ReportExport({ sessionId }) {
     }
   };
 
+  // Get the selected report type config
+  const selectedReportType = reportTypes.find((r) => r.value === reportType);
+
   return (
-    <div style={{ fontFamily: F.sans }}>
-      {/* Report Type Selection */}
+    <div style={{ fontFamily: F.sans }} ref={exportRef}>
+      {/* Header */}
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-          gap: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           marginBottom: 16,
+          flexWrap: "wrap",
+          gap: 10,
         }}
       >
-        {reportTypes.map((type) => (
-          <button
-            key={type.value}
-            onClick={() => setReportType(type.value)}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: "50%",
+              background: `linear-gradient(135deg, ${selectedReportType?.color || C.primary}, ${selectedReportType?.color || C.primary}88)`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+            }}
+          >
+            <FiDownload size={18} />
+          </div>
+          <div>
+            <h3 style={{ margin: 0, fontSize: 16, color: C.dark }}>
+              {t("reportTitle", "Report Export")}
+            </h3>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>
+              {selectedReportType?.label || "Select a report type"}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          style={{
+            background: "none",
+            border: "none",
+            color: C.muted,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 12,
+            padding: "4px 8px",
+            borderRadius: 6,
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = C.bg;
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+          }}
+        >
+          {isExpanded ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
+          {isExpanded ? "Hide" : "Show"} options
+        </button>
+      </div>
+
+      {/* Expanded Options */}
+      {isExpanded && (
+        <div
+          style={{
+            background: C.bg,
+            borderRadius: 12,
+            padding: "16px 20px",
+            marginBottom: 16,
+            border: `1px solid ${C.border}`,
+            animation: "slideDown 0.3s ease",
+          }}
+        >
+          {/* Report Type Selection */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            {reportTypes.map((type) => (
+              <button
+                key={type.value}
+                onClick={() => setReportType(type.value)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  border: `2px solid ${reportType === type.value ? type.color : C.border}`,
+                  background:
+                    reportType === type.value ? type.bgColor : C.white,
+                  color: reportType === type.value ? type.color : C.muted,
+                  cursor: "pointer",
+                  fontSize: 12,
+                  fontWeight: reportType === type.value ? 600 : 400,
+                  transition: "all 0.2s ease",
+                  fontFamily: F.sans,
+                  position: "relative",
+                }}
+                onMouseEnter={(e) => {
+                  if (reportType !== type.value) {
+                    e.currentTarget.style.borderColor = type.color + "66";
+                    e.currentTarget.style.background = type.bgColor + "44";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (reportType !== type.value) {
+                    e.currentTarget.style.borderColor = C.border;
+                    e.currentTarget.style.background = C.white;
+                  }
+                }}
+              >
+                <span style={{ color: type.color }}>{type.icon}</span>
+                {type.label}
+                {reportType === type.value && (
+                  <FiCheck
+                    size={14}
+                    color={type.color}
+                    style={{ marginLeft: "auto" }}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Date Range */}
+          <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
-              padding: "10px 16px",
-              borderRadius: 8,
-              border: `2px solid ${reportType === type.value ? C.primary : C.border}`,
-              background:
-                reportType === type.value ? C.primary + "11" : C.white,
-              color: reportType === type.value ? C.primary : C.muted,
-              cursor: "pointer",
-              fontSize: 13,
-              fontWeight: reportType === type.value ? 600 : 400,
-              transition: "all 0.2s ease",
-              fontFamily: F.sans,
+              gap: 10,
+              flexWrap: "wrap",
             }}
-            aria-label={type.label}
           >
-            {type.icon}
-            {type.label}
-            {reportType === type.value && (
-              <FiCheck
-                size={14}
-                color={C.primary}
-                style={{ marginLeft: "auto" }}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <FiCalendar size={14} color={C.muted} />
+              <span style={{ fontSize: 12, color: C.muted }}>From:</span>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={(e) =>
+                  setDateRange((prev) => ({ ...prev, start: e.target.value }))
+                }
+                style={{
+                  padding: "4px 8px",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  fontSize: 12,
+                  outline: "none",
+                  fontFamily: F.sans,
+                  background: C.white,
+                  width: "140px",
+                }}
               />
-            )}
-          </button>
-        ))}
-      </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <span style={{ fontSize: 12, color: C.muted }}>To:</span>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={(e) =>
+                  setDateRange((prev) => ({ ...prev, end: e.target.value }))
+                }
+                style={{
+                  padding: "4px 8px",
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 6,
+                  fontSize: 12,
+                  outline: "none",
+                  fontFamily: F.sans,
+                  background: C.white,
+                  width: "140px",
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Export Format & Controls */}
+      {/* Format Selection & Export Button */}
       <div
         style={{
           display: "flex",
@@ -1494,46 +1668,10 @@ export default function ReportExport({ sessionId }) {
           flexWrap: "wrap",
           gap: 10,
           alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <FiCalendar size={14} color={C.muted} />
-          <input
-            type="date"
-            value={dateRange.start}
-            onChange={(e) =>
-              setDateRange((prev) => ({ ...prev, start: e.target.value }))
-            }
-            style={{
-              padding: "6px 10px",
-              border: `1px solid ${C.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-              outline: "none",
-              fontFamily: F.sans,
-            }}
-            aria-label="Start date"
-          />
-          <span style={{ color: C.muted }}>to</span>
-          <input
-            type="date"
-            value={dateRange.end}
-            onChange={(e) =>
-              setDateRange((prev) => ({ ...prev, end: e.target.value }))
-            }
-            style={{
-              padding: "6px 10px",
-              border: `1px solid ${C.border}`,
-              borderRadius: 6,
-              fontSize: 12,
-              outline: "none",
-              fontFamily: F.sans,
-            }}
-            aria-label="End date"
-          />
-        </div>
-
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {formatOptions.map((format) => (
             <button
               key={format.value}
@@ -1541,68 +1679,268 @@ export default function ReportExport({ sessionId }) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                gap: 4,
-                padding: "6px 12px",
-                borderRadius: 6,
-                border: `2px solid ${exportFormat === format.value ? C.primary : C.border}`,
+                gap: 6,
+                padding: "8px 16px",
+                borderRadius: 8,
+                border: `2px solid ${exportFormat === format.value ? format.color : C.border}`,
                 background:
-                  exportFormat === format.value ? C.primary : "transparent",
-                color: exportFormat === format.value ? "#fff" : C.muted,
+                  exportFormat === format.value ? `${format.color}11` : C.white,
+                color: exportFormat === format.value ? format.color : C.muted,
                 cursor: "pointer",
-                fontSize: 12,
+                fontSize: 13,
                 fontWeight: exportFormat === format.value ? 600 : 400,
                 fontFamily: F.sans,
                 transition: "all 0.2s ease",
               }}
+              onMouseEnter={(e) => {
+                if (exportFormat !== format.value) {
+                  e.currentTarget.style.borderColor = format.color + "66";
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (exportFormat !== format.value) {
+                  e.currentTarget.style.borderColor = C.border;
+                }
+              }}
             >
-              {format.icon}
+              <span style={{ color: format.color }}>{format.icon}</span>
               {format.label}
+              {exportFormat === format.value && (
+                <FiCheck size={12} color={format.color} />
+              )}
             </button>
           ))}
         </div>
 
-        <button
-          onClick={handleExport}
-          disabled={exporting}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "8px 20px",
-            background: C.primary,
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            cursor: exporting ? "not-allowed" : "pointer",
-            fontWeight: 600,
-            fontSize: 13,
-            fontFamily: F.sans,
-            opacity: exporting ? 0.6 : 1,
-            transition: "all 0.2s ease",
-          }}
-          aria-label="Export Report"
-        >
-          {exporting ? (
-            <>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            onClick={handlePreview}
+            disabled={previewLoading}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 16px",
+              background: C.bg,
+              color: C.dark,
+              border: `1px solid ${C.border}`,
+              borderRadius: 8,
+              cursor: previewLoading ? "not-allowed" : "pointer",
+              fontWeight: 500,
+              fontSize: 13,
+              fontFamily: F.sans,
+              opacity: previewLoading ? 0.6 : 1,
+              transition: "all 0.2s ease",
+            }}
+          >
+            {previewLoading ? (
               <FiLoader
                 size={16}
                 style={{ animation: "spin 1s linear infinite" }}
               />
-              {t("exporting", "Exporting...")}
-            </>
-          ) : (
-            <>
-              <FiDownload size={16} />
-              {t("exportReport", "Export Report")}
-            </>
-          )}
-        </button>
+            ) : (
+              <FiBarChart2 size={16} />
+            )}
+            Preview
+          </button>
+
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 24px",
+              background: `linear-gradient(135deg, ${selectedReportType?.color || C.primary}, ${selectedReportType?.color || C.primary}88)`,
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: exporting ? "not-allowed" : "pointer",
+              fontWeight: 600,
+              fontSize: 13,
+              fontFamily: F.sans,
+              opacity: exporting ? 0.6 : 1,
+              transition: "all 0.2s ease",
+              boxShadow: exporting
+                ? "none"
+                : `0 4px 12px ${selectedReportType?.color || C.primary}44`,
+            }}
+            onMouseEnter={(e) => {
+              if (!exporting) {
+                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.boxShadow = `0 6px 20px ${selectedReportType?.color || C.primary}66`;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!exporting) {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = `0 4px 12px ${selectedReportType?.color || C.primary}44`;
+              }
+            }}
+          >
+            {exporting ? (
+              <>
+                <FiLoader
+                  size={16}
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                {t("exporting", "Exporting...")}
+              </>
+            ) : (
+              <>
+                <FiDownload size={16} />
+                {t("exportReport", "Export Report")}
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.6)",
+            backdropFilter: "blur(8px)",
+            zIndex: 2000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            animation: "fadeIn 0.3s ease",
+          }}
+          onClick={() => setShowPreview(false)}
+        >
+          <div
+            style={{
+              background: C.white,
+              borderRadius: 16,
+              padding: 24,
+              maxWidth: 800,
+              width: "100%",
+              maxHeight: "80vh",
+              overflow: "auto",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
+              position: "relative",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setShowPreview(false)}
+              style={{
+                position: "absolute",
+                top: 12,
+                right: 16,
+                background: "none",
+                border: "none",
+                fontSize: 20,
+                cursor: "pointer",
+                color: "#999",
+              }}
+            >
+              <FiX size={20} />
+            </button>
+
+            <h3 style={{ marginTop: 0, color: C.dark }}>
+              <FiBarChart2 size={18} style={{ marginRight: 8 }} />
+              Report Preview: {selectedReportType?.label}
+            </h3>
+
+            {previewLoading ? (
+              <div style={{ textAlign: "center", padding: 40 }}>
+                <FiLoader
+                  size={32}
+                  style={{
+                    animation: "spin 1s linear infinite",
+                    color: C.primary,
+                  }}
+                />
+                <p style={{ marginTop: 12, color: C.muted }}>
+                  Loading preview...
+                </p>
+              </div>
+            ) : previewData ? (
+              <div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
+                    gap: 10,
+                    marginBottom: 16,
+                  }}
+                >
+                  {Object.entries(previewData.stats || {}).map(([key, val]) => (
+                    <div
+                      key={key}
+                      style={{
+                        background: C.bg,
+                        borderRadius: 8,
+                        padding: "10px 14px",
+                        textAlign: "center",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 18,
+                          fontWeight: 700,
+                          color: C.primary,
+                        }}
+                      >
+                        {val}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: C.muted,
+                          textTransform: "capitalize",
+                        }}
+                      >
+                        {key}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: C.muted,
+                    padding: 12,
+                    background: C.bg,
+                    borderRadius: 8,
+                    textAlign: "center",
+                  }}
+                >
+                  <FiAward
+                    size={16}
+                    style={{ marginRight: 6, color: C.gold }}
+                  />
+                  {previewData.attendance?.length ||
+                    previewData.sessions?.length ||
+                    previewData.photos?.length ||
+                    0}{" "}
+                  records found
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+        @keyframes slideDown {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
     </div>
