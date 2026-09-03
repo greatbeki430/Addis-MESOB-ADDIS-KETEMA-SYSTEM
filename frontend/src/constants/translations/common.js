@@ -4,6 +4,19 @@
 export const commonTranslations = {
   en: {
     common: {
+      // ─── Navigation ──────────────────────────────────────────
+      dashboard: "Dashboard",
+      profile: "Profile",
+      settings: "Settings",
+      users: "Users",
+      teams: "Teams",
+      employees: "Employees",
+      services: "Services",
+      analytics: "Analytics",
+      documents: "Documents",
+      "golden-monday": "Golden Monday",
+
+      // ─── Buttons ─────────────────────────────────────────────
       cancel: "Cancel",
       save: "Save",
       edit: "Edit",
@@ -36,6 +49,8 @@ export const commonTranslations = {
       selectOption: "Select an option",
       pleaseWait: "Please wait...",
       processing: "Processing...",
+
+      // ─── Data ─────────────────────────────────────────────────
       records: "records",
       record: "record",
       total: "Total",
@@ -68,6 +83,8 @@ export const commonTranslations = {
       pending: "Pending",
       inProgress: "In Progress",
       failed: "Failed",
+
+      // ─── Messages ─────────────────────────────────────────────
       tryAgain: "Try Again",
       noResults: "No results found",
       tryAdjusting: "Try adjusting your search or filter",
@@ -87,6 +104,8 @@ export const commonTranslations = {
       connectionError: "Connection Error",
       timeout: "Timeout",
       retry: "Retry",
+
+      // ─── Pagination ───────────────────────────────────────────
       back: "Back",
       next: "Next",
       previous: "Previous",
@@ -98,6 +117,8 @@ export const commonTranslations = {
       to: "to",
       items: "items",
       item: "item",
+
+      // ─── UI ───────────────────────────────────────────────────
       more: "More",
       less: "Less",
       expand: "Expand",
@@ -115,6 +136,8 @@ export const commonTranslations = {
       deselectAll: "Deselect All",
       withSelected: "With Selected",
       bulkAction: "Bulk Action",
+
+      // ─── Confirmations ────────────────────────────────────────
       confirmDelete: "Confirm Delete",
       confirmDeleteMessage: "Are you sure you want to delete this item?",
       deleteWarning: "This action cannot be undone.",
@@ -123,6 +146,8 @@ export const commonTranslations = {
       yes: "Yes",
       no: "No",
       ok: "OK",
+
+      // ─── Status ───────────────────────────────────────────────
       help: "Help",
       info: "Info",
       warning: "Warning",
@@ -150,19 +175,46 @@ export const commonTranslations = {
       published: "Published",
       archived: "Archived",
       restored: "Restored",
-      // ✅ Added View Toggle Translations
+
+      // ─── View Toggle ──────────────────────────────────────────
       list: "List",
       grid: "Grid",
+
+      // ─── Profile ──────────────────────────────────────────────
       saving: "Saving...",
       characters: "characters",
       totalMembers: "Total Members",
       averageScore: "Average Score",
       highestScore: "Highest Score",
       lowestScore: "Lowest Score",
+
+      // ─── Profile Quick Actions ───────────────────────────────
+      goToSettings: "Go to Settings",
+      changePassword: "Change Password",
+      goToDashboard: "Go to Dashboard",
+
+      // ─── Activity ─────────────────────────────────────────────
+      justNow: "Just now",
+      yesterday: "Yesterday",
+      twoHoursAgo: "2 hours ago",
+      threeDaysAgo: "3 days ago",
     },
   },
   am: {
     common: {
+      // ─── Navigation ──────────────────────────────────────────
+      dashboard: "ዳሽቦርድ",
+      profile: "መገለጫ",
+      settings: "ቅንብሮች",
+      users: "ተጠቃሚዎች",
+      teams: "ቡድኖች",
+      employees: "ሰራተኞች",
+      services: "አገልግሎቶች",
+      analytics: "ትንታኔዎች",
+      documents: "ሰነዶች",
+      "golden-monday": "ወርቃማ ሰኞ",
+
+      // ─── Buttons ─────────────────────────────────────────────
       cancel: "ሰርዝ",
       save: "አስቀምጥ",
       edit: "አስተካክል",
@@ -196,6 +248,8 @@ export const commonTranslations = {
       selectOption: "አማራጭ ምረጥ",
       pleaseWait: "እባክዎ ይጠብቁ...",
       processing: "በሂደት ላይ...",
+
+      // ─── Data ─────────────────────────────────────────────────
       records: "መዝገቦች",
       record: "መዝገብ",
       total: "ጠቅላላ",
@@ -228,6 +282,8 @@ export const commonTranslations = {
       pending: "በመጠባበቅ ላይ",
       inProgress: "በሂደት ላይ",
       failed: "አልተሳካም",
+
+      // ─── Messages ─────────────────────────────────────────────
       tryAgain: "እንደገና ሞክር",
       noResults: "ምንም ውጤት አልተገኘም",
       tryAdjusting: "ፍለጋዎን ወይም ማጣሪያዎን ለማስተካከል ይሞክሩ",
@@ -247,6 +303,8 @@ export const commonTranslations = {
       connectionError: "የግንኙነት ስህተት",
       timeout: "ጊዜ አልቋል",
       retry: "እንደገና ሞክር",
+
+      // ─── Pagination ───────────────────────────────────────────
       back: "ተመለስ",
       next: "ቀጥል",
       previous: "ቀዳሚ",
@@ -258,6 +316,8 @@ export const commonTranslations = {
       to: "እስከ",
       items: "እቃዎች",
       item: "እቃ",
+
+      // ─── UI ───────────────────────────────────────────────────
       more: "ተጨማሪ",
       less: "ያነሰ",
       expand: "አስፋ",
@@ -275,6 +335,8 @@ export const commonTranslations = {
       deselectAll: "ሁሉንም አትምረጥ",
       withSelected: "ከተመረጡት ጋር",
       bulkAction: "የጅምላ እርምጃ",
+
+      // ─── Confirmations ────────────────────────────────────────
       confirmDelete: "መሰረዝ አረጋግጥ",
       confirmDeleteMessage: "ይህን እቃ መሰረዝ እርግጠኛ ነዎት?",
       deleteWarning: "ይህ ተግባር ሊቀለበስ አይችልም።",
@@ -283,6 +345,8 @@ export const commonTranslations = {
       yes: "አዎ",
       no: "አይ",
       ok: "እሺ",
+
+      // ─── Status ───────────────────────────────────────────────
       help: "እገዛ",
       info: "መረጃ",
       warning: "ማስጠንቀቂያ",
@@ -299,7 +363,7 @@ export const commonTranslations = {
       valid: "ትክክለኛ",
       invalid: "የተሳሳተ",
       verified: "ተረጋግጧል",
-      unverified: "አልተረጋገጠም",
+      unverified: "አልተረገገጠም",
       approved: "ተፈቅዷል",
       rejected: "ተሰርዟል",
       pendingApproval: "ፈቃድ በመጠባበቅ ላይ",
@@ -309,19 +373,46 @@ export const commonTranslations = {
       published: "ታትሟል",
       archived: "ተመዝግቧል",
       restored: "ተመልሷል",
-      // ✅ Added View Toggle Translations
+
+      // ─── View Toggle ──────────────────────────────────────────
       list: "ዝርዝር",
       grid: "ፍርግርግ",
+
+      // ─── Profile ──────────────────────────────────────────────
       saving: "በማስቀመጥ ላይ...",
       characters: "ፊደላት",
       totalMembers: "ጠቅላላ አባላት",
       averageScore: "አማካይ ውጤት",
       highestScore: "ከፍተኛ ውጤት",
       lowestScore: "ዝቅተኛ ውጤት",
+
+      // ─── Profile Quick Actions ───────────────────────────────
+      goToSettings: "ወደ ቅንብሮች ይሂዱ",
+      changePassword: "የይለፍ ቃል ይቀይሩ",
+      goToDashboard: "ወደ ዳሽቦርድ ይሂዱ",
+
+      // ─── Activity ─────────────────────────────────────────────
+      justNow: "አሁን",
+      yesterday: "ትላንት",
+      twoHoursAgo: "ከ2 ሰዓታት በፊት",
+      threeDaysAgo: "ከ3 ቀናት በፊት",
     },
   },
   om: {
     common: {
+      // ─── Navigation ──────────────────────────────────────────
+      dashboard: "Daashboordii",
+      profile: "Piroofaayilii",
+      settings: "Akkasaa'oota",
+      users: "Fayyadamtoota",
+      teams: "Garee",
+      employees: "Hojjattoota",
+      services: "Tajaajiloota",
+      analytics: "Xiinxala",
+      documents: "Dokumentoota",
+      "golden-monday": "Wiixata Warqee",
+
+      // ─── Buttons ─────────────────────────────────────────────
       cancel: "Haqi",
       save: "Olkaayi",
       edit: "Gulaali",
@@ -354,6 +445,8 @@ export const commonTranslations = {
       selectOption: "Filannoo filadhu",
       pleaseWait: "Maaloo eegi...",
       processing: "Adeemsisaa jira...",
+
+      // ─── Data ─────────────────────────────────────────────────
       records: "Galmee",
       record: "Galmee",
       total: "Waliigala",
@@ -386,6 +479,8 @@ export const commonTranslations = {
       pending: "Eegamaa jira",
       inProgress: "Adeemsa keessa",
       failed: "Hin danda'amne",
+
+      // ─── Messages ─────────────────────────────────────────────
       tryAgain: "Irra deebi'ii yaali",
       noResults: "Bu'aan hin argamne",
       tryAdjusting: "Barbaacha ykn waan ittiin calaltan jijjiiruu yaali",
@@ -405,6 +500,8 @@ export const commonTranslations = {
       connectionError: "Dogoggora walqunnamtii",
       timeout: "Yeroo darbee",
       retry: "Irra deebi'i",
+
+      // ─── Pagination ───────────────────────────────────────────
       back: "Deebi'i",
       next: "Itti aanu",
       previous: "Kan duraa",
@@ -416,6 +513,8 @@ export const commonTranslations = {
       to: "hanga",
       items: "meeshaalee",
       item: "meeshaa",
+
+      // ─── UI ───────────────────────────────────────────────────
       more: "Caalaa",
       less: "Gadi",
       expand: "Bal'iisi",
@@ -433,6 +532,8 @@ export const commonTranslations = {
       deselectAll: "Hundaa hir'isi",
       withSelected: "Waan filataman wajjin",
       bulkAction: "Gochaa jirma",
+
+      // ─── Confirmations ────────────────────────────────────────
       confirmDelete: "Haqachuun mirkaneeffadhu",
       confirmDeleteMessage: "Meeshaa kana haquun mirkaneeffatteettaa?",
       deleteWarning: "Gochi kun duubatti deebisuu hin danda'u.",
@@ -441,6 +542,8 @@ export const commonTranslations = {
       yes: "Eeyyee",
       no: "Lakki",
       ok: "Tole",
+
+      // ─── Status ───────────────────────────────────────────────
       help: "Gargaarsa",
       info: "Odeeffannoo",
       warning: "Akeekkachiisa",
@@ -468,15 +571,29 @@ export const commonTranslations = {
       archived: "Kusame",
       avg: "Giddugaleessa",
       restored: "Deebifame",
-      // ✅ Added View Toggle Translations
+
+      // ─── View Toggle ──────────────────────────────────────────
       list: "Tarree",
       grid: "Saffoo",
+
+      // ─── Profile ──────────────────────────────────────────────
       saving: "Olkaayaa jira...",
       characters: "qubee",
       totalMembers: "Miseensota Waliigalaa",
       averageScore: "Qabxii Giddugaleessaa",
       highestScore: "Qabxii Olaanaa",
       lowestScore: "Qabxii Gad Aanaa",
+
+      // ─── Profile Quick Actions ───────────────────────────────
+      goToSettings: "Akkasaa'oota dhaqi",
+      changePassword: "Jecha Iccitii Jijjiiri",
+      goToDashboard: "Daashboordii dhaqi",
+
+      // ─── Activity ─────────────────────────────────────────────
+      justNow: "Ammuma",
+      yesterday: "Kaleessa",
+      twoHoursAgo: "Sa'aatii 2 dura",
+      threeDaysAgo: "Guyyaa 3 dura",
     },
   },
 };
