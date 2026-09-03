@@ -15,6 +15,7 @@ import {
   FiTag,
   FiEdit2,
   FiCheck,
+  FiLoader,
 } from "react-icons/fi";
 
 // ─── Helper: Get file icon ─────────────────────────────────────
@@ -60,13 +61,13 @@ export default function ResourceLibrary({ sessionId, onRefresh }) {
   }, [sessionId]);
 
   useEffect(() => {
-    if (!sessionId) return undefined;
+    if (!sessionId) return;
 
-    const timeoutId = setTimeout(() => {
-      loadResources();
-    }, 0);
+    const loadResourcesAsync = async () => {
+      await loadResources();
+    };
 
-    return () => clearTimeout(timeoutId);
+    loadResourcesAsync();
   }, [sessionId, loadResources]);
 
   const handleUpload = async () => {
@@ -164,6 +165,8 @@ export default function ResourceLibrary({ sessionId, onRefresh }) {
           justifyContent: "space-between",
           alignItems: "center",
           marginBottom: 16,
+          flexWrap: "wrap",
+          gap: 10,
         }}
       >
         <div>
@@ -349,6 +352,7 @@ export default function ResourceLibrary({ sessionId, onRefresh }) {
               gap: 10,
               marginTop: 12,
               justifyContent: "flex-end",
+              flexWrap: "wrap",
             }}
           >
             <button
@@ -394,8 +398,20 @@ export default function ResourceLibrary({ sessionId, onRefresh }) {
                 gap: 6,
               }}
             >
-              {uploading ? "Uploading..." : <FiUpload size={14} />}
-              {uploading ? "Uploading..." : "Upload"}
+              {uploading ? (
+                <>
+                  <FiLoader
+                    size={14}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <FiUpload size={14} />
+                  Upload
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -404,7 +420,11 @@ export default function ResourceLibrary({ sessionId, onRefresh }) {
       {/* Resource List */}
       {loading ? (
         <div style={{ textAlign: "center", padding: "40px", color: C.muted }}>
-          Loading resources...
+          <FiLoader
+            size={24}
+            style={{ animation: "spin 1s linear infinite" }}
+          />
+          <p style={{ marginTop: 8 }}>Loading resources...</p>
         </div>
       ) : resources.length === 0 ? (
         <div
@@ -483,9 +503,14 @@ export default function ResourceLibrary({ sessionId, onRefresh }) {
                       </>
                     )}
                   </div>
+                  {resource.description && (
+                    <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
+                      {resource.description}
+                    </div>
+                  )}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 6 }}>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <button
                   onClick={() => handleDownload(resource._id)}
                   style={{

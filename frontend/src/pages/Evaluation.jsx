@@ -283,7 +283,7 @@ function EvaluationForm({ t, lang }) {
       }
     };
     loadUserTeam();
-  }, [user, isAdminUser, loadAllTeams]);
+  }, [user, isAdminUser, loadAllTeams, loadTeamRoster]);
 
   // ─── Manually re-pull the roster ────────────────────────────────
   const refreshTeamMembers = async () => {

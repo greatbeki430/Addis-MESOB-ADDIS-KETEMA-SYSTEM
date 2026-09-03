@@ -1,22 +1,33 @@
 // src/components/golden-monday/SignatureCanvas.jsx
 // Signature capture with touch/type support for Golden Monday attendance
-// Reusable component that works with both mouse and touch devices
+// Reusable component that works with both mouse and touch devices - ENHANCED
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { C, F } from "../../styles/theme";
 import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
-import { FiX, FiPenTool } from "react-icons/fi";
+import {
+  FiPenTool,
+  FiCheck,
+  FiDownload,
+  FiRefreshCw,
+  FiUser,
+  FiEdit3,
+  FiEye,
+} from "react-icons/fi";
 
 export default function SignatureCanvas({
   onSave,
   value,
-  height = 100,
-  width = 300,
+  height = 120,
+  width = 400,
   readOnly = false,
   label = "Signature",
   required = false,
   className = "",
+  placeholder,
+  showTypeInput = true,
+  showDownload = true,
 }) {
   const { language } = useLanguage();
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
@@ -25,17 +36,14 @@ export default function SignatureCanvas({
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
   const [textSignature, setTextSignature] = useState("");
-  const [isTouchDevice, setIsTouchDevice] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-
-  // Detect touch device on mount
-  useEffect(() => {
-    const touch =
+  const [isTouchDevice] = useState(
+    () =>
       typeof window !== "undefined" &&
-      ("ontouchstart" in window || navigator.maxTouchPoints > 0);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsTouchDevice(touch);
-  }, []);
+      ("ontouchstart" in window || navigator.maxTouchPoints > 0),
+  );
+  const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const [signatureMode, setSignatureMode] = useState("draw"); // "draw" | "text"
 
   // Initialize canvas and draw existing signature
   useEffect(() => {
@@ -44,7 +52,7 @@ export default function SignatureCanvas({
 
     const ctx = canvas.getContext("2d");
     ctx.strokeStyle = "#1a3aad";
-    ctx.lineWidth = 2.5;
+    ctx.lineWidth = 3;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
 
@@ -54,23 +62,21 @@ export default function SignatureCanvas({
       img.onload = () => {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         setHasSignature(true);
+        setSignatureMode("draw");
       };
       img.onerror = () => {
-        // If image fails to load, clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         setHasSignature(false);
       };
       img.src = value;
     } else {
-      // Clear canvas if no value
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setHasSignature(false);
+      queueMicrotask(() => setHasSignature(false));
     }
   }, [value]);
 
   // Get canvas coordinates from mouse or touch event
-  const getCanvasCoords = (e) => {
+  const getCanvasCoords = useCallback((e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const clientX = e.clientX || e.touches?.[0]?.clientX || 0;
@@ -79,123 +85,264 @@ export default function SignatureCanvas({
       x: (clientX - rect.left) * (canvas.width / rect.width),
       y: (clientY - rect.top) * (canvas.height / rect.height),
     };
-  };
+  }, []);
 
   // Start drawing
-  const startDrawing = (e) => {
-    if (readOnly) return;
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const { x, y } = getCanvasCoords(e);
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    setIsDrawing(true);
-    setHasSignature(true);
-  };
+  const startDrawing = useCallback(
+    (e) => {
+      if (readOnly) return;
+      e.preventDefault();
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      const { x, y } = getCanvasCoords(e);
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      setIsDrawing(true);
+      setHasSignature(true);
+      setSignatureMode("draw");
+    },
+    [readOnly, getCanvasCoords],
+  );
 
   // Draw while moving
-  const draw = (e) => {
-    if (readOnly || !isDrawing) return;
-    e.preventDefault();
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const { x, y } = getCanvasCoords(e);
-    ctx.lineTo(x, y);
-    ctx.stroke();
-  };
+  const draw = useCallback(
+    (e) => {
+      if (readOnly || !isDrawing) return;
+      e.preventDefault();
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      const { x, y } = getCanvasCoords(e);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    },
+    [readOnly, isDrawing, getCanvasCoords],
+  );
 
   // Stop drawing and save
-  const stopDrawing = (e) => {
-    if (readOnly) return;
-    e.preventDefault();
-    setIsDrawing(false);
-    if (hasSignature && onSave) {
-      const canvas = canvasRef.current;
-      onSave(canvas.toDataURL("image/png"));
-    }
-  };
+  const stopDrawing = useCallback(
+    (e) => {
+      if (readOnly) return;
+      e.preventDefault();
+      setIsDrawing(false);
+      if (hasSignature && onSave) {
+        const canvas = canvasRef.current;
+        onSave(canvas.toDataURL("image/png"));
+      }
+    },
+    [readOnly, hasSignature, onSave],
+  );
 
   // Clear the signature
-  const clearSignature = () => {
+  const clearSignature = useCallback(() => {
     if (readOnly) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext("2d");
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setHasSignature(false);
     setTextSignature("");
+    setSignatureMode("draw");
     if (onSave) onSave(null);
-  };
+  }, [readOnly, onSave]);
 
   // Handle text-based signature
-  const handleTextSignature = (e) => {
-    if (readOnly) return;
-    const text = e.target.value;
-    setTextSignature(text);
+  const handleTextSignature = useCallback(
+    (e) => {
+      if (readOnly) return;
+      const text = e.target.value;
+      setTextSignature(text);
 
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (text.trim()) {
-      // Draw text signature
-      const fontSize = Math.min((canvas.width / text.length) * 1.2, 36);
-      ctx.font = `${fontSize}px 'Noto Sans Ethiopic', 'Segoe UI', 'Arial', serif`;
-      ctx.fillStyle = "#1a3aad";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(text.trim(), canvas.width / 2, canvas.height / 2);
-      setHasSignature(true);
-      if (onSave) onSave(canvas.toDataURL("image/png"));
-    } else {
-      setHasSignature(false);
-      if (onSave) onSave(null);
-    }
-  };
+      if (text.trim()) {
+        const fontSize = Math.min(
+          (canvas.width / Math.max(text.length, 1)) * 1.2,
+          40,
+        );
+        ctx.font = `${fontSize}px 'Noto Sans Ethiopic', 'Segoe UI', 'Arial', serif`;
+        ctx.fillStyle = "#1a3aad";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(text.trim(), canvas.width / 2, canvas.height / 2);
+        setHasSignature(true);
+        setSignatureMode("text");
+        if (onSave) onSave(canvas.toDataURL("image/png"));
+      } else {
+        setHasSignature(false);
+        setSignatureMode("draw");
+        if (onSave) onSave(null);
+      }
+    },
+    [readOnly, onSave],
+  );
 
   // Download signature as PNG
-  const downloadSignature = () => {
+  const downloadSignature = useCallback(() => {
     const canvas = canvasRef.current;
     if (!hasSignature) return;
     const link = document.createElement("a");
     link.download = "signature.png";
     link.href = canvas.toDataURL("image/png");
     link.click();
-  };
+  }, [hasSignature]);
+
+  // Switch to draw mode
+  const switchToDraw = useCallback(() => {
+    if (readOnly) return;
+    setSignatureMode("draw");
+    // If there's text but no drawing, clear canvas
+    if (textSignature.trim() && !value) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      setHasSignature(false);
+      if (onSave) onSave(null);
+    }
+  }, [readOnly, textSignature, value, onSave]);
+
+  // Switch to text mode
+  const switchToText = useCallback(() => {
+    if (readOnly) return;
+    setSignatureMode("text");
+    // If there's no text, focus the input
+    if (!textSignature.trim()) {
+      const input = document.getElementById("signature-text-input");
+      if (input) input.focus();
+    }
+  }, [readOnly, textSignature]);
 
   return (
     <div className={className} style={{ fontFamily: F.sans }}>
+      {/* Label with required indicator */}
       {label && (
-        <label
+        <div
           style={{
-            display: "block",
-            fontSize: 12,
-            fontWeight: 600,
-            color: C.dark,
-            marginBottom: 4,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: 6,
           }}
         >
-          {label}
-          {required && (
-            <span style={{ color: "#ef4444", marginLeft: 4 }}>*</span>
+          <label
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: C.dark,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            <FiPenTool size={14} color={C.primary} />
+            {label}
+            {required && (
+              <span style={{ color: "#ef4444", marginLeft: 2 }}>*</span>
+            )}
+          </label>
+          {hasSignature && !readOnly && (
+            <span
+              style={{
+                fontSize: 11,
+                color: "#10b981",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <FiCheck size={14} />
+              {t.signed || "Signed"}
+            </span>
           )}
-        </label>
+        </div>
       )}
 
+      {/* Mode toggle - Draw/Type */}
+      {!readOnly && (
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            marginBottom: 8,
+            background: C.bg,
+            borderRadius: 8,
+            padding: "3px",
+            border: `1px solid ${C.border}`,
+          }}
+        >
+          <button
+            onClick={switchToDraw}
+            style={{
+              flex: 1,
+              padding: "6px 12px",
+              borderRadius: 6,
+              border: "none",
+              background: signatureMode === "draw" ? C.primary : "transparent",
+              color: signatureMode === "draw" ? "#fff" : C.muted,
+              cursor: "pointer",
+              fontWeight: signatureMode === "draw" ? 600 : 400,
+              fontSize: 12,
+              transition: "all 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+            }}
+          >
+            <FiPenTool size={14} />
+            {t.drawSignature || "Draw"}
+          </button>
+          <button
+            onClick={switchToText}
+            style={{
+              flex: 1,
+              padding: "6px 12px",
+              borderRadius: 6,
+              border: "none",
+              background: signatureMode === "text" ? C.primary : "transparent",
+              color: signatureMode === "text" ? "#fff" : C.muted,
+              cursor: "pointer",
+              fontWeight: signatureMode === "text" ? 600 : 400,
+              fontSize: 12,
+              transition: "all 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+            }}
+          >
+            <FiEdit3 size={14} />
+            {t.typeSignature || "Type"}
+          </button>
+        </div>
+      )}
+
+      {/* Signature Canvas */}
       <div
         style={{
           position: "relative",
-          border: `2px ${readOnly ? "solid" : "dashed"} ${hasSignature ? C.primary : C.border}`,
-          borderRadius: 8,
+          border: `2px solid ${hasSignature ? C.primary : isFocused ? C.primary : C.border}`,
+          borderRadius: 10,
           overflow: "hidden",
-          background: readOnly ? "#f9fafb" : "#fafbfc",
+          background: readOnly
+            ? "#f9fafb"
+            : hasSignature
+              ? "#f8faff"
+              : "#fafbfc",
           opacity: readOnly ? 0.8 : 1,
-          transition: "border-color 0.3s ease, box-shadow 0.3s ease",
+          transition: "all 0.3s ease",
           boxShadow:
-            isHovered && !readOnly ? `0 0 0 3px ${C.primary}22` : "none",
+            isHovered && !readOnly
+              ? `0 0 0 4px ${C.primary}15`
+              : isFocused && !readOnly
+                ? `0 0 0 4px ${C.primary}22`
+                : "none",
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
       >
         <canvas
           ref={canvasRef}
@@ -204,18 +351,22 @@ export default function SignatureCanvas({
           style={{
             width: "100%",
             height: `${height}px`,
-            cursor: readOnly ? "default" : "crosshair",
+            cursor: readOnly
+              ? "default"
+              : signatureMode === "draw"
+                ? "crosshair"
+                : "default",
             touchAction: "none",
             display: "block",
           }}
-          onMouseDown={startDrawing}
-          onMouseMove={draw}
-          onMouseUp={stopDrawing}
-          onMouseLeave={stopDrawing}
-          onTouchStart={startDrawing}
-          onTouchMove={draw}
-          onTouchEnd={stopDrawing}
-          onTouchCancel={stopDrawing}
+          onMouseDown={signatureMode === "draw" ? startDrawing : undefined}
+          onMouseMove={signatureMode === "draw" ? draw : undefined}
+          onMouseUp={signatureMode === "draw" ? stopDrawing : undefined}
+          onMouseLeave={signatureMode === "draw" ? stopDrawing : undefined}
+          onTouchStart={signatureMode === "draw" ? startDrawing : undefined}
+          onTouchMove={signatureMode === "draw" ? draw : undefined}
+          onTouchEnd={signatureMode === "draw" ? stopDrawing : undefined}
+          onTouchCancel={signatureMode === "draw" ? stopDrawing : undefined}
         />
 
         {/* Placeholder text when empty */}
@@ -230,12 +381,43 @@ export default function SignatureCanvas({
               pointerEvents: "none",
               color: "#bbb",
               fontSize: 13,
+              flexDirection: "column",
+              gap: 4,
             }}
           >
-            <FiPenTool size={16} style={{ marginRight: 8, opacity: 0.5 }} />
-            {isTouchDevice
-              ? t.touchToSign || "Touch to sign"
-              : t.clickToSign || "Click to sign"}
+            <FiPenTool size={24} style={{ opacity: 0.3 }} />
+            <span>
+              {signatureMode === "draw"
+                ? isTouchDevice
+                  ? t.touchToSign || "Touch to sign"
+                  : t.clickToSign || "Click to sign"
+                : t.typeNameToSign || "Type your name above"}
+            </span>
+          </div>
+        )}
+
+        {/* Drawing indicator */}
+        {isDrawing && (
+          <div
+            style={{
+              position: "absolute",
+              top: 8,
+              left: 12,
+              fontSize: 10,
+              color: C.primary,
+              fontWeight: 600,
+              background: "rgba(255,255,255,0.9)",
+              padding: "2px 12px",
+              borderRadius: 12,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              border: `1px solid ${C.primary}22`,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+            }}
+          >
+            <FiPenTool size={12} />
+            {t.drawing || "Drawing..."}
           </div>
         )}
 
@@ -244,20 +426,25 @@ export default function SignatureCanvas({
           <div
             style={{
               position: "absolute",
-              bottom: 4,
-              right: 8,
+              bottom: 8,
+              right: 12,
               fontSize: 10,
               color: C.primary,
               fontWeight: 600,
-              background: "rgba(255,255,255,0.9)",
-              padding: "2px 8px",
-              borderRadius: 4,
+              background: "rgba(255,255,255,0.95)",
+              padding: "3px 14px",
+              borderRadius: 20,
               display: "flex",
               alignItems: "center",
               gap: 4,
+              border: `1px solid ${C.primary}22`,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
             }}
           >
-            <span>✓</span> {t.signed || "Signed"}
+            <FiCheck size={12} color="#10b981" />
+            {signatureMode === "text"
+              ? t.signatureRecorded || "Signature recorded"
+              : t.signed || "Signed"}
           </div>
         )}
 
@@ -267,10 +454,10 @@ export default function SignatureCanvas({
             onClick={clearSignature}
             style={{
               position: "absolute",
-              top: 4,
-              right: 4,
-              width: 28,
-              height: 28,
+              top: 8,
+              right: 8,
+              width: 32,
+              height: 32,
               borderRadius: "50%",
               background: "rgba(239,68,68,0.9)",
               color: "#fff",
@@ -279,44 +466,48 @@ export default function SignatureCanvas({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              transition: "transform 0.2s ease",
-              fontSize: 14,
+              transition: "all 0.3s ease",
+              boxShadow: "0 2px 8px rgba(239,68,68,0.3)",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "scale(1.1)";
+              e.currentTarget.style.transform = "scale(1.15)";
+              e.currentTarget.style.background = "#dc2626";
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = "scale(1)";
+              e.currentTarget.style.background = "rgba(239,68,68,0.9)";
             }}
             title={t.clearSignature || "Clear signature"}
             aria-label={t.clearSignature || "Clear signature"}
           >
-            <FiX size={14} />
+            <FiRefreshCw size={14} />
           </button>
         )}
       </div>
 
       {/* Text input for typing signature */}
-      {!readOnly && (
-        <div style={{ marginTop: 8 }}>
+      {!readOnly && showTypeInput && (
+        <div style={{ marginTop: 10 }}>
           <input
+            id="signature-text-input"
             type="text"
             value={textSignature}
             onChange={handleTextSignature}
             style={{
               width: "100%",
-              padding: "8px 12px",
-              border: `1.5px solid ${textSignature.trim() ? C.primary : C.border}`,
-              borderRadius: 6,
-              fontSize: 13,
+              padding: "10px 14px",
+              border: `2px solid ${textSignature.trim() ? C.primary : C.border}`,
+              borderRadius: 8,
+              fontSize: 14,
               fontFamily: F.sans,
               outline: "none",
               boxSizing: "border-box",
-              transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+              transition: "all 0.3s ease",
+              background: textSignature.trim() ? `${C.primary}04` : C.white,
             }}
             onFocus={(e) => {
               e.currentTarget.style.borderColor = C.primary;
-              e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+              e.currentTarget.style.boxShadow = `0 0 0 4px ${C.primary}22`;
             }}
             onBlur={(e) => {
               e.currentTarget.style.borderColor = textSignature.trim()
@@ -324,42 +515,83 @@ export default function SignatureCanvas({
                 : C.border;
               e.currentTarget.style.boxShadow = "none";
             }}
-            placeholder={t.typeNameToSign || "Or type your name to sign"}
+            placeholder={
+              placeholder || t.typeNameToSign || "Type your full name to sign"
+            }
             aria-label={t.typeSignature || "Type your signature"}
+            disabled={readOnly}
           />
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              marginTop: 4,
-              fontSize: 10,
-              color: C.muted,
-            }}
-          >
-            <span>
-              {hasSignature
-                ? t.signatureRecorded || "✓ Signature recorded"
-                : t.drawOrTypeSignature || "Draw or type your signature"}
-            </span>
-            {hasSignature && (
-              <button
-                onClick={downloadSignature}
-                style={{
-                  background: "none",
-                  border: "none",
-                  color: C.primary,
-                  cursor: "pointer",
-                  fontSize: 10,
-                  textDecoration: "underline",
-                }}
-                aria-label={t.downloadPNG || "Download signature as PNG"}
-              >
-                {t.downloadPNG || "Download PNG"}
-              </button>
-            )}
-          </div>
         </div>
       )}
+
+      {/* Footer with status and download */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: 6,
+          flexWrap: "wrap",
+          gap: 4,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 10,
+            color: hasSignature ? "#10b981" : C.muted,
+            display: "flex",
+            alignItems: "center",
+            gap: 4,
+          }}
+        >
+          {hasSignature ? (
+            <>
+              <FiCheck size={12} color="#10b981" />
+              {t.signatureVerified || "Signature verified"}
+            </>
+          ) : readOnly ? (
+            <>
+              <FiEye size={12} />
+              {t.readOnly || "Read only"}
+            </>
+          ) : (
+            <>
+              <FiUser size={12} />
+              {t.drawOrTypeSignature || "Draw or type your signature"}
+            </>
+          )}
+        </span>
+
+        {hasSignature && showDownload && !readOnly && (
+          <button
+            onClick={downloadSignature}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              background: "none",
+              border: "none",
+              color: C.primary,
+              cursor: "pointer",
+              fontSize: 10,
+              fontWeight: 600,
+              padding: "4px 8px",
+              borderRadius: 4,
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = C.bg;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
+            aria-label={t.downloadPNG || "Download signature as PNG"}
+          >
+            <FiDownload size={12} />
+            {t.downloadPNG || "Download PNG"}
+          </button>
+        )}
+      </div>
 
       {/* Read-only indicator */}
       {readOnly && hasSignature && (
@@ -369,9 +601,14 @@ export default function SignatureCanvas({
             color: C.muted,
             marginTop: 4,
             textAlign: "center",
+            padding: "4px 12px",
+            background: C.bg,
+            borderRadius: 6,
           }}
         >
-          ✓ {t.signatureVerified || "Signature verified"}
+          <FiCheck size={12} style={{ marginRight: 4, color: "#10b981" }} />
+          {t.signatureVerified || "Signature verified"} •{" "}
+          {t.readOnly || "Read only"}
         </div>
       )}
     </div>

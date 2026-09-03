@@ -64,6 +64,31 @@ function getInitialAutoClearSettings() {
   }
 }
 
+// ─── Helper: Convert dataURL to Blob ──────────────────────────────────────
+function dataURLtoBlob(dataURL) {
+  try {
+    const arr = dataURL.split(",");
+    if (!arr || arr.length < 2) {
+      throw new Error("Invalid data URL format");
+    }
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) {
+      throw new Error("Could not extract MIME type from data URL");
+    }
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch (error) {
+    console.error("dataURLtoBlob error:", error);
+    throw error;
+  }
+}
+
 export default function GalleryGrid({ sessionId = null, onRefresh }) {
   const { user } = useAuth();
   const { language } = useLanguage();
@@ -445,7 +470,8 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     e.target.value = "";
   };
 
-  // ✅ Professional parallel upload processing with concurrency control
+  // ✅ FIXED: Professional parallel upload processing with concurrency control
+  // USING FORMDATA for proper file upload
   const processUploadQueue = useCallback(
     async (folderId, topic) => {
       if (uploading || uploadQueue.length === 0) return;
@@ -456,7 +482,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       let processed = 0;
       let failed = 0;
 
-      // Helper to upload a single file
+      // Helper to upload a single file using FormData
       const uploadSingleFile = async (item) => {
         try {
           // Update status
@@ -488,13 +514,23 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             );
           }
 
-          // Upload with progress tracking
-          await goldenMondayAPI.uploadGalleryPhoto({
-            image: imageData,
-            folderId: folderId,
-            category: detectedCategory,
-            sessionId: sessionId || undefined,
-            lang: language,
+          // ✅ FIX: Use FormData for file upload
+          const blob = dataURLtoBlob(imageData);
+          const ext = blob.type.split("/")[1]?.split("+")[0] || "bin";
+          const formData = new FormData();
+          formData.append("image", blob, `upload.${ext}`);
+          formData.append("folderId", folderId);
+          formData.append("category", detectedCategory);
+          if (sessionId) formData.append("sessionId", sessionId);
+          formData.append("lang", language);
+
+          // Upload with progress tracking using FormData
+          await goldenMondayAPI.uploadGalleryPhoto(formData, (progress) => {
+            setUploadQueue((prev) =>
+              prev.map((q) =>
+                q.id === item.id ? { ...q, progress: 50 + progress * 0.4 } : q,
+              ),
+            );
           });
 
           processed++;

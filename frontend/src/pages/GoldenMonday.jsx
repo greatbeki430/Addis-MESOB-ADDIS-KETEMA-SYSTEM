@@ -71,7 +71,7 @@ const safeArray = (data, fallback = []) => {
 };
 
 // ─────────────────────────────────────────────────────────────
-// STATIC PILLARS (fallback data)
+// STATIC PILLARS (fallback data with translations)
 // ─────────────────────────────────────────────────────────────
 const FALLBACK_PILLARS = [
   {
@@ -261,7 +261,9 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
     },
     {
       label: t.statAvgRating || "Avg Rating",
-      value: stats.averageRating ? stats.averageRating.toFixed(1) : "N/A",
+      value: stats.averageRating
+        ? stats.averageRating.toFixed(1)
+        : t.statNoRating || "N/A",
       icon: <FiStar size={20} />,
     },
   ];
@@ -478,7 +480,7 @@ function SessionCard({ session, language, isAdmin, onRefresh, t }) {
                 t.noPresenter ||
                 "No presenter"}{" "}
               ·{" "}
-              {date.toLocaleDateString("en-US", {
+              {date.toLocaleDateString(t.locale || "en-US", {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
@@ -1427,7 +1429,6 @@ export default function GoldenMonday() {
     });
   };
 
-  // ✅ ADD THIS - Confirm remove function
   const confirmRemoveEmployee = async () => {
     try {
       await goldenMondayAPI.removeEmployee(removeConfirm.userId);
@@ -1462,7 +1463,13 @@ export default function GoldenMonday() {
   const allSessions = [...upcomingSessions, ...pastSessions];
   const sessionOptions = allSessions.map((s) => ({
     id: s._id,
-    label: `${s.presentationTitle || s.title || "Untitled"} - ${new Date(s.date).toLocaleDateString()}`,
+    label: `${s.presentationTitle || s.title || t.untitledSession || "Untitled"} - ${new Date(
+      s.date,
+    ).toLocaleDateString(t.locale || "en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })}`,
   }));
 
   return (
@@ -1486,12 +1493,15 @@ export default function GoldenMonday() {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
         .gm-card:hover { transform: translateY(-4px); box-shadow: 0 12px 32px rgba(13,26,94,0.14); }
         .gm-mesob-point:hover { background: ${C.bg}; }
         .gm-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 26px ${C.primary}55; }
         .gm-refresh-btn:hover { transform: rotate(180deg); }
         .fade-in { animation: fadeIn 0.3s ease forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
 
       {/* ── HERO SECTION ── */}
@@ -1645,7 +1655,7 @@ export default function GoldenMonday() {
               </button>
             )}
 
-            {/* ✅ ADD NOTIFICATION BELL HERE */}
+            {/* Notification Bell */}
             <NotificationBell />
           </div>
         </div>
@@ -1671,6 +1681,7 @@ export default function GoldenMonday() {
           t={t}
         />
       </section>
+
       {/* ── PRESENTER SPOTLIGHT ── */}
       <PresenterSpotlight onRefresh={refreshData} />
 
@@ -2265,7 +2276,7 @@ export default function GoldenMonday() {
                           padding: "20px 0",
                         }}
                       >
-                        {t.noEmployeesFound ||
+                        {t.noEmployeesYet ||
                           'No employees registered yet. Click "Register Employee" to add.'}
                       </p>
                     ) : (
@@ -2449,7 +2460,7 @@ export default function GoldenMonday() {
                     color: C.dark,
                   }}
                 >
-                  Select Session:
+                  {t.selectSession || "Select Session:"}
                 </label>
                 <select
                   value={selectedSessionId || ""}
@@ -2474,7 +2485,7 @@ export default function GoldenMonday() {
               </div>
             )}
 
-            {/* ✅ QR CHECK-IN */}
+            {/* QR CHECK-IN */}
             {selectedSessionId && (
               <div style={{ marginBottom: 20 }}>
                 <QRCheckIn
@@ -2499,10 +2510,11 @@ export default function GoldenMonday() {
               >
                 <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
                 <p style={{ fontSize: 16, marginBottom: 4 }}>
-                  No sessions available
+                  {t.noSessionsAvailable || "No sessions available"}
                 </p>
                 <p style={{ fontSize: 13, color: "#999" }}>
-                  Create a session first to record attendance
+                  {t.createSessionFirst ||
+                    "Create a session first to record attendance"}
                 </p>
               </div>
             )}
@@ -2702,9 +2714,12 @@ export default function GoldenMonday() {
           setRemoveConfirm({ isOpen: false, userId: null, name: "" })
         }
         onConfirm={confirmRemoveEmployee}
-        title="Remove Employee"
-        message={`Are you sure you want to remove "${removeConfirm.name}" from the rotation?`}
-        confirmText="Remove"
+        title={t.confirmRemoveTitle || "Remove Employee"}
+        message={
+          t.confirmRemoveMessage ||
+          `Are you sure you want to remove "${removeConfirm.name}" from the rotation?`
+        }
+        confirmText={t.removeBtn || "Remove"}
         confirmColor="#dc2626"
       />
     </div>
