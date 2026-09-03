@@ -29,6 +29,9 @@ const { startGoldenMondayScheduler } = require("./jobs/goldenMondayScheduler");
 // Departments — NEW
 const departmentRoutes = require("./routes/departmentRoutes");
 
+// ✅ NOTIFICATIONS — NEW
+const notificationRoutes = require("./routes/notificationRoutes");
+
 const { notFound, errorHandler } = require("./middleware/errorHandler");
 const telegramRoutes = require("./routes/telegramRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
@@ -162,6 +165,9 @@ app.use("/api/departments", departmentRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/feed", feedRoutes);
 
+// ✅ NOTIFICATIONS — NEW
+app.use("/api/notifications", notificationRoutes);
+
 // =============================================
 // ✅ HEALTH CHECK
 // =============================================
@@ -188,6 +194,7 @@ app.get("/", (req, res) => {
       documents: "/api/documents",
       "golden-monday": "/api/golden-monday",
       departments: "/api/departments",
+      notifications: "/api/notifications",
       "telegram-webhook": "/api/telegram/webhook",
     },
   });
@@ -246,6 +253,7 @@ const startServer = async () => {
       );
       console.log(`📨 Telegram webhook ready at /api/telegram/webhook`);
       console.log(`📌 Bot menu button (⊞) is now INSIDE the input bar!`);
+      console.log(`🔔 Notification routes mounted at /api/notifications`);
     });
   } catch (error) {
     console.error("❌ Failed to start server:", error);

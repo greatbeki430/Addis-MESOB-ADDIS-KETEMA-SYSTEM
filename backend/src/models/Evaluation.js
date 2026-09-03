@@ -91,6 +91,16 @@ const evaluationSchema = new mongoose.Schema(
         text: { type: String, required: true, trim: true, maxlength: 1000 },
       },
     ],
+    // ✅ NEW: Track who the evaluation was submitted to (for notifications)
+    submittedTo: {
+      type: String,
+      enum: ["superadmin", "admin"],
+      default: null,
+    },
+    submittedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { timestamps: true },
 );

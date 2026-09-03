@@ -130,6 +130,12 @@ function EvaluationForm({ t, lang }) {
   const [loading, setLoading] = useState(false);
   const [userTeamId, setUserTeamId] = useState(null);
   const [canEvaluate, setCanEvaluate] = useState(false);
+  // ✅ True once `members` has been populated from the team roster
+  // (Team Management → assigned members) rather than typed by hand.
+  // Drives whether the member inputs render as an editable list or a
+  // locked, synced roster.
+  const [teamMembersSynced, setTeamMembersSynced] = useState(false);
+  const [refreshingMembers, setRefreshingMembers] = useState(false);
 
   // ─── Tab Management ──────────────────────────────────────────
   const [activeTab, setActiveTab] = useState("form"); // "form" | "history"
@@ -153,6 +159,36 @@ function EvaluationForm({ t, lang }) {
     };
   }, []);
 
+  // ─── Load team roster from Team Management (leader excluded — the
+  // leader is the one filling out the evaluation, not being scored) ──
+  const loadTeamRoster = async (teamId) => {
+    const response = await teamAPI.getById(teamId);
+    const teamData = response?.data;
+    if (!teamData) return;
+
+    setTeamName(teamData.name || teamData.department || "");
+
+    const leaderId = (
+      teamData.leader?._id ||
+      teamData.leader ||
+      ""
+    )?.toString();
+    const rosterNames = (teamData.members || [])
+      .filter((m) => (m._id || m)?.toString() !== leaderId)
+      .map((m) => m.name || m)
+      .filter(Boolean);
+
+    if (rosterNames.length > 0) {
+      setMembers(rosterNames);
+      setTeamMembersSynced(true);
+    } else {
+      // No members assigned to this team yet in Team Management — fall
+      // back to manual entry rather than locking the form onto an
+      // empty roster.
+      setTeamMembersSynced(false);
+    }
+  };
+
   // ─── Load user's team and set permissions ──────────────────────
   useEffect(() => {
     const loadUserTeam = async () => {
@@ -167,16 +203,7 @@ function EvaluationForm({ t, lang }) {
 
           // Load team details if user is a leader
           if (canEval) {
-            const response = await teamAPI.getById(teamId);
-            if (response?.data) {
-              const teamData = response.data;
-              setTeamName(teamData.name || teamData.department || "");
-              const teamMembers =
-                teamData.members?.map((m) => m.name || m) || [];
-              if (teamMembers.length > 0) {
-                setMembers(teamMembers);
-              }
-            }
+            await loadTeamRoster(teamId);
           }
         }
       } catch (error) {
@@ -188,6 +215,25 @@ function EvaluationForm({ t, lang }) {
     };
     loadUserTeam();
   }, [user]);
+
+  // ─── Manually re-pull the roster (e.g. after Team Management was
+  // updated with new hires) without leaving the evaluation form ──────
+  const refreshTeamMembers = async () => {
+    if (!userTeamId) return;
+    setRefreshingMembers(true);
+    try {
+      await loadTeamRoster(userTeamId);
+      showToast(te.membersRefreshed || "Team roster refreshed", "success");
+    } catch (error) {
+      console.error("Failed to refresh team roster:", error);
+      showToast(
+        te.membersRefreshError || "Failed to refresh team roster",
+        "error",
+      );
+    } finally {
+      setRefreshingMembers(false);
+    }
+  };
 
   // ─── Effect to load history when tab changes ──────────────
   useEffect(() => {
@@ -235,6 +281,10 @@ function EvaluationForm({ t, lang }) {
   // ─── Load an evaluation from history ──────────────────────
   const loadEvaluation = (evalData) => {
     setMembers(evalData.members || ["", "", ""]);
+    // A loaded historical evaluation is a point-in-time snapshot, which
+    // may no longer match the live team roster — show it as editable
+    // rather than implying it's still synced.
+    setTeamMembersSynced(false);
     setScores(evalData.scores || {});
     setComments(evalData.comments || {});
     setTeamName(evalData.teamName || "");
@@ -414,7 +464,13 @@ function EvaluationForm({ t, lang }) {
         try {
           const data = JSON.parse(savedEvaluation);
           if (isMounted) {
-            if (data.members) setMembers(data.members);
+            if (data.members) {
+              setMembers(data.members);
+              // Same reasoning as loadEvaluation() above — a locally
+              // cached draft may have been hand-edited, so don't claim
+              // it's still in sync with the team roster.
+              setTeamMembersSynced(false);
+            }
             if (data.scores) setScores(data.scores);
             if (data.comments) setComments(data.comments);
             if (data.teamName) setTeamName(data.teamName);
@@ -633,14 +689,29 @@ function EvaluationForm({ t, lang }) {
   };
 
   // ─── Reset form ──────────────────────────────────────────
-  const resetForm = () => {
+  const resetForm = async () => {
     setScores({});
     setComments({});
-    setMembers(["", "", ""]);
     setTeamName("");
     setEvaluationId(null);
     setSignatures({});
     localStorage.removeItem("currentEvaluation");
+
+    // Re-sync from the team roster instead of leaving blank manual
+    // inputs, since that's the normal starting state now.
+    if (userTeamId) {
+      try {
+        await loadTeamRoster(userTeamId);
+      } catch (error) {
+        console.error("Failed to reload team roster after reset:", error);
+        setMembers(["", "", ""]);
+        setTeamMembersSynced(false);
+      }
+    } else {
+      setMembers(["", "", ""]);
+      setTeamMembersSynced(false);
+    }
+
     showToast(te.resetSuccess || "Form reset successfully", "info");
   };
 
@@ -1274,6 +1345,7 @@ function EvaluationForm({ t, lang }) {
                 alignItems: "center",
                 flexWrap: "wrap",
                 marginBottom: 16,
+                gap: 8,
               }}
             >
               <h3
@@ -1285,6 +1357,7 @@ function EvaluationForm({ t, lang }) {
                   margin: 0,
                   display: "flex",
                   alignItems: "center",
+                  flexWrap: "wrap",
                   gap: 8,
                 }}
               >
@@ -1297,35 +1370,150 @@ function EvaluationForm({ t, lang }) {
                       fontSize: "10px",
                       color: "#ef4444",
                       fontWeight: 400,
-                      marginLeft: 8,
                     }}
                   >
                     🔒 Read-only
                   </span>
                 )}
+                {canEvaluate && teamMembersSynced && (
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      color: "#10b981",
+                      background: "#ecfdf5",
+                      padding: "2px 8px",
+                      borderRadius: 20,
+                      fontWeight: 600,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <FiCheck size={11} />
+                    Synced from Team Management
+                  </span>
+                )}
               </h3>
-              {canEvaluate && members.length < 7 && (
-                <button
-                  onClick={addMember}
-                  style={{
-                    background: C.primary,
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 20,
-                    padding: "6px 16px",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <FiPlus size={14} />
-                  {teKey("addMember", "Add Member")}
-                </button>
+
+              {canEvaluate && teamMembersSynced && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button
+                    onClick={refreshTeamMembers}
+                    disabled={refreshingMembers}
+                    style={{
+                      background: "transparent",
+                      color: C.primary,
+                      border: `1.5px solid ${C.primary}`,
+                      borderRadius: 20,
+                      padding: "6px 14px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: refreshingMembers ? "not-allowed" : "pointer",
+                      opacity: refreshingMembers ? 0.6 : 1,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <FiRefreshCw
+                      size={13}
+                      style={
+                        refreshingMembers
+                          ? { animation: "spin 1s linear infinite" }
+                          : undefined
+                      }
+                    />
+                    {refreshingMembers ? "Refreshing..." : "Refresh roster"}
+                  </button>
+                  <button
+                    onClick={() => setTeamMembersSynced(false)}
+                    style={{
+                      background: "transparent",
+                      color: C.muted,
+                      border: `1.5px solid ${C.border}`,
+                      borderRadius: 20,
+                      padding: "6px 14px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Edit manually
+                  </button>
+                </div>
+              )}
+
+              {canEvaluate && !teamMembersSynced && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {userTeamId && (
+                    <button
+                      onClick={refreshTeamMembers}
+                      disabled={refreshingMembers}
+                      style={{
+                        background: "transparent",
+                        color: C.primary,
+                        border: `1.5px solid ${C.primary}`,
+                        borderRadius: 20,
+                        padding: "6px 14px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: refreshingMembers ? "not-allowed" : "pointer",
+                        opacity: refreshingMembers ? 0.6 : 1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <FiRefreshCw
+                        size={13}
+                        style={
+                          refreshingMembers
+                            ? { animation: "spin 1s linear infinite" }
+                            : undefined
+                        }
+                      />
+                      Use team roster
+                    </button>
+                  )}
+                  {members.length < 7 && (
+                    <button
+                      onClick={addMember}
+                      style={{
+                        background: C.primary,
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 20,
+                        padding: "6px 16px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                      }}
+                    >
+                      <FiPlus size={14} />
+                      {teKey("addMember", "Add Member")}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
+
+            {teamMembersSynced && (
+              <p
+                style={{
+                  fontSize: 11,
+                  color: C.muted,
+                  marginTop: -8,
+                  marginBottom: 12,
+                }}
+              >
+                These names come from Team Management. Added a new hire? Assign
+                them to this team there, then hit "Refresh roster" here — no
+                retyping needed.
+              </p>
+            )}
 
             <div
               style={{
@@ -1335,44 +1523,79 @@ function EvaluationForm({ t, lang }) {
                 gap: 12,
               }}
             >
-              {members.map((member, idx) => (
-                <div
-                  key={idx}
-                  style={{ display: "flex", gap: 8, alignItems: "center" }}
-                >
-                  <input
-                    ref={(el) => (memberInputRefs.current[idx] = el)}
-                    style={{ ...inp, flex: 1 }}
-                    placeholder={teKey(
-                      "memberPlaceholder",
-                      "Member {number}",
-                    ).replace("{number}", idx + 1)}
-                    value={member}
-                    onChange={(e) => updateMemberName(idx, e.target.value)}
-                    disabled={!canEvaluate}
-                  />
-                  {canEvaluate && members.length > 1 && (
-                    <button
-                      onClick={() => removeMember(idx)}
+              {members.map((member, idx) =>
+                teamMembersSynced ? (
+                  // ── Synced (locked) roster row ──────────────────
+                  <div
+                    key={idx}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "0 12px",
+                      height: 40,
+                      borderRadius: 8,
+                      border: `1.5px solid ${C.border}`,
+                      background: "#f8faf9",
+                    }}
+                  >
+                    <FiUser
+                      size={14}
+                      color={C.primary}
+                      style={{ flexShrink: 0 }}
+                    />
+                    <span
                       style={{
-                        background: "#fee2e2",
-                        color: "#dc2626",
-                        border: "none",
-                        borderRadius: 6,
-                        width: 32,
-                        height: 32,
-                        cursor: "pointer",
-                        fontSize: 16,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        fontSize: 13,
+                        color: C.dark,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      <FiX size={16} />
-                    </button>
-                  )}
-                </div>
-              ))}
+                      {member}
+                    </span>
+                  </div>
+                ) : (
+                  // ── Manual entry row (original behavior) ────────
+                  <div
+                    key={idx}
+                    style={{ display: "flex", gap: 8, alignItems: "center" }}
+                  >
+                    <input
+                      ref={(el) => (memberInputRefs.current[idx] = el)}
+                      style={{ ...inp, flex: 1 }}
+                      placeholder={teKey(
+                        "memberPlaceholder",
+                        "Member {number}",
+                      ).replace("{number}", idx + 1)}
+                      value={member}
+                      onChange={(e) => updateMemberName(idx, e.target.value)}
+                      disabled={!canEvaluate}
+                    />
+                    {canEvaluate && members.length > 1 && (
+                      <button
+                        onClick={() => removeMember(idx)}
+                        style={{
+                          background: "#fee2e2",
+                          color: "#dc2626",
+                          border: "none",
+                          borderRadius: 6,
+                          width: 32,
+                          height: 32,
+                          cursor: "pointer",
+                          fontSize: 16,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <FiX size={16} />
+                      </button>
+                    )}
+                  </div>
+                ),
+              )}
             </div>
           </div>
 
