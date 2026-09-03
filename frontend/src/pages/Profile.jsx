@@ -183,31 +183,83 @@ export default function Profile() {
       try {
         let profilePhotoUrl = formData.profilePhotoUrl;
 
+        // ─── Upload photo if selected ──────────────────────────
         if (photoFile) {
           setUploadingPhoto(true);
-          const formDataObj = new FormData();
-          formDataObj.append("photo", photoFile);
-          const response = await uploadAPI.uploadProfilePhoto(formDataObj);
-          profilePhotoUrl = response.data.url;
-          setUploadingPhoto(false);
+          try {
+            const formDataObj = new FormData();
+            formDataObj.append("photo", photoFile);
+
+            console.log("📸 Uploading profile photo...");
+            const response = await uploadAPI.uploadProfilePhoto(formDataObj);
+            console.log("✅ Upload response:", response);
+
+            // ─── Extract URL from response ────────────────────
+            // The backend returns: { url: "...", publicId: "..." }
+            if (response?.data?.url) {
+              profilePhotoUrl = response.data.url;
+            } else if (response?.data?.data?.url) {
+              profilePhotoUrl = response.data.data.url;
+            } else if (response?.data?.secure_url) {
+              profilePhotoUrl = response.data.secure_url;
+            } else if (
+              typeof response?.data === "string" &&
+              response.data.startsWith("http")
+            ) {
+              profilePhotoUrl = response.data;
+            } else {
+              console.error(
+                "⚠️ Could not extract URL from response:",
+                response,
+              );
+              throw new Error("Could not get image URL from server");
+            }
+
+            console.log("📸 Photo uploaded successfully:", profilePhotoUrl);
+          } catch (uploadError) {
+            console.error("❌ Photo upload failed:", uploadError);
+
+            // ─── Better error message ─────────────────────────
+            let errorMsg = "Failed to upload photo. Please try again.";
+            if (uploadError.response?.data?.error) {
+              errorMsg = uploadError.response.data.error;
+            } else if (uploadError.response?.data?.message) {
+              errorMsg = uploadError.response.data.message;
+            } else if (uploadError.message) {
+              errorMsg = uploadError.message;
+            }
+
+            showToast(errorMsg, "error");
+            setSaving(false);
+            setUploadingPhoto(false);
+            return;
+          } finally {
+            setUploadingPhoto(false);
+          }
         }
 
+        // ─── Prepare update data ──────────────────────────────
         const updateData = {
           name: formData.name,
           email: formData.email,
           phone: formData.phone,
           profilePhotoUrl: profilePhotoUrl || formData.profilePhotoUrl,
-          bio: formData.bio,
-          position: formData.position,
-          department: formData.department,
-          location: formData.location,
-          website: formData.website,
-          twitter: formData.twitter,
-          github: formData.github,
-          linkedin: formData.linkedin,
+          bio: formData.bio || "",
+          position: formData.position || "",
+          department: formData.department || "",
+          location: formData.location || "",
+          website: formData.website || "",
+          twitter: formData.twitter || "",
+          github: formData.github || "",
+          linkedin: formData.linkedin || "",
         };
 
-        await authAPI.updateProfile(updateData);
+        console.log("📤 Updating profile with data:", updateData);
+
+        // ─── Update profile ────────────────────────────────────
+        const response = await authAPI.updateProfile(updateData);
+        console.log("✅ Profile update response:", response);
+
         showToast(
           tp("updateSuccess", "Profile updated successfully!"),
           "success",
@@ -215,22 +267,33 @@ export default function Profile() {
         setIsEditing(false);
         setPhotoFile(null);
 
+        // ─── Refresh user data ─────────────────────────────────
         await refreshUser();
-        // Use navigate instead of reload for better UX
-        window.location.reload();
+
+        // ─── Reload after a short delay ────────────────────────
+        setTimeout(() => {
+          window.location.reload();
+        }, 500);
       } catch (error) {
-        console.error("Failed to update profile:", error);
-        showToast(
-          error.response?.data?.message ||
-            tp("updateError", "Failed to update profile"),
-          "error",
-        );
+        console.error("❌ Failed to update profile:", error);
+
+        let errorMessage = tp("updateError", "Failed to update profile");
+
+        if (error.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response?.data?.error) {
+          errorMessage = error.response.data.error;
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        showToast(errorMessage, "error");
       } finally {
         setSaving(false);
         setUploadingPhoto(false);
       }
     },
-    [formData, photoFile, uploadAPI, authAPI, showToast, tp, refreshUser],
+    [formData, photoFile, showToast, tp, refreshUser],
   );
 
   const handleCancel = useCallback(() => {
