@@ -406,6 +406,33 @@ export const goldenMondayTranslations = {
     // ─── Employee Management (missing) ──────────────────────────────
     noPosition: "No position",
     locale: "en-US",
+    // New keys needed:
+    rotationSubtitle: "Fair rotation — longest waiting gets priority",
+    tabPresenter: "Presenter",
+    tabRanking: "Ranking",
+    tabRecordings: "Recordings",
+    yourTurn: "🌟 Your Turn!",
+    assignHint:
+      "The rotation algorithm will assign the next presenter automatically",
+    totalPresenters: "Total",
+    never: "Never",
+    avgWait: "Avg wait",
+    showAll: "Show All",
+    showLess: "Show Less",
+    uploadRecordingLabel: "Upload Session Recording",
+    recordingsExpire: "Recordings expire 7 days after upload",
+    copyTitle: "Copy title",
+    copied: "Copied!",
+    checkRoster: "Check the roster for eligible presenters",
+    new: "NEW",
+    sortRecent: "Most Recent",
+    sortPopular: "Most Popular",
+    sortRating: "Highest Rated",
+    hideStats: "Hide Stats",
+    showStats: "Show Stats",
+    feedView: "Feed",
+    shareNow: "Share Now",
+    logResult: "Log a Result",
   },
 
   am: {
