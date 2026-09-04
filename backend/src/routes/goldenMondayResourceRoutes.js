@@ -1,4 +1,6 @@
 // backend/src/routes/goldenMondayResourceRoutes.js
+// ✅ COMPLETE FIXED VERSION
+
 const express = require("express");
 const router = express.Router();
 const { protect, goldenMondayAdminOrAbove } = require("../middleware/auth");
@@ -14,6 +16,21 @@ const upload = multer({
     fileSize: 50 * 1024 * 1024, // 50MB max
   },
 });
+
+// ─── Helper: Detect resource type for Cloudinary ──────────────
+const getCloudinaryResourceType = (fileType) => {
+  switch (fileType) {
+    case "image":
+      return "image";
+    case "video":
+      return "video";
+    case "pdf":
+    case "presentation":
+    case "document":
+    default:
+      return "raw";
+  }
+};
 
 // ─── GET resources for a session ─────────────────────────────
 router.get("/session/:sessionId", protect, async (req, res) => {
@@ -41,6 +58,7 @@ router.post(
       const { title, description, tags } = req.body;
       const sessionId = req.params.sessionId;
 
+      // ✅ Check if session exists
       const session = await GoldenMondaySession.findById(sessionId);
       if (!session) {
         return res
@@ -48,17 +66,36 @@ router.post(
           .json({ success: false, error: "Session not found" });
       }
 
+      // ✅ Check if file was uploaded
       if (!req.file) {
         return res
           .status(400)
           .json({ success: false, error: "No file uploaded" });
       }
 
-      // Detect file type
-      const fileTypeResult = await fileTypeFromBuffer(req.file.buffer);
-      const mimeType = fileTypeResult?.mime || req.file.mimetype;
+      console.log(
+        `📤 Uploading: ${req.file.originalname} (${req.file.size} bytes)`,
+      );
 
+      // ✅ Detect file type with try/catch
+      let detectedMime = req.file.mimetype;
       let fileType = "other";
+
+      try {
+        const fileTypeResult = await fileTypeFromBuffer(req.file.buffer);
+        if (fileTypeResult) {
+          detectedMime = fileTypeResult.mime;
+          console.log(`📄 Detected MIME: ${detectedMime}`);
+        }
+      } catch (detectError) {
+        console.warn(
+          "⚠️ Could not detect file type, using mimetype:",
+          detectError.message,
+        );
+      }
+
+      // ✅ Determine file type
+      const mimeType = detectedMime;
       if (mimeType.startsWith("image/")) fileType = "image";
       else if (mimeType === "application/pdf") fileType = "pdf";
       else if (
@@ -74,20 +111,34 @@ router.post(
       )
         fileType = "document";
       else if (mimeType.startsWith("video/")) fileType = "video";
+      else if (
+        mimeType === "application/zip" ||
+        mimeType === "application/x-zip-compressed"
+      )
+        fileType = "other";
 
-      // Upload to Cloudinary
+      console.log(`📄 File type: ${fileType}`);
+
+      // ✅ Upload to Cloudinary with correct resource_type
       const dataURI = `data:${mimeType};base64,${req.file.buffer.toString("base64")}`;
+      const cloudinaryResourceType = getCloudinaryResourceType(fileType);
+      console.log(`☁️ Cloudinary resource_type: ${cloudinaryResourceType}`);
+
       const result = await cloudinary.uploader.upload(dataURI, {
         folder: `golden-monday/resources/${sessionId}`,
-        resource_type: "raw",
+        resource_type: cloudinaryResourceType,
         public_id: `${Date.now()}-${req.file.originalname.split(".")[0]}`,
+        overwrite: false,
       });
 
-      // Get existing resources count for version
+      console.log(`✅ Uploaded to Cloudinary: ${result.secure_url}`);
+
+      // ✅ Get existing resources count for version
       const existingCount = await GoldenMondayResource.countDocuments({
         session: sessionId,
       });
 
+      // ✅ Create resource record
       const resource = new GoldenMondayResource({
         session: sessionId,
         title: title || req.file.originalname,
@@ -100,14 +151,19 @@ router.post(
         uploadedBy: req.user._id,
         uploadedByName: req.user.name,
         description: description || "",
-        tags: tags ? tags.split(",").map((t) => t.trim()) : [],
+        tags: tags
+          ? tags
+              .split(",")
+              .map((t) => t.trim())
+              .filter(Boolean)
+          : [],
         downloads: 0,
         isActive: true,
       });
 
       await resource.save();
 
-      // Add resource reference to session
+      // ✅ Add resource reference to session
       if (!session.resources) session.resources = [];
       session.resources.push(resource._id);
       await session.save();
@@ -118,8 +174,11 @@ router.post(
         message: "Resource uploaded successfully!",
       });
     } catch (error) {
-      console.error("Error uploading resource:", error);
-      res.status(500).json({ success: false, error: error.message });
+      console.error("❌ Error uploading resource:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Failed to upload resource",
+      });
     }
   },
 );
@@ -140,16 +199,19 @@ router.delete(
           .json({ success: false, error: "Resource not found" });
       }
 
-      // Delete from Cloudinary
+      // ✅ Delete from Cloudinary with correct resource_type
+      const cloudinaryResourceType = getCloudinaryResourceType(
+        resource.fileType,
+      );
       try {
         await cloudinary.uploader.destroy(resource.publicId, {
-          resource_type: "raw",
+          resource_type: cloudinaryResourceType,
         });
       } catch (cloudErr) {
         console.warn("Cloudinary delete failed:", cloudErr.message);
       }
 
-      // Remove from session's resources array
+      // ✅ Remove from session's resources array
       await GoldenMondaySession.findByIdAndUpdate(resource.session, {
         $pull: { resources: resource._id },
       });
@@ -208,10 +270,17 @@ router.put(
 
       if (title) resource.title = title;
       if (description !== undefined) resource.description = description;
-      if (tags !== undefined)
-        resource.tags = Array.isArray(tags)
-          ? tags
-          : tags.split(",").map((t) => t.trim());
+      if (tags !== undefined) {
+        resource.tags =
+          typeof tags === "string"
+            ? tags
+                .split(",")
+                .map((t) => t.trim())
+                .filter(Boolean)
+            : Array.isArray(tags)
+              ? tags
+              : [];
+      }
       if (isActive !== undefined) resource.isActive = isActive;
 
       await resource.save();
