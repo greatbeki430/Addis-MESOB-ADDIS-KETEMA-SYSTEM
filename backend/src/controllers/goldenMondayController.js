@@ -230,12 +230,22 @@ const getRoster = async (req, res) => {
     const validRoster = [];
     for (const entry of roster) {
       if (entry.user) {
-        const userExists = await User.findById(entry.user);
-        if (!userExists) {
+        try {
+          const userExists = await User.findById(entry.user);
+          if (!userExists) {
+            console.warn(
+              `⚠️ Roster entry ${entry._id} has invalid user ${entry.user}, removing`,
+            );
+            await GoldenMondayPresenter.findByIdAndDelete(entry._id);
+            continue;
+          }
+        } catch (checkErr) {
           console.warn(
-            `⚠️ Roster entry ${entry._id} has invalid user ${entry.user}, removing`,
+            `⚠️ Error checking user ${entry.user}:`,
+            checkErr.message,
           );
-          await GoldenMondayPresenter.findByIdAndDelete(entry._id);
+          // Keep the entry if we can't check
+          validRoster.push(entry);
           continue;
         }
       }
@@ -253,7 +263,7 @@ const getRoster = async (req, res) => {
 
 // POST /api/golden-monday/roster
 // { userId, department, position, profilePhotoUrl, phone, hireDate,
-//   skills, notes, emergencyContact, address, salary? }
+// skills, notes, emergencyContact, address, salary? }
 const addToRoster = async (req, res) => {
   try {
     const {
@@ -568,11 +578,20 @@ const getLiveRecordings = async (req, res) => {
     const validSessions = [];
     for (const session of sessions) {
       if (session.presenter) {
-        const userExists = await User.findById(session.presenter);
-        if (!userExists) {
+        try {
+          const userExists = await User.findById(session.presenter);
+          if (!userExists) {
+            console.warn(
+              `⚠️ Session ${session._id} has invalid presenter, skipping`,
+            );
+            continue;
+          }
+        } catch (checkErr) {
           console.warn(
-            `⚠️ Session ${session._id} has invalid presenter, skipping`,
+            `⚠️ Error checking presenter for session ${session._id}:`,
+            checkErr.message,
           );
+          validSessions.push(session);
           continue;
         }
       }
