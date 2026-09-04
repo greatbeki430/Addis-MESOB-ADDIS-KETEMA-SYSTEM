@@ -13,6 +13,7 @@ const GoldenMondayExperience = require("../models/GoldenMondayExperience");
 const GoldenMondayResult = require("../models/GoldenMondayResult");
 const { suggestTagsFromText } = require("../services/tagSuggestionService");
 
+// At the top of goldenMondayRoutes.js, add this import
 const {
   getSessions,
   previewRecap,
@@ -30,6 +31,7 @@ const {
   removeSessionRecording,
   getLiveRecordings,
   analyzeAndCategorizePhoto,
+  canSeeSalary,
 } = require("../controllers/goldenMondayController");
 
 const rotationService = require("../services/goldenMondayRotationService");
@@ -195,39 +197,39 @@ router.get("/recordings/live", protect, anyRole, async (req, res) => {
 // 👥 ROSTER
 // ════════════════════════════════════════════════════════════════
 
-// router.get("/roster", protect, anyRole, getRoster);
-router.get("/roster", protect, anyRole, async (req, res) => {
-  try {
-    let query = GoldenMondayPresenter.find().sort({ name: 1 });
-    if (canSeeSalary(req.user)) {
-      query = query.select("+salary");
-    }
-    const roster = await query;
+router.get("/roster", protect, anyRole, getRoster);
+// router.get("/roster", protect, anyRole, async (req, res) => {
+//   try {
+//     let query = GoldenMondayPresenter.find().sort({ name: 1 });
+//     if (canSeeSalary(req.user)) {
+//       query = query.select("+salary");
+//     }
+//     const roster = await query;
 
-    // ✅ FIX: Filter out roster entries with non-existent users
-    const validRoster = [];
-    for (const entry of roster) {
-      if (entry.user) {
-        const userExists = await User.findById(entry.user);
-        if (!userExists) {
-          console.warn(
-            `⚠️ Roster entry ${entry._id} has invalid user ${entry.user}, removing`,
-          );
-          await GoldenMondayPresenter.findByIdAndDelete(entry._id);
-          continue;
-        }
-      }
-      validRoster.push(entry);
-    }
+//     // ✅ FIX: Filter out roster entries with non-existent users
+//     const validRoster = [];
+//     for (const entry of roster) {
+//       if (entry.user) {
+//         const userExists = await User.findById(entry.user);
+//         if (!userExists) {
+//           console.warn(
+//             `⚠️ Roster entry ${entry._id} has invalid user ${entry.user}, removing`,
+//           );
+//           await GoldenMondayPresenter.findByIdAndDelete(entry._id);
+//           continue;
+//         }
+//       }
+//       validRoster.push(entry);
+//     }
 
-    res.json(validRoster);
-  } catch (error) {
-    console.error("❌ [GET ROSTER] Error:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to load roster", error: error.message });
-  }
-});
+//     res.json(validRoster);
+//   } catch (error) {
+//     console.error("❌ [GET ROSTER] Error:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to load roster", error: error.message });
+//   }
+// });
 router.post("/roster", protect, goldenMondayAdminOrAbove, addToRoster);
 router.put("/roster/:id", protect, goldenMondayAdminOrAbove, updateRosterEntry);
 router.delete(
