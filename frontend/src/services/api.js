@@ -29,9 +29,27 @@ api.interceptors.request.use(
 );
 
 // Response interceptor to handle 401 errors
+// Response interceptor to handle 401 errors and 404 user endpoints
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // ─── Handle 404 for user endpoints globally ───
+    if (error.response?.status === 404) {
+      const url = error.config?.url || "";
+
+      // Check if it's a user endpoint
+      if (url.includes("/auth/users/") || url.includes("/users/")) {
+        console.warn(`⚠️ User endpoint 404 (silenced): ${url}`);
+        // Return empty data to prevent crashes instead of rejecting
+        return Promise.resolve({
+          data: null,
+          status: 404,
+          _isFallback: true,
+        });
+      }
+    }
+
+    // ─── Handle 401 Unauthorized ───
     if (error.response?.status === 401) {
       const errorData = error.response?.data || {};
       const message = errorData.message || "Unauthorized";
@@ -55,6 +73,7 @@ api.interceptors.response.use(
         localStorage.removeItem("user");
       }
     }
+
     return Promise.reject(error);
   },
 );
