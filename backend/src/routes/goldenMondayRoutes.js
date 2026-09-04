@@ -89,12 +89,27 @@ router.get("/sessions/upcoming", protect, anyRole, async (req, res) => {
     })
       .sort({ date: 1 })
       .populate("presenter", "name email department profilePhotoUrl");
-    res.json(sessions);
+
+    // ✅ FIX: Filter sessions with invalid presenters
+    const validSessions = [];
+    for (const session of sessions) {
+      if (session.presenter) {
+        const userExists = await User.findById(session.presenter._id);
+        if (!userExists) {
+          console.warn(
+            `⚠️ Session ${session._id} has invalid presenter, skipping`,
+          );
+          continue;
+        }
+      }
+      validSessions.push(session);
+    }
+
+    res.json(validSessions);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
-
 router.get("/sessions/past", protect, anyRole, async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -110,13 +125,28 @@ router.get("/sessions/past", protect, anyRole, async (req, res) => {
       .limit(limit)
       .populate("presenter", "name email department profilePhotoUrl");
 
+    // ✅ FIX: Filter sessions with invalid presenters
+    const validSessions = [];
+    for (const session of sessions) {
+      if (session.presenter) {
+        const userExists = await User.findById(session.presenter._id);
+        if (!userExists) {
+          console.warn(
+            `⚠️ Session ${session._id} has invalid presenter, skipping`,
+          );
+          continue;
+        }
+      }
+      validSessions.push(session);
+    }
+
     const total = await GoldenMondaySession.countDocuments({
       status: "completed",
       date: { $lt: new Date() },
     });
 
     res.json({
-      sessions,
+      sessions: validSessions,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
   } catch (error) {
@@ -128,13 +158,76 @@ router.get("/sessions/past", protect, anyRole, async (req, res) => {
 // 🎥 RECORDINGS
 // ════════════════════════════════════════════════════════════════
 
-router.get("/recordings/live", protect, anyRole, getLiveRecordings);
+// router.get("/recordings/live", protect, anyRole, getLiveRecordings);
+router.get("/recordings/live", protect, anyRole, async (req, res) => {
+  try {
+    const sessions = await GoldenMondaySession.find({
+      recordingUrl: { $ne: "" },
+      recordingDeleted: false,
+      recordingExpiresAt: { $gt: new Date() },
+    }).sort({ recordingUploadedAt: -1 });
+
+    // ✅ FIX: Filter sessions with invalid presenters
+    const validSessions = [];
+    for (const session of sessions) {
+      if (session.presenter) {
+        const userExists = await User.findById(session.presenter);
+        if (!userExists) {
+          console.warn(
+            `⚠️ Session ${session._id} has invalid presenter, skipping`,
+          );
+          continue;
+        }
+      }
+      validSessions.push(session);
+    }
+
+    res.json(validSessions);
+  } catch (error) {
+    console.error("❌ [GET LIVE RECORDINGS] Error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to load recordings", error: error.message });
+  }
+});
 
 // ════════════════════════════════════════════════════════════════
 // 👥 ROSTER
 // ════════════════════════════════════════════════════════════════
 
-router.get("/roster", protect, anyRole, getRoster);
+// router.get("/roster", protect, anyRole, getRoster);
+router.get("/roster", protect, anyRole, async (req, res) => {
+  try {
+    let query = GoldenMondayPresenter.find().sort({ name: 1 });
+    if (canSeeSalary(req.user)) {
+      query = query.select("+salary");
+    }
+    const roster = await query;
+
+    // ✅ FIX: Filter out roster entries with non-existent users
+    const validRoster = [];
+    for (const entry of roster) {
+      if (entry.user) {
+        const userExists = await User.findById(entry.user);
+        if (!userExists) {
+          console.warn(
+            `⚠️ Roster entry ${entry._id} has invalid user ${entry.user}, removing`,
+          );
+          await GoldenMondayPresenter.findByIdAndDelete(entry._id);
+          continue;
+        }
+      }
+      validRoster.push(entry);
+    }
+
+    res.json(validRoster);
+  } catch (error) {
+    console.error("❌ [GET ROSTER] Error:", error);
+    res
+      .status(500)
+      .json({ message: "Failed to load roster", error: error.message });
+  }
+});
 router.post("/roster", protect, goldenMondayAdminOrAbove, addToRoster);
 router.put("/roster/:id", protect, goldenMondayAdminOrAbove, updateRosterEntry);
 router.delete(
@@ -155,6 +248,25 @@ router.get("/rotation/next", protect, anyRole, async (req, res) => {
     if (!next) {
       return res.json({ name: "No presenter assigned", department: "" });
     }
+
+    // ✅ FIX: Check if the user still exists
+    if (next.user) {
+      const userExists = await User.findById(next.user);
+      if (!userExists) {
+        console.warn(
+          `⚠️ User ${next.user} no longer exists, removing from roster`,
+        );
+        // Remove stale entry
+        await GoldenMondayPresenter.findOneAndDelete({ user: next.user });
+        // Get next presenter
+        const newNext = await rotationService.getNextPresenter();
+        if (newNext) {
+          return res.json(newNext);
+        }
+        return res.json({ name: "No presenter assigned", department: "" });
+      }
+    }
+
     res.json(next);
   } catch (error) {
     console.error("Error in /rotation/next:", error);
