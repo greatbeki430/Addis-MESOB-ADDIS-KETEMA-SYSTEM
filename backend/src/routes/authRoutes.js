@@ -119,4 +119,146 @@ router.put("/profile", protect, async (req, res) => {
   }
 });
 
+// ─── ADMIN PASSWORD RESET ROUTES ────────────────────────────
+// Reset password for a specific user by ID (admin only)
+router.put(
+  "/admin/reset-password",
+  protect,
+  adminOrSuperAdmin,
+  async (req, res) => {
+    try {
+      const { userId, newPassword } = req.body;
+
+      if (!["admin", "superadmin"].includes(req.user.role)) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({
+          message: "Password must be at least 6 characters",
+        });
+      }
+
+      const user = await User.findById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      await User.findByIdAndUpdate(
+        userId,
+        { $set: { password: hashedPassword } },
+        { new: true },
+      );
+
+      res.json({
+        success: true,
+        message: `Password reset for ${user.name}`,
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Password reset error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  },
+);
+
+// Reset password by email (admin only)
+router.post(
+  "/admin/reset-password-by-email",
+  protect,
+  adminOrSuperAdmin,
+  async (req, res) => {
+    try {
+      const { email, newPassword } = req.body;
+
+      if (!["admin", "superadmin"].includes(req.user.role)) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (!email || !newPassword || newPassword.length < 6) {
+        return res.status(400).json({
+          message: "Email and password (min 6 chars) are required",
+        });
+      }
+
+      const user = await User.findOne({ email });
+      if (!user) {
+        return res
+          .status(404)
+          .json({ message: `User with email "${email}" not found` });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      await User.findByIdAndUpdate(
+        user._id,
+        { $set: { password: hashedPassword } },
+        { new: true },
+      );
+
+      res.json({
+        success: true,
+        message: `Password reset for ${user.name}`,
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      });
+    } catch (error) {
+      console.error("❌ Password reset by email error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  },
+);
+
+// Bulk reset all Team Leader passwords (admin only)
+router.post(
+  "/admin/bulk-reset-team-leaders",
+  protect,
+  adminOrSuperAdmin,
+  async (req, res) => {
+    try {
+      const { newPassword } = req.body;
+
+      if (!["admin", "superadmin"].includes(req.user.role)) {
+        return res.status(403).json({ message: "Not authorized" });
+      }
+
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({
+          message: "Password must be at least 6 characters",
+        });
+      }
+
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+      const result = await User.updateMany(
+        { role: "leader" },
+        { $set: { password: hashedPassword } },
+      );
+
+      res.json({
+        success: true,
+        message: `Updated ${result.modifiedCount} team leaders`,
+        modifiedCount: result.modifiedCount,
+      });
+    } catch (error) {
+      console.error("❌ Bulk reset error:", error);
+      res.status(500).json({ message: error.message });
+    }
+  },
+);
+
 module.exports = router;
