@@ -71,18 +71,27 @@ export default function PresenterSpotlight({ onRefresh }) {
       if (!isMounted.current) return;
       setPresenter(response.data);
 
+      // ✅ FIX: Only fetch user details if we have a valid _id
       if (response.data && response.data._id) {
         try {
           const detailRes = await goldenMondayAPI.getUserDetails(
             response.data._id,
           );
           if (!isMounted.current) return;
-          setPresenter((prev) => ({
-            ...prev,
-            ...detailRes.data,
-          }));
+          if (detailRes.data) {
+            setPresenter((prev) => ({
+              ...prev,
+              ...detailRes.data,
+            }));
+          }
         } catch (detailErr) {
-          if (detailErr.response?.status !== 404) {
+          // ✅ FIX: Handle 404 gracefully
+          if (detailErr.response?.status === 404) {
+            console.warn(
+              `⚠️ User ${response.data._id} not found - using base presenter data`,
+            );
+            // Keep the presenter data we already have
+          } else {
             console.warn("Could not fetch presenter user details:", detailErr);
           }
         }
