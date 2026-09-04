@@ -61,6 +61,7 @@ import {
   FiTrendingUp,
   FiChevronLeft,
   FiBriefcase,
+  FiClock,
 } from "react-icons/fi";
 
 // ─── FONT SIZES ──────────────────────────────────────────────
@@ -882,12 +883,13 @@ export default function ForumReport({
 
   // ─── Timer State ──────────────────────────────────────────────
   // ─── Timer State ──────────────────────────────────────────────
+  // ─── Timer State ──────────────────────────────────────────────
   const [timerActive, setTimerActive] = useState(false);
-  const [setIsReportLocked] = useState(false);
+  const [isReportLocked, setIsReportLocked] = useState(false);
   const [warningMessage, setWarningMessage] = useState(null);
   const [lastAutoSaveTime, setLastAutoSaveTime] = useState(null);
   const [savedProgressId, setSavedProgressId] = useState(null);
-  const [setExtensionRequested] = useState(false);
+  const [extensionRequested, setExtensionRequested] = useState(false);
 
   const isAdmin = isAdminOrAbove(user);
 
@@ -1672,6 +1674,56 @@ ${"=".repeat(50)}
           onResume={handleResumeReport}
         />
       </div>
+
+      {/* ─── Timer Display ─────────────────────────────────────── */}
+      <div style={{ marginBottom: "16px" }}>
+        <MeetingTimer
+          timeRemaining={timeRemaining}
+          formattedTime={formattedTime}
+          progressPercent={progressPercent}
+          status={status}
+          isExpired={isExpired}
+          progressSaved={progressSaved}
+          warningMessage={warningMessage}
+          onExtend={() => setShowExpiredModal(true)}
+          isAdmin={isAdmin}
+          onResume={handleResumeReport}
+        />
+      </div>
+
+      {/* ─── Locked/Extension Status Badge ─────────────────────── */}
+      {(isReportLocked || extensionRequested) && (
+        <div
+          style={{
+            padding: "10px 16px",
+            borderRadius: radius.md,
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            background: isReportLocked ? "#FEF2F2" : "#FFFBEB",
+            border: `1px solid ${isReportLocked ? "#FCA5A5" : "#FDE68A"}`,
+          }}
+        >
+          {isReportLocked ? (
+            <>
+              <FiAlertCircle size={18} color="#DC2626" />
+              <span style={{ fontSize: "13px", color: "#991B1B" }}>
+                {tf("reportLocked") ||
+                  "🔒 This report is locked. Please contact an admin."}
+              </span>
+            </>
+          ) : extensionRequested ? (
+            <>
+              <FiClock size={18} color="#D97706" />
+              <span style={{ fontSize: "13px", color: "#92400E" }}>
+                {tf("extensionPending") ||
+                  "⏳ Extension request pending admin approval."}
+              </span>
+            </>
+          ) : null}
+        </div>
+      )}
 
       {aiGeneratedContent && showAIBadge && (
         <AIInsightBadge type="success" onClose={() => setShowAIBadge(false)}>
