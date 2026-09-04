@@ -101,12 +101,22 @@ export default function GalleryUploader({
 
       while (retries > 0 && !folderId) {
         try {
-          const folderRes = await goldenMondayAPI.createFolder({
+          // Create folder with timeout
+          const folderPromise = goldenMondayAPI.createFolder({
             name: folderName,
             ethiopianDate: dateStr,
             topic: uploadTopic,
             category: category !== "all" ? category : "other",
           });
+
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(
+              () => reject(new Error("Folder creation timed out")),
+              30000,
+            );
+          });
+
+          const folderRes = await Promise.race([folderPromise, timeoutPromise]);
 
           // Handle different response shapes
           folderId =

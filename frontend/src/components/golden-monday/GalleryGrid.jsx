@@ -77,31 +77,6 @@ function getInitialAutoClearSettings() {
   }
 }
 
-// ─── Helper: Convert dataURL to Blob ──────────────────────────────────────
-function dataURLtoBlob(dataURL) {
-  try {
-    const arr = dataURL.split(",");
-    if (!arr || arr.length < 2) {
-      throw new Error("Invalid data URL format");
-    }
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    if (!mimeMatch) {
-      throw new Error("Could not extract MIME type from data URL");
-    }
-    const mime = mimeMatch[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
-  } catch (error) {
-    console.error("dataURLtoBlob error:", error);
-    throw error;
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
@@ -517,36 +492,50 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             ),
           );
 
-          const imageData = await fileToBase64(item.file);
+          // Use the original file directly - NO base64 conversion!
+          const file = item.file;
 
           setUploadQueue((prev) =>
             prev.map((q) => (q.id === item.id ? { ...q, progress: 30 } : q)),
           );
 
           const wasAutoDetected = !item.category;
-          const detectedCategory = await resolveUploadCategory(item, imageData);
 
+          // For AI categorization, we still need base64 (only if needed)
+          let detectedCategory = item.category || "other";
           if (wasAutoDetected) {
-            setUploadQueue((prev) =>
-              prev.map((q) =>
-                q.id === item.id
-                  ? { ...q, progress: 50, aiCategory: detectedCategory }
-                  : q,
-              ),
-            );
+            try {
+              // Only convert to base64 if we need AI categorization
+              const imageData = await fileToBase64(file);
+              detectedCategory = await resolveUploadCategory(item, imageData);
+              setUploadQueue((prev) =>
+                prev.map((q) =>
+                  q.id === item.id
+                    ? { ...q, progress: 50, aiCategory: detectedCategory }
+                    : q,
+                ),
+              );
+            } catch (aiError) {
+              console.warn("AI categorization failed, using default:", aiError);
+              detectedCategory = "other";
+            }
           }
 
-          const blob = dataURLtoBlob(imageData);
-          const ext = blob.type.split("/")[1]?.split("+")[0] || "bin";
           const formData = new FormData();
-          const filename = item.file.name || `upload.${ext}`;
-          formData.append("image", blob, filename);
+          // Use the original file directly!
+          formData.append("image", file, file.name);
           formData.append("folderId", folderId);
           formData.append("category", detectedCategory);
           if (sessionId) formData.append("sessionId", sessionId);
           formData.append("lang", language);
 
-          console.log(`📤 Uploading ${filename} to folder ${folderId}`);
+          console.log(`📤 Uploading ${file.name} to folder ${folderId}`);
+          formData.append("folderId", folderId);
+          formData.append("category", detectedCategory);
+          if (sessionId) formData.append("sessionId", sessionId);
+          formData.append("lang", language);
+
+          console.log(`📤 Uploading ${file.name} to folder ${folderId}`);
 
           const uploadPromise = goldenMondayAPI.uploadGalleryPhoto(
             formData,
