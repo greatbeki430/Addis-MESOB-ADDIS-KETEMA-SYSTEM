@@ -35,6 +35,7 @@ import MeetingTimer from "../components/forum-report/MeetingTimer";
 import TimeExpiredModal from "../components/forum-report/TimeExpiredModal";
 import AutoSaveIndicator from "../components/forum-report/AutoSaveIndicator";
 import { forumReportService } from "../services/forumReportService";
+import SignatureCanvas from "../components/forum-report/SignatureCanvas";
 
 // ✅ React Icons
 import {
@@ -2384,79 +2385,98 @@ ${"=".repeat(50)}
             variant="success"
           />
 
-          {/* Signatures */}
+          {/* Signatures - Using SignatureCanvas */}
           <Section
             title={tf("signatures", "Signatures")}
             icon={<FiPenTool size={18} />}
           >
             <div
-              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                gap: "16px",
+              }}
             >
               {form.signatures.map((sig, idx) => (
                 <div
                   key={idx}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
-                    padding: "10px 14px",
+                    padding: "14px 16px",
                     background: C.cardBg,
                     borderRadius: radius.lg,
-                    border: `1.5px solid ${C.border}`,
-                    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
-                    animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = C.primary;
-                    e.currentTarget.style.background = "#f0f3ff";
-                    e.currentTarget.style.transform = "translateX(4px)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = C.border;
-                    e.currentTarget.style.background = C.cardBg;
-                    e.currentTarget.style.transform = "translateX(0)";
+                    border: `1.5px solid ${sig ? C.primary : C.border}`,
+                    transition: "all 0.3s ease",
+                    position: "relative",
                   }}
                 >
-                  <div style={{ flex: 1 }}>
-                    <Field
-                      label={`${idx + 1}${tf("signatureN", " Signature")}`}
-                      value={sig}
-                      onChange={(v) => {
-                        const updated = [...form.signatures];
-                        updated[idx] = v;
-                        setForm((prev) => ({ ...prev, signatures: updated }));
-                      }}
-                      placeholder={tf("signaturePlaceholder", "Signature line")}
-                    />
-                  </div>
-                  {form.signatures.length > 1 && (
-                    <button
-                      onClick={() => removeItem("signatures", idx)}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <span
                       style={{
-                        ...btn.icon,
-                        color: "#dc2626",
-                        background: "#fee2e2",
-                        width: "30px",
-                        height: "30px",
-                        borderRadius: "8px",
-                        transition: "all 0.25s ease",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = "#fecaca";
-                        e.currentTarget.style.transform =
-                          "scale(1.15) rotate(90deg)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "#fee2e2";
-                        e.currentTarget.style.transform = "scale(1) rotate(0)";
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: sig ? C.primary : C.muted,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}
                     >
-                      <FiX size={14} />
-                    </button>
-                  )}
+                      <FiPenTool size={14} />
+                      {`${idx + 1}${tf("signatureN", " Signature")}`}
+                      {sig && <FiCheck size={14} color="#10b981" />}
+                    </span>
+                    {form.signatures.length > 1 && (
+                      <button
+                        onClick={() => removeItem("signatures", idx)}
+                        style={{
+                          ...btn.icon,
+                          color: "#dc2626",
+                          background: "#fee2e2",
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "6px",
+                          transition: "all 0.25s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "#fecaca";
+                          e.currentTarget.style.transform =
+                            "scale(1.15) rotate(90deg)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "#fee2e2";
+                          e.currentTarget.style.transform =
+                            "scale(1) rotate(0)";
+                        }}
+                      >
+                        <FiX size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  <SignatureCanvas
+                    value={sig}
+                    onSave={(dataUrl) => {
+                      const updated = [...form.signatures];
+                      updated[idx] = dataUrl;
+                      setForm((prev) => ({ ...prev, signatures: updated }));
+                    }}
+                    height={80}
+                    width={300}
+                    readOnly={isReportLocked}
+                    label=""
+                    t={tf}
+                    showTypeInput={true}
+                  />
                 </div>
               ))}
             </div>
+
             <button
               onClick={() => addItem("signatures", "")}
               style={{
