@@ -225,8 +225,26 @@ const getRoster = async (req, res) => {
       query = query.select("+salary");
     }
     const roster = await query;
-    res.json(roster);
+
+    // ✅ FIX: Filter out roster entries with non-existent users
+    const validRoster = [];
+    for (const entry of roster) {
+      if (entry.user) {
+        const userExists = await User.findById(entry.user);
+        if (!userExists) {
+          console.warn(
+            `⚠️ Roster entry ${entry._id} has invalid user ${entry.user}, removing`,
+          );
+          await GoldenMondayPresenter.findByIdAndDelete(entry._id);
+          continue;
+        }
+      }
+      validRoster.push(entry);
+    }
+
+    res.json(validRoster);
   } catch (error) {
+    console.error("❌ [GET ROSTER] Error:", error);
     res
       .status(500)
       .json({ message: "Failed to load roster", error: error.message });
@@ -546,8 +564,24 @@ const getLiveRecordings = async (req, res) => {
       recordingExpiresAt: { $gt: new Date() },
     }).sort({ recordingUploadedAt: -1 });
 
-    res.json(sessions);
+    // ✅ FIX: Filter sessions with invalid presenters
+    const validSessions = [];
+    for (const session of sessions) {
+      if (session.presenter) {
+        const userExists = await User.findById(session.presenter);
+        if (!userExists) {
+          console.warn(
+            `⚠️ Session ${session._id} has invalid presenter, skipping`,
+          );
+          continue;
+        }
+      }
+      validSessions.push(session);
+    }
+
+    res.json(validSessions);
   } catch (error) {
+    console.error("❌ [GET LIVE RECORDINGS] Error:", error);
     res
       .status(500)
       .json({ message: "Failed to load recordings", error: error.message });
