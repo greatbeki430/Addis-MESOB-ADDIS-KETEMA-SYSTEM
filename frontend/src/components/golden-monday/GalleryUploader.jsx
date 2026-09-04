@@ -72,6 +72,7 @@ export default function GalleryUploader({
 }) {
   const [uploadTopic, setUploadTopic] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [attemptStatus, setAttemptStatus] = useState("");
   const isSubmittingRef = useRef(false);
 
   const getEthiopianDateString = () => formatEthiopianDateAmharic(new Date());
@@ -99,7 +100,14 @@ export default function GalleryUploader({
       let retries = 3;
       let lastError = null;
 
+      const totalAttempts = 3;
       while (retries > 0 && !folderId) {
+        const attemptNum = totalAttempts - retries + 1;
+        setAttemptStatus(
+          attemptNum === 1
+            ? "Connecting to server..."
+            : `Server is waking up, retrying (${attemptNum}/${totalAttempts})...`,
+        );
         try {
           // Create folder with timeout
           const folderPromise = goldenMondayAPI.createFolder({
@@ -199,6 +207,7 @@ export default function GalleryUploader({
         "Failed to upload. Please try again.";
       showToast(errorMessage, "error");
       setIsCreating(false);
+      setAttemptStatus("");
     } finally {
       isSubmittingRef.current = false;
     }
@@ -306,7 +315,7 @@ export default function GalleryUploader({
                   display: "inline-block",
                 }}
               />
-              Creating folder...
+              {attemptStatus || "Creating folder..."}
             </span>
           )}
         </div>

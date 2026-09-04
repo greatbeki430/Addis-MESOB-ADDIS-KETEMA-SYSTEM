@@ -19,6 +19,7 @@ const Field = ({
   className = "",
   onFocus,
   onBlur,
+  style: customInputStyle,
   ...props
 }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -115,6 +116,11 @@ const Field = ({
             cursor: disabled ? "not-allowed" : "text",
             width: "100%",
             boxSizing: "border-box",
+            // Merge caller overrides instead of replacing the whole
+            // style object, so a partial override (e.g. just background
+            // + cursor for a read-only field) doesn't wipe out padding,
+            // width, font-size, etc.
+            ...customInputStyle,
           }}
           type={inputType}
           value={value || ""}
