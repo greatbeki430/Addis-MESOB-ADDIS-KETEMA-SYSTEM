@@ -1117,25 +1117,61 @@ router.post(
           let resolvedSource = categorySource;
           let resolvedConfidence = categoryConfidence;
 
+          // Normalize category value
+          const normalizedCategory = (category || "other").toLowerCase().trim();
+
           if (categorySource === "ai") {
             const resolution = await resolveGalleryCategory({
-              candidateCategory: category,
+              candidateCategory: normalizedCategory,
               confidence: categoryConfidence || 0.5,
-              candidateNewCategoryName: category,
+              candidateNewCategoryName: normalizedCategory,
             });
             resolvedCategory = resolution.category;
             resolvedSource = resolution.categorySource;
             resolvedConfidence = resolution.categoryConfidence;
           } else {
+            // Get all dynamic categories
             const dynamicCats =
               await GoldenMondayCategory.find().select("slug");
             const allSlugs = [
               ...BUILT_IN_CATEGORIES,
               ...dynamicCats.map((c) => c.slug),
             ];
-            resolvedCategory = allSlugs.includes(category) ? category : "other";
-          }
 
+            console.log("🔍 [CATEGORY RESOLUTION]");
+            console.log("  - Provided category:", category);
+            console.log("  - Normalized:", normalizedCategory);
+            console.log("  - All valid slugs:", allSlugs);
+
+            // Check if category exists in built-in or dynamic list
+            if (allSlugs.includes(normalizedCategory)) {
+              resolvedCategory = normalizedCategory;
+              console.log("  - ✅ Category matched:", resolvedCategory);
+            } else {
+              // Auto-create the category if it doesn't exist
+              try {
+                console.log("  - ⚠️ Category not found, auto-creating...");
+                const newCategory = new GoldenMondayCategory({
+                  name:
+                    normalizedCategory.charAt(0).toUpperCase() +
+                    normalizedCategory.slice(1),
+                  slug: normalizedCategory,
+                  source: "admin",
+                  createdBy: req.user._id,
+                  createdByName: req.user.name,
+                });
+                await newCategory.save();
+                resolvedCategory = normalizedCategory;
+                console.log("  - ✅ Auto-created category:", resolvedCategory);
+              } catch (catError) {
+                console.warn(
+                  "  - ❌ Could not create category:",
+                  catError.message,
+                );
+                resolvedCategory = "other";
+              }
+            }
+          }
           console.log(`  - Final category: ${resolvedCategory}`);
 
           // ── Upload to Cloudinary ──
