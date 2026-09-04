@@ -1937,14 +1937,16 @@ ${"=".repeat(50)}
               />
               <Field
                 label={tf("endTime", "End Time")}
-                value={form.timeEnd}
-                onChange={() => {}} // Empty onChange to prevent warnings
+                value={form.timeEnd || ""}
+                onChange={() => {}}
                 type="time"
-                disabled={true}
+                readOnly
                 style={{
                   background: "#f3f4f6",
                   cursor: "not-allowed",
                   opacity: 0.8,
+                  pointerEvents: "none",
+                  color: "#6b7280",
                 }}
               />
             </div>
