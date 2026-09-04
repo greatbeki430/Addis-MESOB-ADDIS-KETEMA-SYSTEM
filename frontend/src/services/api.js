@@ -430,6 +430,10 @@ export const goldenMondayAPI = {
       ...formData.keys(),
     ]);
 
+    console.log("🔍 [API] Uploading to /golden-monday/gallery");
+    console.log("🔍 [API] FormData fields:", [...formData.keys()]);
+    console.log("🔍 [API] FormData image file:", formData.get("image"));
+
     return api
       .post("/golden-monday/gallery", formData, {
         timeout: 180000,
