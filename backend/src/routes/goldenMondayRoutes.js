@@ -49,7 +49,8 @@ const {
   galleryUpload,
   SIZE_LIMITS_BYTES,
 } = require("../middleware/galleryUpload");
-const { fileTypeFromBuffer } = require("file-type");
+// const { fileTypeFromBuffer } = require("file-type");
+const fileType = require("file-type");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 const {
@@ -935,7 +936,8 @@ router.post(
           );
 
           // ── Detect file type from buffer ──
-          const fileTypeResult = await fileTypeFromBuffer(file.buffer);
+          // const fileTypeResult = await fileTypeFromBuffer(file.buffer);
+          const fileTypeResult = await fileType.fileTypeFromBuffer(file.buffer);
           const trueMime =
             fileTypeResult?.mime || file.mimetype || "application/octet-stream";
           const trueExt = fileTypeResult?.ext || "bin";
