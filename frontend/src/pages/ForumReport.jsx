@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 // frontend/src/pages/ForumReport.jsx
-// Enhanced Professional Forum Report Page with AI Integration - FIXED
+// Enhanced Professional Forum Report Page with AI Integration - FULLY ENHANCED
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
@@ -43,34 +43,29 @@ import {
   FiSave,
   FiLoader,
   FiChevronDown,
-  FiChevronRight,
   FiCheck,
   FiInfo,
   FiUserCheck as FiUserCheckIcon,
   FiZap,
   FiTrendingUp,
   FiChevronLeft,
+  FiBriefcase,
 } from "react-icons/fi";
 
 // ─── FONT SIZES ──────────────────────────────────────────────
 const FONT_SIZES = {
-  h1: "clamp(18px, 4.5vw, 28px)",
-  h2: "clamp(15px, 3.5vw, 24px)",
+  h1: "clamp(20px, 4.5vw, 32px)",
+  h2: "clamp(16px, 3.5vw, 26px)",
   h3: "clamp(14px, 3vw, 20px)",
-  body: "clamp(11px, 2.8vw, 14px)",
-  small: "clamp(9px, 2.2vw, 12px)",
+  body: "clamp(12px, 2.8vw, 15px)",
+  small: "clamp(10px, 2.2vw, 13px)",
 };
 
 // ─── Team Selector Component ─────────────────────────────────
 const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Translation helper - memoized via useCallback
-  const tf = useCallback(
-    (key, fallback) => t?.(`forum.${key}`) || fallback,
-    [t],
-  );
-
+  const tf = useCallback((key, fallback) => t?.forum?.[key] || fallback, [t]);
   const filteredTeams = teams.filter((team) =>
     team.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
@@ -78,31 +73,33 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
   return (
     <div
       style={{
-        maxWidth: "600px",
+        maxWidth: "700px",
         margin: "0 auto",
-        padding: "clamp(20px, 4vw, 40px)",
+        padding: "clamp(24px, 5vw, 48px)",
+        animation: "fadeInUp 0.6s ease",
       }}
     >
       <div
         style={{
           textAlign: "center",
-          marginBottom: "clamp(24px, 5vw, 32px)",
+          marginBottom: "clamp(28px, 5vw, 40px)",
         }}
       >
         <div
           style={{
-            width: "clamp(50px, 10vw, 80px)",
-            height: "clamp(50px, 10vw, 80px)",
-            background: `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`,
+            width: "clamp(60px, 10vw, 90px)",
+            height: "clamp(60px, 10vw, 90px)",
+            background: `linear-gradient(145deg, ${C.primary}20, ${C.primary}08)`,
             borderRadius: "50%",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            margin: "0 auto 16px",
-            fontSize: "clamp(28px, 7vw, 40px)",
+            margin: "0 auto 18px",
+            fontSize: "clamp(32px, 8vw, 48px)",
+            boxShadow: `0 8px 32px ${C.primary}22`,
           }}
         >
-          <FiMessageSquare size={32} color={C.primary} />
+          <FiMessageSquare size={36} color={C.primary} />
         </div>
         <h2
           style={{
@@ -111,6 +108,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
             color: C.dark,
             fontFamily: F.serif,
             marginBottom: 8,
+            letterSpacing: "-0.02em",
           }}
         >
           {tf("selectTeamPrompt", "Select a Team")}
@@ -120,6 +118,9 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
             fontSize: FONT_SIZES.body,
             color: C.muted,
             fontFamily: F.sans,
+            maxWidth: "500px",
+            margin: "0 auto",
+            lineHeight: 1.6,
           }}
         >
           {tf(
@@ -130,7 +131,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
       </div>
 
       {/* Search Input */}
-      <div style={{ position: "relative", marginBottom: 16 }}>
+      <div style={{ position: "relative", marginBottom: 20 }}>
         <input
           type="text"
           placeholder={tf("searchTeams", "Search teams...")}
@@ -138,53 +139,81 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
             width: "100%",
-            padding: "12px 16px",
-            border: `1.5px solid ${C.border}`,
-            borderRadius: 10,
+            padding: "14px 18px 14px 44px",
+            border: `2px solid ${C.border}`,
+            borderRadius: 12,
             fontSize: 14,
             outline: "none",
-            transition: "border-color 0.2s, box-shadow 0.2s",
+            transition: "all 0.3s ease",
             background: C.white,
+            boxShadow: shadows.sm,
           }}
           onFocus={(e) => {
             e.currentTarget.style.borderColor = C.primary;
-            e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+            e.currentTarget.style.boxShadow = `0 0 0 4px ${C.primary}22, ${shadows.md}`;
           }}
           onBlur={(e) => {
             e.currentTarget.style.borderColor = C.border;
-            e.currentTarget.style.boxShadow = "none";
+            e.currentTarget.style.boxShadow = shadows.sm;
+          }}
+        />
+        <FiUsers
+          size={18}
+          style={{
+            position: "absolute",
+            left: 14,
+            top: "50%",
+            transform: "translateY(-50%)",
+            color: C.muted,
           }}
         />
       </div>
 
       {/* Teams Grid */}
       {loading ? (
-        <div style={{ textAlign: "center", padding: 40, color: C.muted }}>
+        <div
+          style={{
+            textAlign: "center",
+            padding: 60,
+            color: C.muted,
+            background: C.bg,
+            borderRadius: 16,
+          }}
+        >
           <FiLoader
-            size={24}
-            style={{ animation: "spin 1s linear infinite" }}
+            size={32}
+            style={{ animation: "spin 1s linear infinite", marginBottom: 12 }}
+            color={C.primary}
           />
-          <p>{tf("loadingTeams", "Loading teams...")}</p>
+          <p style={{ fontSize: FONT_SIZES.body }}>
+            {tf("loadingTeams", "Loading teams...")}
+          </p>
         </div>
       ) : filteredTeams.length === 0 ? (
         <div
           style={{
             textAlign: "center",
-            padding: 40,
+            padding: 50,
             color: C.muted,
             background: C.bg,
-            borderRadius: 12,
+            borderRadius: 16,
+            border: `2px dashed ${C.border}`,
           }}
         >
-          <FiUsers size={32} style={{ opacity: 0.3, marginBottom: 8 }} />
-          <p>{tf("noTeamsFound", "No teams found")}</p>
+          <FiUsers size={40} style={{ opacity: 0.3, marginBottom: 12 }} />
+          <p style={{ fontSize: FONT_SIZES.body, fontWeight: 500 }}>
+            {tf("noTeamsFound", "No teams found")}
+          </p>
+          <p style={{ fontSize: FONT_SIZES.small, color: C.muted }}>
+            {tf("noTeamsYet", "No teams created yet.")}
+          </p>
         </div>
       ) : (
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))",
-            gap: 12,
+            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+            gap: 14,
           }}
         >
           {filteredTeams.map((team) => (
@@ -192,63 +221,82 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
               key={team.id}
               onClick={() => setSelectedTeam(team)}
               style={{
-                padding: "clamp(12px, 1.8vw, 18px)",
+                padding: "clamp(14px, 2vw, 20px)",
                 background: C.white,
-                borderRadius: 12,
+                borderRadius: 14,
                 border: `2px solid ${selectedTeam?.id === team.id ? C.primary : C.border}44`,
                 cursor: "pointer",
-                transition: "all 0.3s ease",
+                transition: "all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
                 textAlign: "left",
                 boxShadow:
                   selectedTeam?.id === team.id
-                    ? `0 4px 20px ${C.primary}22`
-                    : "0 2px 8px rgba(0,0,0,0.04)",
+                    ? `0 8px 30px ${C.primary}28`
+                    : shadows.sm,
                 transform:
-                  selectedTeam?.id === team.id ? "scale(1.02)" : "scale(1)",
+                  selectedTeam?.id === team.id ? "scale(1.03)" : "scale(1)",
+                position: "relative",
+                overflow: "hidden",
               }}
               onMouseEnter={(e) => {
                 if (selectedTeam?.id !== team.id) {
                   e.currentTarget.style.borderColor = C.primary + "66";
-                  e.currentTarget.style.transform = "translateY(-2px)";
-                  e.currentTarget.style.boxShadow =
-                    "0 4px 16px rgba(0,0,0,0.08)";
+                  e.currentTarget.style.transform = "translateY(-3px)";
+                  e.currentTarget.style.boxShadow = shadows.md;
                 }
               }}
               onMouseLeave={(e) => {
                 if (selectedTeam?.id !== team.id) {
                   e.currentTarget.style.borderColor = C.border + "44";
                   e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow =
-                    "0 2px 8px rgba(0,0,0,0.04)";
+                  e.currentTarget.style.boxShadow = shadows.sm;
                 }
               }}
             >
+              {selectedTeam?.id === team.id && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    right: 0,
+                    background: C.primary,
+                    color: "#fff",
+                    padding: "2px 12px",
+                    fontSize: 9,
+                    fontWeight: 700,
+                    borderRadius: "0 12px 0 12px",
+                    letterSpacing: "0.5px",
+                  }}
+                >
+                  SELECTED
+                </div>
+              )}
               <div
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 10,
+                  gap: 12,
                 }}
               >
                 <div
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: "10px",
-                    background: `linear-gradient(135deg, ${C.primary}15, ${C.primary}08)`,
+                    width: 42,
+                    height: 42,
+                    borderRadius: "12px",
+                    background: `linear-gradient(145deg, ${C.primary}18, ${C.primary}08)`,
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
+                    fontSize: 18,
                   }}
                 >
-                  <FiUsers size={16} color={C.primary} />
+                  <FiUsers size={20} color={C.primary} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
                     style={{
-                      fontWeight: 600,
-                      fontSize: 13,
+                      fontWeight: 700,
+                      fontSize: 14,
                       color: C.dark,
                       whiteSpace: "nowrap",
                       overflow: "hidden",
@@ -259,13 +307,17 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
                   </div>
                   <div
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       color: C.muted,
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
                     }}
                   >
+                    <FiBriefcase size={11} />
                     {team.department || tf("noDepartment", "No department")}
                   </div>
                 </div>
@@ -275,15 +327,15 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
                       background: C.primary,
                       color: "#fff",
                       borderRadius: "50%",
-                      width: 20,
-                      height: 20,
+                      width: 24,
+                      height: 24,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
                     }}
                   >
-                    <FiCheck size={12} />
+                    <FiCheck size={14} />
                   </div>
                 )}
               </div>
@@ -291,6 +343,17 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
           ))}
         </div>
       )}
+
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes fadeInUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };
@@ -308,12 +371,43 @@ const DynamicFieldGroup = ({
   icon,
   maxItems = 20,
   helperText = "",
+  variant = "default",
 }) => {
   const handleAdd = () => {
     if (values.length < maxItems) {
       onAdd();
     }
   };
+
+  const variants = {
+    default: {
+      bg: C.cardBg,
+      border: C.border,
+      hoverBg: "#f0f3ff",
+    },
+    primary: {
+      bg: "#EFF6FF",
+      border: "#BFDBFE",
+      hoverBg: "#DBEAFE",
+    },
+    success: {
+      bg: "#F0FDF4",
+      border: "#86EFAC",
+      hoverBg: "#DCFCE7",
+    },
+    warning: {
+      bg: "#FFFBEB",
+      border: "#FDE68A",
+      hoverBg: "#FEF3C7",
+    },
+    danger: {
+      bg: "#FEF2F2",
+      border: "#FCA5A5",
+      hoverBg: "#FEE2E2",
+    },
+  };
+
+  const style = variants[variant] || variants.default;
 
   return (
     <Section title={title} icon={icon}>
@@ -325,22 +419,42 @@ const DynamicFieldGroup = ({
               display: "flex",
               alignItems: "center",
               gap: "10px",
-              padding: "8px 12px",
-              background: C.cardBg,
-              borderRadius: radius.md,
-              border: `1px solid ${C.border}`,
-              transition: "all 0.2s ease",
-              animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
+              padding: "10px 14px",
+              background: style.bg,
+              borderRadius: radius.lg,
+              border: `1.5px solid ${style.border}`,
+              transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
+              animation: `fadeInUp ${0.15 + idx * 0.05}s ease`,
+              position: "relative",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.borderColor = C.primary;
-              e.currentTarget.style.background = "#f0f3ff";
+              e.currentTarget.style.background = style.hoverBg;
+              e.currentTarget.style.transform = "translateX(4px)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = C.border;
-              e.currentTarget.style.background = C.cardBg;
+              e.currentTarget.style.borderColor = style.border;
+              e.currentTarget.style.background = style.bg;
+              e.currentTarget.style.transform = "translateX(0)";
             }}
           >
+            <div
+              style={{
+                minWidth: 24,
+                height: 24,
+                borderRadius: "50%",
+                background: C.primary,
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 10,
+                fontWeight: 700,
+                flexShrink: 0,
+              }}
+            >
+              {idx + 1}
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               {renderField ? (
                 renderField(value, idx)
@@ -362,17 +476,18 @@ const DynamicFieldGroup = ({
                   ...btn.icon,
                   color: "#dc2626",
                   background: "#fee2e2",
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "6px",
+                  width: "30px",
+                  height: "30px",
+                  borderRadius: "8px",
+                  transition: "all 0.25s ease",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = "#fecaca";
-                  e.currentTarget.style.transform = "scale(1.1)";
+                  e.currentTarget.style.transform = "scale(1.15) rotate(90deg)";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "#fee2e2";
-                  e.currentTarget.style.transform = "scale(1)";
+                  e.currentTarget.style.transform = "scale(1) rotate(0)";
                 }}
               >
                 <FiX size={14} />
@@ -382,17 +497,31 @@ const DynamicFieldGroup = ({
         ))}
       </div>
 
-      {/* "Add Another" button - full width */}
       {values.length < maxItems && (
         <button
           onClick={handleAdd}
           style={{
             ...btn.secondary,
-            padding: "6px 14px",
+            padding: "8px 16px",
             fontSize: "12px",
-            marginTop: "8px",
+            marginTop: "10px",
             width: "100%",
             justifyContent: "center",
+            gap: "6px",
+            borderRadius: radius.lg,
+            borderStyle: "dashed",
+            borderWidth: "2px",
+            transition: "all 0.3s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = C.primary;
+            e.currentTarget.style.background = `${C.primary}08`;
+            e.currentTarget.style.transform = "scale(1.01)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = C.border;
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.transform = "scale(1)";
           }}
         >
           <FiPlus size={14} />
@@ -401,7 +530,7 @@ const DynamicFieldGroup = ({
       )}
 
       {helperText && (
-        <p style={{ ...text.muted, fontSize: "10px", marginTop: "4px" }}>
+        <p style={{ ...text.muted, fontSize: "11px", marginTop: "6px" }}>
           <FiInfo size={12} style={{ marginRight: "4px" }} />
           {helperText}
         </p>
@@ -433,13 +562,20 @@ const StandingAgendasPanel = ({ t }) => {
   return (
     <div
       style={{
-        background: "linear-gradient(135deg, #eef2ff, #e0e7ff)",
-        border: `1px solid ${C.border}`,
-        borderLeft: `4px solid ${C.primary}`,
-        borderRadius: radius.lg,
+        background: `linear-gradient(145deg, ${C.primary}10, ${C.primary}05)`,
+        border: `1.5px solid ${C.primary}30`,
+        borderLeft: `5px solid ${C.primary}`,
+        borderRadius: radius.xl,
         marginBottom: SPACING.lg,
         overflow: "hidden",
-        boxShadow: shadows.sm,
+        boxShadow: shadows.md,
+        transition: "all 0.3s ease",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = shadows.lg;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = shadows.md;
       }}
     >
       <div
@@ -448,20 +584,33 @@ const StandingAgendasPanel = ({ t }) => {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "14px 18px",
+          padding: "16px 20px",
           cursor: "pointer",
           userSelect: "none",
-          transition: "background 0.2s",
+          transition: "all 0.3s ease",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(26,58,173,0.04)";
+          e.currentTarget.style.background = `${C.primary}08`;
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "transparent";
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <FiBookOpen size={18} color={C.primary} />
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: C.primary,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#fff",
+            }}
+          >
+            <FiBookOpen size={16} />
+          </div>
           <span
             style={{
               fontWeight: 700,
@@ -478,40 +627,43 @@ const StandingAgendasPanel = ({ t }) => {
               color: "#fff",
               fontSize: "10px",
               fontWeight: 700,
-              padding: "2px 10px",
+              padding: "2px 12px",
               borderRadius: radius.pill,
             }}
           >
             {agendas.length}
           </span>
         </div>
-        <span style={{ color: C.primary, fontSize: "14px" }}>
-          {collapsed ? (
-            <FiChevronRight size={16} />
-          ) : (
-            <FiChevronDown size={16} />
-          )}
-        </span>
+        <div
+          style={{
+            color: C.primary,
+            fontSize: "14px",
+            transition: "transform 0.3s ease",
+            transform: collapsed ? "rotate(-90deg)" : "rotate(0deg)",
+          }}
+        >
+          <FiChevronDown size={18} />
+        </div>
       </div>
       {!collapsed && (
-        <div style={{ padding: "4px 18px 14px" }}>
+        <div style={{ padding: "4px 20px 18px" }}>
           {agendas.map((agenda, i) => (
             <div
               key={i}
               style={{
                 display: "flex",
                 alignItems: "flex-start",
-                gap: "10px",
-                padding: "6px 0",
+                gap: "12px",
+                padding: "8px 0",
                 borderBottom:
-                  i < agendas.length - 1 ? `1px solid ${C.border}` : "none",
+                  i < agendas.length - 1 ? `1px solid ${C.border}50` : "none",
               }}
             >
               <span
                 style={{
-                  minWidth: "24px",
-                  height: "24px",
-                  background: C.primary,
+                  minWidth: "26px",
+                  height: "26px",
+                  background: `linear-gradient(145deg, ${C.primary}, ${C.light})`,
                   color: "#fff",
                   borderRadius: "50%",
                   display: "flex",
@@ -529,7 +681,7 @@ const StandingAgendasPanel = ({ t }) => {
                   fontSize: FONT_SIZES.body,
                   color: C.dark,
                   fontFamily: F.sans,
-                  lineHeight: 1.5,
+                  lineHeight: 1.6,
                   flex: 1,
                 }}
               >
@@ -544,25 +696,25 @@ const StandingAgendasPanel = ({ t }) => {
 };
 
 // ─── AI Insight Badge ─────────────────────────────────────────
-const AIInsightBadge = ({ type = "info", children }) => {
+const AIInsightBadge = ({ type = "info", children, onClose }) => {
   const styles = {
     info: {
       background: "#EFF6FF",
-      border: "1px solid #BFDBFE",
+      border: "1.5px solid #BFDBFE",
       color: "#1D4ED8",
-      icon: <FiInfo size={14} />,
+      icon: <FiInfo size={16} />,
     },
     success: {
       background: "#F0FDF4",
-      border: "1px solid #86EFAC",
+      border: "1.5px solid #86EFAC",
       color: "#15803D",
-      icon: <FiCheckCircle size={14} />,
+      icon: <FiCheckCircle size={16} />,
     },
     warning: {
       background: "#FFFBEB",
-      border: "1px solid #FDE68A",
+      border: "1.5px solid #FDE68A",
       color: "#92400E",
-      icon: <FiAlertCircle size={14} />,
+      icon: <FiAlertCircle size={16} />,
     },
   };
 
@@ -573,18 +725,38 @@ const AIInsightBadge = ({ type = "info", children }) => {
       style={{
         display: "flex",
         alignItems: "flex-start",
-        gap: "8px",
-        padding: "8px 12px",
+        gap: "10px",
+        padding: "10px 14px",
         borderRadius: radius.md,
         background: style.background,
         border: style.border,
         color: style.color,
-        fontSize: "clamp(10px, 2.5vw, 13px)",
+        fontSize: "clamp(11px, 2.5vw, 14px)",
         marginBottom: SPACING.md,
+        position: "relative",
+        animation: "fadeInUp 0.4s ease",
       }}
     >
       <span style={{ flexShrink: 0, marginTop: "2px" }}>{style.icon}</span>
-      <div>{children}</div>
+      <div style={{ flex: 1 }}>{children}</div>
+      {onClose && (
+        <button
+          onClick={onClose}
+          style={{
+            background: "none",
+            border: "none",
+            color: style.color,
+            cursor: "pointer",
+            padding: "2px",
+            opacity: 0.6,
+            transition: "opacity 0.2s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+          onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.6)}
+        >
+          <FiX size={16} />
+        </button>
+      )}
     </div>
   );
 };
@@ -676,6 +848,7 @@ export default function ForumReport({
   const [focusedField, setFocusedField] = useState(null);
   const [formProgress, setFormProgress] = useState(0);
   const [aiGeneratedContent, setAiGeneratedContent] = useState(null);
+  const [showAIBadge, setShowAIBadge] = useState(true);
 
   const [teams, setTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
@@ -687,6 +860,7 @@ export default function ForumReport({
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
   // ─── Load teams when no team is selected ──────────────────
   useEffect(() => {
     if (!selectedTeam) {
@@ -783,6 +957,7 @@ export default function ForumReport({
     }));
 
     setAiGeneratedContent(formattedText);
+    setShowAIBadge(true);
     showToast(
       tf("aiApplied", "✅ AI suggestion applied to explanation!"),
       "success",
@@ -870,26 +1045,30 @@ export default function ForumReport({
       const formattedContent = formatAIResponse(content);
 
       const fullReport = `
-PEER FORUM MEETING REPORT
-${"=".repeat(40)}
+📋 PEER FORUM MEETING REPORT
+${"=".repeat(50)}
 
-Date: ${form.date}
-Attendees: ${context.attendees.join(", ") || "Not specified"}
+📅 Date: ${form.date}
+👥 Attendees: ${context.attendees.join(", ") || "Not specified"}
 
-TOPICS DISCUSSED:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📌 TOPICS DISCUSSED:
 ${context.topics.map((t, i) => `${i + 1}. ${t}`).join("\n") || "No topics listed"}
 
-DISCUSSION SUMMARY:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+💬 DISCUSSION SUMMARY:
 ${formattedContent || "No summary available"}
 
-GAPS IDENTIFIED:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ GAPS IDENTIFIED:
 ${context.gaps.map((g, i) => `${i + 1}. ${g}`).join("\n") || "No gaps identified"}
 
-AGREEMENTS REACHED:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ AGREEMENTS REACHED:
 ${context.agreements.map((a, i) => `${i + 1}. ${a}`).join("\n") || "No agreements"}
 
-${"=".repeat(40)}
-Generated by AI Assistant • ${new Date().toLocaleString()}
+${"=".repeat(50)}
+🤖 Generated by AI Assistant • ${new Date().toLocaleString()}
       `;
 
       handleApplySuggestion(fullReport);
@@ -969,42 +1148,46 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
   const g3Responsive = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))",
-    gap: "clamp(10px, 2vw, 16px)",
+    gap: "clamp(12px, 2vw, 18px)",
   };
 
   // ─── Submitted State ──────────────────────────────────────
   if (submitted) {
     return (
       <div
-        style={{ maxWidth: "600px", margin: "60px auto", padding: "0 20px" }}
+        style={{
+          maxWidth: "600px",
+          margin: "60px auto",
+          padding: "0 20px",
+          animation: "fadeInUp 0.6s ease",
+        }}
       >
         <div
           style={{
             textAlign: "center",
-            padding: "clamp(30px, 6vw, 60px) clamp(16px, 4vw, 40px)",
+            padding: "clamp(40px, 6vw, 70px) clamp(20px, 4vw, 50px)",
             background: C.white,
             borderRadius: radius.xl,
             boxShadow: shadows.xl,
             border: `1px solid ${C.border}`,
-            animation: "fadeInUp 0.5s ease",
           }}
         >
           <div
             style={{
-              width: "clamp(50px, 12vw, 80px)",
-              height: "clamp(50px, 12vw, 80px)",
-              background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+              width: "clamp(60px, 12vw, 90px)",
+              height: "clamp(60px, 12vw, 90px)",
+              background: `linear-gradient(145deg, ${C.primary}, ${C.light})`,
               borderRadius: "50%",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "clamp(28px, 7vw, 40px)",
+              fontSize: "clamp(32px, 7vw, 48px)",
               color: "#fff",
-              margin: "0 auto 18px",
-              boxShadow: shadows.glow,
+              margin: "0 auto 20px",
+              boxShadow: `0 8px 40px ${C.primary}44`,
             }}
           >
-            <FiCheck size={32} />
+            <FiCheck size={36} />
           </div>
           <h2
             style={{
@@ -1020,7 +1203,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           <p
             style={{
               color: C.muted,
-              marginBottom: 24,
+              marginBottom: 28,
               fontFamily: F.sans,
               fontSize: FONT_SIZES.body,
             }}
@@ -1028,15 +1211,16 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             {tf("savedSub", "Peer Forum report completed successfully.")}
           </p>
 
-          {aiGeneratedContent && (
+          {aiGeneratedContent && showAIBadge && (
             <div
               style={{
                 background: "#EFF6FF",
                 borderRadius: radius.md,
-                padding: "10px 14px",
-                marginBottom: "16px",
+                padding: "12px 16px",
+                marginBottom: "20px",
                 textAlign: "left",
                 border: "1px solid #BFDBFE",
+                animation: "fadeInUp 0.4s ease",
               }}
             >
               <div
@@ -1047,28 +1231,45 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                   marginBottom: "6px",
                 }}
               >
-                <FiZap size={14} color="#1D4ED8" />
+                <FiZap size={16} color="#1D4ED8" />
                 <span
                   style={{
-                    fontSize: "11px",
+                    fontSize: "12px",
                     fontWeight: 600,
                     color: "#1D4ED8",
                   }}
                 >
                   {tf("aiContentApplied", "AI Generated Content Applied")}
                 </span>
+                <button
+                  onClick={() => setShowAIBadge(false)}
+                  style={{
+                    marginLeft: "auto",
+                    background: "none",
+                    border: "none",
+                    color: "#1D4ED8",
+                    cursor: "pointer",
+                    opacity: 0.5,
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = 1)}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = 0.5)}
+                >
+                  <FiX size={14} />
+                </button>
               </div>
               <p
                 style={{
-                  fontSize: "11px",
+                  fontSize: "12px",
                   color: "#1E293B",
                   margin: 0,
                   maxHeight: "80px",
                   overflow: "hidden",
                   textOverflow: "ellipsis",
+                  whiteSpace: "pre-wrap",
                 }}
               >
-                {aiGeneratedContent.substring(0, 150)}...
+                {aiGeneratedContent.substring(0, 200)}
+                {aiGeneratedContent.length > 200 && "..."}
               </p>
             </div>
           )}
@@ -1081,13 +1282,31 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               flexWrap: "wrap",
             }}
           >
-            <button style={btn.primary} onClick={() => setSubmitted(false)}>
-              <FiPlus size={16} />
+            <button
+              style={{
+                ...btn.primary,
+                padding: "12px 28px",
+                gap: "8px",
+              }}
+              onClick={() => setSubmitted(false)}
+            >
+              <FiPlus size={18} />
               {tf("newReport", "New Report")}
+            </button>
+            <button
+              style={{
+                ...btn.secondary,
+                padding: "12px 24px",
+                gap: "8px",
+              }}
+              onClick={handleExport}
+            >
+              <FiDownload size={18} />
+              {tc("export", "Export PDF")}
             </button>
           </div>
 
-          <div style={{ marginTop: "24px", textAlign: "left" }}>
+          <div style={{ marginTop: "28px", textAlign: "left" }}>
             <AISummary
               fetchFn={() =>
                 aiAPI.getMeetingMinutes({
@@ -1123,12 +1342,6 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           t={safeT}
           loading={loadingTeams}
         />
-        <style>{`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
       </div>
     );
   }
@@ -1137,9 +1350,9 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
   return (
     <div
       style={{
-        maxWidth: "1000px",
+        maxWidth: "1100px",
         margin: "0 auto",
-        padding: "clamp(12px, 3vw, 28px) clamp(10px, 3vw, 20px)",
+        padding: "clamp(14px, 3vw, 32px) clamp(12px, 3vw, 24px)",
         animation: "fadeInUp 0.5s ease",
       }}
       ref={formRef}
@@ -1152,9 +1365,9 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           flexWrap: "wrap",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: "clamp(6px, 2vw, 14px)",
-          marginBottom: "clamp(16px, 3.5vw, 28px)",
-          paddingBottom: "clamp(10px, 2.5vw, 16px)",
+          gap: "clamp(8px, 2vw, 16px)",
+          marginBottom: "clamp(18px, 3.5vw, 30px)",
+          paddingBottom: "clamp(12px, 2.5vw, 18px)",
           borderBottom: `2px solid ${C.border}`,
         }}
       >
@@ -1162,25 +1375,25 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "clamp(8px, 2vw, 14px)",
+            gap: "clamp(10px, 2vw, 16px)",
           }}
         >
           <div
             style={{
-              width: "clamp(36px, 7vw, 48px)",
-              height: "clamp(36px, 7vw, 48px)",
-              background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+              width: "clamp(40px, 7vw, 52px)",
+              height: "clamp(40px, 7vw, 52px)",
+              background: `linear-gradient(145deg, ${C.primary}, ${C.light})`,
               borderRadius: radius.lg,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               color: "#fff",
-              fontSize: "clamp(16px, 3vw, 22px)",
-              boxShadow: shadows.glow,
+              fontSize: "clamp(18px, 3vw, 24px)",
+              boxShadow: `0 4px 20px ${C.primary}33`,
               flexShrink: 0,
             }}
           >
-            <FiMessageSquare size={20} />
+            <FiMessageSquare size={22} />
           </div>
           <div>
             <h1
@@ -1191,6 +1404,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 fontFamily: F.serif,
                 margin: 0,
                 lineHeight: 1.2,
+                letterSpacing: "-0.02em",
               }}
             >
               {tf("title", "Peer Forum Report")}
@@ -1214,10 +1428,10 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 margin: "2px 0 0",
                 display: "flex",
                 alignItems: "center",
-                gap: "4px",
+                gap: "6px",
               }}
             >
-              <FiCalendar size={12} />
+              <FiCalendar size={13} />
               {tf(
                 "subtitle",
                 "Addis Ababa City Admin · Addis MESOB · Addis Ketema Center",
@@ -1229,7 +1443,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "clamp(6px, 1.5vw, 12px)",
+            gap: "clamp(8px, 1.5vw, 14px)",
             flexWrap: "wrap",
           }}
         >
@@ -1237,11 +1451,19 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             onClick={() => setSelectedTeam(null)}
             style={{
               ...btn.secondary,
-              padding: "4px 10px",
-              fontSize: "11px",
+              padding: "6px 12px",
+              fontSize: "12px",
+              borderRadius: radius.md,
+              gap: "4px",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-1px)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
             }}
           >
-            <FiChevronLeft size={12} />
+            <FiChevronLeft size={14} />
             {tf("changeTeam", "Change Team")}
           </button>
 
@@ -1249,10 +1471,11 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             style={{
               display: "flex",
               alignItems: "center",
-              gap: "6px",
+              gap: "8px",
               background: C.bg,
-              padding: "3px 10px",
+              padding: "4px 14px 4px 10px",
               borderRadius: radius.pill,
+              border: `1px solid ${C.border}`,
             }}
           >
             <span style={{ fontSize: "10px", color: C.muted, fontWeight: 600 }}>
@@ -1260,8 +1483,8 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
             </span>
             <div
               style={{
-                width: "60px",
-                height: "3px",
+                width: "80px",
+                height: "4px",
                 background: C.border,
                 borderRadius: radius.pill,
                 overflow: "hidden",
@@ -1280,37 +1503,47 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           </div>
           <div
             style={{
-              background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+              background: `linear-gradient(145deg, ${C.primary}, ${C.light})`,
               color: "#fff",
-              padding: "4px 12px",
+              padding: "4px 14px",
               borderRadius: radius.pill,
               fontSize: FONT_SIZES.small,
               fontWeight: 700,
               display: "flex",
               alignItems: "center",
-              gap: "4px",
-              boxShadow: shadows.glow,
+              gap: "6px",
+              boxShadow: `0 2px 12px ${C.primary}33`,
             }}
           >
-            <FiCalendar size={12} />
+            <FiCalendar size={13} />
             {safeYear}
           </div>
         </div>
       </div>
 
+      {aiGeneratedContent && showAIBadge && (
+        <AIInsightBadge type="success" onClose={() => setShowAIBadge(false)}>
+          <strong>🤖 AI Generated Content Applied!</strong>
+          <span
+            style={{ display: "block", fontSize: "12px", marginTop: "2px" }}
+          >
+            {aiGeneratedContent.substring(0, 120)}
+            {aiGeneratedContent.length > 120 && "..."}
+          </span>
+        </AIInsightBadge>
+      )}
+
       <AIInsightBadge type="info">
         <strong>
-          {tf("progressLabel", "Progress")}: {formProgress}%{" "}
-          {tf("complete", "complete")}
+          📊 Progress: {formProgress}% {tf("complete", "complete")}
         </strong>
-        <span style={{ marginLeft: "6px", fontSize: "11px" }}>
-          {formProgress < 30 &&
-            tf("progressStart", "Start filling in the report details below")}
+        <span style={{ marginLeft: "8px", fontSize: "12px" }}>
+          {formProgress < 30 && "🚀 Start filling in the report details below"}
           {formProgress >= 30 &&
             formProgress < 70 &&
-            tf("progressMiddle", "You're making good progress! Keep going.")}
+            "💪 You're making good progress! Keep going."}
           {formProgress >= 70 &&
-            tf("progressEnd", "Almost there! Review and save your report.")}
+            "🎯 Almost there! Review and save your report."}
         </span>
       </AIInsightBadge>
 
@@ -1322,30 +1555,41 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           display: "flex",
           gap: "4px",
           background: "#F1F5F9",
-          borderRadius: "10px",
+          borderRadius: "12px",
           padding: "4px",
-          marginBottom: "clamp(16px, 3vw, 20px)",
+          marginBottom: "clamp(18px, 3vw, 24px)",
+          border: `1px solid ${C.border}50`,
         }}
       >
         <button
           onClick={() => setActiveForumTab("form")}
           style={{
             flex: 1,
-            padding: isMobile ? "6px 12px" : "8px 16px",
-            borderRadius: "8px",
+            padding: isMobile ? "8px 14px" : "10px 20px",
+            borderRadius: "10px",
             border: "none",
             background: activeForumTab === "form" ? "#fff" : "transparent",
             color: activeForumTab === "form" ? "#0F172A" : "#64748B",
             fontWeight: 600,
-            fontSize: isMobile ? "12px" : "13px",
+            fontSize: isMobile ? "12px" : "14px",
             cursor: "pointer",
-            transition: "all 0.2s",
+            transition: "all 0.3s ease",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "6px",
+            gap: "8px",
             boxShadow:
-              activeForumTab === "form" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              activeForumTab === "form" ? `0 2px 8px rgba(0,0,0,0.08)` : "none",
+          }}
+          onMouseEnter={(e) => {
+            if (activeForumTab !== "form") {
+              e.currentTarget.style.color = "#0F172A";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeForumTab !== "form") {
+              e.currentTarget.style.color = "#64748B";
+            }
           }}
         >
           <FiEdit3 size={isMobile ? 14 : 16} />
@@ -1355,21 +1599,31 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           onClick={() => setActiveForumTab("feed")}
           style={{
             flex: 1,
-            padding: isMobile ? "6px 12px" : "8px 16px",
-            borderRadius: "8px",
+            padding: isMobile ? "8px 14px" : "10px 20px",
+            borderRadius: "10px",
             border: "none",
             background: activeForumTab === "feed" ? "#fff" : "transparent",
             color: activeForumTab === "feed" ? "#0F172A" : "#64748B",
             fontWeight: 600,
-            fontSize: isMobile ? "12px" : "13px",
+            fontSize: isMobile ? "12px" : "14px",
             cursor: "pointer",
-            transition: "all 0.2s",
+            transition: "all 0.3s ease",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            gap: "6px",
+            gap: "8px",
             boxShadow:
-              activeForumTab === "feed" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              activeForumTab === "feed" ? `0 2px 8px rgba(0,0,0,0.08)` : "none",
+          }}
+          onMouseEnter={(e) => {
+            if (activeForumTab !== "feed") {
+              e.currentTarget.style.color = "#0F172A";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeForumTab !== "feed") {
+              e.currentTarget.style.color = "#64748B";
+            }
           }}
         >
           <FiMessageSquare size={isMobile ? 14 : 16} />
@@ -1382,17 +1636,17 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
         <div
           style={{
             ...card,
-            padding: "clamp(16px, 3vw, 32px)",
+            padding: "clamp(18px, 3vw, 36px)",
             background: C.white,
             borderRadius: radius.xl,
-            boxShadow: shadows.md,
+            boxShadow: shadows.lg,
             border: `1px solid ${C.border}`,
           }}
         >
           {/* Meeting Time */}
           <Section
             title={tf("meetingTime", "Meeting Time")}
-            icon={<FiCalendar size={16} />}
+            icon={<FiCalendar size={18} />}
           >
             <div style={g3Responsive}>
               <Field
@@ -1419,7 +1673,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           {/* Present Members */}
           <DynamicFieldGroup
             title={tf("presentMembers", "Present Members")}
-            icon={<FiUserCheckIcon size={16} />}
+            icon={<FiUserCheckIcon size={18} />}
             values={form.present}
             onAdd={() => addItem("present", "")}
             onRemove={(idx) => removeItem("present", idx)}
@@ -1444,12 +1698,13 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               "presentHelper",
               "Add all team members who attended the forum meeting",
             )}
+            variant="primary"
           />
 
           {/* Absent Members */}
           <Section
             title={tf("absentMembers", "Absent Members & Reasons")}
-            icon={<FiUserX size={16} />}
+            icon={<FiUserX size={18} />}
           >
             <div
               style={{ display: "flex", flexDirection: "column", gap: "12px" }}
@@ -1458,20 +1713,22 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 <div
                   key={idx}
                   style={{
-                    padding: "12px 14px",
+                    padding: "14px 16px",
                     background: C.cardBg,
-                    border: `1px solid ${C.border}`,
+                    border: `1.5px solid ${C.border}`,
                     borderRadius: radius.lg,
-                    transition: "all 0.2s ease",
+                    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                     animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = C.primary;
                     e.currentTarget.style.background = "#f0f3ff";
+                    e.currentTarget.style.transform = "translateX(4px)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = C.border;
                     e.currentTarget.style.background = C.cardBg;
+                    e.currentTarget.style.transform = "translateX(0)";
                   }}
                 >
                   <div
@@ -1482,17 +1739,17 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                       marginBottom: "8px",
                       display: "flex",
                       alignItems: "center",
-                      gap: "4px",
+                      gap: "6px",
                     }}
                   >
-                    <FiUserX size={12} />
+                    <FiUserX size={14} />
                     {tf("absentMemberLabel", "Absent Member")} #{idx + 1}
                   </div>
                   <div
                     style={{
                       display: "grid",
                       gridTemplateColumns: "1fr 1fr",
-                      gap: "10px",
+                      gap: "12px",
                     }}
                   >
                     <Field
@@ -1519,9 +1776,10 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                         marginTop: "6px",
                         color: "#dc2626",
                         fontSize: "11px",
-                        padding: "3px 6px",
+                        padding: "3px 8px",
                         borderRadius: radius.md,
                         background: "transparent",
+                        transition: "all 0.2s ease",
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = "#fee2e2";
@@ -1530,7 +1788,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                         e.currentTarget.style.background = "transparent";
                       }}
                     >
-                      <FiX size={12} />
+                      <FiX size={14} />
                       {tc("remove", "Remove")}
                     </button>
                   )}
@@ -1541,11 +1799,23 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               onClick={addAbsent}
               style={{
                 ...btn.secondary,
-                padding: "6px 14px",
+                padding: "8px 16px",
                 fontSize: "12px",
-                marginTop: "8px",
+                marginTop: "10px",
                 width: "100%",
                 justifyContent: "center",
+                borderRadius: radius.lg,
+                borderStyle: "dashed",
+                borderWidth: "2px",
+                gap: "6px",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = C.primary;
+                e.currentTarget.style.background = `${C.primary}08`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = C.border;
+                e.currentTarget.style.background = "transparent";
               }}
             >
               <FiPlus size={14} />
@@ -1556,7 +1826,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           {/* Previous Results */}
           <DynamicFieldGroup
             title={tf("prevResults", "Results from Previous Meeting")}
-            icon={<FiFileText size={16} />}
+            icon={<FiFileText size={18} />}
             values={form.prevResults}
             onAdd={() => addItem("prevResults", "")}
             onRemove={(idx) => removeItem("prevResults", idx)}
@@ -1571,12 +1841,13 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               "prevResultHelper",
               "List outcomes and action items from the previous meeting",
             )}
+            variant="warning"
           />
 
           {/* Today's Topics */}
           <DynamicFieldGroup
             title={tf("todayTopics", "Today's Discussion Topics")}
-            icon={<FiMessageSquare size={16} />}
+            icon={<FiMessageSquare size={18} />}
             values={form.topics}
             onAdd={() => addItem("topics", "")}
             onRemove={(idx) => removeItem("topics", idx)}
@@ -1591,30 +1862,31 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               "topicHelper",
               "Enter each discussion topic separately",
             )}
+            variant="primary"
           />
 
           {/* Explanation - Enhanced with AI Actions */}
           <Section
             title={tf("explanation", "Explanation Given (Brief)")}
-            icon={<FiEdit3 size={16} />}
+            icon={<FiEdit3 size={18} />}
           >
             <textarea
               style={{
                 ...inp,
                 resize: "vertical",
-                minHeight: "clamp(80px, 15vw, 120px)",
+                minHeight: "clamp(90px, 15vw, 140px)",
                 fontSize: FONT_SIZES.body,
-                padding: "10px 12px",
+                padding: "12px 14px",
                 borderRadius: radius.md,
-                border: `1.5px solid ${focusedField === "explanation" ? C.primary : C.border}`,
+                border: `2px solid ${focusedField === "explanation" ? C.primary : C.border}`,
                 boxShadow:
                   focusedField === "explanation"
-                    ? `0 0 0 3px ${C.primary}22`
+                    ? `0 0 0 4px ${C.primary}22`
                     : "none",
-                transition: "all 0.2s ease",
+                transition: "all 0.3s ease",
                 width: "100%",
                 fontFamily: F.sans,
-                lineHeight: 1.5,
+                lineHeight: 1.6,
               }}
               rows={4}
               value={form.explanation}
@@ -1626,30 +1898,30 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
 
             <div
               style={{
-                marginTop: "12px",
+                marginTop: "14px",
                 display: "flex",
                 flexWrap: "wrap",
-                gap: "6px",
+                gap: "8px",
                 alignItems: "center",
-                padding: "10px 12px",
+                padding: "12px 16px",
                 background: "#F8FAFC",
                 borderRadius: radius.md,
-                border: `1px solid ${C.border}`,
+                border: `1.5px solid ${C.border}`,
               }}
             >
               <span
                 style={{
-                  fontSize: "10px",
+                  fontSize: "11px",
                   fontWeight: 600,
                   color: C.muted,
                   display: "flex",
                   alignItems: "center",
-                  gap: "4px",
-                  marginRight: "6px",
+                  gap: "6px",
+                  marginRight: "8px",
                   flexShrink: 0,
                 }}
               >
-                <FiZap size={12} color={C.primary} />
+                <FiZap size={14} color={C.primary} />
                 {tf("aiActions", "AI Actions:")}
               </span>
 
@@ -1657,7 +1929,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                 style={{
                   display: "flex",
                   flexWrap: "wrap",
-                  gap: "4px",
+                  gap: "6px",
                   flex: 1,
                   alignItems: "center",
                 }}
@@ -1666,18 +1938,29 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                   onClick={handleGenerateSummary}
                   style={{
                     ...btn.secondary,
-                    padding: "4px 10px",
-                    fontSize: "10px",
+                    padding: "6px 12px",
+                    fontSize: "11px",
                     background: "#EFF6FF",
                     borderColor: "#BFDBFE",
                     color: "#1D4ED8",
                     flex: "1 1 auto",
-                    minWidth: "70px",
+                    minWidth: "80px",
                     justifyContent: "center",
                     whiteSpace: "nowrap",
+                    borderRadius: radius.md,
+                    fontWeight: 600,
+                    transition: "all 0.3s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#DBEAFE";
+                    e.currentTarget.style.transform = "scale(1.02)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#EFF6FF";
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
-                  <FiZap size={11} />
+                  <FiZap size={13} />
                   {tf("generateSummary", "AI Writing Assistant")}
                 </button>
 
@@ -1685,18 +1968,29 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                   onClick={handleGenerateSummary}
                   style={{
                     ...btn.secondary,
-                    padding: "4px 10px",
-                    fontSize: "10px",
+                    padding: "6px 12px",
+                    fontSize: "11px",
                     background: "#F0FDF4",
                     borderColor: "#86EFAC",
                     color: "#15803D",
                     flex: "1 1 auto",
-                    minWidth: "55px",
+                    minWidth: "70px",
                     justifyContent: "center",
                     whiteSpace: "nowrap",
+                    borderRadius: radius.md,
+                    fontWeight: 600,
+                    transition: "all 0.3s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#DCFCE7";
+                    e.currentTarget.style.transform = "scale(1.02)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#F0FDF4";
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
-                  <FiTrendingUp size={11} />
+                  <FiTrendingUp size={13} />
                   {tf("summarize", "Summarize")}
                 </button>
 
@@ -1704,38 +1998,63 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                   onClick={handleGenerateFullReport}
                   style={{
                     ...btn.secondary,
-                    padding: "4px 10px",
-                    fontSize: "10px",
+                    padding: "6px 12px",
+                    fontSize: "11px",
                     background: "#FEF3C7",
                     borderColor: "#FDE68A",
                     color: "#92400E",
                     flex: "1 1 auto",
-                    minWidth: "55px",
+                    minWidth: "70px",
                     justifyContent: "center",
                     whiteSpace: "nowrap",
+                    borderRadius: radius.md,
+                    fontWeight: 600,
+                    transition: "all 0.3s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#FDE68A";
+                    e.currentTarget.style.transform = "scale(1.02)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#FEF3C7";
+                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
-                  <FiBookOpen size={11} />
+                  <FiBookOpen size={13} />
                   {tf("fullReport", "Full Report")}
                 </button>
 
+                {/* ✅ EXPORT BUTTON - Text on Desktop, Icon on Mobile */}
                 <button
                   onClick={handleExport}
                   style={{
                     ...btn.secondary,
-                    padding: "4px 8px",
-                    fontSize: "10px",
+                    padding: isMobile ? "6px 10px" : "6px 14px",
+                    fontSize: isMobile ? "13px" : "11px",
                     background: "#F3E8FF",
                     borderColor: "#D8B4FE",
                     color: "#6D28D9",
-                    flex: "1 1 auto",
-                    minWidth: "36px",
+                    flex: isMobile ? "0 0 auto" : "1 1 auto",
+                    minWidth: isMobile ? "36px" : "60px",
                     justifyContent: "center",
                     whiteSpace: "nowrap",
+                    borderRadius: radius.md,
+                    fontWeight: 600,
+                    transition: "all 0.3s ease",
+                    gap: "4px",
                   }}
-                  title={tc("export", "Export")}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "#EDE9FE";
+                    e.currentTarget.style.transform = "scale(1.02)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#F3E8FF";
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                  title={tc("export", "Export PDF")}
                 >
-                  <FiDownload size={14} />
+                  <FiDownload size={isMobile ? 18 : 14} />
+                  {!isMobile && <span>{tc("export", "Export PDF")}</span>}
                 </button>
               </div>
             </div>
@@ -1744,7 +2063,7 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           {/* Gaps */}
           <DynamicFieldGroup
             title={tf("gaps", "Identified Gaps")}
-            icon={<FiAlertCircle size={16} />}
+            icon={<FiAlertCircle size={18} />}
             values={form.gaps}
             onAdd={() => addItem("gaps", "")}
             onRemove={(idx) => removeItem("gaps", idx)}
@@ -1759,12 +2078,13 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               "gapHelper",
               "Identify gaps or challenges discussed in the forum",
             )}
+            variant="danger"
           />
 
           {/* Agreements */}
           <DynamicFieldGroup
             title={tf("agreements", "Agreed Points")}
-            icon={<FiCheckCircle size={16} />}
+            icon={<FiCheckCircle size={18} />}
             values={form.agreements}
             onAdd={() => addItem("agreements", "")}
             onRemove={(idx) => removeItem("agreements", idx)}
@@ -1779,12 +2099,13 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               "agreementHelper",
               "Document all points of agreement reached",
             )}
+            variant="success"
           />
 
           {/* Signatures */}
           <Section
             title={tf("signatures", "Signatures")}
-            icon={<FiPenTool size={16} />}
+            icon={<FiPenTool size={18} />}
           >
             <div
               style={{ display: "flex", flexDirection: "column", gap: "10px" }}
@@ -1796,18 +2117,22 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                     display: "flex",
                     alignItems: "center",
                     gap: "10px",
-                    padding: "8px 12px",
+                    padding: "10px 14px",
                     background: C.cardBg,
-                    borderRadius: radius.md,
-                    border: `1px solid ${C.border}`,
-                    transition: "all 0.2s ease",
+                    borderRadius: radius.lg,
+                    border: `1.5px solid ${C.border}`,
+                    transition: "all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)",
                     animation: `fadeInUp ${0.2 + idx * 0.05}s ease`,
                   }}
                   onMouseEnter={(e) => {
                     e.currentTarget.style.borderColor = C.primary;
+                    e.currentTarget.style.background = "#f0f3ff";
+                    e.currentTarget.style.transform = "translateX(4px)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = C.border;
+                    e.currentTarget.style.background = C.cardBg;
+                    e.currentTarget.style.transform = "translateX(0)";
                   }}
                 >
                   <div style={{ flex: 1 }}>
@@ -1829,17 +2154,19 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
                         ...btn.icon,
                         color: "#dc2626",
                         background: "#fee2e2",
-                        width: "28px",
-                        height: "28px",
-                        borderRadius: "6px",
+                        width: "30px",
+                        height: "30px",
+                        borderRadius: "8px",
+                        transition: "all 0.25s ease",
                       }}
                       onMouseEnter={(e) => {
                         e.currentTarget.style.background = "#fecaca";
-                        e.currentTarget.style.transform = "scale(1.1)";
+                        e.currentTarget.style.transform =
+                          "scale(1.15) rotate(90deg)";
                       }}
                       onMouseLeave={(e) => {
                         e.currentTarget.style.background = "#fee2e2";
-                        e.currentTarget.style.transform = "scale(1)";
+                        e.currentTarget.style.transform = "scale(1) rotate(0)";
                       }}
                     >
                       <FiX size={14} />
@@ -1852,11 +2179,23 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
               onClick={() => addItem("signatures", "")}
               style={{
                 ...btn.secondary,
-                padding: "6px 14px",
+                padding: "8px 16px",
                 fontSize: "12px",
-                marginTop: "8px",
+                marginTop: "10px",
                 width: "100%",
                 justifyContent: "center",
+                borderRadius: radius.lg,
+                borderStyle: "dashed",
+                borderWidth: "2px",
+                gap: "6px",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = C.primary;
+                e.currentTarget.style.background = `${C.primary}08`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = C.border;
+                e.currentTarget.style.background = "transparent";
               }}
             >
               <FiPlus size={14} />
@@ -1868,62 +2207,83 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           <div
             style={{
               display: "flex",
-              flexDirection: "row",
+              flexDirection: isMobile ? "column" : "row",
               gap: "clamp(10px, 2vw, 16px)",
               justifyContent: "center",
-              marginTop: "clamp(20px, 4vw, 32px)",
-              paddingTop: "clamp(14px, 3vw, 20px)",
+              marginTop: "clamp(24px, 4vw, 36px)",
+              paddingTop: "clamp(16px, 3vw, 24px)",
               borderTop: `2px solid ${C.border}`,
             }}
           >
+            {/* ✅ EXPORT BUTTON - Text on Desktop, Icon on Mobile */}
             <button
               style={{
                 ...btn.danger,
-                flex: 1,
+                flex: isMobile ? "1" : "0.5",
                 justifyContent: "center",
-                padding: "clamp(8px, 2vw, 14px) clamp(16px, 4vw, 32px)",
-                fontSize: FONT_SIZES.body,
+                padding: isMobile
+                  ? "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 20px)"
+                  : "clamp(10px, 2vw, 14px) clamp(20px, 4vw, 36px)",
+                fontSize: isMobile ? "13px" : FONT_SIZES.body,
                 minWidth: 0,
+                gap: "6px",
+                borderRadius: radius.lg,
+                transition: "all 0.3s ease",
               }}
               onClick={handleExport}
               onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
+                e.currentTarget.style.transform = "translateY(-3px)";
                 e.currentTarget.style.boxShadow =
-                  "0 6px 20px rgba(220,38,38,0.3)";
+                  "0 8px 25px rgba(220,38,38,0.35)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
                 e.currentTarget.style.boxShadow = "none";
               }}
-              title={tc("export", "Export")}
+              title={tc("export", "Export PDF")}
             >
-              <FiDownload size={18} />
+              <FiDownload size={isMobile ? 20 : 18} />
+              {!isMobile && <span>{tc("export", "Export PDF")}</span>}
+              {isMobile && <span style={{ fontSize: "10px" }}>PDF</span>}
             </button>
 
             <button
               style={{
                 ...btn.primary,
-                flex: 1,
+                flex: isMobile ? "1" : "1",
                 justifyContent: "center",
-                padding: "clamp(8px, 2vw, 14px) clamp(16px, 4vw, 32px)",
+                padding: "clamp(10px, 2vw, 14px) clamp(16px, 4vw, 32px)",
                 fontSize: FONT_SIZES.body,
                 opacity: saving ? 0.7 : 1,
                 cursor: saving ? "not-allowed" : "pointer",
+                borderRadius: radius.lg,
+                gap: "8px",
+                transition: "all 0.3s ease",
               }}
               onClick={handleSaveReport}
               disabled={saving}
+              onMouseEnter={(e) => {
+                if (!saving) {
+                  e.currentTarget.style.transform = "translateY(-3px)";
+                  e.currentTarget.style.boxShadow = `0 8px 25px ${C.primary}44`;
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = "none";
+              }}
             >
               {saving ? (
                 <>
                   <FiLoader
-                    size={16}
+                    size={18}
                     style={{ animation: "spin 1s linear infinite" }}
                   />
                   {tc("saving", "Saving...")}
                 </>
               ) : (
                 <>
-                  <FiSave size={16} />
+                  <FiSave size={18} />
                   {tf("save", "Save Report")}
                 </>
               )}
@@ -1941,8 +2301,12 @@ Generated by AI Assistant • ${new Date().toLocaleString()}
           100% { transform: rotate(360deg); }
         }
         @keyframes fadeInUp {
-          from { opacity: 0; transform: translateY(20px); }
+          from { opacity: 0; transform: translateY(30px); }
           to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
         }
       `}</style>
     </div>
