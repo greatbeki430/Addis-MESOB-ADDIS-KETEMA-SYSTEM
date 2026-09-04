@@ -1675,22 +1675,6 @@ ${"=".repeat(50)}
         />
       </div>
 
-      {/* ─── Timer Display ─────────────────────────────────────── */}
-      <div style={{ marginBottom: "16px" }}>
-        <MeetingTimer
-          timeRemaining={timeRemaining}
-          formattedTime={formattedTime}
-          progressPercent={progressPercent}
-          status={status}
-          isExpired={isExpired}
-          progressSaved={progressSaved}
-          warningMessage={warningMessage}
-          onExtend={() => setShowExpiredModal(true)}
-          isAdmin={isAdmin}
-          onResume={handleResumeReport}
-        />
-      </div>
-
       {/* ─── Locked/Extension Status Badge ─────────────────────── */}
       {(isReportLocked || extensionRequested) && (
         <div
