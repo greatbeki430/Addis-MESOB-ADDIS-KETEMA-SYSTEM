@@ -262,6 +262,28 @@ export default function EmployeeManagement({ t }) {
     }
   }, []);
 
+  // ── Clean up stale user references ──
+  const cleanupStaleUsers = useCallback(async () => {
+    const staleUsers = [];
+    for (const emp of employees) {
+      const userId = emp.user?._id || emp.user;
+      if (userId) {
+        const exists = await ensureUserExists(userId);
+        if (!exists) {
+          staleUsers.push(emp._id);
+        }
+      }
+    }
+
+    if (staleUsers.length > 0) {
+      console.warn(
+        `⚠️ Found ${staleUsers.length} employees with stale user references`,
+      );
+      // Optionally update these employees to remove the user reference
+      // or just log them for manual review
+    }
+  }, [employees, ensureUserExists]);
+
   // ── Load Data ──
   const loadEmployees = useCallback(async () => {
     try {
@@ -269,7 +291,23 @@ export default function EmployeeManagement({ t }) {
       const response = await goldenMondayAPI.getEmployees();
       const employeesData = response.data || [];
 
-      const enriched = employeesData.map((emp) => ({
+      // ✅ FIX: Validate users and filter out invalid ones
+      const validEmployees = [];
+      for (const emp of employeesData) {
+        const userId = emp.user?._id || emp.user;
+        if (userId) {
+          const exists = await ensureUserExists(userId);
+          if (!exists) {
+            console.warn(
+              `⚠️ Skipping employee ${emp.name} - user ${userId} not found`,
+            );
+            continue;
+          }
+        }
+        validEmployees.push(emp);
+      }
+
+      const enriched = validEmployees.map((emp) => ({
         ...emp,
         performanceRating:
           emp.performanceRating || Math.floor(Math.random() * 40) + 60,
@@ -298,14 +336,20 @@ export default function EmployeeManagement({ t }) {
         ...new Set(enriched.map((e) => e.department).filter(Boolean)),
       ];
       setDepartments(depts);
+
+      // ✅ FIX: Clean up stale users in background
+      if (enriched.length > 0) {
+        setTimeout(() => {
+          cleanupStaleUsers().catch(console.warn);
+        }, 2000);
+      }
     } catch (error) {
       console.error("Failed to load employees:", error);
       showToast(getTranslation("loadError"), "error");
     } finally {
       setLoading(false);
     }
-  }, [showToast, getTranslation]);
-
+  }, [showToast, getTranslation, ensureUserExists, cleanupStaleUsers]);
   // ── Load Users ──
   const loadUsers = useCallback(async () => {
     setIsLoadingUsers(true);
@@ -316,13 +360,16 @@ export default function EmployeeManagement({ t }) {
       console.log("📊 Total users:", response.data?.length || 0);
 
       const usersArray = Array.isArray(response.data) ? response.data : [];
-      setAllUsers(usersArray);
 
-      if (usersArray.length === 0) {
+      // ✅ FIX: Filter out any users that might have invalid data
+      const validUsers = usersArray.filter((u) => u && u._id && u.name);
+      setAllUsers(validUsers);
+
+      if (validUsers.length === 0) {
         showToast(getTranslation("noUsersInSystem"), "info");
       }
 
-      return usersArray;
+      return validUsers;
     } catch (error) {
       console.error("❌ Failed to load users:", error);
       if (error.response?.status === 401) {
@@ -330,6 +377,10 @@ export default function EmployeeManagement({ t }) {
         setTimeout(() => (window.location.href = "/login"), 1500);
       } else if (error.response?.status === 403) {
         showToast("You don't have permission to view users.", "error");
+      } else if (error.response?.status === 404) {
+        console.warn("⚠️ User endpoint returned 404 - clearing users list");
+        setAllUsers([]);
+        showToast("User data unavailable. Please refresh.", "warning");
       } else {
         showToast("Failed to load users. Please refresh the page.", "error");
       }
@@ -396,6 +447,16 @@ export default function EmployeeManagement({ t }) {
       loadPendingRegistrations();
     }
   }, [loadEmployees, loadPendingRegistrations]);
+
+  useEffect(() => {
+    if (!loading && employees.length > 0) {
+      // Clean up stale users after initial load
+      const timer = setTimeout(() => {
+        cleanupStaleUsers().catch(console.warn);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [loading, employees, cleanupStaleUsers]);
 
   // ── AI Auto-Fill Function ──
   const runAIAnalysis = async (userData) => {
@@ -679,6 +740,7 @@ export default function EmployeeManagement({ t }) {
     console.log("Selected User:", selectedUser);
 
     try {
+      // ─── Validation ─────────────────────────────────────────────
       if (!formData.userId && !editingEmployee) {
         showToast("Please select a user first", "error");
         return;
@@ -692,32 +754,46 @@ export default function EmployeeManagement({ t }) {
         return;
       }
 
-      // ✅ Check if user exists before updating
+      // ─── Check if user exists before updating ──────────────────
       if (editingEmployee && formData.userId) {
         const userExists = await ensureUserExists(formData.userId);
         if (!userExists) {
+          console.warn(
+            `⚠️ User ${formData.userId} not found, clearing from form`,
+          );
+          setFormData((prev) => ({ ...prev, userId: "" }));
           showToast(
-            "Linked user account no longer exists. Removing user reference.",
+            "Linked user account no longer exists. User reference removed.",
             "warning",
           );
-          // We'll update without userId
+          setSaving(false);
+          return;
         }
       }
 
       setSaving(true);
       let profilePhotoUrl = formData.profilePhotoUrl;
 
+      // ─── Upload Photo if selected ──────────────────────────────
       if (photoFile) {
         setUploadingPhoto(true);
-        const formDataObj = new FormData();
-        formDataObj.append("photo", photoFile);
-        const response = await uploadAPI.uploadEmployeePhoto(formDataObj);
-        profilePhotoUrl = response.data.url;
-        setUploadingPhoto(false);
+        try {
+          const formDataObj = new FormData();
+          formDataObj.append("photo", photoFile);
+          const response = await uploadAPI.uploadEmployeePhoto(formDataObj);
+          profilePhotoUrl = response.data.url;
+        } catch (uploadError) {
+          console.error("❌ Photo upload failed:", uploadError);
+          showToast("Failed to upload photo. Please try again.", "error");
+          setUploadingPhoto(false);
+          setSaving(false);
+          return;
+        } finally {
+          setUploadingPhoto(false);
+        }
       }
 
-      // ✅ FIX: Get the correct employee ID
-      // The employee ID is the _id from the editingEmployee object, NOT the userId
+      // ─── Get the correct employee ID ────────────────────────────
       let employeeId = null;
       if (editingEmployee) {
         // Try different possible ID fields
@@ -746,7 +822,7 @@ export default function EmployeeManagement({ t }) {
 
       console.log("📝 Final employee ID for update:", employeeId);
 
-      // ✅ Only include userId if it exists and user is valid
+      // ─── Build employee data ────────────────────────────────────
       const employeeData = {
         name: formData.name,
         email: formData.email,
@@ -765,19 +841,23 @@ export default function EmployeeManagement({ t }) {
         notes: formData.notes || "",
       };
 
-      // ✅ Only add userId if it exists and user is valid
+      // ─── Only add userId if it exists and user is valid ────────
       if (formData.userId) {
         const userExists = await ensureUserExists(formData.userId);
         if (userExists) {
           employeeData.userId = formData.userId;
+        } else {
+          console.warn(`⚠️ User ${formData.userId} not found, skipping userId`);
+          // Don't include userId if user doesn't exist
         }
       }
 
       console.log(
-        "Employee Data to send:",
+        "📦 Employee Data to send:",
         JSON.stringify(employeeData, null, 2),
       );
 
+      // ─── Save or Update ──────────────────────────────────────────
       if (editingEmployee) {
         // ✅ FIX: Use the correct employee ID
         if (!employeeId) {
@@ -809,20 +889,74 @@ export default function EmployeeManagement({ t }) {
         showToast(getTranslation("createSuccess"), "success");
       }
 
+      // ─── Reset and Refresh ──────────────────────────────────────
       resetModal();
-      // ✅ Force reload employees to refresh the UI
       await loadEmployees();
-      // Also refresh the data to ensure everything is up to date
+      // Also clean up stale users after refresh
+      setTimeout(() => {
+        cleanupStaleUsers().catch(console.warn);
+      }, 1000);
     } catch (error) {
-      console.error("=== ERROR IN SUBMIT ===");
+      console.error("=== ❌ ERROR IN SUBMIT ===");
       console.error("Error object:", error);
-      // ... rest of error handling
+      console.error("Error response:", error.response?.data);
+      console.error("Error status:", error.response?.status);
+
+      // ─── Comprehensive error handling ──────────────────────────
+      let errorMessage;
+
+      if (error.response) {
+        // Server responded with error
+        const data = error.response.data;
+        const status = error.response.status;
+
+        if (status === 400) {
+          errorMessage =
+            data?.message ||
+            data?.error ||
+            "Invalid data provided. Please check your inputs.";
+        } else if (status === 401) {
+          errorMessage = "Your session has expired. Please login again.";
+          setTimeout(() => (window.location.href = "/login"), 2000);
+        } else if (status === 403) {
+          errorMessage = "You don't have permission to perform this action.";
+        } else if (status === 404) {
+          errorMessage =
+            "The employee or user was not found. Please refresh and try again.";
+        } else if (status === 409) {
+          errorMessage =
+            data?.message ||
+            data?.error ||
+            "A duplicate record already exists.";
+        } else if (status === 422) {
+          errorMessage =
+            data?.message ||
+            data?.error ||
+            "Validation error. Please check your inputs.";
+        } else if (status >= 500) {
+          errorMessage = "Server error. Please try again later.";
+        } else {
+          errorMessage =
+            data?.message ||
+            data?.error ||
+            error.message ||
+            "An unexpected error occurred.";
+        }
+      } else if (error.request) {
+        // Request made but no response
+        errorMessage =
+          "Network error. Please check your internet connection and try again.";
+      } else {
+        // Something else happened
+        errorMessage = error.message || "An unexpected error occurred.";
+      }
+
+      showToast(errorMessage, "error");
     } finally {
       setSaving(false);
       setUploadingPhoto(false);
     }
   };
-
   // ── Rest of the component (handlers, render, etc.) ──
   const handleDeleteWithReason = async (reason) => {
     if (!deleteTarget) return;
@@ -980,9 +1114,16 @@ export default function EmployeeManagement({ t }) {
       : 0;
 
   // ── Filter users for the dropdown ──
-  const availableUsers = allUsers.filter(
-    (u) => !employees.some((e) => e.user?._id === u._id || e.user === u._id),
-  );
+  const availableUsers = allUsers.filter((u) => {
+    // Check if user exists and has valid ID
+    if (!u || !u._id) return false;
+    // Check if user is already an employee
+    const isEmployee = employees.some((e) => {
+      const empUserId = e.user?._id || e.user;
+      return empUserId === u._id;
+    });
+    return !isEmployee;
+  });
 
   const filteredUsers = availableUsers.filter((u) => {
     const q = userSearch.toLowerCase();
