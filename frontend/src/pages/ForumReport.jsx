@@ -35,7 +35,7 @@ import MeetingTimer from "../components/forum-report/MeetingTimer";
 import TimeExpiredModal from "../components/forum-report/TimeExpiredModal";
 import AutoSaveIndicator from "../components/forum-report/AutoSaveIndicator";
 import { forumReportService } from "../services/forumReportService";
-import SignatureCanvas from "../components/forum-report/SignatureCanvas";
+import SignatureModal from "../components/forum-report/SignatureModal";
 
 // ✅ React Icons
 import {
@@ -889,6 +889,12 @@ export default function ForumReport({
   const [lastAutoSaveTime, setLastAutoSaveTime] = useState(null);
   const [savedProgressId, setSavedProgressId] = useState(null);
   const [extensionRequested, setExtensionRequested] = useState(false);
+  // ─── Signature Modal State ──────────────────────────────────
+  const [signatureModal, setSignatureModal] = useState({
+    isOpen: false,
+    index: null,
+    value: null,
+  });
 
   const isAdmin = isAdminOrAbove(user);
 
@@ -1946,7 +1952,6 @@ ${"=".repeat(50)}
                   background: "#f3f4f6",
                   cursor: "not-allowed",
                   opacity: 0.8,
-                  pointerEvents: "none",
                   color: "#6b7280",
                 }}
               />
@@ -2385,7 +2390,7 @@ ${"=".repeat(50)}
             variant="success"
           />
 
-          {/* Signatures - Using SignatureCanvas */}
+          {/* Signatures - With Modal */}
           <Section
             title={tf("signatures", "Signatures")}
             icon={<FiPenTool size={18} />}
@@ -2393,20 +2398,46 @@ ${"=".repeat(50)}
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-                gap: "16px",
+                gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+                gap: "12px",
               }}
             >
               {form.signatures.map((sig, idx) => (
                 <div
                   key={idx}
                   style={{
-                    padding: "14px 16px",
+                    padding: "12px 14px",
                     background: C.cardBg,
                     borderRadius: radius.lg,
                     border: `1.5px solid ${sig ? C.primary : C.border}`,
                     transition: "all 0.3s ease",
+                    cursor: "pointer",
                     position: "relative",
+                  }}
+                  onClick={() => {
+                    if (!isReportLocked) {
+                      setSignatureModal({
+                        isOpen: true,
+                        index: idx,
+                        value: sig,
+                      });
+                    }
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isReportLocked) {
+                      e.currentTarget.style.borderColor = C.primary;
+                      e.currentTarget.style.background = `${C.primary}05`;
+                      e.currentTarget.style.transform = "translateY(-2px)";
+                      e.currentTarget.style.boxShadow = shadows.sm;
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = sig
+                      ? C.primary
+                      : C.border;
+                    e.currentTarget.style.background = C.cardBg;
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "none";
                   }}
                 >
                   <div
@@ -2414,39 +2445,42 @@ ${"=".repeat(50)}
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "space-between",
-                      marginBottom: 8,
+                      marginBottom: 4,
                     }}
                   >
                     <span
                       style={{
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: 600,
                         color: sig ? C.primary : C.muted,
                         display: "flex",
                         alignItems: "center",
-                        gap: 6,
+                        gap: 4,
                       }}
                     >
-                      <FiPenTool size={14} />
+                      <FiPenTool size={12} />
                       {`${idx + 1}${tf("signatureN", " Signature")}`}
-                      {sig && <FiCheck size={14} color="#10b981" />}
                     </span>
+                    {sig && <FiCheck size={14} color="#10b981" />}
                     {form.signatures.length > 1 && (
                       <button
-                        onClick={() => removeItem("signatures", idx)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeItem("signatures", idx);
+                        }}
                         style={{
                           ...btn.icon,
                           color: "#dc2626",
                           background: "#fee2e2",
-                          width: "28px",
-                          height: "28px",
+                          width: "24px",
+                          height: "24px",
                           borderRadius: "6px",
                           transition: "all 0.25s ease",
                         }}
                         onMouseEnter={(e) => {
                           e.currentTarget.style.background = "#fecaca";
                           e.currentTarget.style.transform =
-                            "scale(1.15) rotate(90deg)";
+                            "scale(1.1) rotate(90deg)";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.background = "#fee2e2";
@@ -2454,31 +2488,74 @@ ${"=".repeat(50)}
                             "scale(1) rotate(0)";
                         }}
                       >
-                        <FiX size={14} />
+                        <FiX size={12} />
                       </button>
                     )}
                   </div>
 
-                  <SignatureCanvas
-                    value={sig}
-                    onSave={(dataUrl) => {
-                      const updated = [...form.signatures];
-                      updated[idx] = dataUrl;
-                      setForm((prev) => ({ ...prev, signatures: updated }));
-                    }}
-                    height={80}
-                    width={300}
-                    readOnly={isReportLocked}
-                    label=""
-                    t={tf}
-                    showTypeInput={true}
-                  />
+                  {/* Signature preview */}
+                  {sig ? (
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "50px",
+                        background: "#fff",
+                        borderRadius: 6,
+                        border: `1px solid ${C.border}`,
+                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <img
+                        src={sig}
+                        alt={`Signature ${idx + 1}`}
+                        style={{
+                          maxWidth: "100%",
+                          maxHeight: "100%",
+                          objectFit: "contain",
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        width: "100%",
+                        height: "50px",
+                        background: "#f9fafb",
+                        borderRadius: 6,
+                        border: `1px dashed ${C.border}`,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 11,
+                        color: C.muted,
+                      }}
+                    >
+                      {isReportLocked ? "🔒 Locked" : "Click to sign"}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
 
             <button
-              onClick={() => addItem("signatures", "")}
+              onClick={() => {
+                if (!isReportLocked) {
+                  const newIndex = form.signatures.length;
+                  setForm((prev) => ({
+                    ...prev,
+                    signatures: [...prev.signatures, ""],
+                  }));
+                  setSignatureModal({
+                    isOpen: true,
+                    index: newIndex,
+                    value: null,
+                  });
+                }
+              }}
+              disabled={isReportLocked}
               style={{
                 ...btn.secondary,
                 padding: "8px 16px",
@@ -2490,10 +2567,14 @@ ${"=".repeat(50)}
                 borderStyle: "dashed",
                 borderWidth: "2px",
                 gap: "6px",
+                opacity: isReportLocked ? 0.5 : 1,
+                cursor: isReportLocked ? "not-allowed" : "pointer",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = C.primary;
-                e.currentTarget.style.background = `${C.primary}08`;
+                if (!isReportLocked) {
+                  e.currentTarget.style.borderColor = C.primary;
+                  e.currentTarget.style.background = `${C.primary}08`;
+                }
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = C.border;
@@ -2624,6 +2705,25 @@ ${"=".repeat(50)}
           50% { transform: scale(1.05); }
         }
       `}</style>
+      {/* ─── Signature Modal ──────────────────────────────────────── */}
+      <SignatureModal
+        isOpen={signatureModal.isOpen}
+        onClose={() =>
+          setSignatureModal({ isOpen: false, index: null, value: null })
+        }
+        onConfirm={(dataUrl) => {
+          const updated = [...form.signatures];
+          updated[signatureModal.index] = dataUrl;
+          setForm((prev) => ({ ...prev, signatures: updated }));
+          setSignatureModal({ isOpen: false, index: null, value: null });
+        }}
+        initialSignature={signatureModal.value}
+        title={tf("signatureModalTitle", "Sign Your Report")}
+        subtitle={`${tf("signatureN", "Signature")} ${(signatureModal.index || 0) + 1}`}
+        userName={user?.name || ""}
+        teamName={selectedTeam?.name || ""}
+        t={tf}
+      />
     </div>
   );
 }
