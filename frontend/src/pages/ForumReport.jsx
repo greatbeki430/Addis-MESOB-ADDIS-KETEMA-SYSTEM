@@ -1934,15 +1934,14 @@ ${"=".repeat(50)}
                   }
                 }}
                 type="time"
-                style={{ width: "100%" }}
               />
               <Field
                 label={tf("endTime", "End Time")}
                 value={form.timeEnd}
+                onChange={() => {}} // Empty onChange to prevent warnings
                 type="time"
-                readOnly
+                disabled={true}
                 style={{
-                  width: "100%",
                   background: "#f3f4f6",
                   cursor: "not-allowed",
                   opacity: 0.8,
