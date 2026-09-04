@@ -69,35 +69,52 @@ export default function PresenterSpotlight({ onRefresh }) {
     try {
       const response = await goldenMondayAPI.getNextPresenter();
       if (!isMounted.current) return;
-      setPresenter(response.data);
 
-      // ✅ FIX: Only fetch user details if we have a valid _id
-      if (response.data && response.data._id) {
-        try {
-          const detailRes = await goldenMondayAPI.getUserDetails(
-            response.data._id,
-          );
-          if (!isMounted.current) return;
-          if (detailRes.data) {
-            setPresenter((prev) => ({
-              ...prev,
-              ...detailRes.data,
-            }));
-          }
-        } catch (detailErr) {
-          // ✅ FIX: Handle 404 gracefully
-          if (detailErr.response?.status === 404) {
-            console.warn(
-              `⚠️ User ${response.data._id} not found - using base presenter data`,
+      // ✅ Check if we have valid presenter data
+      if (response.data && response.data.name) {
+        setPresenter(response.data);
+
+        // ✅ Only fetch user details if we have a valid _id
+        if (response.data._id) {
+          try {
+            const detailRes = await goldenMondayAPI.getUserDetails(
+              response.data._id,
             );
-            // Keep the presenter data we already have
-          } else {
-            console.warn("Could not fetch presenter user details:", detailErr);
+            if (!isMounted.current) return;
+
+            // ✅ Only update if we got valid data back
+            if (detailRes.data && detailRes.data._id) {
+              setPresenter((prev) => ({
+                ...prev,
+                ...detailRes.data,
+              }));
+            } else {
+              // User not found - use the presenter data we already have
+              console.warn(
+                `⚠️ User ${response.data._id} not found - using base presenter data`,
+              );
+            }
+          } catch (detailErr) {
+            // Silently handle 404 - keep the presenter data
+            if (detailErr.response?.status === 404) {
+              console.warn(
+                `⚠️ User ${response.data._id} not found - using base presenter data`,
+              );
+            } else {
+              console.warn(
+                "Could not fetch presenter user details:",
+                detailErr,
+              );
+            }
           }
         }
+      } else {
+        // No presenter data - clear the presenter
+        setPresenter(null);
       }
     } catch (error) {
       console.error("Failed to load presenter:", error);
+      setPresenter(null);
     } finally {
       if (isMounted.current) {
         setLoading(false);
