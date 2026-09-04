@@ -1878,7 +1878,22 @@ ${"=".repeat(50)}
               <Field
                 label={tf("startTime", "Start Time")}
                 value={form.timeStart}
-                onChange={(v) => upd("timeStart", v)}
+                onChange={(v) => {
+                  upd("timeStart", v);
+                  // Auto-calculate end time when start time is set
+                  if (v) {
+                    const [hours, minutes] = v.split(":").map(Number);
+                    const date = new Date();
+                    date.setHours(hours, minutes, 0, 0);
+                    date.setMinutes(date.getMinutes() + 30); // Add 30 minutes
+                    const endHours = String(date.getHours()).padStart(2, "0");
+                    const endMinutes = String(date.getMinutes()).padStart(
+                      2,
+                      "0",
+                    );
+                    upd("timeEnd", `${endHours}:${endMinutes}`);
+                  }
+                }}
                 type="time"
               />
               <Field
@@ -1886,6 +1901,12 @@ ${"=".repeat(50)}
                 value={form.timeEnd}
                 onChange={(v) => upd("timeEnd", v)}
                 type="time"
+                readOnly
+                style={{
+                  background: "#f3f4f6",
+                  cursor: "not-allowed",
+                  opacity: 0.8,
+                }}
               />
             </div>
           </Section>
