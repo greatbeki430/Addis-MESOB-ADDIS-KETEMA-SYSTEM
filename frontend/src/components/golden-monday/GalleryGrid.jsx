@@ -520,16 +520,9 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               detectedCategory = "other";
             }
           }
-
           const formData = new FormData();
           // Use the original file directly!
           formData.append("image", file, file.name);
-          formData.append("folderId", folderId);
-          formData.append("category", detectedCategory);
-          if (sessionId) formData.append("sessionId", sessionId);
-          formData.append("lang", language);
-
-          console.log(`📤 Uploading ${file.name} to folder ${folderId}`);
           formData.append("folderId", folderId);
           formData.append("category", detectedCategory);
           if (sessionId) formData.append("sessionId", sessionId);
