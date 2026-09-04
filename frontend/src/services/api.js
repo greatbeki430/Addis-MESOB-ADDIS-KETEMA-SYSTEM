@@ -133,12 +133,40 @@ export const notificationAPI = {
 // MEETINGS API (Forum Reports)
 // ============================================================
 export const meetingAPI = {
+  // ─── Basic CRUD ────────────────────────────────────────────
   create: (data) => api.post("/meetings", data),
-  getAll: () => api.get("/meetings"),
+  getAll: (params = {}) => api.get("/meetings", { params }),
   getById: (id) => api.get(`/meetings/${id}`),
   getByTeam: (teamId) => api.get(`/meetings/team/${teamId}`),
   update: (id, data) => api.put(`/meetings/${id}`, data),
   delete: (id) => api.delete(`/meetings/${id}`),
+
+  // ─── NEW: Auto-Save ────────────────────────────────────────
+  autoSave: (data) => api.post("/meetings/auto-save", data),
+
+  // ─── NEW: Lock/Unlock ──────────────────────────────────────
+  lock: (id, reason = "") => api.post(`/meetings/${id}/lock`, { reason }),
+  unlock: (id) => api.post(`/meetings/${id}/unlock`),
+
+  // ─── NEW: Extension Requests ──────────────────────────────
+  requestExtension: (id, reason, requestedDuration = 15) =>
+    api.post(`/meetings/${id}/request-extension`, {
+      reason,
+      requestedDuration,
+    }),
+  approveExtension: (requestId, adminNotes = "") =>
+    api.post(`/meetings/extension/${requestId}/approve`, { adminNotes }),
+  rejectExtension: (requestId, rejectionReason, adminNotes = "") =>
+    api.post(`/meetings/extension/${requestId}/reject`, {
+      rejectionReason,
+      adminNotes,
+    }),
+  getExtensionRequests: (status = "pending") =>
+    api.get("/meetings/extensions", { params: { status } }),
+
+  // ─── NEW: Admin Progress ──────────────────────────────────
+  getProgress: (id) => api.get(`/meetings/${id}/progress`),
+  resume: (id) => api.post(`/meetings/${id}/resume`),
 };
 
 // ============================================================
