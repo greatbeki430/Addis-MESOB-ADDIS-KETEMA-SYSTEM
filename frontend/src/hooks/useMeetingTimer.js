@@ -12,23 +12,35 @@ const WARNING_THRESHOLDS = [
 
 export const useMeetingTimer = ({
   isActive = false,
+  initialTimeRemaining = null,
   onTimeExpired,
   onAutoSave,
   onWarning,
+  onTick,
   startTime = null,
 }) => {
   const [timeRemaining, setTimeRemaining] = useState(
-    MEETING_DURATION_MINUTES * 60,
+    initialTimeRemaining !== null
+      ? initialTimeRemaining
+      : MEETING_DURATION_MINUTES * 60,
   );
   const [isExpired, setIsExpired] = useState(false);
   const [hasWarned, setHasWarned] = useState({});
   const [progressSaved, setProgressSaved] = useState(false);
   const [showExpiredModal, setShowExpiredModal] = useState(false);
-  const [showExtensionModal, setShowExtensionModal] = useState(false);
 
   const timerRef = useRef(null);
   const startTimeRef = useRef(startTime);
   const hasAutoSavedRef = useRef(false);
+  const initialTimeSet = useRef(false);
+
+  // ─── Set initial time if provided ────────────────────────────
+  useEffect(() => {
+    if (initialTimeRemaining !== null && !initialTimeSet.current) {
+      setTimeRemaining(initialTimeRemaining);
+      initialTimeSet.current = true;
+    }
+  }, [initialTimeRemaining]);
 
   // ─── Format time as MM:SS ──────────────────────────────────
   const formatTime = useCallback((seconds) => {
@@ -86,11 +98,8 @@ export const useMeetingTimer = ({
     if (timerRef.current) return;
 
     startTimeRef.current = Date.now();
-    setTimeRemaining(MEETING_DURATION_MINUTES * 60);
-    setIsExpired(false);
     setHasWarned({});
     hasAutoSavedRef.current = false;
-    setShowExpiredModal(false);
 
     timerRef.current = setInterval(() => {
       setTimeRemaining((prev) => {
@@ -105,6 +114,11 @@ export const useMeetingTimer = ({
         // ── Auto-save at 2 minutes remaining ──
         if (newTime === 120 && !hasAutoSavedRef.current) {
           triggerAutoSave();
+        }
+
+        // ── Call onTick callback ──
+        if (onTick) {
+          onTick(newTime);
         }
 
         // ── Time expired ──
@@ -122,7 +136,7 @@ export const useMeetingTimer = ({
         return newTime;
       });
     }, 1000);
-  }, [getWarningMessage, onWarning, onTimeExpired, triggerAutoSave]);
+  }, [getWarningMessage, onWarning, onTimeExpired, triggerAutoSave, onTick]);
 
   // ─── Pause timer ────────────────────────────────────────────
   const pauseTimer = useCallback(() => {
@@ -147,8 +161,8 @@ export const useMeetingTimer = ({
     setHasWarned({});
     hasAutoSavedRef.current = false;
     setShowExpiredModal(false);
-    setShowExtensionModal(false);
     startTimeRef.current = Date.now();
+    initialTimeSet.current = false;
     if (isActive) {
       startTimer();
     }
@@ -181,8 +195,6 @@ export const useMeetingTimer = ({
     status: getStatus(),
     showExpiredModal,
     setShowExpiredModal,
-    showExtensionModal,
-    setShowExtensionModal,
     startTimer,
     pauseTimer,
     resumeTimer,
