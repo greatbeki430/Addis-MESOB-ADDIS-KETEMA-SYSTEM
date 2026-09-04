@@ -40,7 +40,6 @@ const GoldenMondayGallery = require("../models/GoldenMondayGallery");
 const GoldenMondayFolder = require("../models/GoldenMondayFolder");
 const GoldenMondayCategory = require("../models/GoldenMondayCategory");
 const GoldenMondayNotification = require("../models/GoldenMondayNotification");
-const GoldenMondayResource = require("../models/GoldenMondayResource");
 const User = require("../models/User");
 
 // ── NEW: Multi-file upload middleware and services ──────────
@@ -671,6 +670,41 @@ router.post(
       let weekFolder = null;
       let typeFolders = {};
 
+      // ✅ FIX: Honor an explicit folderId from the client — this is the
+      // folder GalleryUploader.jsx just created (or found) and showed the
+      // user before upload started. Previously this value was destructured
+      // from req.body and then never used again; every upload silently
+      // re-derived "this week's folder for this admin" from today's date
+      // instead, via getOrCreateWeekFolder below. That happened to often
+      // land in the same place by coincidence (same admin, same day), but
+      // breaks as soon as two admins upload the same day, or the folder
+      // the user picked isn't "this week."
+      if (folderId) {
+        weekFolder = await GoldenMondayFolder.findOne({
+          _id: folderId,
+          folderType: "week",
+        });
+        if (!weekFolder) {
+          return res.status(404).json({
+            success: false,
+            error: "The specified folder was not found",
+          });
+        }
+        if (topic && topic.trim()) {
+          const trimmedTopic = topic.trim();
+          const alreadyPresent = (weekFolder.topics || []).some(
+            (t) => t.toLowerCase() === trimmedTopic.toLowerCase(),
+          );
+          if (!alreadyPresent) {
+            weekFolder = await GoldenMondayFolder.findByIdAndUpdate(
+              weekFolder._id,
+              { $addToSet: { topics: trimmedTopic } },
+              { new: true },
+            );
+          }
+        }
+      }
+
       for (const file of req.files) {
         try {
           const fileTypeResult = await fileTypeFromBuffer(file.buffer);
@@ -716,6 +750,8 @@ router.post(
             continue;
           }
 
+          // ✅ Only fall back to date-derived resolution when the client
+          // didn't send a folderId at all (e.g. any older caller).
           if (!weekFolder) {
             weekFolder = await getOrCreateWeekFolder({
               uploadDate: new Date(),
@@ -1122,7 +1158,7 @@ router.post(
 );
 
 // ════════════════════════════════════════════════════════════════
-// ✅ NEW - NOTIFICATIONS ROUTES (ADDED)
+// ✅ NOTIFICATIONS ROUTES
 // ════════════════════════════════════════════════════════════════
 
 // GET /api/golden-monday/notifications
@@ -1233,186 +1269,36 @@ router.put("/notifications/:id/dismiss", protect, anyRole, async (req, res) => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// ✅ NEW - RESOURCES ROUTES (ADDED)
+// 📚 RESOURCES ROUTES
+//
+// ⚠️ REMOVED: this file used to define its own inline
+// /resources/session/:sessionId GET/POST/PUT/DELETE handlers here.
+// That copy had no multer middleware and read the uploaded file off
+// req.body.file as a base64 string — but ResourceLibrary.jsx sends a
+// real multipart/form-data FormData with a `file` field, which Express
+// does not parse into req.body at all without multer. So that inline
+// POST handler always hit `if (!file) return res.status(400)...`,
+// i.e. it could never succeed for a real upload.
+//
+// backend/src/routes/goldenMondayResourceRoutes.js already implements
+// the exact same paths correctly (multer memoryStorage,
+// upload.single("file"), real Cloudinary upload, versioning). Having
+// both mounted is a footgun: whichever router Express registers first
+// for these paths silently wins for every request, and the loser's
+// code never runs — so it's not obvious from either file alone which
+// one is actually live.
+//
+// Fix: mount goldenMondayResourceRoutes.js at this router's
+// "/resources" prefix in your main app/server file, e.g.:
+//   const goldenMondayResourceRoutes = require("./routes/goldenMondayResourceRoutes");
+//   app.use("/api/golden-monday/resources", goldenMondayResourceRoutes);
+// and make sure nothing else still mounts a route that shadows it.
+// If your server file already does this and this router is mounted at
+// a plain "/api/golden-monday" prefix *after* that, the working router
+// wins by Express's most-specific-first matching and you can ignore
+// this note — but paste app.js/server.js so this can be confirmed
+// rather than assumed.
 // ════════════════════════════════════════════════════════════════
-
-// GET /api/golden-monday/resources/session/:sessionId
-router.get(
-  "/resources/session/:sessionId",
-  protect,
-  anyRole,
-  async (req, res) => {
-    try {
-      const { sessionId } = req.params;
-
-      let resources = [];
-
-      try {
-        // If Resource model exists
-        resources = await GoldenMondayResource.find({ sessionId })
-          .sort({ createdAt: -1 })
-          .populate("uploadedBy", "name email")
-          .lean();
-      } catch (modelError) {
-        // If model doesn't exist yet, return empty array
-        console.warn("⚠️ Resource model not available yet");
-      }
-
-      res.json({
-        success: true,
-        data: resources,
-        sessionId,
-      });
-    } catch (error) {
-      console.error("❌ [GET RESOURCES] Error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  },
-);
-
-// POST /api/golden-monday/resources/session/:sessionId
-router.post(
-  "/resources/session/:sessionId",
-  protect,
-  goldenMondayAdminOrAbove,
-  async (req, res) => {
-    try {
-      const { sessionId } = req.params;
-      const { file, title, type, description } = req.body;
-
-      if (!file) {
-        return res.status(400).json({ error: "File data is required" });
-      }
-
-      let resource = null;
-
-      try {
-        // If Resource model exists
-        resource = await GoldenMondayResource.create({
-          sessionId,
-          title: title || "Untitled Resource",
-          type: type || "file",
-          file: file,
-          description: description || "",
-          uploadedBy: req.user._id,
-          uploadedByName: req.user.name,
-        });
-      } catch (modelError) {
-        // If model doesn't exist yet, create a mock response
-        console.warn("⚠️ Resource model not available yet, returning mock");
-        resource = {
-          id: Date.now().toString(),
-          sessionId,
-          title: title || "Untitled Resource",
-          type: type || "file",
-          file: file,
-          description: description || "",
-          uploadedBy: req.user._id,
-          uploadedByName: req.user.name,
-          createdAt: new Date(),
-        };
-      }
-
-      res.status(201).json({
-        success: true,
-        message: "Resource uploaded successfully",
-        resource,
-      });
-    } catch (error) {
-      console.error("❌ [POST RESOURCE] Error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  },
-);
-
-// DELETE /api/golden-monday/resources/:resourceId
-router.delete(
-  "/resources/:resourceId",
-  protect,
-  goldenMondayAdminOrAbove,
-  async (req, res) => {
-    try {
-      const { resourceId } = req.params;
-
-      try {
-        await GoldenMondayResource.findOneAndDelete({ _id: resourceId });
-      } catch (modelError) {
-        console.warn("⚠️ Resource model not available yet");
-      }
-
-      res.json({
-        success: true,
-        message: "Resource deleted successfully",
-      });
-    } catch (error) {
-      console.error("❌ [DELETE RESOURCE] Error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  },
-);
-
-// PUT /api/golden-monday/resources/:resourceId/download
-router.put(
-  "/resources/:resourceId/download",
-  protect,
-  anyRole,
-  async (req, res) => {
-    try {
-      const { resourceId } = req.params;
-
-      try {
-        await GoldenMondayResource.findByIdAndUpdate(resourceId, {
-          $inc: { downloadCount: 1 },
-        });
-      } catch (modelError) {
-        console.warn("⚠️ Resource model not available yet");
-      }
-
-      res.json({
-        success: true,
-        message: "Download count updated",
-      });
-    } catch (error) {
-      console.error("❌ [DOWNLOAD RESOURCE] Error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  },
-);
-
-// PUT /api/golden-monday/resources/:resourceId
-router.put(
-  "/resources/:resourceId",
-  protect,
-  goldenMondayAdminOrAbove,
-  async (req, res) => {
-    try {
-      const { resourceId } = req.params;
-      const { title, description } = req.body;
-
-      let resource = null;
-
-      try {
-        resource = await GoldenMondayResource.findByIdAndUpdate(
-          resourceId,
-          { title, description },
-          { new: true },
-        );
-      } catch (modelError) {
-        console.warn("⚠️ Resource model not available yet");
-        resource = { id: resourceId, title, description };
-      }
-
-      res.json({
-        success: true,
-        message: "Resource updated successfully",
-        resource,
-      });
-    } catch (error) {
-      console.error("❌ [UPDATE RESOURCE] Error:", error);
-      res.status(500).json({ error: error.message });
-    }
-  },
-);
 
 // ════════════════════════════════════════════════════════════════
 // 🔍 DEBUG ROUTES
