@@ -23,7 +23,18 @@ import { teamAPI } from "../services/api";
 import { AISummary } from "../components/ai";
 import { useToast } from "../hooks/useToast";
 import { useLanguage } from "../hooks/useLanguage";
+import { useAuth } from "../hooks/useAuth";
 import ForumReportFeed from "../components/ForumReportFeed";
+import { forumReportTranslations } from "../constants/translations/forumReport";
+import { commonTranslations } from "../constants/translations/common";
+import { isAdminOrAbove } from "../utils/roles";
+
+// ─── Timer Features ──────────────────────────────────────────
+import { useMeetingTimer } from "../hooks/useMeetingTimer";
+import MeetingTimer from "../components/forum-report/MeetingTimer";
+import TimeExpiredModal from "../components/forum-report/TimeExpiredModal";
+import AutoSaveIndicator from "../components/forum-report/AutoSaveIndicator";
+import { forumReportService } from "../services/forumReportService";
 
 // ✅ React Icons
 import {
@@ -61,11 +72,26 @@ const FONT_SIZES = {
   small: "clamp(10px, 2.2vw, 13px)",
 };
 
-// ─── Team Selector Component ─────────────────────────────────
-const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
-  const [searchTerm, setSearchTerm] = useState("");
+// ─── Helper: Get translations based on language ─────────────
+const getTranslations = (lang) => {
+  const forum =
+    forumReportTranslations[lang]?.forum || forumReportTranslations.en.forum;
+  const common =
+    commonTranslations[lang]?.common || commonTranslations.en.common;
+  return { forum, common };
+};
 
-  const tf = useCallback((key, fallback) => t?.forum?.[key] || fallback, [t]);
+// ─── Team Selector Component ─────────────────────────────────
+const TeamSelector = ({
+  teams,
+  selectedTeam,
+  setSelectedTeam,
+  lang,
+  loading,
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const { forum: t, common: tc } = getTranslations(lang);
+
   const filteredTeams = teams.filter((team) =>
     team.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
@@ -111,7 +137,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
             letterSpacing: "-0.02em",
           }}
         >
-          {tf("selectTeamPrompt", "Select a Team")}
+          {t.selectTeamPrompt || "Select a Team"}
         </h2>
         <p
           style={{
@@ -123,10 +149,8 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
             lineHeight: 1.6,
           }}
         >
-          {tf(
-            "selectTeamHelper",
-            "Choose a team from the list below to start or view their forum report",
-          )}
+          {t.selectTeamHelper ||
+            "Choose a team from the list below to start or view their forum report"}
         </p>
       </div>
 
@@ -134,7 +158,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
       <div style={{ position: "relative", marginBottom: 20 }}>
         <input
           type="text"
-          placeholder={tf("searchTeams", "Search teams...")}
+          placeholder={t.searchTeams || "Search teams..."}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
@@ -186,7 +210,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
             color={C.primary}
           />
           <p style={{ fontSize: FONT_SIZES.body }}>
-            {tf("loadingTeams", "Loading teams...")}
+            {t.loadingTeams || "Loading teams..."}
           </p>
         </div>
       ) : filteredTeams.length === 0 ? (
@@ -202,10 +226,10 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
         >
           <FiUsers size={40} style={{ opacity: 0.3, marginBottom: 12 }} />
           <p style={{ fontSize: FONT_SIZES.body, fontWeight: 500 }}>
-            {tf("noTeamsFound", "No teams found")}
+            {t.noTeamsFound || "No teams found"}
           </p>
           <p style={{ fontSize: FONT_SIZES.small, color: C.muted }}>
-            {tf("noTeamsYet", "No teams created yet.")}
+            {t.noTeamsYet || "No teams created yet."}
           </p>
         </div>
       ) : (
@@ -267,7 +291,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
                     letterSpacing: "0.5px",
                   }}
                 >
-                  SELECTED
+                  {tc.selected || "SELECTED"}
                 </div>
               )}
               <div
@@ -318,7 +342,7 @@ const TeamSelector = ({ teams, selectedTeam, setSelectedTeam, t, loading }) => {
                     }}
                   >
                     <FiBriefcase size={11} />
-                    {team.department || tf("noDepartment", "No department")}
+                    {team.department || t.noDepartment || "No department"}
                   </div>
                 </div>
                 {selectedTeam?.id === team.id && (
@@ -813,6 +837,7 @@ export default function ForumReport({
   onReportSaved,
 }) {
   const { t: tHook } = useLanguage();
+  const { user } = useAuth();
   const t = tProp || tHook;
 
   const safeT = useMemo(() => t || {}, [t]);
@@ -854,6 +879,117 @@ export default function ForumReport({
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [activeForumTab, setActiveForumTab] = useState("form");
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  // ─── Timer State ──────────────────────────────────────────────
+  // ─── Timer State ──────────────────────────────────────────────
+  const [timerActive, setTimerActive] = useState(false);
+  const [setIsReportLocked] = useState(false);
+  const [warningMessage, setWarningMessage] = useState(null);
+  const [lastAutoSaveTime, setLastAutoSaveTime] = useState(null);
+  const [savedProgressId, setSavedProgressId] = useState(null);
+  const [setExtensionRequested] = useState(false);
+
+  const isAdmin = isAdminOrAbove(user);
+
+  // ─── Timer Hook ──────────────────────────────────────────────
+  const {
+    timeRemaining,
+    formattedTime,
+    progressPercent,
+    status,
+    isExpired,
+    showExpiredModal,
+    setShowExpiredModal,
+    resetTimer,
+    progressSaved,
+  } = useMeetingTimer({
+    isActive: timerActive,
+    onTimeExpired: () => {
+      setIsReportLocked(true);
+      handleAutoSave();
+      setShowExpiredModal(true);
+    },
+    onWarning: (message) => {
+      setWarningMessage(message);
+      showToast(message, "warning");
+      setTimeout(() => setWarningMessage(null), 5000);
+    },
+  });
+
+  // ─── Auto-save handler ───────────────────────────────────────
+  const handleAutoSave = useCallback(async () => {
+    try {
+      const reportData = {
+        date: form.date,
+        timeStart: form.timeStart,
+        timeEnd: form.timeEnd,
+        present: form.present.filter((p) => p.trim() !== ""),
+        absent: form.absent.filter((a) => a.name.trim() !== ""),
+        prevResults: form.prevResults.filter((p) => p.trim() !== ""),
+        topics: form.topics.filter((t) => t.trim() !== ""),
+        explanation: form.explanation || "",
+        gaps: form.gaps.filter((g) => g.trim() !== ""),
+        agreements: form.agreements.filter((a) => a.trim() !== ""),
+        signatures: form.signatures.filter((s) => s.trim() !== ""),
+        teamId: selectedTeam?.id || selectedTeam?._id,
+        teamName: selectedTeam?.name || "Unknown Team",
+        isAutoSave: true,
+        status: "in_progress",
+      };
+
+      const response = await forumReportService.autoSave(reportData);
+      setLastAutoSaveTime(new Date());
+      setSavedProgressId(response.meeting?._id || response._id);
+      return response;
+    } catch (error) {
+      console.error("Auto-save failed:", error);
+      showToast(tf("autoSaveError") || "Auto-save failed", "error");
+      throw error;
+    }
+  }, [form, selectedTeam, tf, showToast]);
+
+  // ─── Extension request handler ──────────────────────────────
+  const handleRequestExtension = async (reason) => {
+    if (!reason?.trim()) {
+      showToast(tf("reasonRequired") || "Please provide a reason", "warning");
+      return;
+    }
+
+    try {
+      await forumReportService.requestExtension(savedProgressId, reason);
+      setExtensionRequested(true);
+      setShowExpiredModal(false);
+      showToast(
+        tf("extensionRequested") || "✅ Extension request submitted to admin",
+        "success",
+      );
+    } catch (error) {
+      console.error("Extension request failed:", error);
+      showToast(
+        tf("extensionRequestError") || "Failed to request extension",
+        "error",
+      );
+    }
+  };
+
+  // ─── Resume report handler (admin only) ─────────────────────
+  const handleResumeReport = async () => {
+    if (!isAdmin) return;
+    try {
+      await forumReportService.resumeReport(savedProgressId);
+      setIsReportLocked(false);
+      resetTimer();
+      setTimerActive(true);
+      setShowExpiredModal(false);
+      showToast(
+        tf("reportResumed") || "✅ Report resumed successfully",
+        "success",
+      );
+    } catch (error) {
+      console.error("Resume failed:", error);
+      showToast(tf("resumeError") || "Failed to resume report", "error");
+    }
+  };
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -1339,7 +1475,7 @@ ${"=".repeat(50)}
           teams={teams}
           selectedTeam={selectedTeam}
           setSelectedTeam={setSelectedTeam}
-          t={safeT}
+          lang={lang || "en"}
           loading={loadingTeams}
         />
       </div>
@@ -1521,6 +1657,22 @@ ${"=".repeat(50)}
         </div>
       </div>
 
+      {/* ─── Timer Display ─────────────────────────────────────── */}
+      <div style={{ marginBottom: "16px" }}>
+        <MeetingTimer
+          timeRemaining={timeRemaining}
+          formattedTime={formattedTime}
+          progressPercent={progressPercent}
+          status={status}
+          isExpired={isExpired}
+          progressSaved={progressSaved}
+          warningMessage={warningMessage}
+          onExtend={() => setShowExpiredModal(true)}
+          isAdmin={isAdmin}
+          onResume={handleResumeReport}
+        />
+      </div>
+
       {aiGeneratedContent && showAIBadge && (
         <AIInsightBadge type="success" onClose={() => setShowAIBadge(false)}>
           <strong>🤖 AI Generated Content Applied!</strong>
@@ -1643,6 +1795,22 @@ ${"=".repeat(50)}
             border: `1px solid ${C.border}`,
           }}
         >
+          {/* Auto-Save Indicator */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              marginBottom: "8px",
+            }}
+          >
+            <AutoSaveIndicator
+              isSaving={saving}
+              isSaved={progressSaved}
+              lastSavedAt={lastAutoSaveTime}
+              t={tf}
+            />
+          </div>
+
           {/* Meeting Time */}
           <Section
             title={tf("meetingTime", "Meeting Time")}
@@ -2294,6 +2462,19 @@ ${"=".repeat(50)}
         /* ─── FORUM FEED TAB ────────────────────────────────────────── */
         <ForumReportFeed t={t} isMobile={isMobile} teamId={selectedTeam?.id} />
       )}
+
+      {/* ─── Time Expired Modal ──────────────────────────────────── */}
+      <TimeExpiredModal
+        isOpen={showExpiredModal}
+        onClose={() => setShowExpiredModal(false)}
+        onRequestExtension={handleRequestExtension}
+        onViewProgress={() => {
+          // Admin view progress functionality
+          setShowExpiredModal(false);
+        }}
+        isAdmin={isAdmin}
+        t={tf}
+      />
 
       <style>{`
         @keyframes spin {

@@ -309,6 +309,54 @@ export const canEditForumReport = (user, report) => {
 
 export const canDeleteForumReport = canEditForumReport;
 
+// ─── NEW: FORUM REPORT TIMER & EXTENSION PERMISSIONS ──────────────────
+
+/**
+ * Check if user can request extension for a forum report
+ * - Super Admin: YES
+ * - Admin: YES
+ * - Team Leader: YES (only their own team's reports)
+ * - Employee: NO
+ */
+export const canRequestExtension = (user, report) => {
+  if (!user || !report) return false;
+  if (isAdminOrAbove(user)) return true;
+  if (user.role === ROLES.TEAM_LEADER) {
+    const userTeam = getUserTeamId(user);
+    const reportTeam = report.teamId || report.team?._id || report.team;
+    return userTeam?.toString() === reportTeam?.toString();
+  }
+  return false;
+};
+
+/**
+ * Check if user can approve/reject extension requests (Admin only)
+ */
+export const canManageExtensions = (user) => {
+  return isAdminOrAbove(user);
+};
+
+/**
+ * Check if user can view locked/expired report progress (Admin only)
+ */
+export const canViewLockedProgress = (user) => {
+  return isAdminOrAbove(user);
+};
+
+/**
+ * Check if user can resume a locked report (Admin only)
+ */
+export const canResumeReport = (user) => {
+  return isAdminOrAbove(user);
+};
+
+/**
+ * Check if user can unlock a report (Admin only)
+ */
+export const canUnlockReport = (user) => {
+  return isAdminOrAbove(user);
+};
+
 // ─── GOLDEN MONDAY PERMISSIONS ─────────────────────────────────────────
 
 export const canManageGoldenMondayResources = (user) =>
@@ -473,6 +521,13 @@ export const NAV_ITEMS = [
     id: "admin-requests",
     icon: "🔧",
     label: "Manage Requests",
+    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+  // ─── NEW: Admin Extensions Navigation Item ─────────────────────────
+  {
+    id: "admin-extensions",
+    icon: "⏰",
+    label: "Extension Requests",
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
 ];

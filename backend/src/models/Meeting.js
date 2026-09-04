@@ -19,7 +19,7 @@ const meetingSchema = new mongoose.Schema(
 
     // ─── Attendees ────────────────────────────────────────
     present: {
-      type: [String], // Changed from ObjectId to String to handle names
+      type: [String],
       default: [],
     },
     absent: {
@@ -78,15 +78,96 @@ const meetingSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+
+    // ─── NEW: Timer & Auto-Save Fields ────────────────────
+    status: {
+      type: String,
+      enum: ["in_progress", "auto_saved", "completed", "expired", "locked"],
+      default: "in_progress",
+    },
+    isAutoSave: {
+      type: Boolean,
+      default: false,
+    },
+    lastAutoSave: {
+      type: Date,
+      default: null,
+    },
+    autoSaveCount: {
+      type: Number,
+      default: 0,
+    },
+    meetingDuration: {
+      type: Number, // in minutes
+      default: 30,
+    },
+    timeExpired: {
+      type: Boolean,
+      default: false,
+    },
+    timeExpiredAt: {
+      type: Date,
+      default: null,
+    },
+    extensionApproved: {
+      type: Boolean,
+      default: false,
+    },
+    extensionExpiresAt: {
+      type: Date,
+      default: null,
+    },
+    isResumed: {
+      type: Boolean,
+      default: false,
+    },
+    resumedAt: {
+      type: Date,
+      default: null,
+    },
+    isLocked: {
+      type: Boolean,
+      default: false,
+    },
+    lockedAt: {
+      type: Date,
+      default: null,
+    },
+    lockedReason: {
+      type: String,
+      default: "",
+    },
+    progressData: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+    },
+
+    // ─── Admin Notes ──────────────────────────────────────
+    adminNotes: {
+      type: String,
+      default: "",
+    },
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    reviewedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
   },
 );
 
-// ─── Index for queries ───────────────────────────────────────
+// ─── Indexes ───────────────────────────────────────────────
 meetingSchema.index({ date: -1, team: 1 });
 meetingSchema.index({ createdAt: -1 });
 meetingSchema.index({ teamName: 1 });
+meetingSchema.index({ status: 1 });
+meetingSchema.index({ createdBy: 1, status: 1 });
+meetingSchema.index({ isLocked: 1, lockedAt: 1 });
 
 module.exports = mongoose.model("Meeting", meetingSchema);
