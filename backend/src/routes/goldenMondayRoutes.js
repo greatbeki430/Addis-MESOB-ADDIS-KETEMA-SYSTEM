@@ -49,8 +49,7 @@ const {
   galleryUpload,
   SIZE_LIMITS_BYTES,
 } = require("../middleware/galleryUpload");
-// const { fileTypeFromBuffer } = require("file-type");
-const fileType = require("file-type");
+const cloudinary = require("../config/cloudinary");
 const pdfParse = require("pdf-parse");
 const mammoth = require("mammoth");
 const {
@@ -875,7 +874,7 @@ router.post(
         topic,
       } = req.body;
 
-      const cloudinary = require("../config/cloudinary");
+      // const cloudinary = require("../config/cloudinary");
       const uploadedItems = [];
       const failedItems = [];
       let weekFolder = null;
@@ -937,10 +936,13 @@ router.post(
 
           // ── Detect file type from buffer ──
           // const fileTypeResult = await fileTypeFromBuffer(file.buffer);
-          const fileTypeResult = await fileType.fileTypeFromBuffer(file.buffer);
-          const trueMime =
-            fileTypeResult?.mime || file.mimetype || "application/octet-stream";
-          const trueExt = fileTypeResult?.ext || "bin";
+          // const fileTypeResult = await fileType.fileTypeFromBuffer(file.buffer);
+          // const trueMime =
+          //   fileTypeResult?.mime || file.mimetype || "application/octet-stream";
+          // const trueExt = fileTypeResult?.ext || "bin";
+          // ── Detect file type from buffer (using file.mimetype) ──
+          const trueMime = file.mimetype || "application/octet-stream";
+          const trueExt = trueMime.split("/")[1]?.split("+")[0] || "bin";
 
           let fileType = "other";
           let cloudinaryResourceType = "raw";
