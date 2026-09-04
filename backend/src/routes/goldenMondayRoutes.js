@@ -724,41 +724,119 @@ router.post(
 // ════════════════════════════════════════════════════════════════
 
 // GET /api/golden-monday/gallery
+// GET /api/golden-monday/gallery
 router.get("/gallery", protect, anyRole, async (req, res) => {
   try {
-    const { category, session, folderId, limit = 50, page = 1 } = req.query;
+    const {
+      category,
+      session,
+      folderId,
+      fileType,
+      search,
+      limit = 50,
+      page = 1,
+      sortBy = "createdAt",
+      sortOrder = "desc",
+    } = req.query;
+
+    // ─── Build Filter ──────────────────────────────────────────
     const filter = {};
+
     if (category) filter.category = category;
     if (session) filter.session = session;
     if (folderId) filter.folder = folderId;
+    if (fileType) filter.fileType = fileType;
 
+    // ─── Search (title, originalFilename, tags) ──────────────
+    if (search) {
+      filter.$or = [
+        { title: { $regex: search, $options: "i" } },
+        { originalFilename: { $regex: search, $options: "i" } },
+        { caption: { $regex: search, $options: "i" } },
+        { tags: { $in: [new RegExp(search, "i")] } },
+      ];
+    }
+
+    // ─── Build Sort ────────────────────────────────────────────
+    const sort = {};
+    const validSortFields = [
+      "createdAt",
+      "photoDate",
+      "title",
+      "fileType",
+      "category",
+    ];
+    const sortField = validSortFields.includes(sortBy) ? sortBy : "createdAt";
+    sort[sortField] = sortOrder === "asc" ? 1 : -1;
+
+    // ─── Pagination ────────────────────────────────────────────
     const skip = (parseInt(page) - 1) * parseInt(limit);
+    const limitNum = Math.min(parseInt(limit), 100); // Max 100 per page
 
-    const photos = await GoldenMondayGallery.find(filter)
-      .sort({ photoDate: -1, createdAt: -1 })
-      .skip(skip)
-      .limit(parseInt(limit))
-      .populate("uploadedBy", "name email")
-      .populate("session", "title date weekOf");
+    console.log("📸 [GET GALLERY] Request:", {
+      filter,
+      sort,
+      skip,
+      limit: limitNum,
+    });
 
-    const total = await GoldenMondayGallery.countDocuments(filter);
+    // ─── Query Database ───────────────────────────────────────
+    const [photos, total] = await Promise.all([
+      GoldenMondayGallery.find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limitNum)
+        .populate("uploadedBy", "name email profilePhotoUrl")
+        .populate("session", "title date weekOf presenterName")
+        .lean(),
+      GoldenMondayGallery.countDocuments(filter),
+    ]);
+
+    // ─── Enrich Response ──────────────────────────────────────
+    const enrichedPhotos = photos.map((photo) => ({
+      ...photo,
+      // Ensure these fields exist even if populate failed
+      uploadedByName:
+        photo.uploadedBy?.name || photo.uploadedByName || "Unknown",
+      uploadedByEmail: photo.uploadedBy?.email || "",
+      uploadedByPhoto: photo.uploadedBy?.profilePhotoUrl || "",
+    }));
 
     res.json({
-      photos,
+      success: true,
+      photos: enrichedPhotos,
       pagination: {
         total,
         page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(total / parseInt(limit)),
+        limit: limitNum,
+        pages: Math.ceil(total / limitNum),
+        hasNext: parseInt(page) < Math.ceil(total / limitNum),
+        hasPrev: parseInt(page) > 1,
+      },
+      filters: {
+        category: category || "all",
+        session: session || null,
+        folderId: folderId || null,
+        fileType: fileType || "all",
+        search: search || null,
       },
     });
   } catch (error) {
     console.error("❌ [GET GALLERY] Error:", error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({
+      success: false,
+      error: error.message || "Failed to load gallery",
+    });
   }
 });
 
 // POST /api/golden-monday/gallery
+// backend/src/routes/goldenMondayRoutes.js
+// ============================================================
+// 🖼️ GALLERY - COMPLETE FIXED VERSION
+// ============================================================
+
+// POST /api/golden-monday/gallery -  COMPLETE FIXED VERSION
 router.post(
   "/gallery",
   protect,
@@ -766,6 +844,28 @@ router.post(
   galleryUpload.array("image", 20),
   async (req, res) => {
     try {
+      // ─── 1. Log Request ──────────────────────────────────────
+      console.log("📥 [GALLERY UPLOAD] Request received:");
+      console.log("  - folderId:", req.body.folderId);
+      console.log("  - sessionId:", req.body.sessionId);
+      console.log("  - category:", req.body.category);
+      console.log("  - lang:", req.body.lang);
+      console.log("  - topic:", req.body.topic);
+      console.log("  - files count:", req.files?.length || 0);
+      console.log(
+        "  - file names:",
+        req.files?.map((f) => f.originalname) || [],
+      );
+
+      // ─── 2. Validate Files ──────────────────────────────────
+      if (!req.files || req.files.length === 0) {
+        console.error("❌ No files in request!");
+        return res.status(400).json({
+          success: false,
+          error: "No files were uploaded. Please select at least one image.",
+        });
+      }
+
       const {
         folderId,
         sessionId,
@@ -774,53 +874,67 @@ router.post(
         topic,
       } = req.body;
 
-      if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ error: "At least one file is required" });
-      }
-
       const cloudinary = require("../config/cloudinary");
       const uploadedItems = [];
       const failedItems = [];
       let weekFolder = null;
       let typeFolders = {};
 
-      // ✅ FIX: Honor an explicit folderId from the client — this is the
-      // folder GalleryUploader.jsx just created (or found) and showed the
-      // user before upload started. Previously this value was destructured
-      // from req.body and then never used again; every upload silently
-      // re-derived "this week's folder for this admin" from today's date
-      // instead, via getOrCreateWeekFolder below. That happened to often
-      // land in the same place by coincidence (same admin, same day), but
-      // breaks as soon as two admins upload the same day, or the folder
-      // the user picked isn't "this week."
+      // ─── 3. Find or Create Week Folder ──────────────────────
       if (folderId) {
+        // ✅ Try to find the existing folder
         weekFolder = await GoldenMondayFolder.findOne({
           _id: folderId,
           folderType: "week",
         });
+
         if (!weekFolder) {
-          return res.status(404).json({
-            success: false,
-            error: "The specified folder was not found",
+          console.warn(`⚠️ Folder ${folderId} not found, creating new one...`);
+          // ✅ Create a new folder instead of failing
+          weekFolder = await getOrCreateWeekFolder({
+            uploadDate: new Date(),
+            topic: topic || "Golden Monday",
+            userId: req.user._id,
+            userName: req.user.name,
+            weekOfEthiopianDate: req.body.ethiopianDate || "",
           });
+          console.log(`✅ Created new folder: ${weekFolder._id}`);
+        } else {
+          console.log(`✅ Found existing folder: ${weekFolder._id}`);
         }
-        if (topic && topic.trim()) {
-          const trimmedTopic = topic.trim();
-          const alreadyPresent = (weekFolder.topics || []).some(
-            (t) => t.toLowerCase() === trimmedTopic.toLowerCase(),
-          );
-          if (!alreadyPresent) {
-            weekFolder = await GoldenMondayFolder.findByIdAndUpdate(
-              weekFolder._id,
-              { $addToSet: { topics: trimmedTopic } },
-              { new: true },
-            );
-          }
-        }
+      } else {
+        // ✅ No folderId provided - create a new one
+        console.log("ℹ️ No folderId provided, creating new folder...");
+        weekFolder = await getOrCreateWeekFolder({
+          uploadDate: new Date(),
+          topic: topic || "Golden Monday",
+          userId: req.user._id,
+          userName: req.user.name,
+        });
+        console.log(`✅ Created new folder: ${weekFolder._id}`);
       }
 
+      // ─── 4. Ensure We Have a Valid Folder ──────────────────
+      if (!weekFolder) {
+        console.error("❌ Could not create or find a folder!");
+        return res.status(500).json({
+          success: false,
+          error: "Could not create or find a folder for this upload",
+        });
+      }
+
+      console.log(
+        `📁 Using folder: ${weekFolder._id} - ${weekFolder.title || "Week Folder"}`,
+      );
+
+      // ─── 5. Process Each File ──────────────────────────────
       for (const file of req.files) {
         try {
+          console.log(
+            `📤 Processing: ${file.originalname} (${file.size} bytes)`,
+          );
+
+          // ── Detect file type from buffer ──
           const fileTypeResult = await fileTypeFromBuffer(file.buffer);
           const trueMime =
             fileTypeResult?.mime || file.mimetype || "application/octet-stream";
@@ -854,6 +968,11 @@ router.post(
             cloudinaryResourceType = "video";
           }
 
+          console.log(
+            `  - Detected fileType: ${fileType}, resourceType: ${cloudinaryResourceType}`,
+          );
+
+          // ── Check file size ──
           const sizeLimit =
             SIZE_LIMITS_BYTES[fileType] || SIZE_LIMITS_BYTES.other;
           if (file.size > sizeLimit) {
@@ -861,20 +980,13 @@ router.post(
               filename: file.originalname,
               reason: `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB, max ${(sizeLimit / 1024 / 1024).toFixed(0)}MB)`,
             });
+            console.warn(
+              `  - ⚠️ File too large: ${file.originalname} (${file.size} > ${sizeLimit})`,
+            );
             continue;
           }
 
-          // ✅ Only fall back to date-derived resolution when the client
-          // didn't send a folderId at all (e.g. any older caller).
-          if (!weekFolder) {
-            weekFolder = await getOrCreateWeekFolder({
-              uploadDate: new Date(),
-              topic: topic || "Golden Monday",
-              userId: req.user._id,
-              userName: req.user.name,
-            });
-          }
-
+          // ── Get or create type folder ──
           if (!typeFolders[fileType]) {
             typeFolders[fileType] = await getOrCreateTypeFolder({
               weekFolder,
@@ -884,7 +996,9 @@ router.post(
             });
           }
           const targetFolder = typeFolders[fileType];
+          console.log(`  - Target folder: ${targetFolder._id}`);
 
+          // ── Check for duplicates ──
           const contentHash = computeContentHash(file.buffer);
           let perceptualHash = null;
           if (fileType === "image") {
@@ -913,9 +1027,11 @@ router.post(
                   duplicateCheck.match.thumbnailUrl || duplicateCheck.match.url,
               },
             });
+            console.warn(`  - ⚠️ Duplicate found: ${file.originalname}`);
             continue;
           }
 
+          // ── AI Categorization ──
           let category = providedCategory || "other";
           let categoryConfidence = null;
           let categorySource = "manual";
@@ -981,7 +1097,7 @@ router.post(
               }
             } catch (aiError) {
               console.error(
-                `[Gallery Upload] AI categorization failed for ${file.originalname}:`,
+                `  - AI categorization failed for ${file.originalname}:`,
                 aiError.message,
               );
               categorizationAttempts.push({
@@ -992,6 +1108,7 @@ router.post(
             }
           }
 
+          // ── Resolve Category ──
           let resolvedCategory = "other";
           let resolvedSource = categorySource;
           let resolvedConfidence = categoryConfidence;
@@ -1015,6 +1132,9 @@ router.post(
             resolvedCategory = allSlugs.includes(category) ? category : "other";
           }
 
+          console.log(`  - Final category: ${resolvedCategory}`);
+
+          // ── Upload to Cloudinary ──
           const baseOptions = {
             folder: "golden-monday-gallery",
             public_id: `gm-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -1057,7 +1177,7 @@ router.post(
               thumbnailResult = posterResult;
             } catch (posterErr) {
               console.warn(
-                "[Gallery Upload] Could not generate video poster:",
+                "  - Could not generate video poster:",
                 posterErr.message,
               );
               thumbnailResult = {
@@ -1087,7 +1207,7 @@ router.post(
                 thumbnailResult = pdfThumb;
               } catch (pdfThumbErr) {
                 console.warn(
-                  "[Gallery Upload] Could not generate PDF thumbnail:",
+                  "  - Could not generate PDF thumbnail:",
                   pdfThumbErr.message,
                 );
                 thumbnailResult = {
@@ -1103,6 +1223,9 @@ router.post(
             }
           }
 
+          console.log(`  - Uploaded to Cloudinary: ${uploadResult.secure_url}`);
+
+          // ── Save to Database ──
           const galleryItem = new GoldenMondayGallery({
             session: sessionId || null,
             folder: targetFolder._id,
@@ -1136,7 +1259,9 @@ router.post(
           });
 
           await galleryItem.save();
+          console.log(`  - ✅ Saved to database: ${galleryItem._id}`);
 
+          // ── Update folder counts ──
           targetFolder.count = (targetFolder.count || 0) + 1;
           if (!targetFolder.coverPhoto) {
             targetFolder.coverPhoto =
@@ -1146,6 +1271,7 @@ router.post(
 
           await updateWeekFolderAggregates(weekFolder._id);
 
+          // ── Add to session if provided ──
           if (sessionId) {
             const session = await GoldenMondaySession.findById(sessionId);
             if (session) {
@@ -1170,8 +1296,8 @@ router.post(
           });
         } catch (fileError) {
           console.error(
-            `[Gallery Upload] Error processing ${file.originalname}:`,
-            fileError,
+            `  - ❌ Error processing ${file.originalname}:`,
+            fileError.message,
           );
           failedItems.push({
             filename: file.originalname,
@@ -1180,6 +1306,7 @@ router.post(
         }
       }
 
+      // ─── 6. Send Response ────────────────────────────────────
       const response = {
         success: true,
         uploaded: uploadedItems.length,
@@ -1188,6 +1315,10 @@ router.post(
         errors: failedItems.length > 0 ? failedItems : undefined,
         folderId: weekFolder?._id,
       };
+
+      console.log(
+        `📤 [GALLERY UPLOAD] Complete: ${uploadedItems.length} uploaded, ${failedItems.length} failed`,
+      );
 
       if (uploadedItems.length > 0) {
         res.status(201).json(response);
@@ -1199,8 +1330,11 @@ router.post(
         });
       }
     } catch (error) {
-      console.error("❌ [POST GALLERY] Error:", error);
-      res.status(500).json({ error: error.message });
+      console.error("❌ [POST GALLERY] Fatal Error:", error);
+      res.status(500).json({
+        success: false,
+        error: error.message || "Internal server error during upload",
+      });
     }
   },
 );
