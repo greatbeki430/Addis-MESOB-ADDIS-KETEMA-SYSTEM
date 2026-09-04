@@ -432,9 +432,6 @@ export const goldenMondayAPI = {
 
     return api
       .post("/golden-monday/gallery", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
         timeout: 180000,
         onUploadProgress: (progressEvent) => {
           if (onProgress && progressEvent.total) {
