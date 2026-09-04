@@ -24,6 +24,13 @@ const aiRoutes = require("./routes/aiRoutes");
 const chatbotRoutes = require("./routes/chatbotRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const goldenMondayRoutes = require("./routes/goldenMondayRoutes");
+// ✅ FIX: this router (multer-based, actually parses the multipart
+// upload ResourceLibrary.jsx sends) existed in the repo but was never
+// require()'d or mounted anywhere — goldenMondayRoutes.js used to have
+// its own broken inline stand-in for these same paths (removed in the
+// last fix), so /resources/session/:sessionId had no working handler
+// at all. Mounting it here is what actually wires it up.
+const goldenMondayResourceRoutes = require("./routes/goldenMondayResourceRoutes");
 const { startGoldenMondayScheduler } = require("./jobs/goldenMondayScheduler");
 
 // Departments — NEW
@@ -155,6 +162,14 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/golden-monday", goldenMondayRoutes);
+// ✅ FIX: mounted AFTER goldenMondayRoutes so it still sits behind the
+// same "/api/golden-monday" prefix at the more specific
+// "/api/golden-monday/resources" path — matches exactly what
+// ResourceLibrary.jsx / api.js call
+// (`/golden-monday/resources/session/${sessionId}`, etc.). Since
+// goldenMondayRoutes.js no longer defines any /resources/* routes of
+// its own, there's no shadowing: requests fall through to this router.
+app.use("/api/golden-monday/resources", goldenMondayResourceRoutes);
 app.use("/api/telegram", telegramRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);

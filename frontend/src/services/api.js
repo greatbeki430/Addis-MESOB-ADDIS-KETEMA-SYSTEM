@@ -336,52 +336,76 @@ export const goldenMondayAPI = {
     api.post(`/golden-monday/${sessionId}/attendance`, data),
 
   // ──────────────────────────────────────────────────────────────
-  // 🖼️ GALLERY MANAGEMENT - ✅ FIXED upload
+  // 🖼️ GALLERY MANAGEMENT
   // ──────────────────────────────────────────────────────────────
   getGallery: (params) => api.get("/golden-monday/gallery", { params }),
 
+  // ✅ FIXED: GalleryGrid.jsx builds and sends a real FormData object
+  // (with a Blob for the file field, folderId, category, sessionId,
+  // lang all already appended). This used to be re-interpreted as a
+  // plain { image, folderId, ... } object below, where `data.image`
+  // is always `undefined` on a FormData instance — that's what was
+  // producing "No image data provided" on every gallery upload,
+  // client-side, before any request even left the browser.
+  //
+  // The FormData branch is now used whenever the caller already built
+  // one (the current case). The plain-object branch is kept as a
+  // fallback for any future/other caller that still wants to hand
+  // over a base64 data URL instead of building FormData itself.
   uploadGalleryPhoto: (data, onProgress) => {
-    const formData = new FormData();
+    let formData;
 
-    // Handle base64 file data
-    if (data.image && data.image.startsWith("data:")) {
-      try {
-        const blob = dataURLtoBlob(data.image);
-        const ext = blob.type.split("/")[1]?.split("+")[0] || "bin";
-        const filename = data.filename || `upload.${ext}`;
-        formData.append("image", blob, filename);
-        console.log(
-          `📸 [UPLOAD] File prepared: ${filename}, size: ${blob.size} bytes`,
-        );
-      } catch (blobError) {
-        console.error(
-          "❌ [UPLOAD] Failed to convert dataURL to blob:",
-          blobError,
-        );
-        return Promise.reject(
-          new Error("Failed to process image data: " + blobError.message),
-        );
+    if (data instanceof FormData) {
+      formData = data;
+    } else {
+      formData = new FormData();
+
+      // Handle base64 file data
+      if (
+        data.image &&
+        typeof data.image === "string" &&
+        data.image.startsWith("data:")
+      ) {
+        try {
+          const blob = dataURLtoBlob(data.image);
+          const ext = blob.type.split("/")[1]?.split("+")[0] || "bin";
+          const filename = data.filename || `upload.${ext}`;
+          formData.append("image", blob, filename);
+          console.log(
+            `📸 [UPLOAD] File prepared: ${filename}, size: ${blob.size} bytes`,
+          );
+        } catch (blobError) {
+          console.error(
+            "❌ [UPLOAD] Failed to convert dataURL to blob:",
+            blobError,
+          );
+          return Promise.reject(
+            new Error("Failed to process image data: " + blobError.message),
+          );
+        }
+      } else if (data.image) {
+        formData.append("image", data.image);
+      } else {
+        console.error("❌ [UPLOAD] No image data provided");
+        return Promise.reject(new Error("No image data provided"));
       }
-    } else if (data.image) {
-      formData.append("image", data.image);
-    } else {
-      console.error("❌ [UPLOAD] No image data provided");
-      return Promise.reject(new Error("No image data provided"));
-    }
 
-    // ✅ REQUIRED: folderId must be sent
-    if (data.folderId) {
-      formData.append("folderId", data.folderId);
-      console.log(`📤 [UPLOAD] folderId: ${data.folderId}`);
-    } else {
-      console.warn("⚠️ [UPLOAD] No folderId provided - backend requires this");
-      return Promise.reject(new Error("folderId is required for upload"));
-    }
+      // ✅ REQUIRED: folderId must be sent
+      if (data.folderId) {
+        formData.append("folderId", data.folderId);
+        console.log(`📤 [UPLOAD] folderId: ${data.folderId}`);
+      } else {
+        console.warn(
+          "⚠️ [UPLOAD] No folderId provided - backend requires this",
+        );
+        return Promise.reject(new Error("folderId is required for upload"));
+      }
 
-    if (data.category) formData.append("category", data.category);
-    if (data.sessionId) formData.append("sessionId", data.sessionId);
-    if (data.lang) formData.append("lang", data.lang);
-    if (data.topic) formData.append("topic", data.topic);
+      if (data.category) formData.append("category", data.category);
+      if (data.sessionId) formData.append("sessionId", data.sessionId);
+      if (data.lang) formData.append("lang", data.lang);
+      if (data.topic) formData.append("topic", data.topic);
+    }
 
     console.log("📤 [UPLOAD] Sending request with fields:", [
       ...formData.keys(),
@@ -548,9 +572,24 @@ export const goldenMondayAPI = {
   // ─── Resources ──────────────────────────────────────────────────
   getSessionResources: (sessionId) =>
     api.get(`/golden-monday/resources/session/${sessionId}`),
-  uploadSessionResource: (sessionId, formData) =>
+
+  // ✅ FIXED: accepts the onProgress callback ResourceLibrary.jsx
+  // already passes as a 3rd argument and wires it to axios's
+  // onUploadProgress, so the progress bar actually moves. The upload
+  // itself worked before this fix (formData was forwarded correctly);
+  // only the progress reporting was silently dropped.
+  uploadSessionResource: (sessionId, formData, onProgress) =>
     api.post(`/golden-monday/resources/session/${sessionId}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
+      timeout: 60000,
+      onUploadProgress: (progressEvent) => {
+        if (onProgress && progressEvent.total) {
+          const percentCompleted = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total,
+          );
+          onProgress(Math.min(percentCompleted, 100));
+        }
+      },
     }),
   deleteSessionResource: (resourceId) =>
     api.delete(`/golden-monday/resources/${resourceId}`),
