@@ -1120,7 +1120,22 @@ router.post(
           // Normalize category value
           const normalizedCategory = (category || "other").toLowerCase().trim();
 
+          // Get all valid categories (built-in + dynamic)
+          const dynamicCats = await GoldenMondayCategory.find().select("slug");
+          const allSlugs = [
+            ...BUILT_IN_CATEGORIES,
+            ...dynamicCats.map((c) => c.slug),
+          ];
+
+          console.log("🔍 [CATEGORY RESOLUTION]");
+          console.log("  - Provided category:", category);
+          console.log("  - Normalized:", normalizedCategory);
+          console.log("  - Source:", categorySource);
+          console.log("  - Confidence:", categoryConfidence);
+          console.log("  - All slugs:", allSlugs);
+
           if (categorySource === "ai") {
+            // AI mode: use resolveGalleryCategory
             const resolution = await resolveGalleryCategory({
               candidateCategory: normalizedCategory,
               confidence: categoryConfidence || 0.5,
@@ -1129,26 +1144,14 @@ router.post(
             resolvedCategory = resolution.category;
             resolvedSource = resolution.categorySource;
             resolvedConfidence = resolution.categoryConfidence;
+            console.log("  - ✅ AI resolved to:", resolvedCategory);
           } else {
-            // Get all dynamic categories
-            const dynamicCats =
-              await GoldenMondayCategory.find().select("slug");
-            const allSlugs = [
-              ...BUILT_IN_CATEGORIES,
-              ...dynamicCats.map((c) => c.slug),
-            ];
-
-            console.log("🔍 [CATEGORY RESOLUTION]");
-            console.log("  - Provided category:", category);
-            console.log("  - Normalized:", normalizedCategory);
-            console.log("  - All valid slugs:", allSlugs);
-
-            // Check if category exists in built-in or dynamic list
+            // Manual mode: check if category exists
             if (allSlugs.includes(normalizedCategory)) {
               resolvedCategory = normalizedCategory;
-              console.log("  - ✅ Category matched:", resolvedCategory);
+              console.log("  - ✅ Manual category matched:", resolvedCategory);
             } else {
-              // Auto-create the category if it doesn't exist
+              // Auto-create the category
               try {
                 console.log("  - ⚠️ Category not found, auto-creating...");
                 const newCategory = new GoldenMondayCategory({
@@ -1172,7 +1175,8 @@ router.post(
               }
             }
           }
-          console.log(`  - Final category: ${resolvedCategory}`);
+
+          console.log("  - Final resolved category:", resolvedCategory);
 
           // ── Upload to Cloudinary ──
           const baseOptions = {
