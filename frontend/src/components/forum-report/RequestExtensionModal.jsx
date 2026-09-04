@@ -1,5 +1,5 @@
 // frontend/src/components/forum-report/RequestExtensionModal.jsx
-// Modal for requesting time extension from admin
+// Modal for requesting time extension from admin - FIXED ALIGNMENT
 
 import { useState } from "react";
 import { C, radius, shadows, btn } from "../../styles/theme";
@@ -69,66 +69,128 @@ const RequestExtensionModal = ({
           width: "100%",
           padding: "clamp(24px, 4vw, 40px)",
           boxShadow: shadows.xl,
-          position: "relative",
           animation: "scaleIn 0.3s ease",
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button */}
-        <button
-          onClick={handleClose}
-          disabled={isSubmitting}
-          style={{
-            position: "absolute",
-            top: 12,
-            right: 16,
-            background: "none",
-            border: "none",
-            fontSize: 20,
-            cursor: isSubmitting ? "not-allowed" : "pointer",
-            color: "#999",
-            padding: "4px",
-            opacity: isSubmitting ? 0.5 : 1,
-          }}
-        >
-          <FiX size={22} />
-        </button>
-
-        {/* Icon */}
+        {/* ─── HEADER WITH CLOSE BUTTON - FIXED ALIGNMENT ─── */}
         <div
           style={{
-            width: "clamp(56px, 10vw, 72px)",
-            height: "clamp(56px, 10vw, 72px)",
-            borderRadius: "50%",
-            background: `linear-gradient(145deg, ${C.primary}20, ${C.primary}08)`,
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            margin: "0 auto 16px",
+            justifyContent: "space-between",
+            marginBottom: 16,
           }}
         >
-          <FiClock size={32} color={C.primary} />
-        </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width: 40,
+                height: 40,
+                borderRadius: "50%",
+                background: `linear-gradient(145deg, ${C.primary}20, ${C.primary}08)`,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              <FiClock size={20} color={C.primary} />
+            </div>
+            <h2
+              style={{
+                fontSize: "clamp(18px, 3.5vw, 24px)",
+                fontWeight: 700,
+                color: C.dark,
+                fontFamily: "serif",
+                margin: 0,
+                lineHeight: 1.2,
+              }}
+            >
+              {t.extensionRequestTitle || "Request Time Extension"}
+            </h2>
+          </div>
 
-        <h2
-          style={{
-            fontSize: "clamp(20px, 4vw, 28px)",
-            fontWeight: 800,
-            color: C.dark,
-            textAlign: "center",
-            fontFamily: "serif",
-            marginBottom: 4,
-          }}
-        >
-          {t.extensionRequestTitle || "⏰ Request Time Extension"}
-        </h2>
+          {/* ─── HEADER WITH CLOSE BUTTON - FIXED ALIGNMENT ─── */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 16,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: "50%",
+                  background: `linear-gradient(145deg, ${C.primary}20, ${C.primary}08)`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <FiClock size={20} color={C.primary} />
+              </div>
+              <h2
+                style={{
+                  fontSize: "clamp(18px, 3.5vw, 24px)",
+                  fontWeight: 700,
+                  color: C.dark,
+                  fontFamily: "serif",
+                  margin: 0,
+                  lineHeight: 1.2,
+                }}
+              >
+                {t.extensionRequestTitle || "Request Time Extension"}
+              </h2>
+            </div>
+
+            {/* ✅ Close button - now in flex flow, NOT absolute */}
+            <button
+              onClick={handleClose}
+              disabled={isSubmitting}
+              style={{
+                background: "#f1f5f9",
+                border: "none",
+                borderRadius: "50%",
+                width: 36,
+                height: 36,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: isSubmitting ? "not-allowed" : "pointer",
+                color: C.muted,
+                transition: "all 0.2s ease",
+                flexShrink: 0,
+                opacity: isSubmitting ? 0.5 : 1,
+              }}
+              onMouseEnter={(e) => {
+                if (!isSubmitting) {
+                  e.currentTarget.style.background = "#e2e8f0";
+                  e.currentTarget.style.color = C.dark;
+                  e.currentTarget.style.transform = "scale(1.05)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#f1f5f9";
+                e.currentTarget.style.color = C.muted;
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              <FiX size={18} />
+            </button>
+          </div>
+        </div>
 
         {teamName && (
           <p
             style={{
               fontSize: "clamp(13px, 2.5vw, 15px)",
               color: C.primary,
-              textAlign: "center",
               marginBottom: 12,
               fontWeight: 500,
             }}
@@ -141,7 +203,6 @@ const RequestExtensionModal = ({
           style={{
             fontSize: "clamp(13px, 2.5vw, 15px)",
             color: C.muted,
-            textAlign: "center",
             marginBottom: 20,
             lineHeight: 1.6,
           }}
