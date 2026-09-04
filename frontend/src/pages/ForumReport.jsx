@@ -882,8 +882,6 @@ export default function ForumReport({
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // ─── Timer State ──────────────────────────────────────────────
-  // ─── Timer State ──────────────────────────────────────────────
-  // ─── Timer State ──────────────────────────────────────────────
   const [timerActive, setTimerActive] = useState(false);
   const [isReportLocked, setIsReportLocked] = useState(false);
   const [warningMessage, setWarningMessage] = useState(null);
@@ -892,6 +890,48 @@ export default function ForumReport({
   const [extensionRequested, setExtensionRequested] = useState(false);
 
   const isAdmin = isAdminOrAbove(user);
+
+  // ─── LocalStorage Key ──────────────────────────────────────────
+  const STORAGE_KEY = `forum_report_timer_${selectedTeam?.id || "default"}`;
+
+  // ─── Get initial time remaining from localStorage ────────────
+  const getInitialTimeRemaining = useCallback(() => {
+    if (!selectedTeam) return null;
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const data = JSON.parse(saved);
+        const elapsed = Math.floor((Date.now() - data.timestamp) / 1000);
+        const remaining = Math.max(0, data.timeRemaining - elapsed);
+        if (remaining > 0) {
+          console.log(`📊 Restored timer: ${remaining} seconds remaining`);
+          return remaining;
+        }
+      } catch (e) {
+        console.error("Failed to load timer state:", e);
+      }
+    }
+    return null;
+  }, [selectedTeam, STORAGE_KEY]);
+
+  // ─── Load timer state from localStorage ──────────────────────
+  useEffect(() => {
+    if (selectedTeam) {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          const data = JSON.parse(saved);
+          const elapsed = Math.floor((Date.now() - data.timestamp) / 1000);
+          const remaining = Math.max(0, data.timeRemaining - elapsed);
+          if (remaining > 0) {
+            setTimerActive(true);
+          }
+        } catch (e) {
+          console.error("Failed to load timer state:", e);
+        }
+      }
+    }
+  }, [selectedTeam, STORAGE_KEY]);
 
   // ─── Timer Hook ──────────────────────────────────────────────
   const {
@@ -906,15 +946,27 @@ export default function ForumReport({
     progressSaved,
   } = useMeetingTimer({
     isActive: timerActive,
+    initialTimeRemaining: getInitialTimeRemaining(),
     onTimeExpired: () => {
       setIsReportLocked(true);
       handleAutoSave();
       setShowExpiredModal(true);
+      localStorage.removeItem(STORAGE_KEY);
     },
     onWarning: (message) => {
       setWarningMessage(message);
       showToast(message, "warning");
       setTimeout(() => setWarningMessage(null), 5000);
+    },
+    onTick: (remaining) => {
+      // Save timer state to localStorage on every tick
+      localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({
+          timeRemaining: remaining,
+          timestamp: Date.now(),
+        }),
+      );
     },
   });
 
@@ -1869,24 +1921,28 @@ ${"=".repeat(50)}
                     const [hours, minutes] = v.split(":").map(Number);
                     const date = new Date();
                     date.setHours(hours, minutes, 0, 0);
-                    date.setMinutes(date.getMinutes() + 30); // Add 30 minutes
+                    date.setMinutes(date.getMinutes() + 30);
                     const endHours = String(date.getHours()).padStart(2, "0");
                     const endMinutes = String(date.getMinutes()).padStart(
                       2,
                       "0",
                     );
                     upd("timeEnd", `${endHours}:${endMinutes}`);
+
+                    // Start the timer when start time is set
+                    setTimerActive(true);
                   }
                 }}
                 type="time"
+                style={{ width: "100%" }}
               />
               <Field
                 label={tf("endTime", "End Time")}
                 value={form.timeEnd}
-                onChange={(v) => upd("timeEnd", v)}
                 type="time"
                 readOnly
                 style={{
+                  width: "100%",
                   background: "#f3f4f6",
                   cursor: "not-allowed",
                   opacity: 0.8,
