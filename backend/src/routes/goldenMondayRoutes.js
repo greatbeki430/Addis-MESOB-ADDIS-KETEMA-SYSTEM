@@ -858,8 +858,19 @@ router.post(
       );
 
       // ─── 2. Validate Files ──────────────────────────────────
+      // ─── 2. Validate Files ──────────────────────────────────
+      console.log("🔍 [UPLOAD DEBUG]");
+      console.log("  - req.files:", req.files);
+      console.log("  - req.file:", req.file);
+      console.log("  - req.body:", req.body);
+      console.log("  - Content-Type:", req.headers["content-type"]);
+      console.log("  - req.files length:", req.files?.length || 0);
+
       if (!req.files || req.files.length === 0) {
         console.error("❌ No files in request!");
+        console.error("❌ req.files:", JSON.stringify(req.files, null, 2));
+        console.error("❌ req.body:", JSON.stringify(req.body, null, 2));
+        console.error("❌ Content-Type:", req.headers["content-type"]);
         return res.status(400).json({
           success: false,
           error: "No files were uploaded. Please select at least one image.",

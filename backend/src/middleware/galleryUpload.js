@@ -26,23 +26,29 @@ const isAllowedMime = (mimetype) =>
   ALLOWED_MIME_PREFIXES_OR_TYPES.some((allowed) =>
     allowed.endsWith("/") ? mimetype.startsWith(allowed) : mimetype === allowed,
   );
-
 const storage = multer.memoryStorage();
 
 const galleryUpload = multer({
-  storage,
+  storage: storage,
   limits: {
     fileSize: MULTER_HARD_CEILING_BYTES,
     files: MAX_FILES_PER_UPLOAD,
   },
   fileFilter: (req, file, cb) => {
-    // This is the CLIENT-DECLARED mimetype only — a first-pass gate to
-    // reject obviously-wrong types early. The route handler re-verifies
-    // with actual byte sniffing (file-type package) before trusting
-    // anything security-relevant, per the original spec's requirement.
+    console.log(
+      "🔍 [MULTER] File received:",
+      file.originalname,
+      file.mimetype,
+      file.size,
+    );
     if (isAllowedMime(file.mimetype)) {
       cb(null, true);
     } else {
+      console.log(
+        "❌ [MULTER] Rejected file:",
+        file.originalname,
+        file.mimetype,
+      );
       cb(
         new Error(
           `UNSUPPORTED_FILE_TYPE:${file.originalname}:${file.mimetype}`,

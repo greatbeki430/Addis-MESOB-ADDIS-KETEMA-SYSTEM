@@ -520,6 +520,16 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               detectedCategory = "other";
             }
           }
+          console.log(
+            `📤 [GALLERY] Uploading ${file.name} to folder ${folderId}`,
+          );
+          console.log(`📤 [GALLERY] File details:`, {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            lastModified: file.lastModified,
+          });
+
           const formData = new FormData();
           // Use the original file directly!
           formData.append("image", file, file.name);
@@ -528,7 +538,8 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           if (sessionId) formData.append("sessionId", sessionId);
           formData.append("lang", language);
 
-          console.log(`📤 Uploading ${file.name} to folder ${folderId}`);
+          console.log(`📤 [GALLERY] FormData fields:`, [...formData.keys()]);
+          console.log(`📤 [GALLERY] FormData image:`, formData.get("image"));
 
           const uploadPromise = goldenMondayAPI.uploadGalleryPhoto(
             formData,
