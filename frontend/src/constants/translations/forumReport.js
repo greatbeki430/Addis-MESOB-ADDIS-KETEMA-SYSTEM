@@ -198,20 +198,20 @@ export const forumReportTranslations = {
       signaturePlaceholder: "የፊርማ መስመር",
 
       // ─── Buttons ──────────────────────────────────────────────
-      save: "💾 ሪፖርቱን አስቀምጥ",
-      newReport: "📄 አዲስ ሪፖርት",
-      addTeam: "➕ ቡድን ጨምር",
+      save: "ሪፖርቱን አስቀምጥ",
+      newReport: "አዲስ ሪፖርት",
+      addTeam: "ቡድን ጨምር",
       createFirstTeam: "የመጀመሪያ ቡድን ፍጠር",
       openReport: "ሪፖርት ክፈት",
       backToTeams: "← ወደ ቡድኖች ተመለስ",
       addNewTeam: "አዲስ ቡድን ጨምር",
       createTeam: "ቡድን ፍጠር",
       changeTeam: "ቡድን ቀይር",
-      exportPdf: "📄 PDF ላክ",
+      exportPdf: "PDF ላክ",
       addAbsent: "ያልተገኘ አባል ጨምር",
 
       // ─── Team Selector ────────────────────────────────────────
-      teamsTitle: "📊 በቡድን የአቻ ፎረም ሪፖርቶች",
+      teamsTitle: "በቡድን የአቻ ፎረም ሪፖርቶች",
       yourTeam: "ቡድንህ",
       selectTeamToReport: "ሪፖርት ለመሙላት ቡድን ይምረጡ",
       noTeamsYet: "እስካሁን ምንም ቡድን አልተፈጠረም። አዲስ ቡድን ለመፍጠር ቁልፉን ይጫኑ።",
@@ -245,8 +245,8 @@ export const forumReportTranslations = {
 
       // ─── AI Features ──────────────────────────────────────────
       generateSummary: "🤖 የAI ጽሑፍ ረዳት",
-      summarize: "📝 አጭር ያድርጉ",
-      fullReport: "📋 ሙሉ ሪፖርት",
+      summarize: "አጭር ያድርጉ",
+      fullReport: "ሙሉ ሪፖርት",
       aiActions: "የAI ተግባራት:",
       aiSummaryLabel: "🤖 የAI ስብሰባ ደቂቃዎች",
       aiContentApplied: "በAI የተፈጠረ ይዘት ተተግብሯል",
