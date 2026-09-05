@@ -674,8 +674,13 @@ export const goldenMondayAPI = {
   dismiss: (id) => api.delete(`/notifications/${id}/dismiss`), // Alias
 
   // ─── QR Check-in ──────────────────────────────────────────────
+  // Changed from POST to GET for QR generation
   generateQRCheckIn: (sessionId) =>
-    api.post(`/golden-monday/qr-checkin/${sessionId}`),
+    api.get(`/golden-monday/qr-checkin/${sessionId}`),
+
+  // ✅ ADD THIS: For recording the actual check-in (POST)
+  recordQRCheckIn: (sessionId, data) =>
+    api.post(`/golden-monday/qr-checkin/${sessionId}`, data || {}),
 };
 
 // ============================================================
