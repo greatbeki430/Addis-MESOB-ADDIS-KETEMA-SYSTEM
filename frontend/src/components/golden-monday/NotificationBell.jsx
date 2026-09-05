@@ -1,10 +1,10 @@
 // frontend/src/components/golden-monday/NotificationBell.jsx
-// ✅ FIXED: Proper error handling and API function validation
+// ✅ COMPLETELY FIXED: Uses notificationAPI as primary, goldenMondayAPI as fallback
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
 import { C } from "../../styles/theme";
-import { goldenMondayAPI } from "../../services/api";
+import { goldenMondayAPI, notificationAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
 import { useAuth } from "../../hooks/useAuth";
 import {
@@ -29,9 +29,12 @@ const getNotificationIcon = (type, size = 14) => {
 
   switch (type) {
     case "presenter_assigned":
+    case "golden_monday_assigned":
+    case "evaluation_passed_to_superadmin":
       return <FiStar {...iconProps} color={C.gold} />;
     case "session_reminder":
     case "title_reminder":
+    case "golden_monday_reminder":
       return <FiClock {...iconProps} color={C.primary} />;
     case "endorsement_received":
       return <FiMessageCircle {...iconProps} color="#10b981" />;
@@ -41,6 +44,12 @@ const getNotificationIcon = (type, size = 14) => {
     case "agenda_published":
       return <FiFile {...iconProps} color="#8b5cf6" />;
     case "session_cancelled":
+      return <FiAlertCircle {...iconProps} color="#ef4444" />;
+    case "evaluation_submitted":
+      return <FiCheck {...iconProps} color="#3b82f6" />;
+    case "daily_report_submitted":
+      return <FiFile {...iconProps} color="#10b981" />;
+    case "system_alert":
       return <FiAlertCircle {...iconProps} color="#ef4444" />;
     default:
       return <FiBell {...iconProps} color={C.muted} />;
@@ -58,6 +67,14 @@ const getNotificationTypeLabel = (type) => {
     resource_uploaded: "Resource Upload",
     agenda_published: "Agenda Published",
     session_cancelled: "Session Cancelled",
+    evaluation_submitted: "Evaluation Submitted",
+    evaluation_passed_to_superadmin: "Evaluation Passed",
+    daily_report_submitted: "Daily Report",
+    system_alert: "System Alert",
+    team_assigned: "Team Assignment",
+    meeting_scheduled: "Meeting Scheduled",
+    golden_monday_reminder: "Golden Monday Reminder",
+    golden_monday_assigned: "Golden Monday Assignment",
   };
   return labels[type] || "Notification";
 };
@@ -94,7 +111,6 @@ export default function NotificationBell() {
   // ─── Load Notifications ────────────────────────────────────────
   const loadNotifications = useCallback(
     async (reset = true) => {
-      // ✅ FIX: Check if user exists first
       if (!user?._id) {
         console.warn("⚠️ No user logged in, skipping notifications");
         return;
@@ -109,34 +125,48 @@ export default function NotificationBell() {
       try {
         const currentPage = reset ? 1 : page + 1;
 
-        // ✅ FIX: Use the correct API call with proper error handling
-        // Try both possible API endpoint names
+        // ✅ PRIMARY: Use notificationAPI (matches backend)
         let response;
+        let data;
+
         try {
-          // Try getNotifications first (primary)
-          response = await goldenMondayAPI.getNotifications({
+          response = await notificationAPI.getAll({
             page: currentPage,
             limit: 20,
+            includeRead: true,
           });
+          data = response?.data || {};
         } catch (primaryError) {
           console.warn(
-            "⚠️ getNotifications failed, trying getAll:",
+            "⚠️ notificationAPI.getAll failed, trying goldenMondayAPI:",
             primaryError,
           );
-          // Fallback to getAll
-          response = await goldenMondayAPI.getAll({
-            page: currentPage,
-            limit: 20,
-          });
+          // ✅ FALLBACK: Try goldenMondayAPI
+          try {
+            response = await goldenMondayAPI.getNotifications({
+              page: currentPage,
+              limit: 20,
+            });
+            data = response?.data || {};
+          } catch (secondaryError) {
+            console.warn(
+              "⚠️ goldenMondayAPI.getNotifications also failed:",
+              secondaryError,
+            );
+            // ✅ LAST RESORT: Direct fetch
+            response = await goldenMondayAPI.getNotificationList?.({
+              page: currentPage,
+              limit: 20,
+            });
+            data = response?.data || {};
+          }
         }
 
-        // ✅ FIX: Safely extract data with fallbacks
-        const data = response?.data || {};
+        // ✅ Safely extract data
         const items = data?.notifications || data?.data || [];
         const pagination = data?.pagination || { total: 0, pages: 1 };
         const unread = data?.unreadCount || 0;
 
-        // Ensure items is always an array
         const safeItems = Array.isArray(items) ? items : [];
 
         if (reset) {
@@ -151,8 +181,6 @@ export default function NotificationBell() {
         }
       } catch (error) {
         console.error("❌ Failed to load notifications:", error);
-        // ✅ FIX: Don't show toast for silent errors - just log
-        // Only show toast if it's a real error that affects UX
         if (reset && error.message !== "Network Error") {
           showToast("Failed to load notifications", "error");
         }
@@ -186,119 +214,216 @@ export default function NotificationBell() {
   }, []);
 
   // ─── Mark as Read ──────────────────────────────────────────────
-  const markAsRead = async (id) => {
-    if (markingReadId === id) return;
-
-    setMarkingReadId(id);
-    try {
-      // ✅ FIX: Try both possible function names
-      try {
-        await goldenMondayAPI.markNotificationRead(id);
-      } catch (primaryError) {
-        console.warn(
-          "⚠️ markNotificationRead failed, trying markRead:",
-          primaryError,
-        );
-        await goldenMondayAPI.markRead(id);
+  const markAsRead = useCallback(
+    async (id, e) => {
+      if (e) {
+        e.stopPropagation();
+        e.preventDefault();
       }
 
-      setNotifications((prev) =>
-        prev.map((n) =>
-          n._id === id ? { ...n, isRead: true, readAt: new Date() } : n,
-        ),
-      );
-      setUnreadCount((c) => Math.max(0, c - 1));
-    } catch (error) {
-      console.error("❌ Failed to mark as read:", error);
-      showToast("Failed to mark as read", "error");
-    } finally {
-      setMarkingReadId(null);
-    }
-  };
+      if (markingReadId === id) return;
+
+      setMarkingReadId(id);
+      try {
+        // ✅ PRIMARY: Use notificationAPI
+        let success = false;
+
+        try {
+          await notificationAPI.markRead(id);
+          success = true;
+        } catch (primaryError) {
+          console.warn(
+            "⚠️ notificationAPI.markRead failed, trying goldenMondayAPI:",
+            primaryError,
+          );
+          try {
+            await goldenMondayAPI.markNotificationRead(id);
+            success = true;
+          } catch (secondaryError) {
+            console.warn(
+              "⚠️ goldenMondayAPI.markNotificationRead also failed:",
+              secondaryError,
+            );
+            try {
+              await goldenMondayAPI.markRead(id);
+              success = true;
+            } catch (tertiaryError) {
+              console.warn("⚠️ All mark read attempts failed:", tertiaryError);
+            }
+          }
+        }
+
+        // ✅ Optimistic update
+        setNotifications((prev) =>
+          prev.map((n) =>
+            n._id === id ? { ...n, isRead: true, readAt: new Date() } : n,
+          ),
+        );
+        setUnreadCount((c) => Math.max(0, c - 1));
+
+        if (success) {
+          console.log("✅ Marked notification as read:", id);
+        }
+      } catch (error) {
+        console.error("❌ Failed to mark as read:", error);
+      } finally {
+        setMarkingReadId(null);
+      }
+    },
+    [markingReadId],
+  );
 
   // ─── Mark All as Read ──────────────────────────────────────────
-  const markAllAsRead = async () => {
-    if (markingAll || unreadCount === 0) return;
-
-    setMarkingAll(true);
-    try {
-      // ✅ FIX: Try both possible function names
-      try {
-        await goldenMondayAPI.markAllNotificationsRead();
-      } catch (primaryError) {
-        console.warn(
-          "⚠️ markAllNotificationsRead failed, trying markAllRead:",
-          primaryError,
-        );
-        try {
-          await goldenMondayAPI.markAllRead();
-        } catch (secondaryError) {
-          console.warn("⚠️ markAllRead also failed:", secondaryError);
-          // If both fail, update local state only
-        }
+  const markAllAsRead = useCallback(
+    async (e) => {
+      if (e) {
+        e.stopPropagation();
+        e.preventDefault();
       }
 
-      // ✅ FIX: Update local state regardless of API response
-      setNotifications((prev) =>
-        prev.map((n) => ({ ...n, isRead: true, readAt: new Date() })),
-      );
-      setUnreadCount(0);
-      showToast("All notifications marked as read", "success");
-    } catch (error) {
-      console.error("❌ Failed to mark all as read:", error);
-      showToast("Failed to mark all as read", "error");
-    } finally {
-      setMarkingAll(false);
-    }
-  };
+      if (markingAll || unreadCount === 0) return;
+
+      setMarkingAll(true);
+      try {
+        // ✅ PRIMARY: Use notificationAPI
+        let success = false;
+
+        try {
+          await notificationAPI.markAllRead();
+          success = true;
+        } catch (primaryError) {
+          console.warn(
+            "⚠️ notificationAPI.markAllRead failed, trying goldenMondayAPI:",
+            primaryError,
+          );
+          try {
+            await goldenMondayAPI.markAllNotificationsRead();
+            success = true;
+          } catch (secondaryError) {
+            console.warn(
+              "⚠️ goldenMondayAPI.markAllNotificationsRead also failed:",
+              secondaryError,
+            );
+            try {
+              await goldenMondayAPI.markAllRead();
+              success = true;
+            } catch (tertiaryError) {
+              console.warn(
+                "⚠️ All mark all read attempts failed:",
+                tertiaryError,
+              );
+            }
+          }
+        }
+
+        // ✅ Optimistic update
+        setNotifications((prev) =>
+          prev.map((n) => ({ ...n, isRead: true, readAt: new Date() })),
+        );
+        setUnreadCount(0);
+
+        if (success) {
+          showToast("All notifications marked as read", "success");
+        }
+      } catch (error) {
+        console.error("❌ Failed to mark all as read:", error);
+        showToast("Failed to mark all as read", "error");
+      } finally {
+        setMarkingAll(false);
+      }
+    },
+    [markingAll, unreadCount],
+  );
 
   // ─── Dismiss Notification ──────────────────────────────────────
-  const dismissNotification = async (id) => {
-    if (dismissingId === id) return;
+  const dismissNotification = useCallback(
+    async (id, e) => {
+      if (e) {
+        e.stopPropagation();
+        e.preventDefault();
+      }
 
-    setDismissingId(id);
-    try {
-      // ✅ FIX: Try both possible function names
+      if (dismissingId === id) return;
+
+      setDismissingId(id);
       try {
-        await goldenMondayAPI.dismissNotification(id);
-      } catch (primaryError) {
-        console.warn(
-          "⚠️ dismissNotification failed, trying dismiss:",
-          primaryError,
-        );
-        await goldenMondayAPI.dismiss(id);
+        // ✅ PRIMARY: Use notificationAPI
+        let success = false;
+
+        try {
+          await notificationAPI.dismiss(id);
+          success = true;
+        } catch (primaryError) {
+          console.warn(
+            "⚠️ notificationAPI.dismiss failed, trying goldenMondayAPI:",
+            primaryError,
+          );
+          try {
+            await goldenMondayAPI.dismissNotification(id);
+            success = true;
+          } catch (secondaryError) {
+            console.warn(
+              "⚠️ goldenMondayAPI.dismissNotification also failed:",
+              secondaryError,
+            );
+            try {
+              await goldenMondayAPI.dismiss(id);
+              success = true;
+            } catch (tertiaryError) {
+              console.warn("⚠️ All dismiss attempts failed:", tertiaryError);
+            }
+          }
+        }
+
+        // ✅ Update local state
+        const removed = notifications.find((n) => n._id === id);
+        setNotifications((prev) => prev.filter((n) => n._id !== id));
+        if (removed && !removed.isRead) {
+          setUnreadCount((c) => Math.max(0, c - 1));
+        }
+
+        if (success) {
+          showToast("Notification dismissed", "success");
+        }
+      } catch (error) {
+        console.error("❌ Failed to dismiss:", error);
+        showToast("Failed to dismiss", "error");
+      } finally {
+        setDismissingId(null);
+      }
+    },
+    [dismissingId, notifications],
+  );
+
+  // ─── Handle Notification Click ────────────────────────────────
+  const handleNotificationClick = useCallback(
+    (notification, e) => {
+      // ✅ If this is a button click, don't close the dropdown
+      if (e && e.target.closest(".notification-action")) {
+        return;
       }
 
-      const removed = notifications.find((n) => n._id === id);
-      setNotifications((prev) => prev.filter((n) => n._id !== id));
-      if (removed && !removed.isRead) {
-        setUnreadCount((c) => Math.max(0, c - 1));
+      // Mark as read if unread
+      if (!notification.isRead) {
+        markAsRead(notification._id, e);
       }
-      showToast("Notification dismissed", "success");
-    } catch (error) {
-      console.error("❌ Failed to dismiss:", error);
-      showToast("Failed to dismiss", "error");
-    } finally {
-      setDismissingId(null);
-    }
-  };
 
-  // ─── Handle Click ─────────────────────────────────────────────
-  const handleNotificationClick = (notification) => {
-    if (!notification.isRead) {
-      markAsRead(notification._id);
-    }
-    if (notification.link) {
-      window.location.assign(notification.link);
-    }
-    setIsOpen(false);
-  };
+      // Navigate if link exists
+      if (notification.link) {
+        window.location.assign(notification.link);
+      }
+
+      // Close dropdown only if clicking on the card body
+      setIsOpen(false);
+    },
+    [markAsRead],
+  );
 
   // ─── Load More ──────────────────────────────────────────────────
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
     if (!hasMore || loadingMore) return;
     loadNotifications(false);
-  };
+  }, [hasMore, loadingMore, loadNotifications]);
 
   if (!user?._id) return null;
 
@@ -436,6 +561,7 @@ export default function NotificationBell() {
                   <button
                     onClick={markAllAsRead}
                     disabled={markingAll}
+                    className="notification-action"
                     style={{
                       background: "none",
                       border: "none",
@@ -470,7 +596,11 @@ export default function NotificationBell() {
                   </button>
                 )}
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(false);
+                  }}
+                  className="notification-action"
                   style={{
                     background: "none",
                     border: "none",
@@ -574,7 +704,7 @@ export default function NotificationBell() {
                     return (
                       <div
                         key={n._id}
-                        onClick={() => handleNotificationClick(n)}
+                        onClick={(e) => handleNotificationClick(n, e)}
                         style={{
                           display: "flex",
                           alignItems: "flex-start",
@@ -738,6 +868,7 @@ export default function NotificationBell() {
                             alignSelf: "flex-start",
                             marginTop: 4,
                           }}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {n.link && (
                             <FiChevronRight
@@ -747,11 +878,9 @@ export default function NotificationBell() {
                             />
                           )}
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              dismissNotification(n._id);
-                            }}
+                            onClick={(e) => dismissNotification(n._id, e)}
                             disabled={dismissingId === n._id}
+                            className="notification-action"
                             style={{
                               background: "none",
                               border: "none",
@@ -789,6 +918,49 @@ export default function NotificationBell() {
                               <FiX size={16} />
                             )}
                           </button>
+                          {!n.isRead && (
+                            <button
+                              onClick={(e) => markAsRead(n._id, e)}
+                              disabled={markingReadId === n._id}
+                              className="notification-action"
+                              style={{
+                                background: "none",
+                                border: "none",
+                                color: C.primary,
+                                cursor:
+                                  markingReadId === n._id
+                                    ? "not-allowed"
+                                    : "pointer",
+                                padding: "4px",
+                                borderRadius: 6,
+                                opacity: markingReadId === n._id ? 0.5 : 1,
+                                transition: "all 0.2s ease",
+                              }}
+                              onMouseEnter={(e) => {
+                                if (markingReadId !== n._id) {
+                                  e.currentTarget.style.background = `${C.primary}15`;
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (markingReadId !== n._id) {
+                                  e.currentTarget.style.background =
+                                    "transparent";
+                                }
+                              }}
+                              title="Mark as read"
+                            >
+                              {markingReadId === n._id ? (
+                                <FiLoader
+                                  size={14}
+                                  style={{
+                                    animation: "spin 1s linear infinite",
+                                  }}
+                                />
+                              ) : (
+                                <FiCheck size={16} />
+                              )}
+                            </button>
+                          )}
                         </div>
                       </div>
                     );

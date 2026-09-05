@@ -28,7 +28,6 @@ api.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// Response interceptor to handle 401 errors
 // Response interceptor to handle 401 errors and 404 user endpoints
 api.interceptors.response.use(
   (response) => response,
@@ -49,7 +48,7 @@ api.interceptors.response.use(
       }
     }
 
-    // ─── Handle 401 Unauthorized ───
+    // ─── Handle 401 Unauthorized ──────────────────────────────
     if (error.response?.status === 401) {
       const errorData = error.response?.data || {};
       const message = errorData.message || "Unauthorized";
@@ -60,14 +59,8 @@ api.interceptors.response.use(
         console.log("⏰ Token expired, clearing session...");
         localStorage.removeItem("token");
         localStorage.removeItem("user");
-
-        const shouldRedirect = !window.location.pathname.includes("/login");
-        if (shouldRedirect) {
-          alert("Your session has expired. Please login again.");
-          setTimeout(() => {
-            window.location.href = "/login";
-          }, 500);
-        }
+        // ✅ Remove hard redirect - let AuthProvider handle it
+        // window.location.href = "/login";
       } else {
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -92,7 +85,6 @@ export const authAPI = {
   deleteUser: (id) => api.delete(`/auth/users/${id}`),
   changePassword: (data) => api.put("/auth/change-password", data),
   updateProfile: (data) => api.put("/auth/profile", data),
-  // ✅ NEW: Golden Monday Admin toggle
   setGoldenMondayAdmin: (id, isGoldenMondayAdmin) =>
     api.put(`/auth/users/${id}/golden-monday-admin`, { isGoldenMondayAdmin }),
 };
@@ -112,7 +104,7 @@ export const uploadAPI = {
 };
 
 // ============================================================
-// NOTIFICATIONS API
+// NOTIFICATIONS API (GENERAL)
 // ============================================================
 export const notificationAPI = {
   getAll: (params = {}) => {
@@ -133,22 +125,15 @@ export const notificationAPI = {
 // MEETINGS API (Forum Reports)
 // ============================================================
 export const meetingAPI = {
-  // ─── Basic CRUD ────────────────────────────────────────────
   create: (data) => api.post("/meetings", data),
   getAll: (params = {}) => api.get("/meetings", { params }),
   getById: (id) => api.get(`/meetings/${id}`),
   getByTeam: (teamId) => api.get(`/meetings/team/${teamId}`),
   update: (id, data) => api.put(`/meetings/${id}`, data),
   delete: (id) => api.delete(`/meetings/${id}`),
-
-  // ─── NEW: Auto-Save ────────────────────────────────────────
   autoSave: (data) => api.post("/meetings/auto-save", data),
-
-  // ─── NEW: Lock/Unlock ──────────────────────────────────────
   lock: (id, reason = "") => api.post(`/meetings/${id}/lock`, { reason }),
   unlock: (id) => api.post(`/meetings/${id}/unlock`),
-
-  // ─── NEW: Extension Requests ──────────────────────────────
   requestExtension: (id, reason, requestedDuration = 15) =>
     api.post(`/meetings/${id}/request-extension`, {
       reason,
@@ -163,8 +148,6 @@ export const meetingAPI = {
     }),
   getExtensionRequests: (status = "pending") =>
     api.get("/meetings/extensions", { params: { status } }),
-
-  // ─── NEW: Admin Progress ──────────────────────────────────
   getProgress: (id) => api.get(`/meetings/${id}/progress`),
   resume: (id) => api.post(`/meetings/${id}/resume`),
 };
@@ -274,7 +257,6 @@ export const reportAPI = {
 export const aiAPI = {
   getDailyInsight: (reportId, reportData) =>
     api.post("/ai/daily-insight", { reportId, reportData }),
-
   getEvaluationSummary: (arg1, arg2) => {
     let evaluationId;
     let evaluationData;
@@ -301,7 +283,6 @@ export const aiAPI = {
       language,
     });
   },
-
   getDashboardDigest: (stats) => api.post("/ai/dashboard-digest", { stats }),
   getMeetingMinutes: (data) => api.post("/ai/meeting-minutes", data),
   getServiceRecommendations: (query) =>
@@ -357,8 +338,33 @@ export const departmentAPI = {
   deleteDepartment: (id) => api.delete(`/departments/${id}`),
 };
 
+// ✅ Helper: dataURL to Blob
+function dataURLtoBlob(dataURL) {
+  try {
+    const arr = dataURL.split(",");
+    if (!arr || arr.length < 2) {
+      throw new Error("Invalid data URL format");
+    }
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) {
+      throw new Error("Could not extract MIME type from data URL");
+    }
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while (n--) {
+      u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], { type: mime });
+  } catch (error) {
+    console.error("❌ [dataURLtoBlob] Error:", error.message);
+    throw error;
+  }
+}
+
 // ============================================================
-// GOLDEN MONDAY API — COMPLETE
+// GOLDEN MONDAY API — COMPLETE FIXED
 // ============================================================
 export const goldenMondayAPI = {
   // ──────────────────────────────────────────────────────────────
@@ -386,19 +392,6 @@ export const goldenMondayAPI = {
   // 🖼️ GALLERY MANAGEMENT
   // ──────────────────────────────────────────────────────────────
   getGallery: (params) => api.get("/golden-monday/gallery", { params }),
-
-  // ✅ FIXED: GalleryGrid.jsx builds and sends a real FormData object
-  // (with a Blob for the file field, folderId, category, sessionId,
-  // lang all already appended). This used to be re-interpreted as a
-  // plain { image, folderId, ... } object below, where `data.image`
-  // is always `undefined` on a FormData instance — that's what was
-  // producing "No image data provided" on every gallery upload,
-  // client-side, before any request even left the browser.
-  //
-  // The FormData branch is now used whenever the caller already built
-  // one (the current case). The plain-object branch is kept as a
-  // fallback for any future/other caller that still wants to hand
-  // over a base64 data URL instead of building FormData itself.
   uploadGalleryPhoto: (data, onProgress) => {
     let formData;
 
@@ -407,7 +400,6 @@ export const goldenMondayAPI = {
     } else {
       formData = new FormData();
 
-      // Handle base64 file data
       if (
         data.image &&
         typeof data.image === "string" &&
@@ -418,9 +410,6 @@ export const goldenMondayAPI = {
           const ext = blob.type.split("/")[1]?.split("+")[0] || "bin";
           const filename = data.filename || `upload.${ext}`;
           formData.append("image", blob, filename);
-          console.log(
-            `📸 [UPLOAD] File prepared: ${filename}, size: ${blob.size} bytes`,
-          );
         } catch (blobError) {
           console.error(
             "❌ [UPLOAD] Failed to convert dataURL to blob:",
@@ -437,14 +426,9 @@ export const goldenMondayAPI = {
         return Promise.reject(new Error("No image data provided"));
       }
 
-      // ✅ REQUIRED: folderId must be sent
       if (data.folderId) {
         formData.append("folderId", data.folderId);
-        console.log(`📤 [UPLOAD] folderId: ${data.folderId}`);
       } else {
-        console.warn(
-          "⚠️ [UPLOAD] No folderId provided - backend requires this",
-        );
         return Promise.reject(new Error("folderId is required for upload"));
       }
 
@@ -453,14 +437,6 @@ export const goldenMondayAPI = {
       if (data.lang) formData.append("lang", data.lang);
       if (data.topic) formData.append("topic", data.topic);
     }
-
-    console.log("📤 [UPLOAD] Sending request with fields:", [
-      ...formData.keys(),
-    ]);
-
-    console.log("🔍 [API] Uploading to /golden-monday/gallery");
-    console.log("🔍 [API] FormData fields:", [...formData.keys()]);
-    console.log("🔍 [API] FormData image file:", formData.get("image"));
 
     return api
       .post("/golden-monday/gallery", formData, {
@@ -475,7 +451,6 @@ export const goldenMondayAPI = {
         },
       })
       .catch((error) => {
-        // Enhance error with more context
         console.error(
           "❌ [UPLOAD] Request failed:",
           error.response?.data || error.message,
@@ -489,7 +464,6 @@ export const goldenMondayAPI = {
         return Promise.reject(error);
       });
   },
-
   deleteGalleryPhoto: (photoId) =>
     api.delete(`/golden-monday/gallery/${photoId}`),
   getFolders: (params) => api.get("/golden-monday/gallery/folders", { params }),
@@ -620,12 +594,6 @@ export const goldenMondayAPI = {
   // ─── Resources ──────────────────────────────────────────────────
   getSessionResources: (sessionId) =>
     api.get(`/golden-monday/resources/session/${sessionId}`),
-
-  // ✅ FIXED: accepts the onProgress callback ResourceLibrary.jsx
-  // already passes as a 3rd argument and wires it to axios's
-  // onUploadProgress, so the progress bar actually moves. The upload
-  // itself worked before this fix (formData was forwarded correctly);
-  // only the progress reporting was silently dropped.
   uploadSessionResource: (sessionId, formData, onProgress) =>
     api.post(`/golden-monday/resources/session/${sessionId}`, formData, {
       headers: { "Content-Type": "multipart/form-data" },
@@ -646,45 +614,41 @@ export const goldenMondayAPI = {
   updateSessionResource: (resourceId, data) =>
     api.put(`/golden-monday/resources/${resourceId}`, data),
 
-  // ─── Notifications ─────────────────────────────────────────────
-  getNotifications: (params) =>
-    api.get("/golden-monday/notifications", { params }),
-  markNotificationRead: (id) =>
-    api.put(`/golden-monday/notifications/${id}/read`),
-  markAllNotificationsRead: () =>
-    api.put("/golden-monday/notifications/read-all"),
-  dismissNotification: (id) =>
-    api.put(`/golden-monday/notifications/${id}/dismiss`),
+  // ─── NOTIFICATIONS - ✅ FIXED to match backend routes ──────
+  // These now use the general /notifications endpoint instead of /golden-monday/notifications
+  getNotifications: (params) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page);
+    if (params?.limit) queryParams.append("limit", params.limit);
+    if (params?.includeRead !== undefined)
+      queryParams.append("includeRead", params.includeRead);
+    return api.get(`/notifications?${queryParams.toString()}`);
+  },
+  // Alias for consistency with notificationAPI
+  getNotificationList: (params) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page);
+    if (params?.limit) queryParams.append("limit", params.limit);
+    if (params?.includeRead !== undefined)
+      queryParams.append("includeRead", params.includeRead);
+    return api.get(`/notifications?${queryParams.toString()}`);
+  },
+  // ✅ FIXED: GET unread count (not POST)
+  getUnreadCount: () => api.get("/notifications/unread-count"),
+  // ✅ FIXED: PUT to mark as read
+  markNotificationRead: (id) => api.put(`/notifications/${id}/read`),
+  markRead: (id) => api.put(`/notifications/${id}/read`), // Alias
+  // ✅ FIXED: PUT to mark all as read
+  markAllNotificationsRead: () => api.put("/notifications/read-all"),
+  markAllRead: () => api.put("/notifications/read-all"), // Alias
+  // ✅ FIXED: DELETE to dismiss (not PUT)
+  dismissNotification: (id) => api.delete(`/notifications/${id}/dismiss`),
+  dismiss: (id) => api.delete(`/notifications/${id}/dismiss`), // Alias
 
   // ─── QR Check-in ──────────────────────────────────────────────
   generateQRCheckIn: (sessionId) =>
     api.post(`/golden-monday/qr-checkin/${sessionId}`),
 };
-
-// ✅ Helper: dataURL to Blob
-function dataURLtoBlob(dataURL) {
-  try {
-    const arr = dataURL.split(",");
-    if (!arr || arr.length < 2) {
-      throw new Error("Invalid data URL format");
-    }
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    if (!mimeMatch) {
-      throw new Error("Could not extract MIME type from data URL");
-    }
-    const mime = mimeMatch[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) {
-      u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: mime });
-  } catch (error) {
-    console.error("❌ [dataURLtoBlob] Error:", error.message);
-    throw error;
-  }
-}
 
 // ============================================================
 // FEED API
