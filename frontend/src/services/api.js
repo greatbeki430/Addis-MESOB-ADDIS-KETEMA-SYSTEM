@@ -8,12 +8,18 @@ const API_BASE_URL =
 console.log("VITE_API_BASE_URL =", import.meta.env.VITE_API_BASE_URL);
 console.log("API_BASE_URL =", API_BASE_URL);
 
+// ⚠️ NOTE: do NOT set a default "Content-Type": "application/json" header on
+// this instance. Axios already sets that automatically for plain-object
+// bodies. A fixed instance default gets attached to EVERY request through
+// this instance — including FormData/file uploads — so the browser can
+// never attach its own multipart boundary. That was the actual cause of
+// every gallery/photo upload failing with "No files were uploaded": the
+// server received Content-Type: application/json for a multipart body and
+// multer silently parsed zero files. This has already broken this app
+// twice from being re-added — please don't re-add it again.
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 120000,
-  headers: {
-    "Content-Type": "application/json",
-  },
 });
 
 // Add token to requests if it exists
@@ -23,6 +29,22 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // ✅ Whenever the body is FormData (file/photo uploads), strip any
+    // Content-Type header entirely so the browser computes the correct
+    // one with a boundary. A manually set "multipart/form-data" string
+    // (with no boundary) is just as broken as "application/json" here —
+    // multer can't parse either. This covers every FormData call site,
+    // present or future, even if a header is mistakenly added again.
+    if (typeof FormData !== "undefined" && config.data instanceof FormData) {
+      if (config.headers) {
+        delete config.headers["Content-Type"];
+        delete config.headers["content-type"];
+      }
+    } else if (!config.headers["Content-Type"]) {
+      config.headers["Content-Type"] = "application/json";
+    }
+
     return config;
   },
   (error) => Promise.reject(error),
@@ -49,21 +71,32 @@ api.interceptors.response.use(
     }
 
     // ─── Handle 401 Unauthorized ──────────────────────────────
+    // ✅ FIX: a previous edit removed the redirect here on the theory that
+    // "AuthProvider will handle it" once localStorage is cleared. It won't:
+    // AuthProvider's isAuthenticated is driven by its own React `user`
+    // state, and it only calls its logout() (which clears that state) from
+    // inside loadUser()/refreshUser()'s own 401 catch blocks — it has no
+    // listener on localStorage or on this interceptor. So clearing
+    // localStorage here, alone, leaves the UI still believing it's logged
+    // in (stale `user` state) until some unrelated call happens to 401
+    // again through one of those two functions. A hard redirect is what
+    // actually forces a clean re-mount that re-reads localStorage from
+    // scratch, so re-add it.
     if (error.response?.status === 401) {
       const errorData = error.response?.data || {};
       const message = errorData.message || "Unauthorized";
 
       console.log("🔐 Auth error:", message);
 
-      if (message.includes("expired") || message.includes("token failed")) {
-        console.log("⏰ Token expired, clearing session...");
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
-        // ✅ Remove hard redirect - let AuthProvider handle it
-        // window.location.href = "/login";
-      } else {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+
+      const shouldRedirect = !window.location.pathname.includes("/login");
+      if (shouldRedirect) {
+        alert("Your session has expired. Please login again.");
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 500);
       }
     }
 
@@ -93,14 +126,12 @@ export const authAPI = {
 // UPLOAD API
 // ============================================================
 export const uploadAPI = {
+  // ✅ FIX: removed manual Content-Type header — see note on the request
+  // interceptor above. A hardcoded "multipart/form-data" string has no
+  // boundary parameter and the server can't parse the body at all.
   uploadEmployeePhoto: (formData) =>
-    api.post("/upload/employee-photo", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    }),
-  uploadProfilePhoto: (formData) =>
-    api.post("/upload/profile-photo", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    }),
+    api.post("/upload/employee-photo", formData),
+  uploadProfilePhoto: (formData) => api.post("/upload/profile-photo", formData),
 };
 
 // ============================================================
@@ -208,19 +239,16 @@ export const serviceAPI = {
   create: (data) => api.post("/services", data),
   update: (id, data) => api.put(`/services/${id}`, data),
   delete: (id) => api.delete(`/services/${id}`),
+  // ✅ FIX: removed manual Content-Type header — see note above.
   importExcel: (file) => {
     const formData = new FormData();
     formData.append("file", file);
-    return api.post("/services/import-excel", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    return api.post("/services/import-excel", formData);
   },
   previewImport: (file) => {
     const formData = new FormData();
     formData.append("file", file);
-    return api.post("/services/preview-import", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    return api.post("/services/preview-import", formData);
   },
 };
 
@@ -594,9 +622,9 @@ export const goldenMondayAPI = {
   // ─── Resources ──────────────────────────────────────────────────
   getSessionResources: (sessionId) =>
     api.get(`/golden-monday/resources/session/${sessionId}`),
+  // ✅ FIX: removed manual Content-Type header — see note above.
   uploadSessionResource: (sessionId, formData, onProgress) =>
     api.post(`/golden-monday/resources/session/${sessionId}`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
       timeout: 60000,
       onUploadProgress: (progressEvent) => {
         if (onProgress && progressEvent.total) {

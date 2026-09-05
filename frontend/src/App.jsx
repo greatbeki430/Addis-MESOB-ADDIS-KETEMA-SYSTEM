@@ -280,7 +280,11 @@ function AuthenticatedApp() {
             style={{ maxWidth: "100%", overflowX: "hidden" }}
           >
             <Routes>
-              <Route path="/" element={<Landing />} />
+              {/* ✅ FIX: logged-in users hitting "/" now go straight to
+                  the dashboard instead of rendering the public marketing
+                  Landing page inside the authenticated Sidebar/Header
+                  shell (which duplicated navigation and looked broken). */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route
                 path="/dashboard"
                 element={<Dashboard t={t} lang={language} />}
