@@ -2220,9 +2220,74 @@ router.get(
 );
 
 // ════════════════════════════════════════════════════════════════
-// ✅ QR CHECK-IN
+// ✅ QR CHECK-IN - COMPLETE FIXED VERSION
 // ════════════════════════════════════════════════════════════════
 
+// ─── 1. GENERATE QR CODE (GET) ──────────────────────────────
+// GET /api/golden-monday/qr-checkin/:sessionId
+// This generates a QR code image for the session
+router.get("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const QRCode = require("qrcode");
+
+    const session = await GoldenMondaySession.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    // Check if session is active (today or future)
+    const now = new Date();
+    const sessionDate = new Date(session.date);
+    const isActive =
+      sessionDate.toDateString() === now.toDateString() || sessionDate > now;
+
+    if (!isActive && session.status !== "scheduled") {
+      return res.status(400).json({
+        error: "This session is not active for check-in",
+      });
+    }
+
+    // Generate QR code data
+    const qrData = JSON.stringify({
+      sessionId: session._id,
+      userId: req.user._id,
+      timestamp: Date.now(),
+      type: "golden-monday-checkin",
+      sessionTitle: session.title || "Golden Monday Session",
+    });
+
+    // Generate QR code as data URL
+    const qrCode = await QRCode.toDataURL(qrData, {
+      errorCorrectionLevel: "H",
+      margin: 2,
+      width: 300,
+      color: {
+        dark: "#1a3aad",
+        light: "#ffffff",
+      },
+    });
+
+    res.json({
+      success: true,
+      qrCode,
+      session: {
+        id: session._id,
+        title: session.title,
+        date: session.date,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [QR GENERATE] Error:", error);
+    res.status(500).json({
+      error: error.message || "Failed to generate QR code",
+    });
+  }
+});
+
+// ─── 2. RECORD QR CHECK-IN (POST) ────────────────────────────
+// POST /api/golden-monday/qr-checkin/:sessionId
+// This records the attendance after QR scan
 router.post("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -2287,5 +2352,4 @@ router.post("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 module.exports = router;
