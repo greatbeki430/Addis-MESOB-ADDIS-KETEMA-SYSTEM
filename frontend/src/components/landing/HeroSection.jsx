@@ -1,20 +1,22 @@
 // src/components/landing/HeroSection.jsx
-// ✨ PREMIUM HERO SECTION - Unique, Stunning, Modern
+// ✨ PREMIUM HERO SECTION - User-Friendly, Service-Oriented
 
 import { useState, useEffect } from "react";
 import {
   FiLogIn,
   FiArrowRight,
   FiGrid,
-  FiBarChart2,
   FiShield,
-  FiCpu,
   FiUsers,
   FiFileText,
   FiStar,
   FiTrendingUp,
   FiZap,
   FiChevronRight,
+  FiClock,
+  FiAward,
+  FiGlobe,
+  FiMessageSquare,
 } from "react-icons/fi";
 import { C, F } from "../../styles/theme";
 import mesobLogo from "../../assets/mesoblogo.png";
@@ -416,13 +418,13 @@ const HeroSection = ({ t, onLogin }) => {
               {
                 value: "3",
                 label: t("landing.statLanguages") || "Languages",
-                icon: <FiFileText size={isMobile ? 14 : 18} />,
+                icon: <FiGlobe size={isMobile ? 14 : 18} />,
                 color: "#60a5fa",
               },
               {
                 value: "24/7",
                 label: t("landing.statAI") || "AI Support",
-                icon: <FiCpu size={isMobile ? 14 : 18} />,
+                icon: <FiMessageSquare size={isMobile ? 14 : 18} />,
                 color: "#a78bfa",
               },
             ].map((stat, i) => (
@@ -651,52 +653,60 @@ const AnimatedBackground = () => {
   );
 };
 
-// ─── PREMIUM 3D VISUAL ────────────────────────────────────────
+// ─── PREMIUM 3D VISUAL - USER-FOCUSED ────────────────────────
 const Premium3DVisual = ({ isTablet }) => {
   const iconSize = isTablet ? 14 : 18;
   const badgeSize = isTablet ? 36 : 44;
   const centerSize = isTablet ? 110 : 150;
 
+  // ✅ USER-FRIENDLY SERVICES (instead of technical terms)
   const orbitItems = [
     {
-      icon: <FiGrid size={iconSize} />,
-      label: "React",
-      color: "#61dafb",
+      icon: <FiFileText size={iconSize} />,
+      label: "Reports",
+      color: "#60a5fa",
       delay: 0,
     },
     {
-      icon: <FiCpu size={iconSize} />,
-      label: "Node.js",
-      color: "#68a063",
+      icon: <FiStar size={iconSize} />,
+      label: "Evaluation",
+      color: "#f59e0b",
       delay: 0.6,
     },
     {
-      icon: <FiFileText size={iconSize} />,
-      label: "Express",
-      color: "#fff",
+      icon: <FiUsers size={iconSize} />,
+      label: "Services",
+      color: "#34d399",
       delay: 1.2,
     },
     {
-      icon: <FiUsers size={iconSize} />,
-      label: "MongoDB",
-      color: "#4db33d",
+      icon: <FiClock size={iconSize} />,
+      label: "Attendance",
+      color: "#a78bfa",
       delay: 1.8,
     },
     {
-      icon: <FiBarChart2 size={iconSize} />,
-      label: "Vite",
-      color: "#646cff",
+      icon: <FiMessageSquare size={iconSize} />,
+      label: "Forum",
+      color: "#f472b6",
       delay: 2.4,
+    },
+    {
+      icon: <FiAward size={iconSize} />,
+      label: "Golden Monday",
+      color: "#fbbf24",
+      delay: 3.0,
     },
   ];
 
+  // ✅ OUTER ORBIT - Key Benefits (simplified)
   const outerOrbitItems = [
-    { icon: "🎤", label: "Presentations" },
-    { icon: "📊", label: "Reports" },
-    { icon: "📋", label: "Evaluation" },
+    { icon: "📋", label: "Register" },
+    { icon: "📊", label: "Report" },
+    { icon: "⭐", label: "Evaluate" },
+    { icon: "🤖", label: "AI Help" },
     { icon: "📁", label: "Documents" },
-    { icon: "🤖", label: "AI Assistant" },
-    { icon: "📈", label: "Analytics" },
+    { icon: "🏆", label: "Growth" },
   ];
 
   const radius = isTablet ? 48 : 62;
@@ -829,7 +839,7 @@ const Premium3DVisual = ({ isTablet }) => {
         />
       </div>
 
-      {/* Orbiting Tech Items */}
+      {/* Orbiting Service Items (closer to center) */}
       {orbitItems.map((item, i) => {
         const angle = (i / orbitItems.length) * Math.PI * 2 - Math.PI / 2;
         const x = 50 + Math.cos(angle) * radius;
@@ -901,7 +911,7 @@ const Premium3DVisual = ({ isTablet }) => {
         );
       })}
 
-      {/* Outer Orbiting Service Labels */}
+      {/* Outer Orbiting Benefit Labels */}
       {outerOrbitItems.map((item, i) => {
         const angle = (i / outerOrbitItems.length) * Math.PI * 2 + Math.PI / 2;
         const x = 50 + Math.cos(angle) * outerRadius;
@@ -984,7 +994,7 @@ const Premium3DVisual = ({ isTablet }) => {
           backdropFilter: "blur(4px)",
         }}
       >
-        Digital Ethiopia{" "}
+        Digital Ethiopia
       </div>
     </div>
   );
@@ -992,6 +1002,15 @@ const Premium3DVisual = ({ isTablet }) => {
 
 // ─── MOBILE PREMIUM VISUAL ────────────────────────────────────
 const MobilePremiumVisual = () => {
+  // ✅ User-friendly items for mobile
+  const mobileItems = [
+    { icon: "📋", label: "Register" },
+    { icon: "📊", label: "Report" },
+    { icon: "⭐", label: "Evaluate" },
+    { icon: "🤖", label: "AI Help" },
+    { icon: "📁", label: "Docs" },
+  ];
+
   return (
     <div
       style={{
@@ -1082,14 +1101,8 @@ const MobilePremiumVisual = () => {
       </div>
 
       {/* Orbiting labels */}
-      {[
-        { icon: "📊", label: "Reports" },
-        { icon: "🤖", label: "AI" },
-        { icon: "📁", label: "Docs" },
-        { icon: "🎤", label: "Present" },
-        { icon: "📋", label: "Evaluate" },
-      ].map((item, i) => {
-        const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+      {mobileItems.map((item, i) => {
+        const angle = (i / mobileItems.length) * Math.PI * 2 - Math.PI / 2;
         const radius = 58;
         const x = 50 + Math.cos(angle) * radius;
         const y = 50 + Math.sin(angle) * radius;
