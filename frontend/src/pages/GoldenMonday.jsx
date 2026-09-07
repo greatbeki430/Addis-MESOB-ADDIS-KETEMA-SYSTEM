@@ -1897,6 +1897,54 @@ export default function GoldenMonday() {
         .fade-in {
           animation: fadeIn 0.4s ease forwards;
         }
+
+        /* ── Mobile responsive button labels ── */
+@media (max-width: 768px) {
+  .btn-label {
+    display: none !important;
+  }
+  .gm-auto-announce-btn,
+  .gm-reminder-btn,
+  .gm-refresh-btn {
+    padding: 8px 10px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    border-radius: 50% !important;
+    width: 38px !important;
+    height: 38px !important;
+  }
+  .gm-auto-announce-btn svg,
+  .gm-reminder-btn svg,
+  .gm-refresh-btn svg {
+    margin: 0 !important;
+    width: 16px !important;
+    height: 16px !important;
+  }
+  .gm-admin-actions {
+    gap: 6px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .gm-auto-announce-btn,
+  .gm-reminder-btn,
+  .gm-refresh-btn {
+    padding: 6px 8px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    width: 34px !important;
+    height: 34px !important;
+  }
+  .gm-auto-announce-btn svg,
+  .gm-reminder-btn svg,
+  .gm-refresh-btn svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+  .gm-admin-actions {
+    gap: 4px !important;
+  }
+}
       `}</style>
 
       {/* ── HERO SECTION ── */}

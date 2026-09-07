@@ -32,22 +32,27 @@ export default function ReminderControls({ t }) {
     <button
       onClick={handleSendReminders}
       disabled={sending}
+      className="gm-reminder-btn"
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 6,
-        padding: "8px 18px",
-        borderRadius: 10,
+        justifyContent: "center",
+        gap: "6px",
+        padding: "8px 14px",
+        borderRadius: "10px",
         border: "none",
         background: sending
           ? C.border
           : "linear-gradient(135deg, #f59e0b, #d97706)",
         color: sending ? C.muted : "#fff",
         fontWeight: 600,
-        fontSize: 12,
+        fontSize: "clamp(11px, 1.8vw, 13px)",
         cursor: sending ? "not-allowed" : "pointer",
         opacity: sending ? 0.6 : 1,
         transition: "all 0.3s ease",
+        whiteSpace: "nowrap",
+        minHeight: "clamp(32px, 4.5vh, 40px)",
+        flexShrink: 0,
       }}
     >
       {sending ? (
@@ -55,9 +60,9 @@ export default function ReminderControls({ t }) {
       ) : (
         <FiBell size={14} />
       )}
-      {sending
-        ? t.sending || "Sending..."
-        : t.sendReminders || "Send Reminders"}
+      <span className="btn-label">
+        {sending ? t.sending || "Sending..." : t.sendReminders || "Reminders"}
+      </span>
     </button>
   );
 }
