@@ -12,6 +12,7 @@ import { useLanguage } from "../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
 import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
+import AutoAnnounceButton from "./AutoAnnounceButton";
 import {
   FiRefreshCw,
   FiVideo,
@@ -112,12 +113,12 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
   }, [loadAll]);
 
   // ── Handlers ──
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     await loadAll();
     showToast(t.refresh || "Data refreshed", "success");
-  };
+  }, [loadAll, t]);
 
-  const handleAssignNext = async () => {
+  const handleAssignNext = useCallback(async () => {
     setAssigning(true);
     try {
       const res = await goldenMondayAPI.assignRotation();
@@ -126,26 +127,48 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
           t.alreadyAssigned || "This week's presenter is already assigned",
           "info",
         );
+        // Check if announcement should be sent for already assigned
+        if (res.data.session && !res.data.session.announcementSent) {
+          showToast(
+            t.manualPostAvailable || "You can manually post the announcement",
+            "info",
+          );
+        }
       } else {
+        const presenterName =
+          res.data.session?.presenterName ||
+          res.data.session?.presenter?.name ||
+          "Presenter";
         showToast(
-          `${res.data.session.presenterName} ${t.assignedNext || "assigned to present next"}`,
+          `${presenterName} ${t.assignedNext || "assigned to present next"}`,
           "success",
         );
+        // Check if auto-post succeeded
+        if (res.data.session?.announcementSent) {
+          showToast(
+            t.autoPosted || "📢 Announcement auto-posted to Telegram!",
+            "success",
+          );
+        } else {
+          showToast(
+            t.manualPostAvailable || "You can manually post the announcement",
+            "info",
+          );
+        }
       }
       await loadAll();
     } catch (err) {
-      showToast(
+      const errorMessage =
         err.response?.data?.message ||
-          t.assignError ||
-          "Failed to assign presenter",
-        "error",
-      );
+        t.assignError ||
+        "Failed to assign presenter";
+      showToast(errorMessage, "error");
     } finally {
       setAssigning(false);
     }
-  };
+  }, [t, loadAll]);
 
-  const handleSaveTitle = async () => {
+  const handleSaveTitle = useCallback(async () => {
     if (!currentSession || !titleDraft.trim()) return;
     setSavingTitle(true);
     try {
@@ -156,18 +179,17 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
       showToast(t.titleSaved || "Presentation title saved", "success");
       await loadAll();
     } catch (err) {
-      showToast(
+      const errorMessage =
         err.response?.data?.message ||
-          t.titleSaveError ||
-          "Failed to save title",
-        "error",
-      );
+        t.titleSaveError ||
+        "Failed to save title";
+      showToast(errorMessage, "error");
     } finally {
       setSavingTitle(false);
     }
-  };
+  }, [currentSession, titleDraft, t, loadAll]);
 
-  const handleUploadRecording = async () => {
+  const handleUploadRecording = useCallback(async () => {
     if (!currentSession || !recordingFile) return;
     setUploadingRecording(true);
     try {
@@ -180,30 +202,32 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
       setRecordingFile(null);
       await loadAll();
     } catch (err) {
-      showToast(
+      const errorMessage =
         err.response?.data?.message ||
-          t.recordingUploadError ||
-          "Failed to upload recording",
-        "error",
-      );
+        t.recordingUploadError ||
+        "Failed to upload recording";
+      showToast(errorMessage, "error");
     } finally {
       setUploadingRecording(false);
     }
-  };
+  }, [currentSession, recordingFile, t, loadAll]);
 
-  const handleCopyTitle = () => {
+  const handleCopyTitle = useCallback(() => {
     if (currentSession?.presentationTitle) {
       navigator.clipboard.writeText(currentSession.presentationTitle);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
       showToast(t.copied || "Title copied!", "success");
     }
-  };
+  }, [currentSession, t]);
 
-  const isMyTurn =
-    currentSession?.presenter &&
-    user?._id &&
-    String(currentSession.presenter) === String(user._id);
+  const isMyTurn = useMemo(() => {
+    return (
+      currentSession?.presenter &&
+      user?._id &&
+      String(currentSession.presenter) === String(user._id)
+    );
+  }, [currentSession, user]);
 
   // ── Ranking Stats ──
   const rankingStats = useMemo(() => {
@@ -384,6 +408,9 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
           </div>
 
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* ✅ ADD AUTO-ANNOUNCE BUTTON */}
+            <AutoAnnounceButton onDone={loadAll} t={t} />
+
             {isPrivileged && (
               <button
                 onClick={handleAssignNext}
@@ -548,7 +575,7 @@ export default function GoldenMondayRotationPanel({ onRefresh }) {
           ))}
         </div>
 
-        {/* ─── TAB CONTENT ─── */}
+        {/* ── TAB CONTENT ── */}
         <AnimatePresence mode="wait">
           {activeTab === "presenter" && (
             <motion.div
