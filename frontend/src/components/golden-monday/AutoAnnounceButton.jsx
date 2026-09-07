@@ -35,22 +35,27 @@ export default function AutoAnnounceButton({ onDone, t }) {
     <button
       onClick={handleAnnounce}
       disabled={announcing}
+      className="gm-auto-announce-btn"
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 6,
-        padding: "8px 18px",
-        borderRadius: 10,
+        justifyContent: "center",
+        gap: "6px",
+        padding: "8px 14px",
+        borderRadius: "10px",
         border: "none",
         background: announcing
           ? "#d1d5db"
           : "linear-gradient(135deg, #f5c518, #d4a017)",
         color: announcing ? "#6b7280" : "#1a1a2e",
         fontWeight: 700,
-        fontSize: 12,
+        fontSize: "clamp(11px, 1.8vw, 13px)",
         cursor: announcing ? "not-allowed" : "pointer",
         opacity: announcing ? 0.6 : 1,
         transition: "all 0.3s ease",
+        whiteSpace: "nowrap",
+        minHeight: "clamp(32px, 4.5vh, 40px)",
+        flexShrink: 0,
       }}
     >
       {announcing ? (
@@ -58,9 +63,11 @@ export default function AutoAnnounceButton({ onDone, t }) {
       ) : (
         <FiBell size={14} />
       )}
-      {announcing
-        ? t.posting || "Posting..."
-        : t.autoAnnounce || "📢 Auto-Announce Next"}
+      <span className="btn-label">
+        {announcing
+          ? t.posting || "Posting..."
+          : t.autoAnnounce || "Auto-Announce"}
+      </span>
     </button>
   );
 }
