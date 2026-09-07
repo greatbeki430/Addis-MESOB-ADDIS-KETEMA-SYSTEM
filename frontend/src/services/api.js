@@ -681,6 +681,22 @@ export const goldenMondayAPI = {
   // ✅ ADD THIS: For recording the actual check-in (POST)
   recordQRCheckIn: (sessionId, data) =>
     api.post(`/golden-monday/qr-checkin/${sessionId}`, data || {}),
+
+  // ─── TELEGRAM AUTOMATION ──────────────────────────────────────
+  // ✅ ADDED: Send presenter reminders
+  sendReminders: () => api.post("/telegram/send-reminders"),
+
+  // ✅ ADDED: Auto-announce next presenter to Telegram
+  announceNext: () => api.post("/telegram/announce-next"),
+
+  // ─── PRESENTER AVAILABILITY ──────────────────────────────────
+  // ✅ ADDED: Confirm presenter availability
+  confirmAvailability: (sessionId) =>
+    api.post(`/golden-monday/${sessionId}/confirm`),
+
+  // ✅ ADDED: Decline presenter availability with reason
+  declineAvailability: (sessionId, reason) =>
+    api.post(`/golden-monday/${sessionId}/decline`, { reason }),
 };
 
 // ============================================================
