@@ -704,8 +704,8 @@ const Premium3DVisual = ({ isTablet }) => {
   ];
 
   // ✅ FIXED: Reduced radius values to bring items closer to center
-  const radius = isTablet ? 38 : 48; // Was 48/62 - now closer
-  const outerRadius = isTablet ? 52 : 65; // Was 65/82 - now closer
+  const radius = isTablet ? 38 : 48;
+  const outerRadius = isTablet ? 52 : 65;
 
   return (
     <div
@@ -733,7 +733,7 @@ const Premium3DVisual = ({ isTablet }) => {
         }}
       />
 
-      {/* Decorative Rings - Now closer to center */}
+      {/* Decorative Rings */}
       <div
         style={{
           position: "absolute",
@@ -833,7 +833,7 @@ const Premium3DVisual = ({ isTablet }) => {
         />
       </div>
 
-      {/* Inner Orbit Items - Closer to center */}
+      {/* ✅ FIXED: Inner Orbit Items - Brighter backgrounds & text */}
       {orbitItems.map((item, i) => {
         const angle = (i / orbitItems.length) * Math.PI * 2 - Math.PI / 2;
         const x = 50 + Math.cos(angle) * radius;
@@ -859,44 +859,44 @@ const Premium3DVisual = ({ isTablet }) => {
                 width: badgeSize,
                 height: badgeSize,
                 borderRadius: "50%",
-                background: `linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01))`,
-                border: `1px solid ${item.color}22`,
+                background: `rgba(255,255,255,0.12)`,
+                border: `2px solid ${item.color}55`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: item.color,
                 backdropFilter: "blur(10px)",
                 fontSize: isTablet ? 12 : 16,
-                boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                boxShadow: `0 4px 20px rgba(0,0,0,0.2), inset 0 0 30px ${item.color}11`,
                 transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
                 transform: "perspective(400px) rotateY(10deg)",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform =
                   "perspective(400px) rotateY(0deg) scale(1.15)";
-                e.currentTarget.style.background = `${item.color}15`;
-                e.currentTarget.style.boxShadow = `0 8px 40px ${item.color}20`;
+                e.currentTarget.style.background = `rgba(255,255,255,0.2)`;
+                e.currentTarget.style.boxShadow = `0 8px 40px ${item.color}30`;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform =
                   "perspective(400px) rotateY(10deg) scale(1)";
-                e.currentTarget.style.background =
-                  "linear-gradient(145deg, rgba(255,255,255,0.06), rgba(255,255,255,0.01))";
-                e.currentTarget.style.boxShadow = "0 4px 20px rgba(0,0,0,0.15)";
+                e.currentTarget.style.background = `rgba(255,255,255,0.12)`;
+                e.currentTarget.style.boxShadow = `0 4px 20px rgba(0,0,0,0.2)`;
               }}
             >
               {item.icon}
             </div>
             <span
               style={{
-                fontSize: isTablet ? 6 : 8,
-                color: "rgba(255,255,255,0.3)",
-                fontWeight: 600,
+                fontSize: isTablet ? 7 : 9,
+                color: "#e8ecf5",
+                fontWeight: 700,
                 letterSpacing: 0.3,
-                background: "rgba(0,0,0,0.2)",
-                padding: "2px 8px",
+                background: "rgba(0,0,0,0.4)",
+                padding: "2px 10px",
                 borderRadius: 4,
                 backdropFilter: "blur(4px)",
+                textShadow: "0 1px 4px rgba(0,0,0,0.5)",
               }}
             >
               {item.label}
@@ -905,7 +905,7 @@ const Premium3DVisual = ({ isTablet }) => {
         );
       })}
 
-      {/* Outer Orbit Items */}
+      {/* ✅ FIXED: Outer Orbit Items - Brighter backgrounds & text */}
       {outerOrbitItems.map((item, i) => {
         const angle = (i / outerOrbitItems.length) * Math.PI * 2 + Math.PI / 2;
         const x = 50 + Math.cos(angle) * outerRadius;
@@ -931,36 +931,39 @@ const Premium3DVisual = ({ isTablet }) => {
                 width: isTablet ? 28 : 34,
                 height: isTablet ? 28 : 34,
                 borderRadius: "50%",
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.05)",
+                background: "rgba(255,255,255,0.08)",
+                border: `1.5px solid rgba(255,255,255,0.15)`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: isTablet ? 12 : 14,
                 backdropFilter: "blur(4px)",
                 transition: "all 0.3s ease",
+                boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(245,197,24,0.05)";
+                e.currentTarget.style.background = "rgba(245,197,24,0.15)";
                 e.currentTarget.style.transform = "scale(1.2)";
+                e.currentTarget.style.borderColor = `${C.gold}55`;
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,0.03)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.08)";
                 e.currentTarget.style.transform = "scale(1)";
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.15)";
               }}
             >
               {item.icon}
             </div>
             <span
               style={{
-                fontSize: isTablet ? 6 : 7,
-                color: "rgba(255,255,255,0.2)",
+                fontSize: isTablet ? 7 : 8,
+                color: "#d0d8ee",
                 fontWeight: 600,
                 letterSpacing: 0.3,
-                background: "rgba(0,0,0,0.15)",
-                padding: "2px 6px",
+                background: "rgba(0,0,0,0.35)",
+                padding: "2px 8px",
                 borderRadius: 3,
-                whiteSpace: "nowrap",
+                textShadow: "0 1px 4px rgba(0,0,0,0.4)",
               }}
             >
               {item.label}
@@ -969,24 +972,25 @@ const Premium3DVisual = ({ isTablet }) => {
         );
       })}
 
-      {/* Bottom Label - Now more visible */}
+      {/* ✅ FIXED: Bottom Label - Now much more visible */}
       <div
         style={{
           position: "absolute",
           bottom: isTablet ? 2 : 4,
           left: "50%",
           transform: "translateX(-50%)",
-          fontSize: isTablet ? 8 : 10,
-          fontWeight: 700,
-          letterSpacing: 2,
+          fontSize: isTablet ? 10 : 12,
+          fontWeight: 800,
+          letterSpacing: 3,
           textTransform: "uppercase",
-          color: "rgba(255,255,255,0.15)",
-          background: "rgba(0,0,0,0.15)",
-          padding: isTablet ? "3px 12px" : "4px 16px",
-          borderRadius: 10,
-          border: "1px solid rgba(255,255,255,0.03)",
-          backdropFilter: "blur(4px)",
+          color: "rgba(255,255,255,0.25)",
+          background: "rgba(0,0,0,0.25)",
+          padding: isTablet ? "4px 16px" : "6px 24px",
+          borderRadius: 12,
+          border: "1px solid rgba(255,255,255,0.06)",
+          backdropFilter: "blur(8px)",
           whiteSpace: "nowrap",
+          boxShadow: "0 2px 20px rgba(0,0,0,0.1)",
         }}
       >
         Digital Ethiopia
@@ -1005,7 +1009,6 @@ const MobilePremiumVisual = () => {
     { icon: "📁", label: "Docs" },
   ];
 
-  // ✅ Reduced radius for mobile
   const radius = 45;
 
   return (
@@ -1095,7 +1098,7 @@ const MobilePremiumVisual = () => {
         </span>
       </div>
 
-      {/* Orbiting labels - Closer to center */}
+      {/* ✅ FIXED: Mobile items - Brighter backgrounds & text */}
       {mobileItems.map((item, i) => {
         const angle = (i / mobileItems.length) * Math.PI * 2 - Math.PI / 2;
         const x = 50 + Math.cos(angle) * radius;
@@ -1121,25 +1124,26 @@ const MobilePremiumVisual = () => {
                 width: 24,
                 height: 24,
                 borderRadius: "50%",
-                background: "rgba(255,255,255,0.03)",
-                border: "1px solid rgba(255,255,255,0.04)",
+                background: "rgba(255,255,255,0.1)",
+                border: "1px solid rgba(255,255,255,0.08)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 10,
+                boxShadow: "0 2px 10px rgba(0,0,0,0.1)",
               }}
             >
               {item.icon}
             </div>
             <span
               style={{
-                fontSize: 5.5,
-                color: "rgba(255,255,255,0.15)",
+                fontSize: 6,
+                color: "#c9d0f0",
                 fontWeight: 600,
-                background: "rgba(0,0,0,0.15)",
+                background: "rgba(0,0,0,0.3)",
                 padding: "1px 6px",
                 borderRadius: 3,
-                whiteSpace: "nowrap",
+                textShadow: "0 1px 4px rgba(0,0,0,0.4)",
               }}
             >
               {item.label}
