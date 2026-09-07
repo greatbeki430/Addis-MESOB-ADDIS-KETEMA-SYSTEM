@@ -63,6 +63,7 @@ export default function Landing() {
   const abortControllerRef = useRef(null);
   const hasLoadedRef = useRef(false);
   const isInitialMount = useRef(true);
+  const navLinksRef = useRef({});
 
   // ─── Check if mobile ──────────────────────────────────────
   useEffect(() => {
@@ -191,6 +192,33 @@ export default function Landing() {
     [],
   );
 
+  // ─── Register nav link refs ─────────────────────────────────
+  const registerNavRef = useCallback(
+    (key) => (el) => {
+      if (el) navLinksRef.current[key] = el;
+    },
+    [],
+  );
+
+  // ─── Scroll to section ──────────────────────────────────────
+  const scrollToSection = useCallback((sectionId) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      const headerOffset = 80;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition =
+        elementPosition + window.pageYOffset - headerOffset;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      });
+
+      setActiveSection(sectionId);
+      setMobileNavOpen(false);
+    }
+  }, []);
+
   // ─── Scroll observer ────────────────────────────────────────
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -199,17 +227,26 @@ export default function Landing() {
           const key = entry.target.dataset.reveal;
           if (entry.isIntersecting) {
             setVisible((v) => ({ ...v, [key]: true }));
-            if (key === "features" || key === "how") {
+            // Update active section based on scroll position
+            if (
+              key === "features" ||
+              key === "how" ||
+              key === "services" ||
+              key === "faq" ||
+              key === "gm"
+            ) {
               setActiveSection(key);
             }
           }
         });
       },
-      { threshold: 0.12, rootMargin: "-72px 0px -60% 0px" },
+      { threshold: 0.15, rootMargin: "-80px 0px -60% 0px" },
     );
+
     const currentRefs = { ...sectionRefs.current };
     const elements = Object.values(currentRefs).filter(Boolean);
     elements.forEach((el) => observer.observe(el));
+
     return () => elements.forEach((el) => observer.unobserve(el));
   }, []);
 
@@ -306,6 +343,10 @@ export default function Landing() {
         background: "#fbfaf6",
         minHeight: "100vh",
         overflowX: "hidden",
+        display: "flex",
+        flexDirection: "column",
+        position: "relative",
+        maxWidth: "100vw",
       }}
     >
       <style>{`
@@ -353,7 +394,15 @@ export default function Landing() {
           * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
         }
 
-        .lp-nav-link { transition: opacity 0.15s ease, color 0.15s ease; position: relative; }
+        .lp-nav-link {
+          transition: opacity 0.15s ease, color 0.15s ease;
+          position: relative;
+          cursor: pointer;
+          background: none;
+          border: none;
+          padding: 4px 0;
+          font-family: ${F.sans};
+        }
         .lp-nav-link:hover { opacity: 0.72; }
         .lp-nav-link.active { color: ${C.gold} !important; }
         .lp-nav-link.active::after {
@@ -366,11 +415,19 @@ export default function Landing() {
           background: ${C.gold};
           border-radius: 2px;
         }
-        .lp-lang-btn { transition: opacity 0.15s ease, transform 0.15s ease; }
+        .lp-lang-btn {
+          transition: opacity 0.15s ease, transform 0.15s ease, background 0.2s ease;
+          cursor: pointer;
+        }
         .lp-lang-btn:hover { opacity: 0.85; }
 
-        .lp-back-to-top { transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease; }
-        .lp-back-to-top:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(6,11,46,0.35); }
+        .lp-back-to-top {
+          transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+        }
+        .lp-back-to-top:hover {
+          transform: translateY(-3px);
+          box-shadow: 0 10px 24px rgba(6,11,46,0.35);
+        }
 
         /* Mobile optimizations */
         @media (max-width: 768px) {
@@ -433,10 +490,10 @@ export default function Landing() {
         style={{
           position: "sticky",
           top: 0,
-          zIndex: 30,
-          background: "rgba(6,11,46,0.9)",
-          backdropFilter: "blur(10px)",
-          WebkitBackdropFilter: "blur(10px)",
+          zIndex: 999,
+          background: "rgba(6,11,46,0.98)",
+          backdropFilter: "blur(20px)",
+          WebkitBackdropFilter: "blur(20px)",
           borderBottom: "1px solid rgba(255,255,255,0.08)",
           padding: isMobile
             ? "10px clamp(12px, 4vw, 16px)"
@@ -445,13 +502,26 @@ export default function Landing() {
           alignItems: "center",
           justifyContent: "space-between",
           gap: isMobile ? 8 : 16,
+          boxShadow: "0 4px 30px rgba(0,0,0,0.3)",
+          width: "100%",
+          maxWidth: "100vw",
+          boxSizing: "border-box",
+          flexShrink: 0,
+          transition: "background 0.3s ease, box-shadow 0.3s ease",
         }}
       >
+        {/* Logo */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             gap: isMobile ? 8 : 10,
+            flexShrink: 0,
+            cursor: "pointer",
+          }}
+          onClick={() => {
+            window.scrollTo({ top: 0, behavior: "smooth" });
+            setActiveSection("");
           }}
         >
           <img
@@ -469,64 +539,148 @@ export default function Landing() {
               fontWeight: 800,
               fontSize: isMobile ? 14 : 18,
               color: "#fff",
+              whiteSpace: "nowrap",
             }}
           >
             Addis MESOB
           </span>
         </div>
 
+        {/* Desktop Navigation */}
         <div
           className="lp-desktop-only"
-          style={{ alignItems: "center", gap: isMobile ? 12 : 20 }}
+          style={{
+            alignItems: "center",
+            gap: isMobile ? 12 : 20,
+            display: "flex",
+            flexWrap: "nowrap",
+          }}
         >
-          <a
-            href="#features"
+          <button
+            ref={registerNavRef("features")}
             className={`lp-nav-link${activeSection === "features" ? " active" : ""}`}
+            onClick={() => scrollToSection("features")}
             style={{
               color: activeSection === "features" ? C.gold : "#c9d0f0",
               textDecoration: "none",
               fontSize: isMobile ? 12 : 13,
               fontWeight: 600,
+              whiteSpace: "nowrap",
+              transition: "color 0.2s ease",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px 0",
+              fontFamily: F.sans,
+            }}
+            onMouseEnter={(e) => {
+              if (activeSection !== "features") {
+                e.currentTarget.style.color = C.gold;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeSection !== "features") {
+                e.currentTarget.style.color = "#c9d0f0";
+              }
             }}
           >
             Features
-          </a>
-          <a
-            href="#services"
-            className="lp-nav-link"
+          </button>
+
+          <button
+            ref={registerNavRef("services")}
+            className={`lp-nav-link${activeSection === "services" ? " active" : ""}`}
+            onClick={() => scrollToSection("services")}
             style={{
-              color: "#c9d0f0",
+              color: activeSection === "services" ? C.gold : "#c9d0f0",
               textDecoration: "none",
               fontSize: isMobile ? 12 : 13,
               fontWeight: 600,
+              whiteSpace: "nowrap",
+              transition: "color 0.2s ease",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px 0",
+              fontFamily: F.sans,
+            }}
+            onMouseEnter={(e) => {
+              if (activeSection !== "services") {
+                e.currentTarget.style.color = C.gold;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeSection !== "services") {
+                e.currentTarget.style.color = "#c9d0f0";
+              }
             }}
           >
             Services
-          </a>
-          <a
-            href="#how"
+          </button>
+
+          <button
+            ref={registerNavRef("how")}
             className={`lp-nav-link${activeSection === "how" ? " active" : ""}`}
+            onClick={() => scrollToSection("how")}
             style={{
               color: activeSection === "how" ? C.gold : "#c9d0f0",
               textDecoration: "none",
               fontSize: isMobile ? 12 : 13,
               fontWeight: 600,
+              whiteSpace: "nowrap",
+              transition: "color 0.2s ease",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px 0",
+              fontFamily: F.sans,
+            }}
+            onMouseEnter={(e) => {
+              if (activeSection !== "how") {
+                e.currentTarget.style.color = C.gold;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeSection !== "how") {
+                e.currentTarget.style.color = "#c9d0f0";
+              }
             }}
           >
             How it works
-          </a>
-          <a
-            href="#faq"
-            className="lp-nav-link"
+          </button>
+
+          <button
+            ref={registerNavRef("faq")}
+            className={`lp-nav-link${activeSection === "faq" ? " active" : ""}`}
+            onClick={() => scrollToSection("faq")}
             style={{
-              color: "#c9d0f0",
+              color: activeSection === "faq" ? C.gold : "#c9d0f0",
               textDecoration: "none",
               fontSize: isMobile ? 12 : 13,
               fontWeight: 600,
+              whiteSpace: "nowrap",
+              transition: "color 0.2s ease",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              padding: "4px 0",
+              fontFamily: F.sans,
+            }}
+            onMouseEnter={(e) => {
+              if (activeSection !== "faq") {
+                e.currentTarget.style.color = C.gold;
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (activeSection !== "faq") {
+                e.currentTarget.style.color = "#c9d0f0";
+              }
             }}
           >
             FAQ
-          </a>
+          </button>
+
+          {/* Language Buttons */}
           <div style={{ display: "flex", gap: isMobile ? 2 : 4 }}>
             {LANGUAGES.map((l) => (
               <button
@@ -545,12 +699,26 @@ export default function Landing() {
                   fontWeight: 700,
                   cursor: "pointer",
                   fontFamily: F.sans,
+                  transition: "all 0.2s ease",
+                  minHeight: isMobile ? 32 : 34,
+                }}
+                onMouseEnter={(e) => {
+                  if (language !== l.code) {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (language !== l.code) {
+                    e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+                  }
                 }}
               >
                 {l.flag}
               </button>
             ))}
           </div>
+
+          {/* Sign In Button */}
           <button
             onClick={goLogin}
             className="lp-cta"
@@ -571,6 +739,7 @@ export default function Landing() {
               fontFamily: F.sans,
               whiteSpace: "nowrap",
               transition: "transform 0.2s ease, box-shadow 0.2s ease",
+              minHeight: isMobile ? 40 : 44,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateY(-2px)";
@@ -587,6 +756,7 @@ export default function Landing() {
           </button>
         </div>
 
+        {/* Mobile Menu Toggle */}
         <button
           className="lp-mobile-toggle"
           onClick={() => setMobileNavOpen((v) => !v)}
@@ -602,6 +772,13 @@ export default function Landing() {
             alignItems: "center",
             justifyContent: "center",
             display: "flex",
+            transition: "background 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
           }}
         >
           {mobileNavOpen ? (
@@ -616,7 +793,12 @@ export default function Landing() {
       {mobileNavOpen && (
         <div
           style={{
-            background: "#081d17",
+            position: "sticky",
+            top: 0,
+            zIndex: 998,
+            background: "rgba(6,11,46,0.98)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
             padding: isMobile
               ? "12px clamp(12px, 4vw, 16px) 20px"
               : "16px clamp(16px, 5vw, 48px) 24px",
@@ -627,75 +809,107 @@ export default function Landing() {
             animation: "lp-fade-in 0.2s ease",
             maxHeight: "80vh",
             overflowY: "auto",
+            boxShadow: "0 4px 30px rgba(0,0,0,0.3)",
           }}
         >
-          <a
-            href="#features"
+          <button
+            onClick={() => scrollToSection("features")}
             style={{
-              color: "#c9d0f0",
-              fontSize: isMobile ? 13 : 14,
-              fontWeight: 600,
+              color: activeSection === "features" ? C.gold : "#c9d0f0",
+              fontSize: isMobile ? 15 : 16,
+              fontWeight: activeSection === "features" ? 700 : 600,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textAlign: "left",
+              padding: "8px 0",
+              fontFamily: F.sans,
+              transition: "color 0.2s ease",
             }}
-            onClick={() => setMobileNavOpen(false)}
           >
             Features
-          </a>
-          <a
-            href="#services"
+          </button>
+          <button
+            onClick={() => scrollToSection("services")}
             style={{
-              color: "#c9d0f0",
-              fontSize: isMobile ? 13 : 14,
-              fontWeight: 600,
+              color: activeSection === "services" ? C.gold : "#c9d0f0",
+              fontSize: isMobile ? 15 : 16,
+              fontWeight: activeSection === "services" ? 700 : 600,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textAlign: "left",
+              padding: "8px 0",
+              fontFamily: F.sans,
+              transition: "color 0.2s ease",
             }}
-            onClick={() => setMobileNavOpen(false)}
           >
             Services
-          </a>
-          <a
-            href="#how"
+          </button>
+          <button
+            onClick={() => scrollToSection("how")}
             style={{
-              color: "#c9d0f0",
-              fontSize: isMobile ? 13 : 14,
-              fontWeight: 600,
+              color: activeSection === "how" ? C.gold : "#c9d0f0",
+              fontSize: isMobile ? 15 : 16,
+              fontWeight: activeSection === "how" ? 700 : 600,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textAlign: "left",
+              padding: "8px 0",
+              fontFamily: F.sans,
+              transition: "color 0.2s ease",
             }}
-            onClick={() => setMobileNavOpen(false)}
           >
             How it works
-          </a>
-          <a
-            href="#faq"
+          </button>
+          <button
+            onClick={() => scrollToSection("faq")}
             style={{
-              color: "#c9d0f0",
-              fontSize: isMobile ? 13 : 14,
-              fontWeight: 600,
+              color: activeSection === "faq" ? C.gold : "#c9d0f0",
+              fontSize: isMobile ? 15 : 16,
+              fontWeight: activeSection === "faq" ? 700 : 600,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textAlign: "left",
+              padding: "8px 0",
+              fontFamily: F.sans,
+              transition: "color 0.2s ease",
             }}
-            onClick={() => setMobileNavOpen(false)}
           >
             FAQ
-          </a>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          </button>
+
+          <div
+            style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}
+          >
             {LANGUAGES.map((l) => (
               <button
                 key={l.code}
-                onClick={() => changeLanguage(l.code)}
+                onClick={() => {
+                  changeLanguage(l.code);
+                }}
                 style={{
                   background:
                     language === l.code ? C.gold : "rgba(255,255,255,0.08)",
                   color: language === l.code ? C.dark : "#c9d0f0",
                   border: "none",
                   borderRadius: 6,
-                  padding: isMobile ? "6px 10px" : "6px 10px",
-                  fontSize: isMobile ? 11 : 12,
+                  padding: isMobile ? "8px 12px" : "8px 12px",
+                  fontSize: isMobile ? 13 : 14,
                   fontWeight: 700,
                   cursor: "pointer",
                   minHeight: 44,
                   minWidth: 44,
+                  transition: "all 0.2s ease",
                 }}
               >
-                {l.flag}
+                {l.flag} {l.label}
               </button>
             ))}
           </div>
+
           <button
             onClick={goLogin}
             style={{
@@ -703,11 +917,23 @@ export default function Landing() {
               color: C.dark,
               border: "none",
               borderRadius: 8,
-              padding: isMobile ? "12px 16px" : "10px 16px",
+              padding: isMobile ? "14px 16px" : "12px 16px",
               fontWeight: 800,
-              fontSize: isMobile ? 14 : 13,
+              fontSize: isMobile ? 15 : 14,
               cursor: "pointer",
-              minHeight: 44,
+              minHeight: 48,
+              marginTop: 4,
+              fontFamily: F.sans,
+              transition: "transform 0.2s ease, box-shadow 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = "translateY(-2px)";
+              e.currentTarget.style.boxShadow =
+                "0 12px 28px rgba(245,197,24,0.3)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
             }}
           >
             {LANDING_COPY.ctaPrimary}
@@ -716,7 +942,16 @@ export default function Landing() {
       )}
 
       {/* ── MAIN CONTENT ──────────────────────────────────── */}
-      <div id="main-content" style={{ overflowX: "hidden", maxWidth: "100vw" }}>
+      <div
+        id="main-content"
+        style={{
+          overflowX: "hidden",
+          maxWidth: "100vw",
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
         {/* Hero Section */}
         <HeroSection t={t} onLogin={goLogin} />
 
