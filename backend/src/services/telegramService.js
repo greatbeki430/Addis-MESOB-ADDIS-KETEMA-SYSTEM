@@ -13,6 +13,25 @@ const TELEGRAM_ADMIN_GROUP_ID = process.env.TELEGRAM_ADMIN_GROUP_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://akmesob.vercel.app";
 
 // =====================================================================
+// BRANCHES CONSTANT
+// =====================================================================
+
+const BRANCHES = [
+  "Addis Ketema",
+  "Lideta",
+  "Kirkos",
+  "Bole",
+  "Yeka",
+  "Gulele",
+  "Nifas Silk",
+  "Kolfe Keranio",
+  "Arada",
+  "Akaki Kality",
+  "Lemi Kura",
+  "Other",
+];
+
+// =====================================================================
 // EXISTING CODE - Announcement functions (unchanged)
 // =====================================================================
 
@@ -46,22 +65,22 @@ const postPresenterAnnouncement = async (session) => {
 
     const imageUrl = await generateAnnouncementImage(presenter, session);
 
-    let message = `🎯 *Golden Monday - ${dateFormatted}*\n\n`;
-    message += `👤 *Presenter:* ${presenter.name || "TBD"}\n`;
+    let message = `🎯 Golden Monday - ${dateFormatted}\n\n`;
+    message += `👤 Presenter: ${presenter.name || "TBD"}\n`;
     if (presenter.department) {
-      message += `🏛️ *Department:* ${presenter.department}\n`;
+      message += `🏛️ Department: ${presenter.department}\n`;
     }
     if (session.presentationTitle) {
-      message += `📖 *Topic:* "${session.presentationTitle}"\n`;
+      message += `📖 Topic: "${session.presentationTitle}"\n`;
     }
     if (session.presentationDescription) {
-      message += `📝 *Description:* ${session.presentationDescription}\n`;
+      message += `📝 Description: ${session.presentationDescription}\n`;
     }
-    message += `\n🕒 *Time:* 2:00 - 2:50 PM\n`;
-    message += `📍 *Location:* Addis MESOB Conference Hall\n\n`;
+    message += `\n🕒 Time: 2:00 - 2:50 PM\n`;
+    message += `📍 Location: Addis MESOB Conference Hall\n\n`;
 
     if (session.suggestedTopics && session.suggestedTopics.length > 0) {
-      message += `💡 *AI Suggested Topics:*\n`;
+      message += `💡 AI Suggested Topics:\n`;
       session.suggestedTopics.forEach((topic, i) => {
         message += `   ${i + 1}. ${topic}\n`;
       });
@@ -215,7 +234,7 @@ const STEPS = {
   SKILLS: "awaiting_skills",
   PHOTO: "awaiting_photo",
   OTP: "awaiting_otp",
-  BRANCH: "awaiting_branch", // ✅ NEW STEP
+  BRANCH: "awaiting_branch",
 };
 
 function parseSkills(input) {
@@ -229,7 +248,6 @@ function parseSkills(input) {
 // PERSISTENT MENU BUTTON INSIDE THE INPUT BAR (GRID ICON ⊞)
 // =====================================================================
 
-// ─── SET BOT COMMANDS (appears when user types "/" in input) ──────
 async function setBotCommands() {
   const commands = [
     { command: "start", description: "🚀 Start the bot" },
@@ -261,7 +279,6 @@ async function setBotCommands() {
   return result;
 }
 
-// ─── SET CHAT MENU BUTTON (Grid icon INSIDE the input bar) ────────
 async function setChatMenuButton(chatId) {
   const result = await callTelegramApi("setChatMenuButton", {
     chat_id: chatId,
@@ -282,7 +299,6 @@ async function setChatMenuButton(chatId) {
   return result;
 }
 
-// ─── SET DEFAULT MENU BUTTON FOR ALL CHATS ─────────────────────────
 async function setDefaultMenuButton() {
   const result = await callTelegramApi("setMyDefaultAdministratorRights", {
     rights: {
@@ -312,7 +328,6 @@ async function setDefaultMenuButton() {
   return result;
 }
 
-// ─── SETUP PERSISTENT MENU (CALL ON BOT STARTUP) ──────────────────
 async function setupPersistentMenu() {
   console.log("🔧 Setting up persistent menu...");
   console.log("📌 The menu button (⊞) will appear INSIDE the input bar");
@@ -334,7 +349,6 @@ async function setupPersistentMenu() {
   }
 }
 
-// ─── PERSISTENT MENU ───────────────────────────────────────
 const PERSISTENT_MENU_BUTTONS = {
   inline_keyboard: [
     [{ text: "⊞ Main Menu", callback_data: "menu" }],
@@ -349,10 +363,9 @@ const PERSISTENT_MENU_BUTTONS = {
   ],
 };
 
-// ─── SHOW MAIN MENU (WITH PERSISTENT BUTTON) ──────────────
 function showMainMenu(chatId, extraText = "") {
   const menuText =
-    `🏠 *Addis MESOB Bot Menu*\n\n` +
+    `🏠 Addis MESOB Bot Menu\n\n` +
     `Welcome to the Addis MESOB Telegram Bot!\n` +
     `Use the buttons below to navigate:\n` +
     `${extraText}`;
@@ -381,8 +394,7 @@ function showMainMenu(chatId, extraText = "") {
   });
 }
 
-// ─── PERSISTENT MENU HANDLER ──────────────────────────────
-async function showPersistentMenu(chatId, messageText = "⊞ *Main Menu*") {
+async function showPersistentMenu(chatId, messageText = "⊞ Main Menu") {
   await setChatMenuButton(chatId);
 
   const menuText = `${messageText}\n\nSelect an option from the menu below:`;
@@ -411,7 +423,42 @@ async function showPersistentMenu(chatId, messageText = "⊞ *Main Menu*") {
   });
 }
 
-// ─── START HANDLER ──────────────────────────────────────────
+// =====================================================================
+// BRANCH SELECTION - CLICKABLE BUTTONS
+// =====================================================================
+
+function showBranchSelection(chatId) {
+  // Create a grid of branch buttons (3 columns for compact display)
+  const branchButtons = [];
+  for (let i = 0; i < BRANCHES.length; i += 3) {
+    const row = [];
+    for (let j = i; j < Math.min(i + 3, BRANCHES.length); j++) {
+      const branch = BRANCHES[j];
+      // Sanitize branch name for callback data
+      const callbackData = `branch:${branch.replace(/\s/g, "_")}`;
+      row.push({ text: `📍 ${branch}`, callback_data: callbackData });
+    }
+    branchButtons.push(row);
+  }
+
+  // Add a "Skip" button at the bottom
+  branchButtons.push([
+    { text: "⏭️ Skip (Default: Addis Ketema)", callback_data: "branch:skip" },
+  ]);
+
+  return sendMessage(chatId, "📍 Please select your branch location:", {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: branchButtons,
+      resize_keyboard: true,
+    },
+  });
+}
+
+// =====================================================================
+// START HANDLER
+// =====================================================================
+
 async function handleStart(msg) {
   const chatId = msg.chat.id.toString();
 
@@ -456,7 +503,7 @@ async function handleStart(msg) {
     chatId,
     "👋 Welcome to Addis MESOB employee registration!\n\n" +
       "Please provide the following information to register.\n\n" +
-      "📝 *What is your full name?*\n\n" +
+      "📝 What is your full name?\n\n" +
       "🔹 You can always click the ⊞ menu button in your input bar.\n" +
       "🔹 Or type /menu to return to the main menu.\n" +
       "🔹 The ⊞ grid icon is permanently in your input bar!",
@@ -464,7 +511,10 @@ async function handleStart(msg) {
   );
 }
 
-// ─── REGISTRATION FLOW ───────────────────────────────────────
+// =====================================================================
+// REGISTRATION FLOW
+// =====================================================================
+
 async function handleRegistrationMessage(msg) {
   const chatId = msg.chat.id.toString();
   const session = registrationSessions.get(chatId);
@@ -497,7 +547,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.EMAIL;
       sendMessage(
         chatId,
-        "📧 *What is your email address?*\n\nThis will be your login email.\n\nClick ⊞ in input bar or type /menu to cancel.",
+        "📧 What is your email address?\n\nThis will be your login email.\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -522,7 +572,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.PHONE;
       sendMessage(
         chatId,
-        "📱 *What is your phone number?*\n\nFormat: +251 9XX XXX XXX\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
+        "📱 What is your phone number?\n\nFormat: +251 9XX XXX XXX\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -530,61 +580,14 @@ async function handleRegistrationMessage(msg) {
 
     case STEPS.PHONE: {
       session.data.phone = text.toLowerCase() === "skip" ? "" : text;
-      session.step = STEPS.BRANCH; // ✅ NEW: Go to branch after phone
-      sendMessage(
-        chatId,
-        "📍 *What is your branch location?*\n\nPlease select your branch:\n\n" +
-          "Addis Ketema\n" +
-          "Lideta\n" +
-          "Kirkos\n" +
-          "Bole\n" +
-          "Yeka\n" +
-          "Gulele\n" +
-          "Nifas Silk\n" +
-          "Kolfe Keranio\n" +
-          "Arada\n" +
-          "Akaki Kality\n" +
-          "Lemi Kura\n" +
-          "Other\n\n" +
-          "Or type 'skip' to use default (Addis Ketema)\n\nClick ⊞ in input bar or type /menu to cancel.",
-        { parse_mode: "Markdown" },
-      );
+      session.step = STEPS.BRANCH;
+      // ✅ NEW: Show clickable branch buttons instead of text input
+      await showBranchSelection(chatId);
       break;
     }
 
     case STEPS.BRANCH: {
-      // ✅ NEW STEP
-      const validBranches = [
-        "Addis Ketema",
-        "Lideta",
-        "Kirkos",
-        "Bole",
-        "Yeka",
-        "Gulele",
-        "Nifas Silk",
-        "Kolfe Keranio",
-        "Arada",
-        "Akaki Kality",
-        "Lemi Kura",
-        "Other",
-      ];
-
-      if (text.toLowerCase() === "skip") {
-        session.data.branch = "Addis Ketema";
-      } else {
-        // Try to match the branch (case insensitive)
-        const matchedBranch = validBranches.find(
-          (b) => b.toLowerCase() === text.toLowerCase(),
-        );
-        session.data.branch = matchedBranch || text;
-      }
-
-      session.step = STEPS.DEPARTMENT;
-      sendMessage(
-        chatId,
-        "🏛️ *What is your department?*\n\nExamples: IT, HR, Finance, Customer Service\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
-        { parse_mode: "Markdown" },
-      );
+      // Branch is handled via callback, so this case shouldn't be reached
       break;
     }
 
@@ -593,7 +596,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.POSITION;
       sendMessage(
         chatId,
-        "💼 *What is your position/title?*\n\nExamples: Team Leader, Developer, Manager\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
+        "💼 What is your position/title?\n\nExamples: Team Leader, Developer, Manager\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -604,7 +607,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.SKILLS;
       sendMessage(
         chatId,
-        "🛠️ *What are your skills?*\n\nComma-separated: JavaScript, React, MongoDB\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
+        "🛠️ What are your skills?\n\nComma-separated: JavaScript, React, MongoDB\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -619,7 +622,7 @@ async function handleRegistrationMessage(msg) {
       session.step = STEPS.PHOTO;
       sendMessage(
         chatId,
-        "📸 *Upload your profile photo*\n\nClick the attachment icon (📎) and select a photo.\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
+        "📸 Upload your profile photo\n\nClick the attachment icon (📎) and select a photo.\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.",
         { parse_mode: "Markdown" },
       );
       break;
@@ -645,281 +648,59 @@ async function handleRegistrationMessage(msg) {
   }
 }
 
-// ─── PHOTO UPLOAD ──────────────────────────────────────────
-async function handlePhotoUpload(msg, session, chatId) {
-  try {
-    const fileId = msg.photo[msg.photo.length - 1].file_id;
-    const file = await callTelegramApi("getFile", { file_id: fileId });
+// =====================================================================
+// CALLBACK HANDLER - INCLUDES BRANCH SELECTION
+// =====================================================================
 
-    if (!file.ok) {
-      sendMessage(
-        chatId,
-        "❌ Failed to get photo. Please try again or type 'skip'\n\nClick ⊞ in input bar or type /menu to cancel.",
-      );
-      return;
-    }
-
-    const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${file.result.file_path}`;
-    const response = await fetch(fileUrl);
-    const buffer = await response.arrayBuffer();
-    const base64Photo = Buffer.from(buffer).toString("base64");
-    session.data.photoUrl = `data:image/jpeg;base64,${base64Photo}`;
-
-    sendMessage(chatId, "✅ Photo uploaded successfully!");
-    await completeRegistration(chatId, session);
-  } catch (error) {
-    console.error("❌ Photo upload error:", error.message);
-    sendMessage(
-      chatId,
-      "❌ Failed to upload photo. Please type 'skip' to continue.\n\nClick ⊞ in input bar or type /menu to cancel.",
-    );
-  }
-}
-
-// ─── COMPLETE REGISTRATION ──────────────────────────────────
-async function completeRegistration(chatId, session) {
-  const otpCode = generateOtp();
-  const pending = await PendingRegistration.create({
-    telegramChatId: chatId,
-    telegramUsername: session.data.telegramUsername,
-    name: session.data.name,
-    email: session.data.email,
-    phone: session.data.phone || "",
-    branch: session.data.branch || "Addis Ketema", // ✅ ADD THIS
-    department: session.data.department || "",
-    position: session.data.position || "",
-    skills: session.data.skills || [],
-    profilePhotoUrl: session.data.photoUrl || "",
-    status: "pending_otp",
-    otpCode,
-    otpExpiresAt: otpExpiry(10),
-  });
-
-  session.pendingId = pending._id.toString();
-  session.step = STEPS.OTP;
-
-  sendMessage(
-    chatId,
-    `✅ Registration almost complete!\n\nYour verification code is: *${otpCode}*\n\nReply with this code to confirm (valid for 10 minutes).\n\nClick ⊞ in input bar or type /menu to cancel.`,
-    { parse_mode: "Markdown" },
-  );
-}
-
-// ─── OTP VERIFICATION ──────────────────────────────────────
-async function handleOtpVerification(chatId, session, text) {
-  const pending = await PendingRegistration.findById(session.pendingId).select(
-    "+otpCode +otpExpiresAt",
-  );
-
-  if (!pending) {
-    registrationSessions.delete(chatId);
-    return showPersistentMenu(
-      chatId,
-      "❌ Something went wrong. Please try again.",
-    );
-  }
-
-  if (!pending.otpExpiresAt || pending.otpExpiresAt < new Date()) {
-    registrationSessions.delete(chatId);
-    return showPersistentMenu(
-      chatId,
-      "❌ That code expired. Please try again.",
-    );
-  }
-
-  if (text !== pending.otpCode) {
-    return sendMessage(
-      chatId,
-      "❌ That code doesn't match — please check and try again.\n\nClick ⊞ in input bar or type /menu to cancel.",
-    );
-  }
-
-  pending.otpVerified = true;
-  pending.status = "pending_approval";
-  pending.otpCode = undefined;
-  pending.otpExpiresAt = undefined;
-  await pending.save();
-
-  registrationSessions.delete(chatId);
-
-  await showPersistentMenu(
-    chatId,
-    "✅ *Registration Complete!*\nYour registration has been sent for admin approval.\nYou'll receive a notification once approved.",
-  );
-
-  await notifyAdminsForApproval(pending);
-}
-
-// ─── ADMIN NOTIFICATION ─────────────────────────────────────
-async function notifyAdminsForApproval(pending) {
-  if (!TELEGRAM_ADMIN_GROUP_ID) {
-    console.warn("⚠️ TELEGRAM_ADMIN_GROUP_ID not set — cannot notify admins.");
-    return;
-  }
-
-  const text =
-    `📋 *New Employee Registration*\n\n` +
-    `👤 Name: ${pending.name}\n` +
-    `📧 Email: ${pending.email}\n` +
-    `📱 Phone: ${pending.phone || "Not provided"}\n` +
-    `📍 Branch: ${pending.branch || "Addis Ketema"}\n` + // ✅ ADD THIS
-    `🏛️ Department: ${pending.department || "Not provided"}\n` +
-    `💼 Position: ${pending.position || "Not provided"}\n` +
-    `🛠️ Skills: ${pending.skills?.length ? pending.skills.join(", ") : "Not provided"}\n` +
-    `👤 Telegram: @${pending.telegramUsername || "n/a"}\n` +
-    `🖼️ Photo: ${pending.profilePhotoUrl ? "✅ Uploaded" : "❌ Not uploaded"}`;
-
-  await sendMessage(TELEGRAM_ADMIN_GROUP_ID, text, {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: "✅ Approve", callback_data: `approve:${pending._id}` },
-          { text: "❌ Reject", callback_data: `reject:${pending._id}` },
-        ],
-        [{ text: "👤 View Profile", url: `${FRONTEND_URL}/employees` }],
-      ],
-    },
-  });
-}
-
-// ─── APPROVE REGISTRATION ──────────────────────────────────
-async function approveRegistration(pendingId, reviewer) {
-  console.log("📝 Approving registration:", pendingId);
-
-  const pending = await PendingRegistration.findById(pendingId);
-  if (!pending) throw new Error("Registration not found");
-  if (pending.status !== "pending_approval") {
-    throw new Error(`Cannot approve from status "${pending.status}"`);
-  }
-
-  try {
-    console.log("👤 Creating user account for:", pending.email);
-    const tempPassword = generateTempPassword();
-
-    // ✅ FIXED: Pass ALL fields to createUserAccount
-    const user = await createUserAccount({
-      name: pending.name,
-      email: pending.email,
-      password: tempPassword,
-      role: "employee",
-      phone: pending.phone,
-      telegramChatId: pending.telegramChatId,
-      profilePhotoUrl: pending.profilePhotoUrl || "",
-      branch: pending.branch || "Addis Ketema", // ✅ ADD THIS
-    });
-
-    console.log("✅ User created with ID:", user._id);
-
-    // ADD TO GOLDEN MONDAY ROSTER
-    console.log("📋 Adding user to Golden Monday roster...");
-    try {
-      const existingPresenter = await GoldenMondayPresenter.findOne({
-        user: user._id,
-      });
-      if (!existingPresenter) {
-        const presenter = await GoldenMondayPresenter.create({
-          user: user._id,
-          name: pending.name,
-          email: pending.email,
-          department: pending.department || "",
-          position: pending.position || "",
-          phone: pending.phone || "",
-          profilePhotoUrl: pending.profilePhotoUrl || "",
-          skills: pending.skills || [],
-          isEligible: true,
-          timesPresented: 0,
-          registeredAt: new Date(),
-          registeredBy: reviewer?._id || undefined,
-        });
-        console.log("✅ Added to Golden Monday roster:", presenter._id);
-      } else {
-        console.log("ℹ️ User already in Golden Monday roster");
-      }
-    } catch (rosterError) {
-      console.error(
-        "⚠️ Failed to add to Golden Monday roster:",
-        rosterError.message,
-      );
-    }
-
-    pending.status = "approved";
-    pending.createdUser = user._id;
-    pending.reviewedBy = reviewer?._id || undefined;
-    pending.reviewedByName = reviewer?.name || "unknown";
-    pending.reviewedAt = new Date();
-    await pending.save();
-
-    console.log("📤 Sending login link to:", pending.telegramChatId);
-    await sendLoginLink(pending.telegramChatId, pending.email, tempPassword);
-
-    return { pending, user };
-  } catch (error) {
-    console.error("❌ Approval error:", error.message);
-    if (TELEGRAM_ADMIN_GROUP_ID) {
-      await sendMessage(
-        TELEGRAM_ADMIN_GROUP_ID,
-        `❌ Approval failed for ${pending.email}:\n${error.message}`,
-      );
-    }
-    throw error;
-  }
-}
-
-// ─── REJECT REGISTRATION ──────────────────────────────────
-async function rejectRegistration(pendingId, reviewer, reason) {
-  const pending = await PendingRegistration.findById(pendingId);
-  if (!pending) throw new Error("Registration not found");
-
-  pending.status = "rejected";
-  pending.rejectionReason = reason || "";
-  pending.reviewedBy = reviewer?._id || undefined;
-  pending.reviewedByName = reviewer?.name || "unknown";
-  pending.reviewedAt = new Date();
-  await pending.save();
-
-  await showPersistentMenu(
-    pending.telegramChatId,
-    "❌ Your registration could not be approved.\nPlease contact HR/admin for details.",
-  );
-
-  return pending;
-}
-
-// ─── SEND LOGIN LINK ──────────────────────────────────────
-async function sendLoginLink(chatId, email, tempPassword) {
-  const message =
-    `✅ *Account Approved!*\n\n` +
-    `🔗 Login: ${FRONTEND_URL}/login\n` +
-    `📧 Email: ${email}\n` +
-    `🔑 Password: ${tempPassword}\n\n` +
-    `⚠️ *Please change your password after logging in.*`;
-
-  await showPersistentMenu(chatId, `\n${message}`);
-}
-
-// ─── SEND DELETION NOTIFICATION ───────────────────────────
-async function sendDeletionNotification(
-  chatId,
-  name,
-  reason = "Your account has been removed by an administrator.",
-) {
-  const message =
-    `⚠️ *Account Deletion Notification*\n\n` +
-    `Dear ${name},\n\n` +
-    `${reason}\n\n` +
-    `If you believe this is a mistake, please contact your administrator.\n\n` +
-    `To re-register, please send /start to this bot again.`;
-
-  await showPersistentMenu(chatId, `\n${message}`);
-}
-
-// ─── CALLBACK HANDLER ──────────────────────────────────────
 async function handleCallback(query) {
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
   const data = query.data;
 
+  // ─── BRANCH SELECTION ──────────────────────────────────────────
+  if (data.startsWith("branch:")) {
+    const branchValue = data.replace("branch:", "");
+    const session = registrationSessions.get(chatId.toString());
+
+    if (!session) {
+      await callTelegramApi("answerCallbackQuery", {
+        callback_query_id: query.id,
+        text: "❌ Session expired. Please start over.",
+      });
+      return;
+    }
+
+    if (branchValue === "skip") {
+      session.data.branch = "Addis Ketema";
+    } else {
+      // Convert back from underscore to space
+      const branchName = branchValue.replace(/_/g, " ");
+      // Find the matching branch
+      const matchedBranch = BRANCHES.find(
+        (b) => b.toLowerCase() === branchName.toLowerCase(),
+      );
+      session.data.branch = matchedBranch || branchName;
+    }
+
+    session.step = STEPS.DEPARTMENT;
+
+    await callTelegramApi("answerCallbackQuery", {
+      callback_query_id: query.id,
+      text: `✅ Branch selected: ${session.data.branch}`,
+    });
+
+    // Edit the message to show selection
+    await callTelegramApi("editMessageText", {
+      chat_id: chatId,
+      message_id: messageId,
+      text: `✅ Branch selected: ${session.data.branch}\n\n🏛️ What is your department?\n\nExamples: IT, HR, Finance, Customer Service\nOr type 'skip' to skip\n\nClick ⊞ in input bar or type /menu to cancel.`,
+      parse_mode: "Markdown",
+    });
+
+    return;
+  }
+
+  // ─── MAIN MENU ──────────────────────────────────────────────────
   if (data === "menu") {
     await showPersistentMenu(chatId);
     await callTelegramApi("answerCallbackQuery", {
@@ -930,7 +711,7 @@ async function handleCallback(query) {
   }
 
   if (data === "reset") {
-    registrationSessions.delete(chatId);
+    registrationSessions.delete(chatId.toString());
     await showPersistentMenu(chatId, "🔄 Session reset. Starting fresh.");
     await callTelegramApi("answerCallbackQuery", {
       callback_query_id: query.id,
@@ -941,7 +722,7 @@ async function handleCallback(query) {
 
   if (data === "register") {
     const existingPending = await PendingRegistration.findOne({
-      telegramChatId: chatId,
+      telegramChatId: chatId.toString(),
     }).sort({ createdAt: -1 });
 
     if (existingPending) {
@@ -980,7 +761,7 @@ async function handleCallback(query) {
   if (data === "about_gm") {
     await sendMessage(
       chatId,
-      `📖 *About Golden Monday*\n\n` +
+      `📖 About Golden Monday\n\n` +
         `Golden Monday is Addis MESOB's weekly capacity-building program.\n\n` +
         `• Every Monday, 2:00 - 2:50 PM\n` +
         `• One employee presents on a topic of their choice\n` +
@@ -999,7 +780,7 @@ async function handleCallback(query) {
 
   if (data === "my_status") {
     const pending = await PendingRegistration.findOne({
-      telegramChatId: chatId,
+      telegramChatId: chatId.toString(),
     }).sort({ createdAt: -1 });
 
     if (!pending) {
@@ -1016,11 +797,11 @@ async function handleCallback(query) {
       };
       await sendMessage(
         chatId,
-        `*Your Registration Status*\n\n` +
+        `Your Registration Status\n\n` +
           `Status: ${statusMap[pending.status] || pending.status}\n` +
           `Name: ${pending.name}\n` +
           `Email: ${pending.email}\n` +
-          `📍 Branch: ${pending.branch || "Addis Ketema"}\n` + // ✅ ADD THIS
+          `📍 Branch: ${pending.branch || "Addis Ketema"}\n` +
           `🏛️ Department: ${pending.department || "Not set"}\n\n` +
           `🔹 Click the ⊞ in your input bar to see all options.`,
         { parse_mode: "Markdown" },
@@ -1036,7 +817,7 @@ async function handleCallback(query) {
   if (data === "contact_admin") {
     await sendMessage(
       chatId,
-      `📞 *Contact Admin*\n\n` +
+      `📞 Contact Admin\n\n` +
         `For any questions or support, please:\n` +
         `• Email: admin@addismesob.example\n` +
         `• Visit: ${FRONTEND_URL}/support\n` +
@@ -1054,7 +835,7 @@ async function handleCallback(query) {
   if (data === "help") {
     await sendMessage(
       chatId,
-      `ℹ️ *Help & Support*\n\n` +
+      `ℹ️ Help & Support\n\n` +
         `Available commands (or click ⊞ in input bar):\n` +
         `• /start - Start the bot\n` +
         `• /menu - Show main menu\n` +
@@ -1076,6 +857,7 @@ async function handleCallback(query) {
     return;
   }
 
+  // ─── APPROVE / REJECT ──────────────────────────────────────────
   const [action, pendingId] = data.split(":");
   if (pendingId) {
     const pending = await PendingRegistration.findById(pendingId);
@@ -1088,7 +870,7 @@ async function handleCallback(query) {
       await callTelegramApi("editMessageText", {
         chat_id: chatId,
         message_id: messageId,
-        text: `${query.message.text}\n\n✅ **Already Approved**`,
+        text: `${query.message.text}\n\n✅ Already Approved`,
         parse_mode: "Markdown",
         reply_markup: { inline_keyboard: [] },
       });
@@ -1103,7 +885,7 @@ async function handleCallback(query) {
       await callTelegramApi("editMessageText", {
         chat_id: chatId,
         message_id: messageId,
-        text: `${query.message.text}\n\n❌ **Already Rejected**`,
+        text: `${query.message.text}\n\n❌ Already Rejected`,
         parse_mode: "Markdown",
         reply_markup: { inline_keyboard: [] },
       });
@@ -1149,7 +931,380 @@ async function handleCallback(query) {
   }
 }
 
-// ─── WEBHOOK HANDLER ──────────────────────────────────────
+// =====================================================================
+// PHOTO UPLOAD
+// =====================================================================
+
+async function handlePhotoUpload(msg, session, chatId) {
+  try {
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+    const file = await callTelegramApi("getFile", { file_id: fileId });
+
+    if (!file.ok) {
+      sendMessage(
+        chatId,
+        "❌ Failed to get photo. Please try again or type 'skip'\n\nClick ⊞ in input bar or type /menu to cancel.",
+      );
+      return;
+    }
+
+    const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${file.result.file_path}`;
+    const response = await fetch(fileUrl);
+    const buffer = await response.arrayBuffer();
+    const base64Photo = Buffer.from(buffer).toString("base64");
+    session.data.photoUrl = `data:image/jpeg;base64,${base64Photo}`;
+
+    sendMessage(chatId, "✅ Photo uploaded successfully!");
+    await completeRegistration(chatId, session);
+  } catch (error) {
+    console.error("❌ Photo upload error:", error.message);
+    sendMessage(
+      chatId,
+      "❌ Failed to upload photo. Please type 'skip' to continue.\n\nClick ⊞ in input bar or type /menu to cancel.",
+    );
+  }
+}
+
+// =====================================================================
+// COMPLETE REGISTRATION
+// =====================================================================
+
+async function completeRegistration(chatId, session) {
+  const otpCode = generateOtp();
+  const pending = await PendingRegistration.create({
+    telegramChatId: chatId,
+    telegramUsername: session.data.telegramUsername,
+    name: session.data.name,
+    email: session.data.email,
+    phone: session.data.phone || "",
+    branch: session.data.branch || "Addis Ketema",
+    department: session.data.department || "",
+    position: session.data.position || "",
+    skills: session.data.skills || [],
+    profilePhotoUrl: session.data.photoUrl || "",
+    status: "pending_otp",
+    otpCode,
+    otpExpiresAt: otpExpiry(10),
+  });
+
+  session.pendingId = pending._id.toString();
+  session.step = STEPS.OTP;
+
+  sendMessage(
+    chatId,
+    `✅ Registration almost complete!\n\nYour verification code is: ${otpCode}\n\nReply with this code to confirm (valid for 10 minutes).\n\nClick ⊞ in input bar or type /menu to cancel.`,
+    { parse_mode: "Markdown" },
+  );
+}
+
+// =====================================================================
+// OTP VERIFICATION
+// =====================================================================
+
+async function handleOtpVerification(chatId, session, text) {
+  const pending = await PendingRegistration.findById(session.pendingId).select(
+    "+otpCode +otpExpiresAt",
+  );
+
+  if (!pending) {
+    registrationSessions.delete(chatId);
+    return showPersistentMenu(
+      chatId,
+      "❌ Something went wrong. Please try again.",
+    );
+  }
+
+  if (!pending.otpExpiresAt || pending.otpExpiresAt < new Date()) {
+    registrationSessions.delete(chatId);
+    return showPersistentMenu(
+      chatId,
+      "❌ That code expired. Please try again.",
+    );
+  }
+
+  if (text !== pending.otpCode) {
+    return sendMessage(
+      chatId,
+      "❌ That code doesn't match — please check and try again.\n\nClick ⊞ in input bar or type /menu to cancel.",
+    );
+  }
+
+  pending.otpVerified = true;
+  pending.status = "pending_approval";
+  pending.otpCode = undefined;
+  pending.otpExpiresAt = undefined;
+  await pending.save();
+
+  registrationSessions.delete(chatId);
+
+  await showPersistentMenu(
+    chatId,
+    "✅ Registration Complete!\nYour registration has been sent for admin approval.\nYou'll receive a notification once approved.",
+  );
+
+  await notifyAdminsForApproval(pending);
+}
+
+// =====================================================================
+// ADMIN NOTIFICATION
+// =====================================================================
+
+async function notifyAdminsForApproval(pending) {
+  if (!TELEGRAM_ADMIN_GROUP_ID) {
+    console.warn("⚠️ TELEGRAM_ADMIN_GROUP_ID not set — cannot notify admins.");
+    return;
+  }
+
+  const text =
+    `📋 New Employee Registration\n\n` +
+    `👤 Name: ${pending.name}\n` +
+    `📧 Email: ${pending.email}\n` +
+    `📱 Phone: ${pending.phone || "Not provided"}\n` +
+    `📍 Branch: ${pending.branch || "Addis Ketema"}\n` +
+    `🏛️ Department: ${pending.department || "Not provided"}\n` +
+    `💼 Position: ${pending.position || "Not provided"}\n` +
+    `🛠️ Skills: ${pending.skills?.length ? pending.skills.join(", ") : "Not provided"}\n` +
+    `👤 Telegram: @${pending.telegramUsername || "n/a"}\n` +
+    `🖼️ Photo: ${pending.profilePhotoUrl ? "✅ Uploaded" : "❌ Not uploaded"}`;
+
+  await sendMessage(TELEGRAM_ADMIN_GROUP_ID, text, {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "✅ Approve", callback_data: `approve:${pending._id}` },
+          { text: "❌ Reject", callback_data: `reject:${pending._id}` },
+        ],
+        [{ text: "👤 View Profile", url: `${FRONTEND_URL}/employees` }],
+      ],
+    },
+  });
+}
+
+// =====================================================================
+// SEND LOGIN CREDENTIALS
+// =====================================================================
+
+async function sendLoginCredentials(chatId, userData) {
+  const { email, password, name, department, position, phone, branch } =
+    userData;
+
+  const message =
+    `✅ Account Approved! 🎉\n\n` +
+    `📋 Your Account Details:\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n` +
+    `👤 Name: ${name}\n` +
+    `📧 Email: ${email}\n` +
+    `🔑 Password: ${password}\n` +
+    `🏛️ Department: ${department || "Not set"}\n` +
+    `💼 Position: ${position || "Not set"}\n` +
+    `📱 Phone: ${phone || "Not set"}\n` +
+    `📍 Branch: ${branch || "Addis Ketema"}\n` +
+    `━━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `🔗 Login: ${FRONTEND_URL}/login\n\n` +
+    `⚠️ Please change your password after logging in.\n\n` +
+    `📌 Click the ⊞ in your input bar to see all options.`;
+
+  try {
+    const result = await showPersistentMenu(chatId, `\n${message}`);
+    console.log(`✅ Login credentials sent to ${chatId} with menu`);
+    return result;
+  } catch (error) {
+    console.error(
+      "❌ Failed to send with menu, trying plain message:",
+      error.message,
+    );
+    try {
+      const result = await sendMessage(chatId, message, {
+        parse_mode: "Markdown",
+      });
+      console.log(`✅ Login credentials sent to ${chatId} (plain message)`);
+      return result;
+    } catch (secondError) {
+      console.error(
+        "❌ Failed to send credentials even with plain message:",
+        secondError.message,
+      );
+
+      if (TELEGRAM_ADMIN_GROUP_ID) {
+        await sendMessage(
+          TELEGRAM_ADMIN_GROUP_ID,
+          `⚠️ Could not send credentials to user\n\n` +
+            `User: ${name}\n` +
+            `Email: ${email}\n` +
+            `Chat ID: ${chatId}\n\n` +
+            `Please contact the user manually with their login details.`,
+          { parse_mode: "Markdown" },
+        );
+      }
+      return null;
+    }
+  }
+}
+
+// =====================================================================
+// APPROVE REGISTRATION
+// =====================================================================
+
+async function approveRegistration(pendingId, reviewer) {
+  console.log("📝 Approving registration:", pendingId);
+
+  const pending = await PendingRegistration.findById(pendingId);
+  if (!pending) throw new Error("Registration not found");
+  if (pending.status !== "pending_approval") {
+    throw new Error(`Cannot approve from status "${pending.status}"`);
+  }
+
+  try {
+    console.log("👤 Creating user account for:", pending.email);
+    const tempPassword = generateTempPassword();
+
+    const user = await createUserAccount({
+      name: pending.name,
+      email: pending.email,
+      password: tempPassword,
+      role: "employee",
+      phone: pending.phone,
+      telegramChatId: pending.telegramChatId,
+      profilePhotoUrl: pending.profilePhotoUrl || "",
+      branch: pending.branch || "Addis Ketema",
+    });
+
+    console.log("✅ User created with ID:", user._id);
+
+    console.log("📋 Adding user to Golden Monday roster...");
+    try {
+      const existingPresenter = await GoldenMondayPresenter.findOne({
+        user: user._id,
+      });
+      if (!existingPresenter) {
+        const presenter = await GoldenMondayPresenter.create({
+          user: user._id,
+          name: pending.name,
+          email: pending.email,
+          department: pending.department || "",
+          position: pending.position || "",
+          phone: pending.phone || "",
+          profilePhotoUrl: pending.profilePhotoUrl || "",
+          skills: pending.skills || [],
+          isEligible: true,
+          timesPresented: 0,
+          registeredAt: new Date(),
+          registeredBy: reviewer?._id || undefined,
+        });
+        console.log("✅ Added to Golden Monday roster:", presenter._id);
+      } else {
+        console.log("ℹ️ User already in Golden Monday roster");
+      }
+    } catch (rosterError) {
+      console.error(
+        "⚠️ Failed to add to Golden Monday roster:",
+        rosterError.message,
+      );
+    }
+
+    pending.status = "approved";
+    pending.createdUser = user._id;
+    pending.reviewedBy = reviewer?._id || undefined;
+    pending.reviewedByName = reviewer?.name || "unknown";
+    pending.reviewedAt = new Date();
+    await pending.save();
+
+    console.log("📤 Sending login credentials to:", pending.telegramChatId);
+
+    await sendLoginCredentials(pending.telegramChatId, {
+      email: pending.email,
+      password: tempPassword,
+      name: pending.name,
+      department: pending.department || "",
+      position: pending.position || "",
+      phone: pending.phone || "",
+      branch: pending.branch || "Addis Ketema",
+    });
+
+    return { pending, user };
+  } catch (error) {
+    console.error("❌ Approval error:", error.message);
+    if (TELEGRAM_ADMIN_GROUP_ID) {
+      await sendMessage(
+        TELEGRAM_ADMIN_GROUP_ID,
+        `❌ Approval failed for ${pending.email}:\n${error.message}`,
+      );
+    }
+    throw error;
+  }
+}
+
+// =====================================================================
+// REJECT REGISTRATION
+// =====================================================================
+
+async function rejectRegistration(pendingId, reviewer, reason) {
+  const pending = await PendingRegistration.findById(pendingId);
+  if (!pending) throw new Error("Registration not found");
+
+  pending.status = "rejected";
+  pending.rejectionReason = reason || "";
+  pending.reviewedBy = reviewer?._id || undefined;
+  pending.reviewedByName = reviewer?.name || "unknown";
+  pending.reviewedAt = new Date();
+  await pending.save();
+
+  await showPersistentMenu(
+    pending.telegramChatId,
+    "❌ Your registration could not be approved.\nPlease contact HR/admin for details.",
+  );
+
+  return pending;
+}
+
+// =====================================================================
+// SEND LOGIN LINK
+// =====================================================================
+
+async function sendLoginLink(chatId, email, tempPassword) {
+  const message =
+    `✅ Account Approved!\n\n` +
+    `🔗 Login: ${FRONTEND_URL}/login\n` +
+    `📧 Email: ${email}\n` +
+    `🔑 Password: ${tempPassword}\n\n` +
+    `⚠️ Please change your password after logging in.\n\n` +
+    `📌 Click the ⊞ in your input bar to see all options.`;
+
+  try {
+    await showPersistentMenu(chatId, `\n${message}`);
+  } catch (error) {
+    console.error(
+      "❌ Failed to send with persistent menu, trying plain message:",
+      error.message,
+    );
+    await sendMessage(chatId, message, { parse_mode: "Markdown" });
+  }
+}
+
+// =====================================================================
+// SEND DELETION NOTIFICATION
+// =====================================================================
+
+async function sendDeletionNotification(
+  chatId,
+  name,
+  reason = "Your account has been removed by an administrator.",
+) {
+  const message =
+    `⚠️ Account Deletion Notification\n\n` +
+    `Dear ${name},\n\n` +
+    `${reason}\n\n` +
+    `If you believe this is a mistake, please contact your administrator.\n\n` +
+    `To re-register, please send /start to this bot again.`;
+
+  await showPersistentMenu(chatId, `\n${message}`);
+}
+
+// =====================================================================
+// WEBHOOK HANDLER
+// =====================================================================
+
 async function handleWebhookUpdate(update) {
   try {
     console.log(`📨 Webhook update received`);
@@ -1225,7 +1380,10 @@ async function handleWebhookUpdate(update) {
   }
 }
 
-// ─── WEBHOOK SETUP ────────────────────────────────────────
+// =====================================================================
+// WEBHOOK SETUP
+// =====================================================================
+
 async function setWebhook(webhookUrl) {
   if (!TELEGRAM_BOT_TOKEN) {
     console.error("❌ TELEGRAM_BOT_TOKEN not configured");
@@ -1272,7 +1430,10 @@ async function getWebhookInfo() {
   }
 }
 
-// ─── EXPORTS ──────────────────────────────────────────────
+// =====================================================================
+// EXPORTS
+// =====================================================================
+
 module.exports = {
   postPresenterAnnouncement,
   generateAnnouncementImage,
@@ -1285,6 +1446,7 @@ module.exports = {
   rejectRegistration,
   sendMessage,
   sendLoginLink,
+  sendLoginCredentials,
   sendDeletionNotification,
   showPersistentMenu,
   setupPersistentMenu,
