@@ -40,7 +40,9 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
       setGenerating(true);
       setError(null);
       try {
+        // ✅ FIXED: Using GET request for QR generation
         const response = await goldenMondayAPI.generateQRCheckIn(sessionId);
+
         if (response.data && response.data.qrCode) {
           setQrCode(response.data.qrCode);
         } else {
@@ -61,7 +63,6 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
               for (let col = 0; col < 10; col++) {
                 const x = col * cellSize;
                 const y = row * cellSize;
-                // Create a pattern that looks like a QR code
                 const val = (row * 7 + col * 13 + 5) % 17;
                 if (val < 8) {
                   ctx.fillRect(x, y, cellSize - 1, cellSize - 1);
@@ -83,7 +84,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
         }
       } catch (error) {
         console.error("Failed to generate QR:", error);
-        setError("Failed to generate QR code");
+        setError(error.response?.data?.error || "Failed to generate QR code");
       } finally {
         setGenerating(false);
       }
@@ -92,15 +93,15 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
     generateQR();
   }, [sessionId, user]);
 
+  // ✅ FIXED: Use recordQRCheckIn API for check-in
   const handleCheckIn = async () => {
     if (!sessionId) return;
     setScanning(true);
     setError(null);
     try {
-      await goldenMondayAPI.recordAttendance(sessionId, {
-        userId: user._id,
-        signature: "qr-checkin",
-        signatureType: "qr",
+      // ✅ Use the correct API endpoint for recording check-in
+      await goldenMondayAPI.recordQRCheckIn(sessionId, {
+        location: "qr-scan",
       });
       setCheckedIn(true);
       setCheckInTime(new Date());
@@ -108,7 +109,11 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
       if (onCheckIn) onCheckIn();
     } catch (error) {
       console.error("Check-in failed:", error);
-      setError(error.response?.data?.error || "Check-in failed");
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        "Check-in failed";
+      setError(errorMessage);
       showToast(t.checkInFailed || "Check-in failed", "error");
     } finally {
       setScanning(false);
@@ -123,6 +128,27 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
       second: "2-digit",
     });
   };
+
+  // ✅ Check if user is already checked in on mount
+  useEffect(() => {
+    const checkAttendance = async () => {
+      if (!sessionId || !user) return;
+      try {
+        const response = await goldenMondayAPI.getAttendance(sessionId);
+        const attendance = response.data?.attendance || [];
+        const userAttendance = attendance.find(
+          (a) => a.userId?._id === user._id || a.user?._id === user._id,
+        );
+        if (userAttendance && userAttendance.attended) {
+          setCheckedIn(true);
+          setCheckInTime(new Date(userAttendance.checkedInAt));
+        }
+      } catch (error) {
+        console.warn("Could not check attendance status:", error);
+      }
+    };
+    checkAttendance();
+  }, [sessionId, user]);
 
   return (
     <div
@@ -229,7 +255,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           gap: 18,
         }}
       >
-        {/* QR Code Display - Enhanced */}
+        {/* QR Code Display */}
         <div
           style={{
             width: 180,
@@ -307,7 +333,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           )}
         </div>
 
-        {/* User Info - Enhanced */}
+        {/* User Info */}
         {user && (
           <div
             style={{
@@ -385,7 +411,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           </div>
         )}
 
-        {/* Check-in Button - Enhanced */}
+        {/* Check-in Button */}
         <button
           onClick={handleCheckIn}
           disabled={scanning || checkedIn || !sessionId}
@@ -449,7 +475,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           )}
         </button>
 
-        {/* Status Message - Enhanced */}
+        {/* Status Message */}
         <div
           style={{
             width: "100%",
