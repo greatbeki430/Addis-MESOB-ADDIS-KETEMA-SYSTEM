@@ -9,6 +9,8 @@ const {
   setWebhook,
   getWebhookInfo,
   setupPersistentMenu,
+  postNextPresenterAnnouncement,
+  sendPresenterReminders,
 } = require("../services/telegramService");
 const GoldenMondaySession = require("../models/GoldenMondaySession");
 const {
@@ -128,7 +130,6 @@ router.get("/test-message", async (req, res) => {
 /**
  * Post a specific session to Telegram
  * POST /api/telegram/post/:sessionId
- * Now uses goldenMondayAdminOrAbove (scoped to GM feature)
  */
 router.post(
   "/post/:sessionId",
@@ -170,7 +171,6 @@ router.post(
 /**
  * Post a test announcement to Telegram
  * POST /api/telegram/test-post
- * Now uses goldenMondayAdminOrAbove (scoped to GM feature)
  */
 router.post(
   "/test-post",
@@ -230,5 +230,51 @@ router.post("/setup-menu", protect, adminOrSuperAdmin, async (req, res) => {
     });
   }
 });
+
+/**
+ * Post next presenter announcement to Telegram
+ * POST /api/telegram/announce-next
+ */
+router.post(
+  "/announce-next",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const result = await postNextPresenterAnnouncement();
+      res.json({
+        success: true,
+        result,
+        message: result ? "Announcement posted!" : "No announcement to post",
+      });
+    } catch (error) {
+      console.error("Error posting announcement:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+);
+
+/**
+ * Send presenter reminders
+ * POST /api/telegram/send-reminders
+ */
+router.post(
+  "/send-reminders",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const results = await sendPresenterReminders();
+      res.json({
+        success: true,
+        results,
+        count: results.length,
+      });
+    } catch (error) {
+      console.error("Error sending reminders:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  },
+);
 
 module.exports = router;

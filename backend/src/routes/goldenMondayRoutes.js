@@ -33,6 +33,11 @@ const {
   analyzeAndCategorizePhoto,
   canSeeSalary,
 } = require("../controllers/goldenMondayController");
+const {
+  createNotification,
+  createPresenterAssignedNotification,
+  createSessionReminderNotification,
+} = require("../services/telegram");
 
 const rotationService = require("../services/goldenMondayRotationService");
 const GoldenMondaySession = require("../models/GoldenMondaySession");
@@ -2350,6 +2355,112 @@ router.post("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
   } catch (error) {
     console.error("❌ [QR CHECK-IN] Error:", error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// GET /api/golden-monday/notifications
+router.get("/notifications", protect, anyRole, async (req, res) => {
+  try {
+    const GoldenMondayNotification = require("../models/GoldenMondayNotification");
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [notifications, total] = await Promise.all([
+      GoldenMondayNotification.find({ user: req.user._id })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      GoldenMondayNotification.countDocuments({ user: req.user._id }),
+    ]);
+
+    const unreadCount = await GoldenMondayNotification.countDocuments({
+      user: req.user._id,
+      isRead: false,
+      isDismissed: false,
+    });
+
+    res.json({
+      success: true,
+      notifications,
+      total,
+      unreadCount,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit)),
+      },
+    });
+  } catch (error) {
+    console.error("❌ Error fetching notifications:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/golden-monday/notifications/:id/read
+router.put("/notifications/:id/read", protect, anyRole, async (req, res) => {
+  try {
+    const GoldenMondayNotification = require("../models/GoldenMondayNotification");
+    const notification = await GoldenMondayNotification.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+
+    if (!notification) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Notification not found" });
+    }
+
+    notification.isRead = true;
+    notification.readAt = new Date();
+    await notification.save();
+
+    res.json({ success: true, notification });
+  } catch (error) {
+    console.error("❌ Error marking notification as read:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/golden-monday/notifications/read-all
+router.put("/notifications/read-all", protect, anyRole, async (req, res) => {
+  try {
+    const GoldenMondayNotification = require("../models/GoldenMondayNotification");
+    await GoldenMondayNotification.updateMany(
+      { user: req.user._id, isRead: false },
+      { isRead: true, readAt: new Date() },
+    );
+    res.json({ success: true, message: "All notifications marked as read" });
+  } catch (error) {
+    console.error("❌ Error marking all as read:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PUT /api/golden-monday/notifications/:id/dismiss
+router.put("/notifications/:id/dismiss", protect, anyRole, async (req, res) => {
+  try {
+    const GoldenMondayNotification = require("../models/GoldenMondayNotification");
+    const notification = await GoldenMondayNotification.findOne({
+      _id: req.params.id,
+      user: req.user._id,
+    });
+
+    if (!notification) {
+      return res
+        .status(404)
+        .json({ success: false, error: "Notification not found" });
+    }
+
+    notification.isDismissed = true;
+    await notification.save();
+
+    res.json({ success: true, notification });
+  } catch (error) {
+    console.error("❌ Error dismissing notification:", error);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 module.exports = router;
