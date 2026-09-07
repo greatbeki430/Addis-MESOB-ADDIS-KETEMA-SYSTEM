@@ -23,6 +23,61 @@ const goldenMondaySessionSchema = new mongoose.Schema(
     presenterDepartment: { type: String, default: "", trim: true },
     presenterPhotoUrl: { type: String, default: "" },
 
+    // ─── Presenter Confirmation Fields ──────────────────────────
+    presenterConfirmed: {
+      type: Boolean,
+      default: false,
+    },
+    presenterConfirmedAt: {
+      type: Date,
+      default: null,
+    },
+    presenterStatus: {
+      type: String,
+      enum: ["pending", "confirmed", "declined", "no-response"],
+      default: "pending",
+    },
+    presenterDeclineReason: {
+      type: String,
+      default: "",
+    },
+    presenterDeclinedAt: {
+      type: Date,
+      default: null,
+    },
+
+    // ─── Announcement & Availability Fields ──────────────────────
+    announcementSent: {
+      type: Boolean,
+      default: false,
+    },
+    announcementMessageId: {
+      type: String,
+      default: null,
+    },
+    availabilityRequestSentAt: {
+      type: Date,
+      default: null,
+    },
+    availabilityResponseDeadline: {
+      type: Date,
+      default: null,
+    },
+
+    // ─── Reminder Tracking ──────────────────────────────────────
+    reminder7DaySent: {
+      type: Boolean,
+      default: false,
+    },
+    reminder3DaySent: {
+      type: Boolean,
+      default: false,
+    },
+    reminder1DaySent: {
+      type: Boolean,
+      default: false,
+    },
+
     // Presentation Details
     presentationTitle: { type: String, default: "", trim: true },
     titleConfirmedAt: { type: Date, default: null },
@@ -143,6 +198,8 @@ goldenMondaySessionSchema.index({ date: -1 });
 goldenMondaySessionSchema.index({ weekOf: 1 }, { unique: true, sparse: true });
 goldenMondaySessionSchema.index({ status: 1 });
 goldenMondaySessionSchema.index({ presenter: 1 });
+goldenMondaySessionSchema.index({ presenterStatus: 1 });
+goldenMondaySessionSchema.index({ announcementSent: 1 });
 
 // Methods
 goldenMondaySessionSchema.methods.isRecordingLive = function () {
@@ -160,6 +217,25 @@ goldenMondaySessionSchema.methods.isUpcoming = function () {
 
 goldenMondaySessionSchema.methods.isPast = function () {
   return this.status === "completed" || this.date < new Date();
+};
+
+goldenMondaySessionSchema.methods.isPresenterConfirmed = function () {
+  return (
+    this.presenterConfirmed === true && this.presenterStatus === "confirmed"
+  );
+};
+
+goldenMondaySessionSchema.methods.isPresenterDeclined = function () {
+  return this.presenterStatus === "declined";
+};
+
+goldenMondaySessionSchema.methods.needsReplacement = function () {
+  return (
+    this.presenterStatus === "declined" ||
+    (this.presenterStatus === "pending" &&
+      this.availabilityResponseDeadline &&
+      this.availabilityResponseDeadline < new Date())
+  );
 };
 
 module.exports = mongoose.model(
