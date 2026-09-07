@@ -1,5 +1,5 @@
 // frontend/src/components/golden-monday/NotificationBell.jsx
-// ✅ COMPLETELY FIXED: Uses notificationAPI as primary, goldenMondayAPI as fallback
+// ✅ COMPLETELY FIXED: All buttons now work with proper event handling
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -125,7 +125,6 @@ export default function NotificationBell() {
       try {
         const currentPage = reset ? 1 : page + 1;
 
-        // ✅ PRIMARY: Use notificationAPI (matches backend)
         let response;
         let data;
 
@@ -141,7 +140,6 @@ export default function NotificationBell() {
             "⚠️ notificationAPI.getAll failed, trying goldenMondayAPI:",
             primaryError,
           );
-          // ✅ FALLBACK: Try goldenMondayAPI
           try {
             response = await goldenMondayAPI.getNotifications({
               page: currentPage,
@@ -153,7 +151,6 @@ export default function NotificationBell() {
               "⚠️ goldenMondayAPI.getNotifications also failed:",
               secondaryError,
             );
-            // ✅ LAST RESORT: Direct fetch
             response = await goldenMondayAPI.getNotificationList?.({
               page: currentPage,
               limit: 20,
@@ -162,7 +159,6 @@ export default function NotificationBell() {
           }
         }
 
-        // ✅ Safely extract data
         const items = data?.notifications || data?.data || [];
         const pagination = data?.pagination || { total: 0, pages: 1 };
         const unread = data?.unreadCount || 0;
@@ -216,6 +212,7 @@ export default function NotificationBell() {
   // ─── Mark as Read ──────────────────────────────────────────────
   const markAsRead = useCallback(
     async (id, e) => {
+      // ✅ Always stop propagation
       if (e) {
         e.stopPropagation();
         e.preventDefault();
@@ -225,7 +222,6 @@ export default function NotificationBell() {
 
       setMarkingReadId(id);
       try {
-        // ✅ PRIMARY: Use notificationAPI
         let success = false;
 
         try {
@@ -276,6 +272,7 @@ export default function NotificationBell() {
   // ─── Mark All as Read ──────────────────────────────────────────
   const markAllAsRead = useCallback(
     async (e) => {
+      // ✅ Always stop propagation
       if (e) {
         e.stopPropagation();
         e.preventDefault();
@@ -285,7 +282,6 @@ export default function NotificationBell() {
 
       setMarkingAll(true);
       try {
-        // ✅ PRIMARY: Use notificationAPI
         let success = false;
 
         try {
@@ -338,6 +334,7 @@ export default function NotificationBell() {
   // ─── Dismiss Notification ──────────────────────────────────────
   const dismissNotification = useCallback(
     async (id, e) => {
+      // ✅ Always stop propagation
       if (e) {
         e.stopPropagation();
         e.preventDefault();
@@ -347,7 +344,6 @@ export default function NotificationBell() {
 
       setDismissingId(id);
       try {
-        // ✅ PRIMARY: Use notificationAPI
         let success = false;
 
         try {
@@ -398,8 +394,9 @@ export default function NotificationBell() {
   // ─── Handle Notification Click ────────────────────────────────
   const handleNotificationClick = useCallback(
     (notification, e) => {
-      // ✅ If this is a button click, don't close the dropdown
-      if (e && e.target.closest(".notification-action")) {
+      // ✅ Check if click was on an action button
+      const target = e?.target || e?.currentTarget;
+      if (target?.closest?.(".notification-action")) {
         return;
       }
 
@@ -704,7 +701,14 @@ export default function NotificationBell() {
                     return (
                       <div
                         key={n._id}
-                        onClick={(e) => handleNotificationClick(n, e)}
+                        onClick={(e) => {
+                          // ✅ Only handle click if not on an action button
+                          const target = e?.target;
+                          if (target?.closest?.(".notification-action")) {
+                            return;
+                          }
+                          handleNotificationClick(n, e);
+                        }}
                         style={{
                           display: "flex",
                           alignItems: "flex-start",
@@ -859,7 +863,7 @@ export default function NotificationBell() {
                           </div>
                         </div>
 
-                        {/* Actions */}
+                        {/* ✅ FIXED: Actions with proper className and stopPropagation */}
                         <div
                           style={{
                             display: "flex",
@@ -868,7 +872,10 @@ export default function NotificationBell() {
                             alignSelf: "flex-start",
                             marginTop: 4,
                           }}
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            // ✅ Stop propagation to parent
+                            e.stopPropagation();
+                          }}
                         >
                           {n.link && (
                             <FiChevronRight
@@ -878,7 +885,12 @@ export default function NotificationBell() {
                             />
                           )}
                           <button
-                            onClick={(e) => dismissNotification(n._id, e)}
+                            onClick={(e) => {
+                              // ✅ Stop propagation and handle dismiss
+                              e.stopPropagation();
+                              e.preventDefault();
+                              dismissNotification(n._id, e);
+                            }}
                             disabled={dismissingId === n._id}
                             className="notification-action"
                             style={{
@@ -920,7 +932,12 @@ export default function NotificationBell() {
                           </button>
                           {!n.isRead && (
                             <button
-                              onClick={(e) => markAsRead(n._id, e)}
+                              onClick={(e) => {
+                                // ✅ Stop propagation and handle mark as read
+                                e.stopPropagation();
+                                e.preventDefault();
+                                markAsRead(n._id, e);
+                              }}
                               disabled={markingReadId === n._id}
                               className="notification-action"
                               style={{
