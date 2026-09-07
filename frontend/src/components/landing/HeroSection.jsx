@@ -60,7 +60,6 @@ const HeroSection = ({ t, onLogin }) => {
         color: "#fff",
       }}
     >
-      {/* ✨ Animated Background */}
       <AnimatedBackground />
 
       <div
@@ -78,7 +77,7 @@ const HeroSection = ({ t, onLogin }) => {
       >
         {/* ─── LEFT COLUMN ─── */}
         <div style={{ order: isMobile ? 1 : 0 }}>
-          {/* ✨ Premium Badge */}
+          {/* Premium Badge */}
           <div
             style={{
               display: "inline-flex",
@@ -119,7 +118,7 @@ const HeroSection = ({ t, onLogin }) => {
             />
           </div>
 
-          {/* ✨ Main Title with Premium Gradient */}
+          {/* Main Title */}
           <h1
             style={{
               fontFamily: F.serif,
@@ -141,7 +140,7 @@ const HeroSection = ({ t, onLogin }) => {
             {t("landing.heroTitle") || "Every service, in one basket."}
           </h1>
 
-          {/* ✨ Subtitle with Quote Style */}
+          {/* Subtitle */}
           <div
             style={{
               position: "relative",
@@ -180,7 +179,7 @@ const HeroSection = ({ t, onLogin }) => {
             </p>
           </div>
 
-          {/* ✨ Premium Feature Tags */}
+          {/* Feature Tags */}
           <div
             style={{
               display: "flex",
@@ -259,7 +258,7 @@ const HeroSection = ({ t, onLogin }) => {
             ))}
           </div>
 
-          {/* ✨ Premium CTA Buttons */}
+          {/* CTA Buttons */}
           <div
             style={{
               display: "flex",
@@ -269,7 +268,6 @@ const HeroSection = ({ t, onLogin }) => {
               width: "100%",
             }}
           >
-            {/* Primary CTA - Login Button */}
             <button
               onClick={onLogin}
               style={{
@@ -347,7 +345,6 @@ const HeroSection = ({ t, onLogin }) => {
               />
             </button>
 
-            {/* Secondary CTA - Explore */}
             <a
               href="#features"
               style={{
@@ -389,7 +386,7 @@ const HeroSection = ({ t, onLogin }) => {
             </a>
           </div>
 
-          {/* ✨ Premium Stats with Icons */}
+          {/* Stats */}
           <div
             style={{
               display: "grid",
@@ -583,7 +580,6 @@ const AnimatedBackground = () => {
         zIndex: 1,
       }}
     >
-      {/* Floating orbs */}
       <div
         style={{
           position: "absolute",
@@ -611,7 +607,6 @@ const AnimatedBackground = () => {
         }}
       />
 
-      {/* Floating particles */}
       {Array.from({ length: 30 }, (_, i) => ({
         size: 1.5 + (i % 3),
         x: 2 + ((i * 13) % 96),
@@ -636,7 +631,6 @@ const AnimatedBackground = () => {
         />
       ))}
 
-      {/* Grid pattern overlay (subtle) */}
       <div
         style={{
           position: "absolute",
@@ -659,7 +653,7 @@ const Premium3DVisual = ({ isTablet }) => {
   const badgeSize = isTablet ? 36 : 44;
   const centerSize = isTablet ? 110 : 150;
 
-  // ✅ USER-FRIENDLY SERVICES (instead of technical terms)
+  // ✅ USER-FRIENDLY SERVICES - Inner Orbit (6 items)
   const orbitItems = [
     {
       icon: <FiFileText size={iconSize} />,
@@ -699,7 +693,7 @@ const Premium3DVisual = ({ isTablet }) => {
     },
   ];
 
-  // ✅ OUTER ORBIT - Key Benefits (simplified)
+  // ✅ OUTER ORBIT - Key Benefits (6 items)
   const outerOrbitItems = [
     { icon: "📋", label: "Register" },
     { icon: "📊", label: "Report" },
@@ -709,8 +703,9 @@ const Premium3DVisual = ({ isTablet }) => {
     { icon: "🏆", label: "Growth" },
   ];
 
-  const radius = isTablet ? 48 : 62;
-  const outerRadius = isTablet ? 65 : 82;
+  // ✅ FIXED: Reduced radius values to bring items closer to center
+  const radius = isTablet ? 38 : 48; // Was 48/62 - now closer
+  const outerRadius = isTablet ? 52 : 65; // Was 65/82 - now closer
 
   return (
     <div
@@ -725,7 +720,7 @@ const Premium3DVisual = ({ isTablet }) => {
         margin: "0 auto",
       }}
     >
-      {/* 3D Depth Layers */}
+      {/* Depth Layers */}
       <div
         style={{
           position: "absolute",
@@ -738,12 +733,12 @@ const Premium3DVisual = ({ isTablet }) => {
         }}
       />
 
-      {/* Decorative Rings */}
+      {/* Decorative Rings - Now closer to center */}
       <div
         style={{
           position: "absolute",
-          width: "94%",
-          height: "94%",
+          width: "90%",
+          height: "90%",
           borderRadius: "50%",
           border: "1px solid rgba(245,197,24,0.05)",
           animation: "orbit-reverse 50s linear infinite",
@@ -752,8 +747,8 @@ const Premium3DVisual = ({ isTablet }) => {
       <div
         style={{
           position: "absolute",
-          width: "78%",
-          height: "78%",
+          width: "74%",
+          height: "74%",
           borderRadius: "50%",
           border: "2px solid rgba(245,197,24,0.03)",
           animation: "float-3d 8s ease-in-out infinite",
@@ -762,15 +757,15 @@ const Premium3DVisual = ({ isTablet }) => {
       <div
         style={{
           position: "absolute",
-          width: "62%",
-          height: "62%",
+          width: "58%",
+          height: "58%",
           borderRadius: "50%",
           border: "1px solid rgba(245,197,24,0.06)",
           animation: "orbit-reverse 30s linear infinite reverse",
         }}
       />
 
-      {/* Center 3D Basket */}
+      {/* Center Basket */}
       <div
         style={{
           position: "relative",
@@ -826,7 +821,6 @@ const Premium3DVisual = ({ isTablet }) => {
         >
           One Basket
         </span>
-        {/* Inner glow */}
         <div
           style={{
             position: "absolute",
@@ -839,7 +833,7 @@ const Premium3DVisual = ({ isTablet }) => {
         />
       </div>
 
-      {/* Orbiting Service Items (closer to center) */}
+      {/* Inner Orbit Items - Closer to center */}
       {orbitItems.map((item, i) => {
         const angle = (i / orbitItems.length) * Math.PI * 2 - Math.PI / 2;
         const x = 50 + Math.cos(angle) * radius;
@@ -911,7 +905,7 @@ const Premium3DVisual = ({ isTablet }) => {
         );
       })}
 
-      {/* Outer Orbiting Benefit Labels */}
+      {/* Outer Orbit Items */}
       {outerOrbitItems.map((item, i) => {
         const angle = (i / outerOrbitItems.length) * Math.PI * 2 + Math.PI / 2;
         const x = 50 + Math.cos(angle) * outerRadius;
@@ -975,23 +969,24 @@ const Premium3DVisual = ({ isTablet }) => {
         );
       })}
 
-      {/* Bottom Label */}
+      {/* Bottom Label - Now more visible */}
       <div
         style={{
           position: "absolute",
-          bottom: isTablet ? 4 : 8,
+          bottom: isTablet ? 2 : 4,
           left: "50%",
           transform: "translateX(-50%)",
-          fontSize: isTablet ? 7 : 9,
+          fontSize: isTablet ? 8 : 10,
           fontWeight: 700,
-          letterSpacing: 3,
+          letterSpacing: 2,
           textTransform: "uppercase",
-          color: "rgba(255,255,255,0.08)",
-          background: "rgba(0,0,0,0.1)",
-          padding: isTablet ? "4px 14px" : "6px 20px",
-          borderRadius: 12,
-          border: "1px solid rgba(255,255,255,0.02)",
+          color: "rgba(255,255,255,0.15)",
+          background: "rgba(0,0,0,0.15)",
+          padding: isTablet ? "3px 12px" : "4px 16px",
+          borderRadius: 10,
+          border: "1px solid rgba(255,255,255,0.03)",
           backdropFilter: "blur(4px)",
+          whiteSpace: "nowrap",
         }}
       >
         Digital Ethiopia
@@ -1002,7 +997,6 @@ const Premium3DVisual = ({ isTablet }) => {
 
 // ─── MOBILE PREMIUM VISUAL ────────────────────────────────────
 const MobilePremiumVisual = () => {
-  // ✅ User-friendly items for mobile
   const mobileItems = [
     { icon: "📋", label: "Register" },
     { icon: "📊", label: "Report" },
@@ -1010,6 +1004,9 @@ const MobilePremiumVisual = () => {
     { icon: "🤖", label: "AI Help" },
     { icon: "📁", label: "Docs" },
   ];
+
+  // ✅ Reduced radius for mobile
+  const radius = 45;
 
   return (
     <div
@@ -1024,7 +1021,6 @@ const MobilePremiumVisual = () => {
         margin: "0 auto",
       }}
     >
-      {/* Glow */}
       <div
         style={{
           position: "absolute",
@@ -1037,12 +1033,11 @@ const MobilePremiumVisual = () => {
         }}
       />
 
-      {/* Rings */}
       <div
         style={{
           position: "absolute",
-          width: "88%",
-          height: "88%",
+          width: "85%",
+          height: "85%",
           borderRadius: "50%",
           border: "1px solid rgba(245,197,24,0.04)",
           borderStyle: "dashed",
@@ -1051,8 +1046,8 @@ const MobilePremiumVisual = () => {
       <div
         style={{
           position: "absolute",
-          width: "72%",
-          height: "72%",
+          width: "68%",
+          height: "68%",
           borderRadius: "50%",
           border: "1px solid rgba(245,197,24,0.03)",
         }}
@@ -1100,10 +1095,9 @@ const MobilePremiumVisual = () => {
         </span>
       </div>
 
-      {/* Orbiting labels */}
+      {/* Orbiting labels - Closer to center */}
       {mobileItems.map((item, i) => {
         const angle = (i / mobileItems.length) * Math.PI * 2 - Math.PI / 2;
-        const radius = 58;
         const x = 50 + Math.cos(angle) * radius;
         const y = 50 + Math.sin(angle) * radius;
 
