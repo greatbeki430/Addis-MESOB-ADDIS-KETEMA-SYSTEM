@@ -756,37 +756,35 @@ export default function Landing() {
           </button>
         </div>
 
-        {/* Mobile Menu Toggle */}
-        <button
-          className="lp-mobile-toggle"
-          onClick={() => setMobileNavOpen((v) => !v)}
-          aria-label="Toggle menu"
-          style={{
-            background: "rgba(255,255,255,0.08)",
-            border: "none",
-            borderRadius: 8,
-            width: isMobile ? 36 : 38,
-            height: isMobile ? 36 : 38,
-            color: "#fff",
-            cursor: "pointer",
-            alignItems: "center",
-            justifyContent: "center",
-            display: "flex",
-            transition: "background 0.2s ease",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.15)";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "rgba(255,255,255,0.08)";
-          }}
-        >
-          {mobileNavOpen ? (
-            <FiX size={isMobile ? 16 : 18} />
-          ) : (
-            <FiMenu size={isMobile ? 16 : 18} />
-          )}
-        </button>
+        {/* ✅ FIXED: Mobile Menu Toggle - Only visible on mobile */}
+        {isMobile && (
+          <button
+            className="lp-mobile-toggle"
+            onClick={() => setMobileNavOpen((v) => !v)}
+            aria-label="Toggle menu"
+            style={{
+              background: "rgba(255,255,255,0.08)",
+              border: "none",
+              borderRadius: 8,
+              width: 36,
+              height: 36,
+              color: "#fff",
+              cursor: "pointer",
+              alignItems: "center",
+              justifyContent: "center",
+              display: "flex",
+              transition: "background 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.15)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.08)";
+            }}
+          >
+            {mobileNavOpen ? <FiX size={16} /> : <FiMenu size={16} />}
+          </button>
+        )}
       </header>
 
       {/* ── MOBILE NAV ────────────────────────────────────── */}
