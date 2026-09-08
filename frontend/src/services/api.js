@@ -687,27 +687,21 @@ export const goldenMondayAPI = {
   dismiss: (id) => api.delete(`/notifications/${id}/dismiss`), // Alias
 
   // ─── QR Check-in ──────────────────────────────────────────────
-  // Changed from POST to GET for QR generation
+  // ✅ FIXED: GET for QR generation (was POST)
   generateQRCheckIn: (sessionId) =>
     api.get(`/golden-monday/qr-checkin/${sessionId}`),
 
-  // ✅ ADD THIS: For recording the actual check-in (POST)
+  // ✅ FIXED: POST for recording the actual check-in
   recordQRCheckIn: (sessionId, data) =>
     api.post(`/golden-monday/qr-checkin/${sessionId}`, data || {}),
 
   // ─── TELEGRAM AUTOMATION ──────────────────────────────────────
-  // ✅ ADDED: Send presenter reminders
   sendReminders: () => api.post("/telegram/send-reminders"),
-
-  // ✅ ADDED: Auto-announce next presenter to Telegram
   announceNext: () => api.post("/telegram/announce-next"),
 
   // ─── PRESENTER AVAILABILITY ──────────────────────────────────
-  // ✅ ADDED: Confirm presenter availability
   confirmAvailability: (sessionId) =>
     api.post(`/golden-monday/${sessionId}/confirm`),
-
-  // ✅ ADDED: Decline presenter availability with reason
   declineAvailability: (sessionId, reason) =>
     api.post(`/golden-monday/${sessionId}/decline`, { reason }),
 };
