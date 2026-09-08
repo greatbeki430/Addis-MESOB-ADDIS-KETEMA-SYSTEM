@@ -962,23 +962,49 @@ export default function EmployeeManagement({ t }) {
     if (!deleteTarget) return;
 
     try {
-      await goldenMondayAPI.deleteEmployeeWithNotification(
-        deleteTarget,
-        reason,
+      setSaving(true);
+      setProcessingApproval("deleting");
+
+      const userId =
+        typeof deleteTarget === "object" ? deleteTarget.userId : deleteTarget;
+      const response = await goldenMondayAPI.deleteEmployeeWithNotification(
+        userId,
+        reason || "Account removed by administrator.",
       );
-      showToast(
-        "Employee deleted successfully! Telegram notification sent.",
-        "success",
-      );
+
+      const data = response.data || {};
+
+      // ✅ Build appropriate toast message based on response
+      let toastMessage = "Employee deleted successfully!";
+      let toastType = "success";
+
+      if (data.notificationSent) {
+        toastMessage += " Telegram notification sent.";
+      } else if (data.hasTelegram === false) {
+        toastMessage += " Employee has no Telegram account.";
+        toastType = "info";
+      } else if (data.warning) {
+        toastMessage += ` ${data.warning}`;
+        toastType = "warning";
+      } else {
+        toastMessage += " Telegram notification failed to send.";
+        toastType = "warning";
+      }
+
+      showToast(toastMessage, toastType);
+
       setShowDeleteConfirm(false);
       setDeleteTarget(null);
       await loadEmployees();
+      await loadPendingRegistrations();
     } catch (error) {
       console.error("Failed to delete employee:", error);
-      showToast(
-        error.response?.data?.error || "Failed to delete employee",
-        "error",
-      );
+      const errorMessage =
+        error.response?.data?.error || "Failed to delete employee";
+      showToast(errorMessage, "error");
+    } finally {
+      setSaving(false);
+      setProcessingApproval(null);
     }
   };
 
@@ -1053,7 +1079,13 @@ export default function EmployeeManagement({ t }) {
   };
 
   const confirmDelete = (emp) => {
-    setDeleteTarget(emp.user?._id || emp.user || emp._id);
+    // ✅ Store more info for better deletion handling
+    setDeleteTarget({
+      userId: emp.user?._id || emp.user || emp._id,
+      name: emp.name,
+      email: emp.email,
+      hasTelegram: !!emp.telegramChatId,
+    });
     setShowDeleteConfirm(true);
   };
 
@@ -4138,6 +4170,7 @@ export default function EmployeeManagement({ t }) {
       )}
 
       {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
         <div
           style={{
@@ -4175,8 +4208,13 @@ export default function EmployeeManagement({ t }) {
               <p style={{ fontSize: 12, color: "#ef4444", marginTop: 4 }}>
                 {getTranslation("deleteWarning")}
               </p>
+              {/* ✅ UPDATED: Show Telegram notification status */}
               <p style={{ fontSize: 12, color: "#8b5cf6", marginTop: 8 }}>
-                A Telegram notification will be sent to the employee.
+                {deleteTarget && deleteTarget.hasTelegram !== undefined
+                  ? deleteTarget.hasTelegram
+                    ? "📱 Telegram notification will be sent to this employee."
+                    : "⚠️ This employee has no Telegram account. No notification will be sent."
+                  : "📱 A Telegram notification will be sent to the employee."}
               </p>
             </div>
             <div style={{ marginBottom: 16 }}>
@@ -4211,6 +4249,7 @@ export default function EmployeeManagement({ t }) {
               <button
                 onClick={() => setShowDeleteConfirm(false)}
                 style={btn.secondary}
+                disabled={saving}
               >
                 {getTranslation("cancel")}
               </button>
@@ -4219,13 +4258,26 @@ export default function EmployeeManagement({ t }) {
                   const reasonInput = document.getElementById("deleteReason");
                   const reason =
                     reasonInput?.value || "Account removed by administrator.";
-                  setDeleteTarget(deleteTarget);
                   handleDeleteWithReason(reason);
                 }}
-                style={{ ...btn.primary, background: "#ef4444", color: "#fff" }}
+                disabled={saving}
+                style={{
+                  ...btn.primary,
+                  background: "#ef4444",
+                  color: "#fff",
+                  opacity: saving ? 0.6 : 1,
+                  cursor: saving ? "not-allowed" : "pointer",
+                }}
               >
-                <FiTrash2 size={16} style={{ marginRight: 6 }} />
-                {getTranslation("delete")}
+                {saving ? (
+                  <FiLoader
+                    size={16}
+                    style={{ animation: "spin 0.8s linear infinite" }}
+                  />
+                ) : (
+                  <FiTrash2 size={16} style={{ marginRight: 6 }} />
+                )}
+                {saving ? "Deleting..." : getTranslation("delete")}
               </button>
             </div>
           </div>
