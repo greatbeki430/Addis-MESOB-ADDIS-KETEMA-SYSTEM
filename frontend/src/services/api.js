@@ -120,6 +120,14 @@ export const authAPI = {
   updateProfile: (data) => api.put("/auth/profile", data),
   setGoldenMondayAdmin: (id, isGoldenMondayAdmin) =>
     api.put(`/auth/users/${id}/golden-monday-admin`, { isGoldenMondayAdmin }),
+  // ✅ Password reset for admin
+  resetPassword: (data) => api.put("/auth/admin/reset-password", data),
+  // ✅ Optional: Reset password by email
+  resetPasswordByEmail: (data) =>
+    api.post("/auth/admin/reset-password-by-email", data),
+  // ✅ Optional: Bulk reset team leaders
+  bulkResetTeamLeaders: (data) =>
+    api.post("/auth/admin/bulk-reset-team-leaders", data),
 };
 
 // ============================================================
