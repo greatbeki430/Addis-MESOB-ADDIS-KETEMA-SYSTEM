@@ -35,7 +35,7 @@ const {
   // Reminders
   sendPresenterReminders,
 
-  // Utils
+  // Utils - ✅ ADDED setWebhook and getWebhookInfo
   sendMessage,
   callTelegramApi,
   generateOtp,
@@ -44,6 +44,9 @@ const {
   parseSkills,
   formatDate,
   mondayOf,
+  setWebhook,
+  getWebhookInfo,
+  testTelegramConnection,
 
   // Constants
   BRANCHES,
@@ -52,7 +55,6 @@ const {
   PRIORITY,
 
   // Test functions
-  testTelegramConnection,
   sendTestMessage,
 } = require("./telegram");
 
@@ -61,16 +63,16 @@ const {
 const postPresenterAnnouncement = postPresenterAnnouncementToChannel;
 const generateAnnouncementImage =
   require("./telegram/presenters").generateAnnouncementImage;
+
 const setChatMenuButton = async (chatId) => {
-  const { callTelegramApi } = require("./telegram/utils");
   const result = await callTelegramApi("setChatMenuButton", {
     chat_id: chatId,
     menu_button: { type: "default" },
   });
   return result;
 };
+
 const setBotCommands = async () => {
-  const { callTelegramApi } = require("./telegram/utils");
   const commands = [
     { command: "start", description: "🚀 Start the bot" },
     { command: "menu", description: "⊞ Open main menu" },
@@ -123,7 +125,7 @@ module.exports = {
   // Reminders
   sendPresenterReminders,
 
-  // Utils
+  // Utils - ✅ Includes setWebhook and getWebhookInfo
   sendMessage,
   callTelegramApi,
   generateOtp,
@@ -132,6 +134,9 @@ module.exports = {
   parseSkills,
   formatDate,
   mondayOf,
+  setWebhook,
+  getWebhookInfo,
+  testTelegramConnection,
 
   // Constants
   BRANCHES,
@@ -140,7 +145,6 @@ module.exports = {
   PRIORITY,
 
   // Test functions
-  testTelegramConnection,
   sendTestMessage,
 
   // Legacy
@@ -157,26 +161,5 @@ module.exports = {
     console.warn(
       "⚠️ stopRegistrationPolling is deprecated. Use webhook instead.",
     );
-  },
-  setWebhook: async (webhookUrl) => {
-    const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-    if (!TELEGRAM_BOT_TOKEN) {
-      console.error("❌ TELEGRAM_BOT_TOKEN not configured");
-      return false;
-    }
-    const { callTelegramApi } = require("./telegram/utils");
-    const result = await callTelegramApi(
-      `setWebhook?url=${encodeURIComponent(webhookUrl)}`,
-    );
-    return result && result.ok;
-  },
-  getWebhookInfo: async () => {
-    const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-    if (!TELEGRAM_BOT_TOKEN) {
-      console.error("❌ TELEGRAM_BOT_TOKEN not configured");
-      return null;
-    }
-    const { callTelegramApi } = require("./telegram/utils");
-    return callTelegramApi("getWebhookInfo");
   },
 };

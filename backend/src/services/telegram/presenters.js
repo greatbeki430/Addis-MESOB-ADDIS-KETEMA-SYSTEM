@@ -1,14 +1,11 @@
 // backend/src/services/telegram/presenters.js
 const GoldenMondaySession = require("../../models/GoldenMondaySession");
-const { formatDate } = require("./utils");
-const { sendMessage, callTelegramApi } = require("./utils");
+const { formatDate, sendMessage, callTelegramApi } = require("./utils");
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 const TELEGRAM_ADMIN_GROUP_ID = process.env.TELEGRAM_ADMIN_GROUP_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://akmesob.vercel.app";
-
-// ✅ ADD THIS - TELEGRAM_API constant
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
 // ─── PENDING CONFIRMATIONS ──────────────────────────────────────
