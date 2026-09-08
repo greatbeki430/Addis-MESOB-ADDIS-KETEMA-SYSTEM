@@ -31,6 +31,7 @@ import {
   FiCheck,
   FiCopy,
   FiEyeOff,
+  FiLoader,
 } from "react-icons/fi";
 
 // ✅ Beautiful Stat Card with Gradient and Icon
@@ -150,7 +151,7 @@ const StatCard = ({ icon: Icon, value, label, color, gradient, subtitle }) => (
   </div>
 );
 
-// ✅ Action Button Group
+// ✅ Action Button Group with Reset Password
 const ActionButtons = ({
   user,
   onEdit,
@@ -158,6 +159,7 @@ const ActionButtons = ({
   onRoleChange,
   onDelete,
   onToggleGoldenMondayAdmin,
+  onResetPassword,
   isSuperAdmin,
   isAdmin,
   currentUser,
@@ -312,6 +314,41 @@ const ActionButtons = ({
             🌅
           </button>
         )}
+
+      {/* ✅ NEW: Reset Password Button */}
+      {isAdminOrAbove && user._id !== currentUser._id && (
+        <button
+          onClick={() => onResetPassword(user)}
+          title="Reset user password"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            border: "none",
+            background: "#fef3c7",
+            color: "#d97706",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            transition: "all 0.2s ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "#f59e0b";
+            e.currentTarget.style.color = "#fff";
+            e.currentTarget.style.transform = "scale(1.1)";
+            e.currentTarget.style.boxShadow = "0 4px 12px rgba(245,158,11,0.3)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "#fef3c7";
+            e.currentTarget.style.color = "#d97706";
+            e.currentTarget.style.transform = "scale(1)";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        >
+          🔑
+        </button>
+      )}
 
       {canDelete && (
         <button
@@ -580,6 +617,7 @@ export default function UserManagement({ t }) {
     [safeT],
   );
 
+  // ── State ──
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -588,6 +626,7 @@ export default function UserManagement({ t }) {
   const [roleFilter, setRoleFilter] = useState("all");
   const [generatedPassword, setGeneratedPassword] = useState(null);
   const [showPasswordDisplay, setShowPasswordDisplay] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -618,8 +657,18 @@ export default function UserManagement({ t }) {
     selectedRole: "employee",
   });
 
+  // ✅ NEW: Password Reset Modal State
+  const [resetPasswordModal, setResetPasswordModal] = useState({
+    isOpen: false,
+    user: null,
+    newPassword: "",
+    showPassword: false,
+    isLoading: false,
+  });
+
   const { showToast } = useToast();
 
+  // ── Load Users ──
   const loadUsers = useCallback(async () => {
     try {
       setLoading(true);
@@ -646,8 +695,10 @@ export default function UserManagement({ t }) {
     return () => clearTimeout(timeoutId);
   }, [loadUsers]);
 
+  // ── Handle Submit ──
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSaving(true);
     try {
       if (editingUser) {
         await authAPI.updateUser(editingUser._id, {
@@ -662,7 +713,6 @@ export default function UserManagement({ t }) {
         resetForm();
         loadUsers();
       } else {
-        // ✅ Generate temporary password for new users
         const tempPassword = generateTempPassword(12);
         const userData = {
           name: formData.name,
@@ -674,14 +724,11 @@ export default function UserManagement({ t }) {
 
         await authAPI.register(userData);
 
-        // ✅ Store the generated password to display
         setGeneratedPassword(tempPassword);
         setShowPasswordDisplay(true);
 
         showToast(getTranslation("createSuccess"), "success");
 
-        // Don't close modal yet - show password first
-        // Reset form but keep modal open to show password
         setFormData({
           name: "",
           email: "",
@@ -699,6 +746,8 @@ export default function UserManagement({ t }) {
         message: error.response?.data?.message || getTranslation("saveError"),
         type: "error",
       });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -777,6 +826,86 @@ export default function UserManagement({ t }) {
     });
   };
 
+  // ✅ NEW: Password Reset Functions
+  const generateCleanPassword = () => {
+    const chars =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let password = "";
+    for (let i = 0; i < 10; i++) {
+      password += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return password;
+  };
+
+  const openResetPasswordModal = (user) => {
+    const newPassword = generateCleanPassword();
+    setResetPasswordModal({
+      isOpen: true,
+      user: user,
+      newPassword: newPassword,
+      showPassword: false,
+      isLoading: false,
+    });
+  };
+
+  const closeResetPasswordModal = () => {
+    setResetPasswordModal({
+      isOpen: false,
+      user: null,
+      newPassword: "",
+      showPassword: false,
+      isLoading: false,
+    });
+  };
+
+  const handleResetPasswordConfirm = async () => {
+    const { user, newPassword } = resetPasswordModal;
+    if (!user || !newPassword) {
+      showToast("Please generate a password first", "warning");
+      return;
+    }
+
+    setResetPasswordModal((prev) => ({ ...prev, isLoading: true }));
+
+    try {
+      await authAPI.resetPassword({
+        userId: user._id,
+        newPassword: newPassword,
+      });
+
+      showToast(`✅ Password reset for ${user.name}.`, "success");
+      closeResetPasswordModal();
+      loadUsers();
+    } catch (error) {
+      console.error("Failed to reset password:", error);
+      showToast(
+        error.response?.data?.message || "Failed to reset password",
+        "error",
+      );
+    } finally {
+      setResetPasswordModal((prev) => ({ ...prev, isLoading: false }));
+    }
+  };
+
+  const copyNewPassword = async () => {
+    const { newPassword } = resetPasswordModal;
+    if (!newPassword) return;
+
+    try {
+      await navigator.clipboard.writeText(newPassword);
+      showToast("Password copied to clipboard!", "success");
+    } catch {
+      const textArea = document.createElement("textarea");
+      textArea.value = newPassword;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+      showToast("Password copied to clipboard!", "success");
+    }
+  };
+
+  // ── Filters ──
   const filteredUsers = users.filter((user) => {
     const matchesSearch =
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -852,7 +981,7 @@ export default function UserManagement({ t }) {
         margin: "0 auto",
       }}
     >
-      {/* Modals */}
+      {/* ─── MODALS ─── */}
       <Modal
         isOpen={alertModal.isOpen}
         onClose={() =>
@@ -1034,7 +1163,7 @@ export default function UserManagement({ t }) {
         </div>
       </Modal>
 
-      {/* Header */}
+      {/* ─── HEADER ─── */}
       <div
         style={{
           display: "flex",
@@ -1112,7 +1241,7 @@ export default function UserManagement({ t }) {
         </button>
       </div>
 
-      {/* Statistics Cards */}
+      {/* ─── STATISTICS CARDS ─── */}
       <div
         style={{
           display: "grid",
@@ -1163,7 +1292,7 @@ export default function UserManagement({ t }) {
         />
       </div>
 
-      {/* Search and Filter */}
+      {/* ─── SEARCH AND FILTER ─── */}
       <div
         style={{
           display: "flex",
@@ -1244,7 +1373,7 @@ export default function UserManagement({ t }) {
         </select>
       </div>
 
-      {/* User Table */}
+      {/* ─── USER TABLE ─── */}
       {loading ? (
         <div
           style={{
@@ -1486,6 +1615,7 @@ export default function UserManagement({ t }) {
                       }}
                       onDelete={openDeleteConfirm}
                       onToggleGoldenMondayAdmin={handleToggleGoldenMondayAdmin}
+                      onResetPassword={openResetPasswordModal}
                       isSuperAdmin={isSuperAdmin}
                       isAdmin={isAdmin}
                       currentUser={currentUser}
@@ -1521,7 +1651,7 @@ export default function UserManagement({ t }) {
         </div>
       )}
 
-      {/* ✅ User Modal with Password Display */}
+      {/* ─── ✅ FIXED: USER MODAL - FULLY VISIBLE & CENTERED ─── */}
       {showModal && (
         <div
           style={{
@@ -1530,16 +1660,17 @@ export default function UserManagement({ t }) {
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0,0,0,0.5)",
+            background: "rgba(0,0,0,0.6)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
-            padding: "12px",
+            padding: "16px",
             backdropFilter: "blur(4px)",
+            overflow: "hidden",
           }}
           onClick={() => {
-            if (!showPasswordDisplay) {
+            if (!showPasswordDisplay && !saving) {
               setShowModal(false);
               setEditingUser(null);
               resetForm();
@@ -1550,19 +1681,25 @@ export default function UserManagement({ t }) {
             style={{
               background: C.white,
               borderRadius: 16,
-              padding: "clamp(20px, 4vw, 32px)",
-              width: "min(92%, 500px)",
-              maxWidth: 500,
-              maxHeight: "90vh",
-              overflow: "auto",
-              boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
-              margin: "0 auto",
+              padding: "clamp(16px, 3vw, 28px)",
+              width: "min(94%, 520px)",
+              maxWidth: 520,
+              maxHeight: "88vh",
+              overflowY: "auto",
+              overflowX: "hidden",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
+              margin: "auto",
               position: "relative",
+              display: "flex",
+              flexDirection: "column",
+              animation: "modalSlideUp 0.3s ease",
+              scrollbarWidth: "thin",
+              scrollbarColor: `${C.border} transparent`,
             }}
             onClick={(e) => e.stopPropagation()}
           >
             {!editingUser && showPasswordDisplay && generatedPassword ? (
-              // ✅ Show Password Display
+              // ─── SHOW PASSWORD DISPLAY ───
               <>
                 <h2
                   style={{
@@ -1609,164 +1746,73 @@ export default function UserManagement({ t }) {
                 </div>
               </>
             ) : (
-              // ✅ User Form
+              // ─── USER FORM ───
               <>
-                <h2
-                  style={{
-                    fontSize: "clamp(18px, 4vw, 24px)",
-                    fontWeight: 800,
-                    color: C.dark,
-                    fontFamily: F.serif,
-                    marginBottom: 4,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
-                  }}
-                >
-                  {editingUser ? (
-                    <>
-                      <FiEdit2 size={22} color="#3b82f6" />
-                      {getTranslation("editUser")}
-                    </>
-                  ) : (
-                    <>
-                      <FiUserPlus size={22} color={C.primary} />
-                      {getTranslation("addNewUser")}
-                    </>
-                  )}
-                </h2>
-                <p
-                  style={{
-                    fontSize: "clamp(12px, 2.5vw, 14px)",
-                    color: C.muted,
-                    marginBottom: 20,
-                    fontFamily: F.sans,
-                  }}
-                >
-                  {editingUser
-                    ? `${getTranslation("updateInfo")} ${editingUser.name}`
-                    : getTranslation("createAccount")}
-                </p>
+                <div style={{ flexShrink: 0 }}>
+                  <h2
+                    style={{
+                      fontSize: "clamp(18px, 4vw, 22px)",
+                      fontWeight: 800,
+                      color: C.dark,
+                      fontFamily: F.serif,
+                      marginBottom: 2,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                    }}
+                  >
+                    {editingUser ? (
+                      <>
+                        <FiEdit2 size={20} color="#3b82f6" />
+                        {getTranslation("editUser")}
+                      </>
+                    ) : (
+                      <>
+                        <FiUserPlus size={20} color={C.primary} />
+                        {getTranslation("addNewUser")}
+                      </>
+                    )}
+                  </h2>
+                  <p
+                    style={{
+                      fontSize: "clamp(12px, 2.5vw, 13px)",
+                      color: C.muted,
+                      marginBottom: 16,
+                      fontFamily: F.sans,
+                    }}
+                  >
+                    {editingUser
+                      ? `${getTranslation("updateInfo")} ${editingUser.name}`
+                      : getTranslation("createAccount")}
+                  </p>
+                </div>
 
-                <form id="user-form" onSubmit={handleSubmit}>
-                  <div style={{ marginBottom: 14 }}>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: 4,
-                        fontWeight: 600,
-                        fontSize: 12,
-                        color: C.dark,
-                      }}
-                    >
-                      {getTranslation("fullName")}{" "}
-                      <span style={{ color: "#ef4444" }}>*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g., John Doe"
-                      value={formData.name}
-                      onChange={(e) =>
-                        setFormData({ ...formData, name: e.target.value })
-                      }
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        border: `1.5px solid ${C.border}`,
-                        borderRadius: 8,
-                        fontSize: 13,
-                        transition: "border-color 0.2s, box-shadow 0.2s",
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = C.primary;
-                        e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = C.border;
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    />
-                  </div>
-
-                  <div style={{ marginBottom: 14 }}>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: 4,
-                        fontWeight: 600,
-                        fontSize: 12,
-                        color: C.dark,
-                      }}
-                    >
-                      {getTranslation("email")}{" "}
-                      <span style={{ color: "#ef4444" }}>*</span>
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      placeholder="user@example.com"
-                      value={formData.email}
-                      onChange={(e) =>
-                        setFormData({ ...formData, email: e.target.value })
-                      }
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        border: `1.5px solid ${C.border}`,
-                        borderRadius: 8,
-                        fontSize: 13,
-                        transition: "border-color 0.2s, box-shadow 0.2s",
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = C.primary;
-                        e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = C.border;
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    />
-                  </div>
-
-                  {!editingUser && (
-                    <div style={{ marginBottom: 14 }}>
+                <div style={{ flex: 1, overflowY: "auto", paddingRight: 4 }}>
+                  <form id="user-form" onSubmit={handleSubmit}>
+                    <div style={{ marginBottom: 12 }}>
                       <label
                         style={{
                           display: "block",
-                          marginBottom: 4,
+                          marginBottom: 3,
                           fontWeight: 600,
                           fontSize: 12,
                           color: C.dark,
                         }}
                       >
-                        {getTranslation("password")}{" "}
+                        {getTranslation("fullName")}{" "}
                         <span style={{ color: "#ef4444" }}>*</span>
-                        <span
-                          style={{
-                            fontSize: 10,
-                            color: C.muted,
-                            fontWeight: 400,
-                            marginLeft: 6,
-                          }}
-                        >
-                          (Auto-generated if left empty)
-                        </span>
                       </label>
                       <input
-                        type="password"
-                        placeholder="Min 6 characters or leave empty for auto-generate"
-                        value={formData.password}
+                        type="text"
+                        required
+                        placeholder="e.g., John Doe"
+                        value={formData.name}
                         onChange={(e) =>
-                          setFormData({ ...formData, password: e.target.value })
+                          setFormData({ ...formData, name: e.target.value })
                         }
                         style={{
                           width: "100%",
-                          padding: "10px 14px",
+                          padding: "8px 12px",
                           border: `1.5px solid ${C.border}`,
                           borderRadius: 8,
                           fontSize: 13,
@@ -1784,128 +1830,194 @@ export default function UserManagement({ t }) {
                         }}
                       />
                     </div>
-                  )}
 
-                  <div style={{ marginBottom: 14 }}>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: 4,
-                        fontWeight: 600,
-                        fontSize: 12,
-                        color: C.dark,
-                      }}
-                    >
-                      {getTranslation("role")}{" "}
-                      <span style={{ color: "#ef4444" }}>*</span>
-                    </label>
-                    <select
-                      value={formData.role}
-                      onChange={(e) =>
-                        setFormData({ ...formData, role: e.target.value })
-                      }
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        border: `1.5px solid ${C.border}`,
-                        borderRadius: 8,
-                        fontSize: 13,
-                        background: C.white,
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                    >
-                      {getAvailableRoles().map((role) => (
-                        <option key={role.value} value={role.value}>
-                          {role.label}
-                        </option>
-                      ))}
-                    </select>
-                    <RoleDescription role={formData.role} />
-                  </div>
-
-                  <div style={{ marginBottom: 18 }}>
-                    <label
-                      style={{
-                        display: "block",
-                        marginBottom: 4,
-                        fontWeight: 600,
-                        fontSize: 12,
-                        color: C.dark,
-                      }}
-                    >
-                      {getTranslation("phoneOptional")}
-                    </label>
-                    <input
-                      type="tel"
-                      placeholder="+251 9XX XXX XXX"
-                      value={formData.phone}
-                      onChange={(e) =>
-                        setFormData({ ...formData, phone: e.target.value })
-                      }
-                      style={{
-                        width: "100%",
-                        padding: "10px 14px",
-                        border: `1.5px solid ${C.border}`,
-                        borderRadius: 8,
-                        fontSize: 13,
-                        transition: "border-color 0.2s, box-shadow 0.2s",
-                        outline: "none",
-                        boxSizing: "border-box",
-                      }}
-                      onFocus={(e) => {
-                        e.currentTarget.style.borderColor = C.primary;
-                        e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-                      }}
-                      onBlur={(e) => {
-                        e.currentTarget.style.borderColor = C.border;
-                        e.currentTarget.style.boxShadow = "none";
-                      }}
-                    />
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "10px",
-                      borderTop: `1px solid ${C.border}`,
-                      paddingTop: 20,
-                      marginTop: 4,
-                    }}
-                  >
-                    <style>{`
-                      @media (min-width: 480px) {
-                        .modal-button-row {
-                          flex-direction: row !important;
-                          justify-content: flex-end !important;
+                    <div style={{ marginBottom: 12 }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: 3,
+                          fontWeight: 600,
+                          fontSize: 12,
+                          color: C.dark,
+                        }}
+                      >
+                        {getTranslation("email")}{" "}
+                        <span style={{ color: "#ef4444" }}>*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="user@example.com"
+                        value={formData.email}
+                        onChange={(e) =>
+                          setFormData({ ...formData, email: e.target.value })
                         }
-                        .modal-button-row button {
-                          flex: 0 1 auto !important;
-                          min-width: 100px !important;
-                          width: auto !important;
-                        }
-                      }
-                      @media (max-width: 479px) {
-                        .modal-button-row button {
-                          width: 100% !important;
-                          justify-content: center !important;
-                          padding: 14px 20px !important;
-                          font-size: 15px !important;
-                        }
-                      }
-                      @keyframes fadeIn {
-                        from { opacity: 0; transform: translateY(10px); }
-                        to { opacity: 1; transform: translateY(0); }
-                      }
-                    `}</style>
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          border: `1.5px solid ${C.border}`,
+                          borderRadius: 8,
+                          fontSize: 13,
+                          transition: "border-color 0.2s, box-shadow 0.2s",
+                          outline: "none",
+                          boxSizing: "border-box",
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = C.primary;
+                          e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = C.border;
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      />
+                    </div>
 
+                    {!editingUser && (
+                      <div style={{ marginBottom: 12 }}>
+                        <label
+                          style={{
+                            display: "block",
+                            marginBottom: 3,
+                            fontWeight: 600,
+                            fontSize: 12,
+                            color: C.dark,
+                          }}
+                        >
+                          {getTranslation("password")}{" "}
+                          <span style={{ color: "#ef4444" }}>*</span>
+                          <span
+                            style={{
+                              fontSize: 10,
+                              color: C.muted,
+                              fontWeight: 400,
+                              marginLeft: 6,
+                            }}
+                          >
+                            (Auto-generated if left empty)
+                          </span>
+                        </label>
+                        <input
+                          type="password"
+                          placeholder="Min 6 characters or leave empty for auto-generate"
+                          value={formData.password}
+                          onChange={(e) =>
+                            setFormData({
+                              ...formData,
+                              password: e.target.value,
+                            })
+                          }
+                          style={{
+                            width: "100%",
+                            padding: "8px 12px",
+                            border: `1.5px solid ${C.border}`,
+                            borderRadius: 8,
+                            fontSize: 13,
+                            transition: "border-color 0.2s, box-shadow 0.2s",
+                            outline: "none",
+                            boxSizing: "border-box",
+                          }}
+                          onFocus={(e) => {
+                            e.currentTarget.style.borderColor = C.primary;
+                            e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                          }}
+                          onBlur={(e) => {
+                            e.currentTarget.style.borderColor = C.border;
+                            e.currentTarget.style.boxShadow = "none";
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    <div style={{ marginBottom: 12 }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: 3,
+                          fontWeight: 600,
+                          fontSize: 12,
+                          color: C.dark,
+                        }}
+                      >
+                        {getTranslation("role")}{" "}
+                        <span style={{ color: "#ef4444" }}>*</span>
+                      </label>
+                      <select
+                        value={formData.role}
+                        onChange={(e) =>
+                          setFormData({ ...formData, role: e.target.value })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          border: `1.5px solid ${C.border}`,
+                          borderRadius: 8,
+                          fontSize: 13,
+                          background: C.white,
+                          outline: "none",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        {getAvailableRoles().map((role) => (
+                          <option key={role.value} value={role.value}>
+                            {role.label}
+                          </option>
+                        ))}
+                      </select>
+                      <RoleDescription role={formData.role} />
+                    </div>
+
+                    <div style={{ marginBottom: 16 }}>
+                      <label
+                        style={{
+                          display: "block",
+                          marginBottom: 3,
+                          fontWeight: 600,
+                          fontSize: 12,
+                          color: C.dark,
+                        }}
+                      >
+                        {getTranslation("phoneOptional")}
+                      </label>
+                      <input
+                        type="tel"
+                        placeholder="+251 9XX XXX XXX"
+                        value={formData.phone}
+                        onChange={(e) =>
+                          setFormData({ ...formData, phone: e.target.value })
+                        }
+                        style={{
+                          width: "100%",
+                          padding: "8px 12px",
+                          border: `1.5px solid ${C.border}`,
+                          borderRadius: 8,
+                          fontSize: 13,
+                          transition: "border-color 0.2s, box-shadow 0.2s",
+                          outline: "none",
+                          boxSizing: "border-box",
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = C.primary;
+                          e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = C.border;
+                          e.currentTarget.style.boxShadow = "none";
+                        }}
+                      />
+                    </div>
+
+                    {/* ─── MODAL ACTIONS - FIXED AT BOTTOM ─── */}
                     <div
-                      className="modal-button-row"
                       style={{
                         display: "flex",
-                        flexDirection: "column",
+                        flexDirection: "row",
                         gap: "10px",
+                        borderTop: `1px solid ${C.border}`,
+                        paddingTop: 16,
+                        marginTop: 4,
+                        justifyContent: "flex-end",
+                        flexShrink: 0,
                       }}
                     >
                       <button
@@ -1917,59 +2029,370 @@ export default function UserManagement({ t }) {
                         }}
                         style={{
                           ...btn.secondary,
-                          padding: "12px 24px",
-                          fontSize: "14px",
+                          padding: "10px 22px",
+                          fontSize: "13px",
                           display: "flex",
                           alignItems: "center",
-                          gap: 8,
+                          gap: 6,
                           borderRadius: 10,
-                          width: "100%",
-                          justifyContent: "center",
                           cursor: "pointer",
                           transition: "all 0.2s ease",
                           border: `1.5px solid ${C.border}`,
                         }}
+                        disabled={saving}
                       >
-                        <FiX size={18} />
+                        <FiX size={16} />
                         {getTranslation("cancel")}
                       </button>
                       <button
                         type="submit"
                         style={{
                           ...btn.primary,
-                          padding: "12px 24px",
-                          fontSize: "14px",
+                          padding: "10px 26px",
+                          fontSize: "13px",
                           display: "flex",
                           alignItems: "center",
-                          gap: 8,
+                          gap: 6,
                           borderRadius: 10,
-                          width: "100%",
-                          justifyContent: "center",
-                          cursor: "pointer",
+                          cursor: saving ? "not-allowed" : "pointer",
                           transition: "all 0.2s ease",
                           boxShadow: `0 4px 14px ${C.primary}44`,
+                          opacity: saving ? 0.7 : 1,
                         }}
+                        disabled={saving}
                       >
-                        {editingUser ? (
+                        {saving ? (
                           <>
-                            <FiCheck size={18} />
+                            <FiLoader
+                              size={16}
+                              style={{ animation: "spin 0.8s linear infinite" }}
+                            />
+                            Saving...
+                          </>
+                        ) : editingUser ? (
+                          <>
+                            <FiCheck size={16} />
                             {getTranslation("updateUser")}
                           </>
                         ) : (
                           <>
-                            <FiUserPlus size={18} />
+                            <FiUserPlus size={16} />
                             {getTranslation("createUser")}
                           </>
                         )}
                       </button>
                     </div>
-                  </div>
-                </form>
+                  </form>
+                </div>
               </>
             )}
           </div>
         </div>
       )}
+
+      {/* ─── ✅ NEW: RESET PASSWORD MODAL ─── */}
+      {resetPasswordModal.isOpen && resetPasswordModal.user && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.6)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            padding: "16px",
+            backdropFilter: "blur(4px)",
+            overflow: "hidden",
+          }}
+          onClick={closeResetPasswordModal}
+        >
+          <div
+            style={{
+              background: C.white,
+              borderRadius: 16,
+              padding: "clamp(20px, 4vw, 32px)",
+              width: "min(92%, 450px)",
+              maxWidth: 450,
+              maxHeight: "85vh",
+              overflowY: "auto",
+              overflowX: "hidden",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
+              margin: "auto",
+              position: "relative",
+              animation: "modalSlideUp 0.3s ease",
+              display: "flex",
+              flexDirection: "column",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ flexShrink: 0 }}>
+              <h2
+                style={{
+                  fontSize: "clamp(18px, 4vw, 22px)",
+                  fontWeight: 800,
+                  color: C.dark,
+                  fontFamily: F.serif,
+                  marginBottom: 2,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                }}
+              >
+                <span style={{ fontSize: 24 }}>🔑</span>
+                Reset Password
+              </h2>
+              <p
+                style={{
+                  fontSize: "clamp(12px, 2.5vw, 13px)",
+                  color: C.muted,
+                  marginBottom: 16,
+                  fontFamily: F.sans,
+                }}
+              >
+                Reset password for{" "}
+                <strong>{resetPasswordModal.user.name}</strong>
+              </p>
+            </div>
+
+            <div style={{ flex: 1, overflowY: "auto", paddingRight: 4 }}>
+              <div
+                style={{
+                  background: "#fef3c7",
+                  border: "1px solid #fcd34d",
+                  borderRadius: 8,
+                  padding: "12px 16px",
+                  marginBottom: 16,
+                }}
+              >
+                <p style={{ fontSize: 13, color: "#92400e", margin: 0 }}>
+                  ⚠️ The user will receive the new password via Telegram if they
+                  have a Telegram account linked.
+                </p>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label
+                  style={{
+                    display: "block",
+                    marginBottom: 6,
+                    fontWeight: 600,
+                    fontSize: 12,
+                    color: C.dark,
+                  }}
+                >
+                  New Password
+                </label>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    background: "#f0fdf4",
+                    border: `1px solid ${
+                      resetPasswordModal.showPassword ? "#10b981" : "#86efac"
+                    }`,
+                    borderRadius: 8,
+                    padding: "8px 14px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: "#065f46",
+                      fontFamily: "monospace",
+                      flex: 1,
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {resetPasswordModal.showPassword
+                      ? resetPasswordModal.newPassword
+                      : "••••••••••"}
+                  </span>
+                  <button
+                    onClick={() =>
+                      setResetPasswordModal((prev) => ({
+                        ...prev,
+                        showPassword: !prev.showPassword,
+                      }))
+                    }
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "#065f46",
+                      padding: "4px",
+                    }}
+                    title={
+                      resetPasswordModal.showPassword
+                        ? "Hide password"
+                        : "Show password"
+                    }
+                  >
+                    {resetPasswordModal.showPassword ? (
+                      <FiEyeOff size={18} />
+                    ) : (
+                      <FiEye size={18} />
+                    )}
+                  </button>
+                  <button
+                    onClick={copyNewPassword}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "#065f46",
+                      padding: "4px",
+                    }}
+                    title="Copy password"
+                  >
+                    <FiCopy size={18} />
+                  </button>
+                  <button
+                    onClick={() => {
+                      const newPassword = generateCleanPassword();
+                      setResetPasswordModal((prev) => ({
+                        ...prev,
+                        newPassword: newPassword,
+                      }));
+                    }}
+                    style={{
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      color: "#065f46",
+                      padding: "4px",
+                    }}
+                    title="Generate new password"
+                  >
+                    <FiRefreshCw size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  justifyContent: "flex-end",
+                  borderTop: `1px solid ${C.border}`,
+                  paddingTop: 16,
+                  flexShrink: 0,
+                }}
+              >
+                <button
+                  onClick={closeResetPasswordModal}
+                  style={{
+                    ...btn.secondary,
+                    padding: "10px 22px",
+                    fontSize: "13px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    borderRadius: 10,
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                    border: `1.5px solid ${C.border}`,
+                  }}
+                  disabled={resetPasswordModal.isLoading}
+                >
+                  <FiX size={16} />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleResetPasswordConfirm}
+                  style={{
+                    ...btn.primary,
+                    padding: "10px 26px",
+                    fontSize: "13px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                    borderRadius: 10,
+                    background: "#d97706",
+                    boxShadow: "0 4px 14px rgba(217,119,6,0.4)",
+                    cursor: resetPasswordModal.isLoading
+                      ? "not-allowed"
+                      : "pointer",
+                    opacity: resetPasswordModal.isLoading ? 0.7 : 1,
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!resetPasswordModal.isLoading) {
+                      e.currentTarget.style.background = "#b45309";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!resetPasswordModal.isLoading) {
+                      e.currentTarget.style.background = "#d97706";
+                    }
+                  }}
+                  disabled={resetPasswordModal.isLoading}
+                >
+                  {resetPasswordModal.isLoading ? (
+                    <>
+                      <FiLoader
+                        size={16}
+                        style={{ animation: "spin 0.8s linear infinite" }}
+                      />
+                      Resetting...
+                    </>
+                  ) : (
+                    <>
+                      <FiCheck size={16} style={{ marginRight: 6 }} />
+                      Reset Password
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes modalSlideUp {
+          from {
+            opacity: 0;
+            transform: translateY(30px) scale(0.96);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @media (min-width: 480px) {
+          .modal-button-row {
+            flex-direction: row !important;
+            justify-content: flex-end !important;
+          }
+          .modal-button-row button {
+            flex: 0 1 auto !important;
+            min-width: 100px !important;
+            width: auto !important;
+          }
+        }
+        @media (max-width: 479px) {
+          .modal-button-row button {
+            width: 100% !important;
+            justify-content: center !important;
+            padding: 14px 20px !important;
+            font-size: 15px !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
