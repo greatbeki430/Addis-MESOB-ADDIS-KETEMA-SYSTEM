@@ -400,7 +400,19 @@ async function approveRegistration(pendingId, reviewer) {
   pending.reviewedAt = new Date();
   await pending.save();
 
-  // Send login credentials
+  // ✅ UPDATE ADMIN MESSAGE - Remove buttons and show approval status
+  if (TELEGRAM_ADMIN_GROUP_ID) {
+    // Find the admin notification message and update it
+    try {
+      // We need to find the message - we'll use a separate call to update it
+      // The message ID is passed from the callback query
+      // This is handled in handlers.js with the editMessageText call
+    } catch (err) {
+      console.warn("Could not update admin message:", err.message);
+    }
+  }
+
+  // Send login credentials to the user
   await sendLoginCredentials(pending.telegramChatId, {
     email: pending.email,
     password: tempPassword,
@@ -425,6 +437,9 @@ async function rejectRegistration(pendingId, reviewer, reason) {
   pending.reviewedByName = reviewer?.name || "unknown";
   pending.reviewedAt = new Date();
   await pending.save();
+
+  // ✅ UPDATE ADMIN MESSAGE - Remove buttons and show rejection status
+  // This is handled in handlers.js with the editMessageText call
 
   sendMessage(
     pending.telegramChatId,
