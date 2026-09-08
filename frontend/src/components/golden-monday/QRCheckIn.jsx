@@ -1,5 +1,5 @@
 // frontend/src/components/golden-monday/QRCheckIn.jsx
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { C, F } from "../../styles/theme";
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
@@ -16,6 +16,7 @@ import {
   FiXCircle,
   FiAward,
   FiShield,
+  FiAlertTriangle,
 } from "react-icons/fi";
 
 export default function QRCheckIn({ sessionId, onCheckIn }) {
@@ -30,17 +31,91 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
   const [isHovering, setIsHovering] = useState(false);
   const [checkInTime, setCheckInTime] = useState(null);
   const [error, setError] = useState(null);
+  const [sessionStatus, setSessionStatus] = useState(null);
+  const [checkingStatus, setCheckingStatus] = useState(true);
   const canvasRef = useRef(null);
 
-  // Generate QR code for this session
+  // ─── Check session status before generating QR ──────────────
+  const checkSessionStatus = useCallback(async () => {
+    if (!sessionId) {
+      setCheckingStatus(false);
+      return;
+    }
+
+    try {
+      setCheckingStatus(true);
+      // Get both upcoming and past sessions to find this session
+      const [upcomingRes, pastRes] = await Promise.all([
+        goldenMondayAPI.getUpcomingSessions().catch(() => ({ data: [] })),
+        goldenMondayAPI
+          .getPastSessions()
+          .catch(() => ({ data: { sessions: [] } })),
+      ]);
+
+      const upcomingSessions = upcomingRes.data || [];
+      const pastSessions = pastRes.data?.sessions || [];
+      const allSessions = [...upcomingSessions, ...pastSessions];
+
+      const session = allSessions.find((s) => s._id === sessionId);
+
+      if (session) {
+        const sessionDate = new Date(session.date);
+        const now = new Date();
+        // Check if session is today, future, or scheduled
+        const isToday = sessionDate.toDateString() === now.toDateString();
+        const isFuture = sessionDate > now;
+        const isScheduled = session.status === "scheduled";
+        const isActive = isToday || isFuture || isScheduled;
+
+        setSessionStatus({
+          active: isActive,
+          status: session.status,
+          date: sessionDate,
+          isToday,
+          isFuture,
+          title: session.title || session.presentationTitle || "Session",
+        });
+
+        if (!isActive) {
+          setError(
+            "This session is not active for check-in. Please select an active session.",
+          );
+        }
+      } else {
+        setSessionStatus({ active: false, status: "unknown", date: null });
+        setError("Session not found. Please select a valid session.");
+      }
+    } catch (error) {
+      console.warn("Could not check session status:", error);
+    } finally {
+      setCheckingStatus(false);
+    }
+  }, [sessionId]);
+
+  // ─── Check session status on mount and when sessionId changes ──
   useEffect(() => {
-    if (!sessionId || !user) return;
+    const timeoutId = setTimeout(() => {
+      checkSessionStatus();
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [checkSessionStatus]);
+
+  // ─── Generate QR code for this session ──────────────────────────
+  useEffect(() => {
+    // Skip if no session, no user, or still checking status
+    if (!sessionId || !user || checkingStatus) return;
+
+    // Don't generate if session is not active
+    if (sessionStatus && !sessionStatus.active) {
+      return;
+    }
 
     const generateQR = async () => {
       setGenerating(true);
       setError(null);
       try {
-        // ✅ FIXED: Using GET request for QR generation
+        // ✅ GET request for QR generation
         const response = await goldenMondayAPI.generateQRCheckIn(sessionId);
 
         if (response.data && response.data.qrCode) {
@@ -84,52 +159,28 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
         }
       } catch (error) {
         console.error("Failed to generate QR:", error);
-        setError(error.response?.data?.error || "Failed to generate QR code");
+        // Show user-friendly error message based on status code
+        if (error.response?.status === 400) {
+          setError(
+            "This session is not active for check-in. Please select an active session.",
+          );
+        } else if (error.response?.status === 404) {
+          setError("Session not found. Please select a valid session.");
+        } else {
+          setError(
+            error.response?.data?.error ||
+              "Failed to generate QR code. Please try again.",
+          );
+        }
       } finally {
         setGenerating(false);
       }
     };
 
     generateQR();
-  }, [sessionId, user]);
+  }, [sessionId, user, checkingStatus, sessionStatus]);
 
-  // ✅ FIXED: Use recordQRCheckIn API for check-in
-  const handleCheckIn = async () => {
-    if (!sessionId) return;
-    setScanning(true);
-    setError(null);
-    try {
-      // ✅ Use the correct API endpoint for recording check-in
-      await goldenMondayAPI.recordQRCheckIn(sessionId, {
-        location: "qr-scan",
-      });
-      setCheckedIn(true);
-      setCheckInTime(new Date());
-      showToast(t.checkInSuccess || "✅ Checked in successfully!", "success");
-      if (onCheckIn) onCheckIn();
-    } catch (error) {
-      console.error("Check-in failed:", error);
-      const errorMessage =
-        error.response?.data?.error ||
-        error.response?.data?.message ||
-        "Check-in failed";
-      setError(errorMessage);
-      showToast(t.checkInFailed || "Check-in failed", "error");
-    } finally {
-      setScanning(false);
-    }
-  };
-
-  const formatTime = (date) => {
-    if (!date) return "";
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  };
-
-  // ✅ Check if user is already checked in on mount
+  // ─── Check if user is already checked in ──────────────────────
   useEffect(() => {
     const checkAttendance = async () => {
       if (!sessionId || !user) return;
@@ -150,17 +201,66 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
     checkAttendance();
   }, [sessionId, user]);
 
+  // ─── Handle Check-in ────────────────────────────────────────────
+  const handleCheckIn = async () => {
+    if (!sessionId) {
+      showToast("No session selected", "warning");
+      return;
+    }
+
+    // Check if session is active before attempting check-in
+    if (sessionStatus && !sessionStatus.active) {
+      showToast("This session is not active for check-in", "warning");
+      return;
+    }
+
+    setScanning(true);
+    setError(null);
+    try {
+      // ✅ Use the correct API endpoint for recording check-in
+      await goldenMondayAPI.recordQRCheckIn(sessionId, {
+        location: "qr-scan",
+      });
+      setCheckedIn(true);
+      setCheckInTime(new Date());
+      showToast(t.checkInSuccess || "✅ Checked in successfully!", "success");
+      if (onCheckIn) onCheckIn();
+    } catch (error) {
+      console.error("Check-in failed:", error);
+      const errorMessage =
+        error.response?.data?.error ||
+        error.response?.data?.message ||
+        "Check-in failed. Please try again.";
+      setError(errorMessage);
+      showToast(t.checkInFailed || "Check-in failed", "error");
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const formatTime = (date) => {
+    if (!date) return "";
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
+  // ─── Render ─────────────────────────────────────────────────────
   return (
     <div
       style={{
         background: C.white,
         borderRadius: 20,
         padding: "clamp(20px, 3vw, 28px)",
-        border: `1px solid ${checkedIn ? "#10b981" : C.border}`,
+        border: `1px solid ${checkedIn ? "#10b981" : error ? "#fca5a5" : C.border}`,
         fontFamily: F.sans,
         boxShadow: checkedIn
           ? `0 4px 24px rgba(16, 185, 129, 0.15)`
-          : "0 2px 8px rgba(0,0,0,0.04)",
+          : error
+            ? `0 4px 24px rgba(239, 68, 68, 0.1)`
+            : "0 2px 8px rgba(0,0,0,0.04)",
         transition: "all 0.3s ease",
         position: "relative",
         overflow: "hidden",
@@ -178,7 +278,9 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           height: 4,
           background: checkedIn
             ? "linear-gradient(90deg, #10b981, #34d399, #10b981)"
-            : `linear-gradient(90deg, ${C.primary}, ${C.gold}, ${C.primary})`,
+            : error
+              ? "linear-gradient(90deg, #ef4444, #f87171, #ef4444)"
+              : `linear-gradient(90deg, ${C.primary}, ${C.gold}, ${C.primary})`,
           backgroundSize: "200% 100%",
           animation: "gradientMove 3s ease-in-out infinite",
         }}
@@ -201,14 +303,18 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             borderRadius: "50%",
             background: checkedIn
               ? "linear-gradient(135deg, #10b981, #34d399)"
-              : `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
+              : error
+                ? "linear-gradient(135deg, #ef4444, #f87171)"
+                : `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             color: "#fff",
             boxShadow: checkedIn
               ? "0 4px 16px rgba(16, 185, 129, 0.4)"
-              : `0 4px 16px ${C.primary}44`,
+              : error
+                ? "0 4px 16px rgba(239, 68, 68, 0.4)"
+                : `0 4px 16px ${C.primary}44`,
           }}
         >
           <RiQrCodeLine size={22} />
@@ -222,7 +328,9 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>
             {checkedIn
               ? t.alreadyCheckedIn || "You're all set!"
-              : t.scanToCheckIn || "Scan or tap to check in"}
+              : error
+                ? "⚠️ Session not active"
+                : t.scanToCheckIn || "Scan or tap to check in"}
           </p>
         </div>
         {checkedIn && (
@@ -245,6 +353,26 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             {t.signed || "Checked In"}
           </span>
         )}
+        {error && !checkedIn && (
+          <span
+            style={{
+              marginLeft: "auto",
+              fontSize: 12,
+              color: "#dc2626",
+              fontWeight: 700,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "#fee2e2",
+              padding: "4px 14px",
+              borderRadius: 20,
+              border: `1px solid #fca5a5`,
+            }}
+          >
+            <FiAlertTriangle size={14} />
+            Inactive
+          </span>
+        )}
       </div>
 
       <div
@@ -262,7 +390,15 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             height: 180,
             background: "#fff",
             borderRadius: 16,
-            border: `3px solid ${checkedIn ? "#10b981" : isHovering ? C.primary : C.border}`,
+            border: `3px solid ${
+              checkedIn
+                ? "#10b981"
+                : error
+                  ? "#fca5a5"
+                  : isHovering
+                    ? C.primary
+                    : C.border
+            }`,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -270,13 +406,30 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             transition: "all 0.4s ease",
             boxShadow: checkedIn
               ? "0 0 0 4px rgba(16, 185, 129, 0.15)"
-              : isHovering
-                ? `0 0 0 4px ${C.primary}15`
-                : "none",
+              : error
+                ? "0 0 0 4px rgba(239, 68, 68, 0.1)"
+                : isHovering
+                  ? `0 0 0 4px ${C.primary}15`
+                  : "none",
             transform: isHovering ? "scale(1.02)" : "scale(1)",
           }}
         >
-          {generating ? (
+          {checkingStatus ? (
+            <div style={{ textAlign: "center", color: C.muted }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: "50%",
+                  border: `3px solid ${C.primary}`,
+                  borderTopColor: "transparent",
+                  animation: "spin 0.8s linear infinite",
+                  margin: "0 auto 8px",
+                }}
+              />
+              <span style={{ fontSize: 12 }}>Checking session...</span>
+            </div>
+          ) : generating ? (
             <div style={{ textAlign: "center", color: C.muted }}>
               <div
                 style={{
@@ -293,10 +446,10 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
                 {t.generatingQR || "Generating..."}
               </span>
             </div>
-          ) : qrCode ? (
+          ) : qrCode && !error ? (
             <img
               src={qrCode}
-              alt="QR Code"
+              alt="QR Code for check-in"
               style={{
                 width: "90%",
                 height: "90%",
@@ -306,8 +459,17 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             />
           ) : (
             <div style={{ textAlign: "center", color: C.muted }}>
-              <RiQrCodeLine size={40} style={{ opacity: 0.3 }} />
-              <p style={{ fontSize: 12, marginTop: 8 }}>No QR available</p>
+              {error ? (
+                <FiAlertTriangle
+                  size={40}
+                  style={{ opacity: 0.5, color: "#dc2626" }}
+                />
+              ) : (
+                <RiQrCodeLine size={40} style={{ opacity: 0.3 }} />
+              )}
+              <p style={{ fontSize: 12, marginTop: 8 }}>
+                {error ? "QR unavailable" : "No QR available"}
+              </p>
             </div>
           )}
           <canvas
@@ -318,7 +480,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           />
 
           {/* Animated scan line */}
-          {!checkedIn && !generating && qrCode && (
+          {!checkedIn && !generating && qrCode && !error && (
             <div
               style={{
                 position: "absolute",
@@ -332,6 +494,33 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             />
           )}
         </div>
+
+        {/* Session Status Info */}
+        {sessionStatus && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 14px",
+              background: sessionStatus.active ? "#d1fae5" : "#fee2e2",
+              borderRadius: 8,
+              fontSize: 12,
+              color: sessionStatus.active ? "#065f46" : "#dc2626",
+              width: "100%",
+              justifyContent: "center",
+            }}
+          >
+            {sessionStatus.active ? (
+              <FiCheckCircle size={14} color="#10b981" />
+            ) : (
+              <FiAlertTriangle size={14} color="#dc2626" />
+            )}
+            {sessionStatus.active
+              ? `✅ Session is active: ${sessionStatus.title || "Session"}`
+              : `⚠️ Session ${sessionStatus.status || "is not active"} - ${sessionStatus.date ? new Date(sessionStatus.date).toLocaleDateString() : "Unknown date"}`}
+          </div>
+        )}
 
         {/* User Info */}
         {user && (
@@ -413,23 +602,26 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
 
         {/* Check-in Button */}
         <button
+          type="button"
           onClick={handleCheckIn}
-          disabled={scanning || checkedIn || !sessionId}
+          disabled={scanning || checkedIn || !sessionId || !!error}
           style={{
             display: "flex",
             alignItems: "center",
             gap: 10,
             padding: "12px 28px",
             background:
-              checkedIn || !sessionId
+              checkedIn || !sessionId || error
                 ? "#d1d5db"
                 : `linear-gradient(135deg, ${C.primary}, ${C.gold})`,
             color: "#fff",
             border: "none",
             borderRadius: 12,
             cursor:
-              scanning || checkedIn || !sessionId ? "not-allowed" : "pointer",
-            opacity: scanning || checkedIn || !sessionId ? 0.6 : 1,
+              scanning || checkedIn || !sessionId || error
+                ? "not-allowed"
+                : "pointer",
+            opacity: scanning || checkedIn || !sessionId || error ? 0.6 : 1,
             fontWeight: 700,
             fontSize: 15,
             fontFamily: F.sans,
@@ -437,18 +629,20 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             justifyContent: "center",
             transition: "all 0.3s ease",
             boxShadow:
-              checkedIn || !sessionId ? "none" : `0 4px 20px ${C.primary}44`,
+              checkedIn || !sessionId || error
+                ? "none"
+                : `0 4px 20px ${C.primary}44`,
             position: "relative",
             overflow: "hidden",
           }}
           onMouseEnter={(e) => {
-            if (!checkedIn && !scanning && sessionId) {
+            if (!checkedIn && !scanning && sessionId && !error) {
               e.currentTarget.style.transform = "scale(1.02)";
               e.currentTarget.style.boxShadow = `0 6px 28px ${C.primary}66`;
             }
           }}
           onMouseLeave={(e) => {
-            if (!checkedIn && !scanning && sessionId) {
+            if (!checkedIn && !scanning && sessionId && !error) {
               e.currentTarget.style.transform = "scale(1)";
               e.currentTarget.style.boxShadow = `0 4px 20px ${C.primary}44`;
             }
@@ -467,6 +661,11 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
               <FiCheck size={20} />
               {t.alreadyCheckedIn || "Already Checked In"}
             </>
+          ) : error ? (
+            <>
+              <FiAlertTriangle size={20} />
+              Session Inactive
+            </>
           ) : (
             <>
               <FiCamera size={20} />
@@ -481,13 +680,15 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             width: "100%",
             padding: "8px 14px",
             borderRadius: 8,
-            background: checkedIn ? "#d1fae5" : C.bg,
-            border: `1px solid ${checkedIn ? "#6ee7b7" : C.border}`,
+            background: checkedIn ? "#d1fae5" : error ? "#fee2e2" : C.bg,
+            border: `1px solid ${
+              checkedIn ? "#6ee7b7" : error ? "#fca5a5" : C.border
+            }`,
             display: "flex",
             alignItems: "center",
             gap: 8,
             fontSize: 12,
-            color: checkedIn ? "#065f46" : C.muted,
+            color: checkedIn ? "#065f46" : error ? "#dc2626" : C.muted,
             justifyContent: "center",
           }}
         >
@@ -495,6 +696,11 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             <>
               <FiCheckCircle size={16} color="#10b981" />
               {t.checkInSuccess || "✅ Checked in successfully!"}
+            </>
+          ) : error ? (
+            <>
+              <FiAlertTriangle size={16} color="#dc2626" />
+              {error}
             </>
           ) : (
             <>
