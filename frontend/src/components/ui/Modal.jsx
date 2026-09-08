@@ -442,7 +442,7 @@ export const Modal = ({
   );
 };
 
-// ✅ Toast notification component (unchanged — no bug reported here)
+// ✅ Toast notification component (unchanged)
 export const Toast = ({
   message,
   type = "success",

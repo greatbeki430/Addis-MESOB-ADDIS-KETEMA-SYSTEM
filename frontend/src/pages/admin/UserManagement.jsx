@@ -10,6 +10,8 @@ import {
   ROLES,
 } from "../../utils/roles";
 import { Modal } from "../../components/ui/Modal";
+import { Portal } from "../../components/ui/Portal";
+import { ModalWrapper } from "../../components/ui/ModalWrapper";
 import { useToast } from "../../hooks/useToast";
 import {
   generateTempPassword,
@@ -611,6 +613,8 @@ export default function UserManagement({ t }) {
         temporaryPassword: "Temporary Password",
         copyPassword: "Copy Password",
         passwordCopied: "Password copied to clipboard!",
+        changeRolePrompt: "Select a new role for",
+        update: "Update",
       };
       return fallback[key] || key;
     },
@@ -973,6 +977,13 @@ export default function UserManagement({ t }) {
     },
   };
 
+  // Helper to close modals properly
+  const closeUserModal = () => {
+    setShowModal(false);
+    setEditingUser(null);
+    resetForm();
+  };
+
   return (
     <div
       style={{
@@ -981,187 +992,211 @@ export default function UserManagement({ t }) {
         margin: "0 auto",
       }}
     >
-      {/* ─── MODALS ─── */}
-      <Modal
-        isOpen={alertModal.isOpen}
-        onClose={() =>
-          setAlertModal({ isOpen: false, title: "", message: "", type: "info" })
-        }
-        title={alertModal.title}
-        message={alertModal.message}
-        type={alertModal.type}
-      />
+      {/* ─── MODALS WITH PORTAL ─── */}
+      <Portal>
+        {/* Alert Modal */}
+        <Modal
+          isOpen={alertModal.isOpen}
+          onClose={() =>
+            setAlertModal({
+              isOpen: false,
+              title: "",
+              message: "",
+              type: "info",
+            })
+          }
+          title={alertModal.title}
+          message={alertModal.message}
+          type={alertModal.type}
+        />
 
-      <Modal
-        isOpen={confirmModal.isOpen}
-        onClose={() =>
-          setConfirmModal({ isOpen: false, userId: null, userName: "" })
-        }
-        title={getTranslation("confirmDeleteTitle")}
-        message={`${getTranslation("confirmDeleteMessage")} "${confirmModal.userName}"? ${getTranslation("deleteWarning")}`}
-        type="confirm"
-        confirmText={getTranslation("delete")}
-        cancelText={getTranslation("cancel")}
-        onConfirm={handleDelete}
-        onCancel={() =>
-          setConfirmModal({ isOpen: false, userId: null, userName: "" })
-        }
-      />
+        {/* Confirm Delete Modal */}
+        <Modal
+          isOpen={confirmModal.isOpen}
+          onClose={() =>
+            setConfirmModal({ isOpen: false, userId: null, userName: "" })
+          }
+          title={getTranslation("confirmDeleteTitle")}
+          message={`${getTranslation("confirmDeleteMessage")} "${confirmModal.userName}"? ${getTranslation("deleteWarning")}`}
+          type="confirm"
+          confirmText={getTranslation("delete")}
+          cancelText={getTranslation("cancel")}
+          onConfirm={handleDelete}
+          onCancel={() =>
+            setConfirmModal({ isOpen: false, userId: null, userName: "" })
+          }
+        />
 
-      <Modal
-        isOpen={viewModal.isOpen}
-        onClose={() => setViewModal({ isOpen: false, user: null })}
-        title={`👤 ${getTranslation("userDetails")} - ${viewModal.user?.name || ""}`}
-        type="info"
-        size="md"
-      >
-        {viewModal.user && (
-          <div style={{ fontFamily: F.sans }}>
-            <div style={{ display: "grid", gap: 10 }}>
-              {[
-                {
-                  label: getTranslation("fullName"),
-                  value: viewModal.user.name,
-                },
-                { label: getTranslation("email"), value: viewModal.user.email },
-                {
-                  label: getTranslation("role"),
-                  value: getRoleDisplayName(viewModal.user.role),
-                },
-                {
-                  label: getTranslation("phone"),
-                  value: viewModal.user.phone || "N/A",
-                },
-                {
-                  label: getTranslation("userId"),
-                  value: viewModal.user._id,
-                  small: true,
-                },
-                {
-                  label: getTranslation("created"),
-                  value: new Date(viewModal.user.createdAt).toLocaleString(),
-                },
-                {
-                  label: getTranslation("lastUpdated"),
-                  value: new Date(viewModal.user.updatedAt).toLocaleString(),
-                },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    borderBottom: idx < 6 ? `1px solid ${C.border}` : "none",
-                    paddingBottom: idx < 6 ? 8 : 0,
-                  }}
-                >
-                  <span style={{ color: C.muted, fontSize: 12 }}>
-                    {item.label}
-                  </span>
-                  <span
+        {/* View User Modal */}
+        <Modal
+          isOpen={viewModal.isOpen}
+          onClose={() => setViewModal({ isOpen: false, user: null })}
+          title={`👤 ${getTranslation("userDetails")} - ${viewModal.user?.name || ""}`}
+          type="info"
+          size="md"
+        >
+          {viewModal.user && (
+            <div style={{ fontFamily: F.sans }}>
+              <div style={{ display: "grid", gap: 10 }}>
+                {[
+                  {
+                    label: getTranslation("fullName"),
+                    value: viewModal.user.name,
+                  },
+                  {
+                    label: getTranslation("email"),
+                    value: viewModal.user.email,
+                  },
+                  {
+                    label: getTranslation("role"),
+                    value: getRoleDisplayName(viewModal.user.role),
+                  },
+                  {
+                    label: getTranslation("phone"),
+                    value: viewModal.user.phone || "N/A",
+                  },
+                  {
+                    label: getTranslation("userId"),
+                    value: viewModal.user._id,
+                    small: true,
+                  },
+                  {
+                    label: getTranslation("created"),
+                    value: new Date(viewModal.user.createdAt).toLocaleString(),
+                  },
+                  {
+                    label: getTranslation("lastUpdated"),
+                    value: new Date(viewModal.user.updatedAt).toLocaleString(),
+                  },
+                ].map((item, idx) => (
+                  <div
+                    key={idx}
                     style={{
-                      fontWeight: 600,
-                      color: C.dark,
-                      fontSize: item.small ? 11 : 13,
+                      display: "flex",
+                      justifyContent: "space-between",
+                      borderBottom: idx < 6 ? `1px solid ${C.border}` : "none",
+                      paddingBottom: idx < 6 ? 8 : 0,
                     }}
                   >
-                    {item.value}
-                  </span>
-                </div>
-              ))}
+                    <span style={{ color: C.muted, fontSize: 12 }}>
+                      {item.label}
+                    </span>
+                    <span
+                      style={{
+                        fontWeight: 600,
+                        color: C.dark,
+                        fontSize: item.small ? 11 : 13,
+                      }}
+                    >
+                      {item.value}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* Change Role Modal */}
+        <Modal
+          isOpen={roleModal.isOpen}
+          onClose={() =>
+            setRoleModal({
+              isOpen: false,
+              user: null,
+              selectedRole: "employee",
+            })
+          }
+          title={`🔄 ${getTranslation("changeRole")}`}
+          type="confirm"
+          confirmText={getTranslation("update")}
+          cancelText={getTranslation("cancel")}
+          onConfirm={() => {
+            if (roleModal.user) {
+              const newRole = roleModal.selectedRole;
+              const updateData = {
+                name: roleModal.user.name,
+                email: roleModal.user.email,
+                role: newRole,
+                phone: roleModal.user.phone || "",
+              };
+              authAPI
+                .updateUser(roleModal.user._id, updateData)
+                .then(() => {
+                  showToast(getTranslation("updateSuccess"), "success");
+                  loadUsers();
+                  setRoleModal({
+                    isOpen: false,
+                    user: null,
+                    selectedRole: "employee",
+                  });
+                })
+                .catch((error) => {
+                  console.error("Failed to update role:", error);
+                  setAlertModal({
+                    isOpen: true,
+                    title: getTranslation("title"),
+                    message:
+                      error.response?.data?.message ||
+                      getTranslation("saveError"),
+                    type: "error",
+                  });
+                });
+            }
+          }}
+          onCancel={() =>
+            setRoleModal({
+              isOpen: false,
+              user: null,
+              selectedRole: "employee",
+            })
+          }
+        >
+          <div style={{ padding: "4px 0" }}>
+            <p style={{ marginBottom: 16, color: "#555", fontSize: 13 }}>
+              {getTranslation("changeRolePrompt")}{" "}
+              <strong>{roleModal.user?.name}</strong>
+            </p>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  marginBottom: 6,
+                  fontWeight: 600,
+                  fontSize: 12,
+                }}
+              >
+                {getTranslation("role")}
+              </label>
+              <select
+                value={roleModal.selectedRole}
+                onChange={(e) =>
+                  setRoleModal({ ...roleModal, selectedRole: e.target.value })
+                }
+                style={{
+                  width: "100%",
+                  padding: "8px 12px",
+                  border: `1.5px solid ${C.border}`,
+                  borderRadius: 8,
+                  fontSize: 13,
+                  background: C.white,
+                  outline: "none",
+                }}
+              >
+                <option value={ROLES.EMPLOYEE}>
+                  {getTranslation("roleEmployee")}
+                </option>
+                <option value={ROLES.TEAM_LEADER}>
+                  {getTranslation("roleTeamLeader")}
+                </option>
+                <option value={ROLES.ADMIN}>
+                  {getTranslation("roleAdmin")}
+                </option>
+              </select>
             </div>
           </div>
-        )}
-      </Modal>
-
-      <Modal
-        isOpen={roleModal.isOpen}
-        onClose={() =>
-          setRoleModal({ isOpen: false, user: null, selectedRole: "employee" })
-        }
-        title={`🔄 ${getTranslation("changeRole")}`}
-        type="confirm"
-        confirmText={getTranslation("update")}
-        cancelText={getTranslation("cancel")}
-        onConfirm={() => {
-          if (roleModal.user) {
-            const newRole = roleModal.selectedRole;
-            const updateData = {
-              name: roleModal.user.name,
-              email: roleModal.user.email,
-              role: newRole,
-              phone: roleModal.user.phone || "",
-            };
-            authAPI
-              .updateUser(roleModal.user._id, updateData)
-              .then(() => {
-                showToast(getTranslation("updateSuccess"), "success");
-                loadUsers();
-                setRoleModal({
-                  isOpen: false,
-                  user: null,
-                  selectedRole: "employee",
-                });
-              })
-              .catch((error) => {
-                console.error("Failed to update role:", error);
-                setAlertModal({
-                  isOpen: true,
-                  title: getTranslation("title"),
-                  message:
-                    error.response?.data?.message ||
-                    getTranslation("saveError"),
-                  type: "error",
-                });
-              });
-          }
-        }}
-        onCancel={() =>
-          setRoleModal({ isOpen: false, user: null, selectedRole: "employee" })
-        }
-      >
-        <div style={{ padding: "4px 0" }}>
-          <p style={{ marginBottom: 16, color: "#555", fontSize: 13 }}>
-            {getTranslation("changeRolePrompt")}{" "}
-            <strong>{roleModal.user?.name}</strong>
-          </p>
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: 6,
-                fontWeight: 600,
-                fontSize: 12,
-              }}
-            >
-              {getTranslation("role")}
-            </label>
-            <select
-              value={roleModal.selectedRole}
-              onChange={(e) =>
-                setRoleModal({ ...roleModal, selectedRole: e.target.value })
-              }
-              style={{
-                width: "100%",
-                padding: "8px 12px",
-                border: `1.5px solid ${C.border}`,
-                borderRadius: 8,
-                fontSize: 13,
-                background: C.white,
-                outline: "none",
-              }}
-            >
-              <option value={ROLES.EMPLOYEE}>
-                {getTranslation("roleEmployee")}
-              </option>
-              <option value={ROLES.TEAM_LEADER}>
-                {getTranslation("roleTeamLeader")}
-              </option>
-              <option value={ROLES.ADMIN}>{getTranslation("roleAdmin")}</option>
-            </select>
-          </div>
-        </div>
-      </Modal>
+        </Modal>
+      </Portal>
 
       {/* ─── HEADER ─── */}
       <div
@@ -1651,52 +1686,13 @@ export default function UserManagement({ t }) {
         </div>
       )}
 
-      {/* ─── ✅ FIXED: USER MODAL - FULLY VISIBLE & CENTERED ─── */}
+      {/* ─── USER FORM MODAL (USING PORTAL) ─── */}
       {showModal && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "16px",
-            backdropFilter: "blur(4px)",
-            overflow: "hidden",
-          }}
-          onClick={() => {
-            if (!showPasswordDisplay && !saving) {
-              setShowModal(false);
-              setEditingUser(null);
-              resetForm();
-            }
-          }}
-        >
-          <div
-            style={{
-              background: C.white,
-              borderRadius: 16,
-              padding: "clamp(16px, 3vw, 28px)",
-              width: "min(94%, 520px)",
-              maxWidth: 520,
-              maxHeight: "88vh",
-              overflowY: "auto",
-              overflowX: "hidden",
-              boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
-              margin: "auto",
-              position: "relative",
-              display: "flex",
-              flexDirection: "column",
-              animation: "modalSlideUp 0.3s ease",
-              scrollbarWidth: "thin",
-              scrollbarColor: `${C.border} transparent`,
-            }}
-            onClick={(e) => e.stopPropagation()}
+        <Portal>
+          <ModalWrapper
+            isOpen={showModal}
+            onClose={closeUserModal}
+            zIndex={1000}
           >
             {!editingUser && showPasswordDisplay && generatedPassword ? (
               // ─── SHOW PASSWORD DISPLAY ───
@@ -2007,7 +2003,7 @@ export default function UserManagement({ t }) {
                       />
                     </div>
 
-                    {/* ─── MODAL ACTIONS - FIXED AT BOTTOM ─── */}
+                    {/* ─── MODAL ACTIONS ─── */}
                     <div
                       style={{
                         display: "flex",
@@ -2022,11 +2018,7 @@ export default function UserManagement({ t }) {
                     >
                       <button
                         type="button"
-                        onClick={() => {
-                          setShowModal(false);
-                          setEditingUser(null);
-                          resetForm();
-                        }}
+                        onClick={closeUserModal}
                         style={{
                           ...btn.secondary,
                           padding: "10px 22px",
@@ -2086,50 +2078,17 @@ export default function UserManagement({ t }) {
                 </div>
               </>
             )}
-          </div>
-        </div>
+          </ModalWrapper>
+        </Portal>
       )}
 
-      {/* ─── ✅ FIXED: RESET PASSWORD MODAL - FULLY VISIBLE & CENTERED ─── */}
+      {/* ─── RESET PASSWORD MODAL (USING PORTAL) ─── */}
       {resetPasswordModal.isOpen && resetPasswordModal.user && (
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: "rgba(0,0,0,0.6)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-            padding: "16px",
-            backdropFilter: "blur(4px)",
-            overflow: "hidden",
-          }}
-          onClick={closeResetPasswordModal}
-        >
-          <div
-            style={{
-              background: C.white,
-              borderRadius: 16,
-              padding: "clamp(16px, 3vw, 28px)",
-              width: "min(92%, 450px)",
-              maxWidth: 450,
-              maxHeight: "75vh", // ← Reduced for better fit
-              overflowY: "auto",
-              overflowX: "hidden",
-              boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
-              margin: "auto", // ← Key: auto centering
-              position: "relative",
-              animation: "modalSlideUp 0.3s ease",
-              display: "flex",
-              flexDirection: "column",
-              scrollbarWidth: "thin",
-              scrollbarColor: `${C.border} transparent`,
-            }}
-            onClick={(e) => e.stopPropagation()}
+        <Portal>
+          <ModalWrapper
+            isOpen={resetPasswordModal.isOpen}
+            onClose={closeResetPasswordModal}
+            zIndex={1001}
           >
             {/* ─── HEADER ─── */}
             <div style={{ flexShrink: 0 }}>
@@ -2308,7 +2267,7 @@ export default function UserManagement({ t }) {
               </div>
             </div>
 
-            {/* ─── ACTIONS - FIXED AT BOTTOM ─── */}
+            {/* ─── ACTIONS ─── */}
             <div
               style={{
                 display: "flex",
@@ -2385,8 +2344,8 @@ export default function UserManagement({ t }) {
                 )}
               </button>
             </div>
-          </div>
-        </div>
+          </ModalWrapper>
+        </Portal>
       )}
 
       <style>{`
