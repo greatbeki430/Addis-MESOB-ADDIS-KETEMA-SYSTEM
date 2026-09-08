@@ -359,13 +359,10 @@ async function approveRegistration(pendingId, reviewer) {
     throw new Error(`Cannot approve from status "${pending.status}"`);
   }
 
-  // ✅ Generate temporary password
   const tempPassword = generateTempPassword();
 
-  // ✅ DEBUG: Log the password
   console.log(`🔑 Generated password for ${pending.email}: "${tempPassword}"`);
 
-  // ✅ Create user account with ALL fields
   const user = await createUserAccount({
     name: pending.name,
     email: pending.email,
@@ -375,15 +372,13 @@ async function approveRegistration(pendingId, reviewer) {
     telegramChatId: pending.telegramChatId,
     profilePhotoUrl: pending.profilePhotoUrl || "",
     branch: pending.branch || "Addis Ketema",
-    position: pending.position || "", // ✅ ADDED
+    position: pending.position || "",
   });
 
-  // ✅ Verify user was created correctly
   const savedUser = await User.findById(user._id);
   console.log(`✅ User created: ${savedUser.email}`);
   console.log(`✅ Password hashed: ${savedUser.password.startsWith("$2b$")}`);
 
-  // Add to Golden Monday roster
   const existingPresenter = await GoldenMondayPresenter.findOne({
     user: user._id,
   });
@@ -411,7 +406,6 @@ async function approveRegistration(pendingId, reviewer) {
   pending.reviewedAt = new Date();
   await pending.save();
 
-  // Send login credentials to the user
   await sendLoginCredentials(pending.telegramChatId, {
     email: pending.email,
     password: tempPassword,
@@ -450,7 +444,6 @@ async function sendLoginCredentials(chatId, userData) {
   const { email, password, name, department, position, phone, branch } =
     userData;
 
-  // ✅ DEBUG: Log the password being sent
   console.log(`📤 Sending credentials to ${email}: password = "${password}"`);
 
   const message =
@@ -518,6 +511,203 @@ async function handleBranchSelection(callbackQuery) {
   });
 }
 
+// ─── ✅ NEW: NOTIFY EMPLOYEE DELETION ──────────────────────────
+async function notifyEmployeeDeletion({
+  userId,
+  employeeName,
+  email,
+  reason,
+  deletedBy,
+  deletedByName,
+}) {
+  try {
+    const user = await User.findById(userId);
+    if (!user) {
+      console.warn(`⚠️ User ${userId} not found for deletion notification`);
+      return { success: false, error: "User not found" };
+    }
+
+    if (!user.telegramChatId) {
+      console.warn(`⚠️ User ${userId} has no Telegram chat ID`);
+      return { success: false, error: "No Telegram chat ID" };
+    }
+
+    const chatId = user.telegramChatId.toString();
+    const date = new Date().toLocaleString();
+    const reasonText = reason || "No specific reason provided.";
+
+    let message =
+      `⚠️ *Account Deletion Notice*\n\n` +
+      `Dear ${employeeName || user.name},\n\n` +
+      `Your employee account has been removed from the Golden Monday system.\n\n` +
+      `📋 *Details:*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `📧 *Email:* ${email || user.email}\n` +
+      `🕐 *Deleted on:* ${date}\n` +
+      `👤 *Deleted by:* ${deletedByName || "Administrator"}\n` +
+      `📝 *Reason:* ${reasonText}\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    if (reason && reason.toLowerCase().includes("resigned")) {
+      message += `📌 *Note:* This appears to be a resignation or voluntary departure.\n\n`;
+    } else if (reason && reason.toLowerCase().includes("inactive")) {
+      message += `📌 *Note:* This appears to be an inactivity-related removal.\n\n`;
+    } else if (reason && reason.toLowerCase().includes("transfer")) {
+      message += `📌 *Note:* This appears to be a transfer to another department.\n\n`;
+    }
+
+    message +=
+      `❓ *What you can do:*\n` +
+      `━━━━━━━━━━━━━━━━━━━━━\n` +
+      `• If this deletion was a mistake, you can appeal\n` +
+      `• Contact HR/admin for clarification\n` +
+      `• Re-register through the bot if eligible\n\n`;
+
+    await sendMessage(chatId, message, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: "📢 Appeal Deletion",
+              callback_data: `appeal_deletion:${user._id}`,
+            },
+            { text: "📞 Contact Admin", callback_data: "contact_admin" },
+          ],
+          [
+            { text: "📝 Re-register", callback_data: "register" },
+            { text: "📖 About Golden Monday", callback_data: "about_gm" },
+          ],
+          [{ text: "🌐 Visit Website", url: FRONTEND_URL }],
+        ],
+        resize_keyboard: true,
+      },
+    });
+
+    console.log(
+      `✅ Deletion notification sent to ${user.email} (Chat ID: ${chatId})`,
+    );
+
+    if (TELEGRAM_ADMIN_GROUP_ID) {
+      await sendMessage(
+        TELEGRAM_ADMIN_GROUP_ID,
+        `📋 *Employee Deletion Notification Sent*\n\n` +
+          `👤 *Employee:* ${employeeName || user.name}\n` +
+          `📧 *Email:* ${email || user.email}\n` +
+          `📝 *Reason:* ${reasonText}\n` +
+          `🕐 *Deleted by:* ${deletedByName || "Administrator"}\n` +
+          `📱 *Telegram:* @${user.telegramUsername || "n/a"}\n` +
+          `✅ *Notification sent to employee*`,
+        { parse_mode: "Markdown" },
+      );
+    }
+
+    return { success: true, chatId };
+  } catch (error) {
+    console.error("❌ Failed to send deletion notification:", error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+// ─── ✅ NEW: HANDLE APPEAL DELETION ─────────────────────────────
+async function handleAppealDeletion(callbackQuery) {
+  const chatId = callbackQuery.message.chat.id;
+  const messageId = callbackQuery.message.message_id;
+  const [, userId] = callbackQuery.data.split(":");
+
+  await callTelegramApi("answerCallbackQuery", {
+    callback_query_id: callbackQuery.id,
+    text: "📢 Please tell us why you're appealing this deletion...",
+  });
+
+  registrationSessions.set(chatId.toString(), {
+    step: "awaiting_appeal_reason",
+    data: {
+      userId,
+      type: "deletion_appeal",
+    },
+  });
+
+  await callTelegramApi("editMessageText", {
+    chat_id: chatId,
+    message_id: messageId,
+    text:
+      `📢 *Appeal Deletion*\n\n` +
+      `Please type your reason for appealing this deletion:\n\n` +
+      `Examples:\n` +
+      `• This was a mistake, I'm still working here\n` +
+      `• I was not given proper notice\n` +
+      `• I want to understand the reason better\n` +
+      `• I believe this deletion was unfair\n\n` +
+      `Type your appeal message below.\n\n` +
+      `Type /cancel to cancel.`,
+    parse_mode: "Markdown",
+  });
+}
+
+// ─── ✅ NEW: HANDLE APPEAL REASON ──────────────────────────────
+async function handleAppealReason(msg) {
+  const chatId = msg.chat.id.toString();
+  const text = (msg.text || "").trim();
+
+  const session = registrationSessions.get(chatId);
+  if (!session || session.step !== "awaiting_appeal_reason") {
+    return;
+  }
+
+  if (!text || text.length < 10) {
+    await sendMessage(
+      chatId,
+      "❌ Please provide a valid appeal reason (at least 10 characters).\n\n" +
+        "Type /cancel to cancel.",
+    );
+    return;
+  }
+
+  const { userId } = session.data;
+
+  const user = await User.findById(userId);
+  if (!user) {
+    await sendMessage(chatId, "❌ User not found.");
+    registrationSessions.delete(chatId);
+    return;
+  }
+
+  registrationSessions.delete(chatId);
+
+  await sendMessage(
+    chatId,
+    `✅ *Your appeal has been submitted!*\n\n` +
+      `📝 *Your message:*\n${text}\n\n` +
+      `An administrator will review your appeal and contact you.\n\n` +
+      `📌 Click the ⊞ in your input bar to see all options.`,
+    { parse_mode: "Markdown" },
+  );
+
+  if (TELEGRAM_ADMIN_GROUP_ID) {
+    await sendMessage(
+      TELEGRAM_ADMIN_GROUP_ID,
+      `📢 *Deletion Appeal Received*\n\n` +
+        `👤 *Employee:* ${user.name}\n` +
+        `📧 *Email:* ${user.email}\n` +
+        `📱 *Telegram:* @${msg.from.username || "anonymous"}\n\n` +
+        `📝 *Appeal Reason:*\n${text}\n\n` +
+        `⚠️ Please review this appeal and respond to the employee.`,
+      { parse_mode: "Markdown" },
+    );
+
+    await sendMessage(
+      TELEGRAM_ADMIN_GROUP_ID,
+      `🔔 *Actions Available:*\n\n` +
+        `• Reply to the employee directly\n` +
+        `• Re-add them to the system\n` +
+        `• Schedule a meeting to discuss\n\n` +
+        `👤 Employee: ${user.name} (@${msg.from.username || "n/a"})`,
+      { parse_mode: "Markdown" },
+    );
+  }
+}
+
 module.exports = {
   registrationSessions,
   handleStartRegistration,
@@ -530,4 +720,8 @@ module.exports = {
   rejectRegistration,
   sendLoginCredentials,
   showBranchSelection,
+  // ✅ NEW EXPORTS
+  notifyEmployeeDeletion,
+  handleAppealDeletion,
+  handleAppealReason,
 };

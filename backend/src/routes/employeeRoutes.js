@@ -5,7 +5,7 @@ const User = require("../models/User");
 const GoldenMondayPresenter = require("../models/GoldenMondayPresenter");
 const PendingRegistration = require("../models/PendingRegistration");
 const { protect, adminOrSuperAdmin } = require("../middleware/auth");
-const { sendDeletionNotification } = require("../services/telegramService");
+const { notifyEmployeeDeletion } = require("../services/telegramService");
 
 /**
  * DELETE /api/employees/:userId - Delete an employee and notify via Telegram
@@ -15,45 +15,71 @@ router.delete("/:userId", protect, adminOrSuperAdmin, async (req, res) => {
     const { userId } = req.params;
     const { reason } = req.body;
 
+    // ✅ Find the user
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // ✅ Prevent self-deletion
     if (user._id.toString() === req.user._id.toString()) {
       return res.status(400).json({ error: "Cannot delete your own account" });
     }
 
+    // ✅ Prevent deleting the last Super Admin
     if (user.role === "superadmin") {
       const superAdminCount = await User.countDocuments({ role: "superadmin" });
       if (superAdminCount <= 1) {
-        return res.status(400).json({ 
-          error: "Cannot delete the last Super Admin" 
+        return res.status(400).json({
+          error: "Cannot delete the last Super Admin",
         });
       }
     }
 
-    const userName = user.name;
-    const telegramChatId = user.telegramChatId;
-    const userEmail = user.email;
+    // ✅ Store employee info before deletion for the notification
+    const employeeInfo = {
+      userId: user._id,
+      employeeName: user.name,
+      email: user.email,
+      reason: reason || "No specific reason provided.",
+      deletedBy: req.user._id,
+      deletedByName: req.user.name,
+    };
 
-    await GoldenMondayPresenter.deleteOne({ user: userId });
-    await PendingRegistration.deleteOne({ email: userEmail });
-    await User.findByIdAndDelete(userId);
+    // ✅ Check if user has Telegram chat ID
+    const hasTelegram = !!user.telegramChatId;
 
-    if (telegramChatId) {
-      const deletionReason = reason || 
-        `Your account has been removed from the system by ${req.user.name} (${req.user.email}).\n\n` +
-        `To re-register, please send /start to this bot: @${process.env.TELEGRAM_BOT_USERNAME || 'addis_mesob_gm_bot'}`;
-      
-      await sendDeletionNotification(telegramChatId, userName, deletionReason);
+    // ✅ Send Telegram notification BEFORE deleting (if they have Telegram)
+    let notificationResult = { success: false };
+    if (hasTelegram) {
+      notificationResult = await notifyEmployeeDeletion(employeeInfo);
     }
 
-    res.json({ 
-      success: true, 
-      message: "Employee deleted successfully. Telegram notification sent." 
-    });
+    // ✅ Delete from Golden Monday roster
+    await GoldenMondayPresenter.deleteOne({ user: userId });
 
+    // ✅ Delete pending registrations
+    await PendingRegistration.deleteMany({ email: user.email });
+
+    // ✅ Delete the user account
+    await User.findByIdAndDelete(userId);
+
+    // ✅ Log the deletion
+    console.log(
+      `🗑️ Employee deleted: ${user.name} (${user.email}) by ${req.user.name}`,
+    );
+
+    res.json({
+      success: true,
+      message: "Employee deleted successfully.",
+      notificationSent: notificationResult.success || false,
+      hasTelegram: hasTelegram,
+      ...(hasTelegram &&
+        !notificationResult.success && {
+          warning:
+            "Employee deleted but Telegram notification failed. Check bot configuration.",
+        }),
+    });
   } catch (error) {
     console.error("❌ Error deleting employee:", error);
     res.status(500).json({ error: error.message });

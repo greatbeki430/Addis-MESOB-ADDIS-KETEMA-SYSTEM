@@ -17,6 +17,10 @@ const {
   rejectRegistration,
   sendLoginCredentials,
   showBranchSelection,
+  // ✅ NEW IMPORTS
+  notifyEmployeeDeletion,
+  handleAppealDeletion,
+  handleAppealReason,
 
   // Presenters
   pendingPresenterConfirmations,
@@ -105,6 +109,10 @@ module.exports = {
   rejectRegistration,
   sendLoginCredentials,
   showBranchSelection,
+  // ✅ NEW EXPORTS
+  notifyEmployeeDeletion,
+  handleAppealDeletion,
+  handleAppealReason,
 
   // Presenters
   pendingPresenterConfirmations,
