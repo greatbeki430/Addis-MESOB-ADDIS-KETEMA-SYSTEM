@@ -499,6 +499,19 @@ export const goldenMondayAPI = {
   analyzeGalleryPhoto: (data) =>
     api.post("/golden-monday/gallery/analyze", data, { timeout: 30000 }),
 
+  // ─── ✅ NEW: FOLDER CRUD OPERATIONS ──────────────────────────
+  // Delete a folder (and all its contents)
+  deleteFolder: (folderId) =>
+    api.delete(`/golden-monday/gallery/folders/${folderId}`),
+
+  // Update/Rename a folder
+  updateFolder: (folderId, data) =>
+    api.put(`/golden-monday/gallery/folders/${folderId}`, data),
+
+  // Get folder contents with all subfolders
+  getFolderContents: (folderId) =>
+    api.get(`/golden-monday/gallery/folders/${folderId}/contents`),
+
   // ──────────────────────────────────────────────────────────────
   // 🎥 RECORDINGS MANAGEMENT
   // ──────────────────────────────────────────────────────────────

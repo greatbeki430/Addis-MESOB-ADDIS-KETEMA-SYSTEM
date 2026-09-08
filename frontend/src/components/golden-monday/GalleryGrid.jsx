@@ -207,8 +207,9 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   ];
 
   // ── Helper functions for modals ──
-  const closeClearAllModal = () =>
+  const closeClearAllModal = useCallback(() => {
     setClearAllModal({ isOpen: false, category: "all" });
+  }, []);
 
   // ── Data Fetching (Folders vs. Photos with Category Support) ──
   const loadGallery = useCallback(async () => {
@@ -220,9 +221,30 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         lang: language,
       };
 
-      // Case 1: We're inside a folder - show files with category filter
+      // Case 1: We're inside a folder - show files from this folder and its children
       if (currentFolder) {
-        params.folderId = currentFolder._id;
+        // ✅ FIX: Get all child folder IDs and query them all
+        try {
+          // Fetch child folders (fileType subfolders)
+          const childFoldersRes = await goldenMondayAPI.getFolders({
+            parentFolder: currentFolder._id,
+            limit: 100,
+          });
+          const childFolders = childFoldersRes.data?.folders || [];
+          const allFolderIds = [
+            currentFolder._id,
+            ...childFolders.map((f) => f._id),
+          ];
+          params.folderIds = allFolderIds.join(",");
+        } catch (e) {
+          // Fallback: just use current folder
+          console.warn(
+            "Could not fetch child folders, using direct folder:",
+            e,
+          );
+          params.folderId = currentFolder._id;
+        }
+
         if (category !== "all") params.category = category;
         const response = await goldenMondayAPI.getGallery(params);
         setItems(response.data.photos || []);
@@ -253,6 +275,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     }
   }, [page, category, currentFolder, sessionId, language, t.loadError]);
 
+  // ── Initial load ──
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false;
@@ -272,7 +295,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       const lastRun = settings.lastRun
         ? new Date(settings.lastRun).getTime()
         : 0;
-      const periodDays = parseInt(settings.period) || 30;
+      const periodDays = parseInt(settings.period, 10) || 30;
       const periodMs = periodDays * 24 * 60 * 60 * 1000;
 
       if (now - lastRun >= periodMs) {
@@ -305,7 +328,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           for (const photo of photosToDelete) {
             try {
               await goldenMondayAPI.deleteGalleryPhoto(photo._id);
-              deletedCount++;
+              deletedCount += 1;
             } catch (e) {
               console.error(`Failed to delete photo ${photo._id}:`, e);
             }
@@ -384,97 +407,109 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   }, []);
 
   // ─── Handle File Selection ──
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length === 0) return;
+  const handleFileSelect = useCallback(
+    (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
 
-    const allowedTypes = {
-      image: { mimes: ["image/"], maxSize: 10 * 1024 * 1024 },
-      pdf: { mimes: ["application/pdf"], maxSize: 10 * 1024 * 1024 },
-      presentation: {
-        mimes: [
-          "application/vnd.ms-powerpoint",
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        ],
-        maxSize: 10 * 1024 * 1024,
-      },
-      document: {
-        mimes: [
-          "application/msword",
-          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ],
-        maxSize: 10 * 1024 * 1024,
-      },
-      video: { mimes: ["video/"], maxSize: 100 * 1024 * 1024 },
-    };
+      const allowedTypes = {
+        image: { mimes: ["image/"], maxSize: 10 * 1024 * 1024 },
+        pdf: { mimes: ["application/pdf"], maxSize: 10 * 1024 * 1024 },
+        presentation: {
+          mimes: [
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          ],
+          maxSize: 10 * 1024 * 1024,
+        },
+        document: {
+          mimes: [
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          ],
+          maxSize: 10 * 1024 * 1024,
+        },
+        video: { mimes: ["video/"], maxSize: 100 * 1024 * 1024 },
+      };
 
-    const validFiles = [];
-    const rejectedFiles = [];
+      const validFiles = [];
+      const rejectedFiles = [];
 
-    for (const file of files) {
-      let matchedType = null;
-      for (const [typeKey, typeConfig] of Object.entries(allowedTypes)) {
-        if (
-          typeConfig.mimes.some(
-            (mime) =>
-              file.type.startsWith(mime.replace("*", "")) || file.type === mime,
-          )
-        ) {
-          matchedType = typeKey;
-          break;
+      for (const file of files) {
+        let matchedType = null;
+        for (const [typeKey, typeConfig] of Object.entries(allowedTypes)) {
+          if (
+            typeConfig.mimes.some(
+              (mime) =>
+                file.type.startsWith(mime.replace("*", "")) ||
+                file.type === mime,
+            )
+          ) {
+            matchedType = typeKey;
+            break;
+          }
         }
+        if (!matchedType) {
+          rejectedFiles.push({
+            name: file.name,
+            reason: `Unsupported file type: ${file.type || "unknown"}`,
+          });
+          continue;
+        }
+        const typeConfig = allowedTypes[matchedType];
+        if (file.size > typeConfig.maxSize) {
+          rejectedFiles.push({
+            name: file.name,
+            reason: `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB, max ${(typeConfig.maxSize / 1024 / 1024).toFixed(0)}MB)`,
+          });
+          continue;
+        }
+        validFiles.push(file);
       }
-      if (!matchedType) {
-        rejectedFiles.push({
-          name: file.name,
-          reason: `Unsupported file type: ${file.type || "unknown"}`,
-        });
-        continue;
-      }
-      const typeConfig = allowedTypes[matchedType];
-      if (file.size > typeConfig.maxSize) {
-        rejectedFiles.push({
-          name: file.name,
-          reason: `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB, max ${(typeConfig.maxSize / 1024 / 1024).toFixed(0)}MB)`,
-        });
-        continue;
-      }
-      validFiles.push(file);
-    }
 
-    if (rejectedFiles.length > 0) {
-      const messages = rejectedFiles.map((f) => `❌ ${f.name}: ${f.reason}`);
-      showToast(
-        `${rejectedFiles.length} file(s) rejected:\n${messages.join("\n")}`,
-        "warning",
-        { duration: 5000 },
+      if (rejectedFiles.length > 0) {
+        const messages = rejectedFiles.map((f) => `❌ ${f.name}: ${f.reason}`);
+        showToast(
+          `${rejectedFiles.length} file(s) rejected:\n${messages.join("\n")}`,
+          "warning",
+          { duration: 5000 },
+        );
+      }
+
+      if (validFiles.length === 0) {
+        if (rejectedFiles.length === 0) {
+          showToast("No valid files selected", "warning");
+        }
+        e.target.value = "";
+        return;
+      }
+
+      setUploadQueue(
+        validFiles.map((file) => ({
+          file,
+          id: Date.now() + Math.random(),
+          status: "pending",
+          progress: 0,
+          category: category !== "all" ? category : null,
+        })),
       );
-    }
-
-    if (validFiles.length === 0) {
-      if (rejectedFiles.length === 0)
-        showToast("No valid files selected", "warning");
+      setIsUploadModalOpen(true);
       e.target.value = "";
-      return;
-    }
-
-    setUploadQueue(
-      validFiles.map((file) => ({
-        file,
-        id: Date.now() + Math.random(),
-        status: "pending",
-        progress: 0,
-        category: category !== "all" ? category : null,
-      })),
-    );
-    setIsUploadModalOpen(true);
-    e.target.value = "";
-  };
+    },
+    [category],
+  );
 
   // ─── Process Upload Queue ──
   const processUploadQueue = useCallback(
     async (folderId, topic) => {
       if (uploading || uploadQueue.length === 0) return;
+
+      // ✅ Validate folderId
+      if (!folderId) {
+        showToast("Folder ID is required for upload", "error");
+        return;
+      }
+
       setUploading(true);
 
       const CONCURRENCY_LIMIT = 3;
@@ -563,7 +598,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
 
           await Promise.race([uploadPromise, timeoutPromise]);
 
-          processed++;
+          processed += 1;
           setUploadQueue((prev) =>
             prev.map((q) =>
               q.id === item.id
@@ -579,7 +614,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           return { success: true, item };
         } catch (error) {
           console.error(`Upload error for ${item.file.name}:`, error);
-          failed++;
+          failed += 1;
 
           let errorMessage = error.message || "Upload failed";
           if (error.response?.data?.error) {
@@ -636,56 +671,82 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     ],
   );
 
-  const removeFromQueue = (id) => {
+  const removeFromQueue = useCallback((id) => {
     setUploadQueue((prev) => prev.filter((q) => q.id !== id));
-  };
+  }, []);
 
   // ─── Delete Modal Logic ──
-  const openDeleteModal = (photoId, photoTitle) => {
-    if (dontAskAgain) {
-      confirmDelete(photoId);
-      return;
-    }
-    setDeleteModal({ isOpen: true, photoId, photoTitle });
-  };
+  const confirmDelete = useCallback(
+    async (photoId) => {
+      try {
+        await goldenMondayAPI.deleteGalleryPhoto(photoId);
+        showToast(t.deleteSuccess || "Photo deleted", "success");
+        await loadGallery();
+        if (onRefresh) onRefresh();
+      } catch (error) {
+        console.error("Delete error:", error);
+        showToast(t.deleteError || "Failed to delete photo", "error");
+      } finally {
+        setDeleteModal({ isOpen: false, photoId: null, photoTitle: "" });
+      }
+    },
+    [loadGallery, onRefresh, t.deleteError, t.deleteSuccess],
+  );
 
-  const closeDeleteModal = () =>
-    setDeleteModal({ isOpen: false, photoId: null, photoTitle: "" });
+  const openDeleteModal = useCallback(
+    (photoId, photoTitle) => {
+      if (dontAskAgain) {
+        confirmDelete(photoId);
+        return;
+      }
+      setDeleteModal({ isOpen: true, photoId, photoTitle });
+    },
+    [dontAskAgain, confirmDelete],
+  );
 
-  const confirmDelete = async (photoId) => {
-    try {
-      await goldenMondayAPI.deleteGalleryPhoto(photoId);
-      showToast(t.deleteSuccess || "Photo deleted", "success");
-      await loadGallery();
-      if (onRefresh) onRefresh();
-    } catch (error) {
-      console.error("Delete error:", error);
-      showToast(t.deleteError || "Failed to delete photo", "error");
-    } finally {
-      closeDeleteModal();
-    }
-  };
+  const handleDelete = useCallback(
+    (photoId) => {
+      const photo = items.find((p) => p._id === photoId);
+      const photoTitle =
+        photo?.title || photo?.caption || t.untitled || "Untitled";
+      openDeleteModal(photoId, photoTitle);
+    },
+    [items, openDeleteModal, t.untitled],
+  );
 
-  const handleDelete = (photoId) => {
-    const photo = items.find((p) => p._id === photoId);
-    const photoTitle =
-      photo?.title || photo?.caption || t.untitled || "Untitled";
-    openDeleteModal(photoId, photoTitle);
-  };
+  // ─── Folder Rename Handler ──
+  const handleRenameFolder = useCallback(
+    async (folderId, newTitle) => {
+      try {
+        await goldenMondayAPI.updateFolder(folderId, { title: newTitle });
+        showToast(`Folder renamed to "${newTitle}"`, "success");
+        await loadGallery();
+        if (onRefresh) onRefresh();
+      } catch (error) {
+        console.error("Rename error:", error);
+        showToast("Failed to rename folder", "error");
+      }
+    },
+    [loadGallery, onRefresh],
+  );
 
-  const handleDontAskAgainToggle = (e) => {
+  const handleDontAskAgainToggle = useCallback((e) => {
     const checked = e.target.checked;
     setDontAskAgain(checked);
-    if (checked) localStorage.setItem("galleryDeleteDontAskAgain", "true");
-    else localStorage.removeItem("galleryDeleteDontAskAgain");
-  };
+    if (checked) {
+      localStorage.setItem("galleryDeleteDontAskAgain", "true");
+    } else {
+      localStorage.removeItem("galleryDeleteDontAskAgain");
+    }
+  }, []);
 
   // ─── Clear All Photos ──
-  const clearAllPhotos = async () => {
+  const clearAllPhotos = useCallback(async () => {
     try {
       const params = { limit: 1000, page: 1 };
-      if (clearAllModal.category !== "all")
+      if (clearAllModal.category !== "all") {
         params.category = clearAllModal.category;
+      }
 
       const response = await goldenMondayAPI.getGallery(params);
       const photosToDelete = response.data.photos || [];
@@ -703,14 +764,15 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         !window.confirm(
           `This will permanently delete ${photosToDelete.length} photo(s). This action cannot be undone!`,
         )
-      )
+      ) {
         return;
+      }
 
       let deletedCount = 0;
       for (const photo of photosToDelete) {
         try {
           await goldenMondayAPI.deleteGalleryPhoto(photo._id);
-          deletedCount++;
+          deletedCount += 1;
         } catch (e) {
           console.error(`Failed to delete photo ${photo._id}:`, e);
         }
@@ -727,27 +789,39 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       console.error("Clear all error:", error);
       showToast("Failed to clear photos.", "error");
     }
-  };
+  }, [
+    clearAllModal.category,
+    closeClearAllModal,
+    getCategoryLabel,
+    loadGallery,
+    onRefresh,
+  ]);
 
-  const updateAutoClearSettings = (key, value) => {
-    const newSettings = { ...autoClearSettings, [key]: value };
-    setAutoClearSettings(newSettings);
-    localStorage.setItem(
-      "galleryAutoClearSettings",
-      JSON.stringify(newSettings),
-    );
-  };
+  const updateAutoClearSettings = useCallback(
+    (key, value) => {
+      const newSettings = { ...autoClearSettings, [key]: value };
+      setAutoClearSettings(newSettings);
+      localStorage.setItem(
+        "galleryAutoClearSettings",
+        JSON.stringify(newSettings),
+      );
+    },
+    [autoClearSettings],
+  );
 
   // ─── Lightbox Navigation ──
-  const openLightbox = (photo) => {
-    const photoItems = items.filter((item) => item.url);
-    const index = photoItems.findIndex((p) => p._id === photo._id);
-    setLightboxIndex(index >= 0 ? index : 0);
-    setSelectedPhoto(photo);
-    setZoomLevel(1);
-    setDragOffset({ x: 0, y: 0 });
-    document.body.style.overflow = "hidden";
-  };
+  const openLightbox = useCallback(
+    (photo) => {
+      const photoItems = items.filter((item) => item.url);
+      const index = photoItems.findIndex((p) => p._id === photo._id);
+      setLightboxIndex(index >= 0 ? index : 0);
+      setSelectedPhoto(photo);
+      setZoomLevel(1);
+      setDragOffset({ x: 0, y: 0 });
+      document.body.style.overflow = "hidden";
+    },
+    [items],
+  );
 
   const closeLightbox = useCallback(() => {
     setSelectedPhoto(null);
@@ -784,14 +858,14 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     }
   }, [isFullscreen]);
 
-  const handleZoomIn = useCallback(
-    () => setZoomLevel((prev) => Math.min(prev + 0.25, 3)),
-    [],
-  );
-  const handleZoomOut = useCallback(
-    () => setZoomLevel((prev) => Math.max(prev - 0.25, 0.5)),
-    [],
-  );
+  const handleZoomIn = useCallback(() => {
+    setZoomLevel((prev) => Math.min(prev + 0.25, 3));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoomLevel((prev) => Math.max(prev - 0.25, 0.5));
+  }, []);
+
   const handleZoomReset = useCallback(() => {
     setZoomLevel(1);
     setDragOffset({ x: 0, y: 0 });
@@ -813,7 +887,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     selectedPhoto,
-    lightboxIndex,
     closeLightbox,
     navigateLightbox,
     handleZoomIn,
@@ -931,6 +1004,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           }}
         >
           <button
+            type="button"
             onClick={() => {
               setCurrentFolder(null);
               setPage(1);
@@ -992,6 +1066,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
         {CATEGORIES.map((cat) => (
           <button
             key={cat.value}
+            type="button"
             className={`category-btn ${category === cat.value ? "active" : ""}`}
             onClick={() => {
               setCategory(cat.value);
@@ -1042,8 +1117,9 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                   transition: "all 0.3s ease",
                 }}
                 onMouseEnter={(e) => {
-                  if (!uploading)
+                  if (!uploading) {
                     e.currentTarget.style.background = `${C.primary}22`;
+                  }
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = `${C.primary}11`;
@@ -1077,6 +1153,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               </label>
 
               <button
+                type="button"
                 onClick={() =>
                   setClearAllModal({ isOpen: true, category: "all" })
                 }
@@ -1107,6 +1184,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               </button>
 
               <button
+                type="button"
                 onClick={() => setShowAutoClearSettings(!showAutoClearSettings)}
                 style={{
                   padding: "6px 12px",
@@ -1156,6 +1234,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           )}
 
           <button
+            type="button"
             onClick={() => setViewMode("grid")}
             style={{
               padding: "6px 10px",
@@ -1170,6 +1249,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             <FiGrid size={16} />
           </button>
           <button
+            type="button"
             onClick={() => setViewMode("list")}
             style={{
               padding: "6px 10px",
@@ -1232,6 +1312,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                   </span>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowAutoClearSettings(false)}
                   style={{
                     background: "none",
@@ -1512,6 +1593,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 </div>
                 {item.status === "pending" && (
                   <button
+                    type="button"
                     onClick={() => removeFromQueue(item.id)}
                     style={{
                       background: "none",
@@ -1644,7 +1726,8 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 item={item}
                 viewMode={viewMode}
                 isAdmin={isAdmin}
-                onDelete={handleDelete}
+                onDelete={isAdmin ? handleDelete : undefined}
+                onRename={isAdmin ? handleRenameFolder : undefined}
                 onClick={(clickedItem) => {
                   if (!clickedItem.url) {
                     setCurrentFolder(clickedItem);
@@ -1671,6 +1754,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           }}
         >
           <button
+            type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1}
             style={{
@@ -1707,6 +1791,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
             {t.page || "Page"} {page} {t.of || "of"} {totalPages}
           </span>
           <button
+            type="button"
             onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
             style={{
@@ -1820,6 +1905,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
 
               {/* ── Navigation Arrows ── */}
               <button
+                type="button"
                 className="lightbox-controls"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1860,6 +1946,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               </button>
 
               <button
+                type="button"
                 className="lightbox-controls"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -1920,6 +2007,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               >
                 {/* Zoom Controls */}
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleZoomOut();
@@ -1969,6 +2057,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 </span>
 
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleZoomIn();
@@ -2008,6 +2097,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 />
 
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     handleZoomReset();
@@ -2040,6 +2130,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 </button>
 
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     toggleFullscreen();
@@ -2078,6 +2169,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 </button>
 
                 <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     window.open(selectedPhoto.url, "_blank");
@@ -2119,6 +2211,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                       }}
                     />
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         closeLightbox();
@@ -2164,6 +2257,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 />
 
                 <button
+                  type="button"
                   onClick={closeLightbox}
                   style={{
                     background: "rgba(0,0,0,0.5)",
@@ -2277,7 +2371,9 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               alignItems: "center",
               justifyContent: "center",
             }}
-            onClick={closeDeleteModal}
+            onClick={() =>
+              setDeleteModal({ isOpen: false, photoId: null, photoTitle: "" })
+            }
           >
             <motion.div
               initial={{ scale: 0.9, y: 20 }}
@@ -2296,7 +2392,14 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               onClick={(e) => e.stopPropagation()}
             >
               <button
-                onClick={closeDeleteModal}
+                type="button"
+                onClick={() =>
+                  setDeleteModal({
+                    isOpen: false,
+                    photoId: null,
+                    photoTitle: "",
+                  })
+                }
                 style={{
                   position: "absolute",
                   top: 12,
@@ -2404,7 +2507,14 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
               >
                 <button
-                  onClick={closeDeleteModal}
+                  type="button"
+                  onClick={() =>
+                    setDeleteModal({
+                      isOpen: false,
+                      photoId: null,
+                      photoTitle: "",
+                    })
+                  }
                   style={{
                     padding: "10px 20px",
                     borderRadius: 10,
@@ -2426,6 +2536,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                   {t.cancel || "Cancel"}
                 </button>
                 <button
+                  type="button"
                   onClick={() => confirmDelete(deleteModal.photoId)}
                   style={{
                     padding: "10px 24px",
@@ -2494,6 +2605,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               onClick={(e) => e.stopPropagation()}
             >
               <button
+                type="button"
                 onClick={closeClearAllModal}
                 style={{
                   position: "absolute",
@@ -2604,6 +2716,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}
               >
                 <button
+                  type="button"
                   onClick={closeClearAllModal}
                   style={{
                     padding: "10px 20px",
@@ -2626,6 +2739,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                   {t.cancel || "Cancel"}
                 </button>
                 <button
+                  type="button"
                   onClick={clearAllPhotos}
                   style={{
                     padding: "10px 24px",
