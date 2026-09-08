@@ -12,6 +12,7 @@ import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
 import { showToast } from "../../utils/toastHelper";
 import { goldenMondayTranslations } from "../../constants/goldenMondayTranslations";
+import FolderActionModal, { FOLDER_MODAL_TYPES } from "./FolderActionModal";
 import {
   FiX,
   FiChevronLeft,
@@ -135,6 +136,12 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
   // ── Drag State ──
   const [dragStart, setDragStart] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [folderModal, setFolderModal] = useState({
+    isOpen: false,
+    type: FOLDER_MODAL_TYPES.RENAME,
+    folder: null,
+    isLoading: false,
+  });
 
   // Update ref when autoClearSettings changes
   useEffect(() => {
@@ -405,6 +412,73 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       reader.readAsDataURL(file);
     });
   }, []);
+
+  // ─── Folder Modal Handlers ──
+  const handleOpenRenameModal = useCallback((folder) => {
+    setFolderModal({
+      isOpen: true,
+      type: FOLDER_MODAL_TYPES.RENAME,
+      folder,
+      isLoading: false,
+    });
+  }, []);
+
+  const handleOpenDeleteModal = useCallback((folder) => {
+    setFolderModal({
+      isOpen: true,
+      type: FOLDER_MODAL_TYPES.DELETE,
+      folder,
+      isLoading: false,
+    });
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setFolderModal((prev) => ({ ...prev, isOpen: false }));
+  }, []);
+
+  const handleRenameConfirm = useCallback(
+    async (newTitle) => {
+      const { folder } = folderModal;
+      if (!folder) return;
+
+      setFolderModal((prev) => ({ ...prev, isLoading: true }));
+      try {
+        await goldenMondayAPI.updateFolder(folder._id, { title: newTitle });
+        showToast(`Folder renamed to "${newTitle}"`, "success");
+        await loadGallery();
+        if (onRefresh) onRefresh();
+        handleCloseModal();
+      } catch (error) {
+        console.error("Rename error:", error);
+        showToast("Failed to rename folder", "error");
+      } finally {
+        setFolderModal((prev) => ({ ...prev, isLoading: false }));
+      }
+    },
+    [folderModal, loadGallery, onRefresh, handleCloseModal],
+  );
+
+  const handleDeleteConfirm = useCallback(async () => {
+    const { folder } = folderModal;
+    if (!folder) return;
+
+    setFolderModal((prev) => ({ ...prev, isLoading: true }));
+    try {
+      await goldenMondayAPI.deleteFolder(folder._id);
+      showToast(`Folder "${folder.title}" deleted successfully`, "success");
+      await loadGallery();
+      if (onRefresh) onRefresh();
+      handleCloseModal();
+    } catch (error) {
+      console.error("Delete error:", error);
+      showToast(
+        error.response?.data?.error || "Failed to delete folder",
+        "error",
+      );
+    } finally {
+      setFolderModal((prev) => ({ ...prev, isLoading: false }));
+    }
+  }, [folderModal, loadGallery, onRefresh, handleCloseModal]);
 
   // ─── Handle File Selection ──
   const handleFileSelect = useCallback(
@@ -1723,11 +1797,14 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
               className="gallery-item"
             >
               <GalleryItem
+                key={item._id}
                 item={item}
                 viewMode={viewMode}
                 isAdmin={isAdmin}
                 onDelete={isAdmin ? handleDelete : undefined}
                 onRename={isAdmin ? handleRenameFolder : undefined}
+                onOpenRenameModal={isAdmin ? handleOpenRenameModal : undefined} // ← NEW
+                onOpenDeleteModal={isAdmin ? handleOpenDeleteModal : undefined} // ← NEW
                 onClick={(clickedItem) => {
                   if (!clickedItem.url) {
                     setCurrentFolder(clickedItem);
@@ -2771,6 +2848,20 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* ─── FOLDER ACTION MODAL ─── */}
+      <FolderActionModal
+        isOpen={folderModal.isOpen}
+        onClose={handleCloseModal}
+        type={folderModal.type}
+        folder={folderModal.folder}
+        onConfirm={
+          folderModal.type === FOLDER_MODAL_TYPES.RENAME
+            ? handleRenameConfirm
+            : handleDeleteConfirm
+        }
+        isLoading={folderModal.isLoading}
+      />
     </div>
   );
 }
