@@ -311,6 +311,7 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
         gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
         gap: 16,
       }}
+      className="stats-grid"
     >
       {statItems.map((item, i) => (
         <motion.div
@@ -1946,6 +1947,33 @@ export default function GoldenMonday() {
             gap: 4px !important;
           }
         }
+          /* ── Stats Grid - Mobile Equal Width ── */
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .stats-grid > div {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    padding: 16px !important;
+  }
+  .stats-grid > div {
+    padding: 12px 8px !important;
+  }
+  .stats-grid > div > div:first-child {
+    font-size: 20px !important;
+  }
+  .stats-grid > div > div:last-child {
+    font-size: 10px !important;
+  }
+}
       `}</style>
 
       {/* ── HERO SECTION ── */}
