@@ -317,7 +317,7 @@ async function handleWebhookUpdate(update) {
 
       console.log(`📨 Callback query: "${data}" from ${chatId}`);
 
-      // ✅ ANSWER THE CALLBACK IMMEDIATELY - CRITICAL!
+      // ✅ ANSWER THE CALLBACK IMMEDIATELY
       try {
         await callTelegramApi("answerCallbackQuery", {
           callback_query_id: query.id,
@@ -437,35 +437,43 @@ async function handleWebhookUpdate(update) {
       }
 
       // ─── APPROVE/REJECT REGISTRATION ────────────────────────
+      // ✅ FIXED: Properly update the admin message
       if (data.startsWith("approve:") || data.startsWith("reject:")) {
         const [action, pendingId] = data.split(":");
         const reviewer = {
           _id: null,
-          name: query.from.username || query.from.first_name,
+          name: query.from.username || query.from.first_name || "Admin",
         };
 
         try {
+          let statusText = "";
           if (action === "approve") {
             await approveRegistration(pendingId, reviewer);
-            await callTelegramApi("editMessageText", {
-              chat_id: chatId,
-              message_id: messageId,
-              text: `${query.message.text}\n\n✅ Approved by ${reviewer.name}`,
-              parse_mode: "Markdown",
-              reply_markup: { inline_keyboard: [] },
-            });
+            statusText = `✅ *Approved* by @${reviewer.name}`;
           } else if (action === "reject") {
             await rejectRegistration(pendingId, reviewer);
-            await callTelegramApi("editMessageText", {
-              chat_id: chatId,
-              message_id: messageId,
-              text: `${query.message.text}\n\n❌ Rejected by ${reviewer.name}`,
-              parse_mode: "Markdown",
-              reply_markup: { inline_keyboard: [] },
-            });
+            statusText = `❌ *Rejected* by @${reviewer.name}`;
           }
+
+          // ✅ CRITICAL FIX: Remove buttons and show approval status
+          await callTelegramApi("editMessageText", {
+            chat_id: chatId,
+            message_id: messageId,
+            text: `${query.message.text}\n\n${statusText}`,
+            parse_mode: "Markdown",
+            reply_markup: { inline_keyboard: [] }, // ← REMOVE ALL BUTTONS
+          });
+
+          await callTelegramApi("answerCallbackQuery", {
+            callback_query_id: query.id,
+            text: action === "approve" ? "✅ Approved!" : "❌ Rejected!",
+          });
         } catch (err) {
           console.error("❌ Error handling approval callback:", err.message);
+          await callTelegramApi("answerCallbackQuery", {
+            callback_query_id: query.id,
+            text: `Error: ${err.message}`,
+          });
         }
         return;
       }
