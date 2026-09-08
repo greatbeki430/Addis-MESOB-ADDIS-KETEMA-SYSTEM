@@ -712,6 +712,11 @@ router.post(
           count: weekFolder.count || 0,
         },
         typeFolderId: typeFolder._id,
+        // Include typeFolder for frontend reference
+        typeFolder: {
+          _id: typeFolder._id,
+          fileType: typeFolder.fileType,
+        },
         message: "Folder created successfully",
       });
     } catch (error) {
@@ -729,13 +734,13 @@ router.post(
 // ════════════════════════════════════════════════════════════════
 
 // GET /api/golden-monday/gallery
-// GET /api/golden-monday/gallery
 router.get("/gallery", protect, anyRole, async (req, res) => {
   try {
     const {
       category,
       session,
       folderId,
+      folderIds, // ← NEW: comma-separated list
       fileType,
       search,
       limit = 50,
@@ -749,8 +754,19 @@ router.get("/gallery", protect, anyRole, async (req, res) => {
 
     if (category) filter.category = category;
     if (session) filter.session = session;
-    if (folderId) filter.folder = folderId;
     if (fileType) filter.fileType = fileType;
+
+    // ✅ NEW: Support multiple folder IDs
+    if (folderIds) {
+      const ids = folderIds.split(",").filter((id) => id.trim());
+      if (ids.length === 1) {
+        filter.folder = ids[0];
+      } else if (ids.length > 1) {
+        filter.folder = { $in: ids };
+      }
+    } else if (folderId) {
+      filter.folder = folderId;
+    }
 
     // ─── Search (title, originalFilename, tags) ──────────────
     if (search) {
@@ -1463,6 +1479,124 @@ router.post(
   protect,
   goldenMondayAdminOrAbove,
   analyzeAndCategorizePhoto,
+);
+
+// ════════════════════════════════════════════════════════════════
+// 📁 FOLDER CRUD OPERATIONS - ADD THIS NEW SECTION
+// ════════════════════════════════════════════════════════════════
+
+// ─── DELETE FOLDER ──────────────────────────────────────────────
+router.delete(
+  "/gallery/folders/:folderId",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const folder = await GoldenMondayFolder.findById(req.params.folderId);
+      if (!folder) {
+        return res.status(404).json({ error: "Folder not found" });
+      }
+
+      // Check if folder has items
+      if (folder.count > 0) {
+        // Get all photos in this folder and its children
+        let photoFilter = { folder: folder._id };
+        if (folder.folderType === "week") {
+          const childFolders = await GoldenMondayFolder.find({
+            parentFolder: folder._id,
+          });
+          const childIds = childFolders.map((f) => f._id);
+          photoFilter = { folder: { $in: [folder._id, ...childIds] } };
+        }
+
+        const photos = await GoldenMondayGallery.find(photoFilter);
+        if (photos.length > 0) {
+          return res.status(400).json({
+            error: `Cannot delete folder with ${photos.length} items. Delete the items first.`,
+            hasItems: true,
+            itemCount: photos.length,
+          });
+        }
+      }
+
+      // Delete child folders if week folder
+      if (folder.folderType === "week") {
+        await GoldenMondayFolder.deleteMany({ parentFolder: folder._id });
+      }
+
+      await folder.deleteOne();
+      res.json({ success: true, message: "Folder deleted successfully" });
+    } catch (error) {
+      console.error("❌ [DELETE FOLDER] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ─── UPDATE/RENAME FOLDER ──────────────────────────────────────
+router.put(
+  "/gallery/folders/:folderId",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const { title, topics } = req.body;
+      const folder = await GoldenMondayFolder.findById(req.params.folderId);
+      if (!folder) {
+        return res.status(404).json({ error: "Folder not found" });
+      }
+
+      if (title) folder.title = title;
+      if (topics && Array.isArray(topics)) folder.topics = topics;
+
+      await folder.save();
+      res.json({ success: true, folder });
+    } catch (error) {
+      console.error("❌ [UPDATE FOLDER] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
+// ─── GET FOLDER CONTENTS (with all subfolders) ────────────────
+router.get(
+  "/gallery/folders/:folderId/contents",
+  protect,
+  anyRole,
+  async (req, res) => {
+    try {
+      const folder = await GoldenMondayFolder.findById(req.params.folderId);
+      if (!folder) {
+        return res.status(404).json({ error: "Folder not found" });
+      }
+
+      let folderIds = [folder._id];
+
+      // If it's a week folder, include all child folders
+      if (folder.folderType === "week") {
+        const children = await GoldenMondayFolder.find({
+          parentFolder: folder._id,
+        });
+        folderIds = [...folderIds, ...children.map((c) => c._id)];
+      }
+
+      const photos = await GoldenMondayGallery.find({
+        folder: { $in: folderIds },
+      })
+        .sort({ createdAt: -1 })
+        .populate("uploadedBy", "name email profilePhotoUrl");
+
+      res.json({
+        success: true,
+        folder,
+        photos,
+        count: photos.length,
+      });
+    } catch (error) {
+      console.error("❌ [GET FOLDER CONTENTS] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
 );
 
 // ════════════════════════════════════════════════════════════════

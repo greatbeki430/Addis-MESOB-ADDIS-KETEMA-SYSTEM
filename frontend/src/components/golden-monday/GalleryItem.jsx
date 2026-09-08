@@ -12,24 +12,26 @@ import {
   FiCalendar,
   FiClock,
   FiStar,
+  FiEdit2,
 } from "react-icons/fi";
 import { C } from "../../styles/theme";
 import { useState } from "react";
 
 const getFileTypeIcon = (fileType, size = 20) => {
+  const iconStyle = { color: getFileTypeColor(fileType) };
+
   switch (fileType) {
     case "image":
-      return <FiImage size={size} style={{ color: "#10b981" }} />;
+      return <FiImage size={size} style={iconStyle} />;
     case "pdf":
-      return <FiFile size={size} style={{ color: "#e74c3c" }} />;
+      return <FiFile size={size} style={iconStyle} />;
     case "video":
-      return <FiVideo size={size} style={{ color: "#8b5cf6" }} />;
+      return <FiVideo size={size} style={iconStyle} />;
     case "presentation":
-      return <FiFileText size={size} style={{ color: "#f39c12" }} />;
     case "document":
-      return <FiFileText size={size} style={{ color: "#3b82f6" }} />;
+      return <FiFileText size={size} style={iconStyle} />;
     default:
-      return <FiFile size={size} style={{ color: "#6b7280" }} />;
+      return <FiFile size={size} style={iconStyle} />;
   }
 };
 
@@ -57,49 +59,91 @@ const getFileTypeColor = (fileType) => {
   return colors[fileType] || colors.other;
 };
 
+const formatDate = (date) => {
+  if (!date) return "";
+  const d = new Date(date);
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const getFileSize = (bytes) => {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+};
+
+const handleRename = (item, onRename) => {
+  const newTitle = window.prompt("Enter new folder name:", item.title);
+  if (newTitle && newTitle.trim()) {
+    onRename?.(item._id, newTitle.trim());
+  }
+};
+
+const handleDeleteFolder = (item, onDelete) => {
+  const msg = `Delete folder "${item.title}" and all its contents?\n\nThis will permanently delete all photos in this folder and cannot be undone.`;
+  if (window.confirm(msg)) {
+    onDelete?.(item._id);
+  }
+};
+
 export default function GalleryItem({
   item,
   viewMode,
   isAdmin,
   onDelete,
+  onRename,
   onClick,
 }) {
   const [isHovering, setIsHovering] = useState(false);
 
   const isFolder = !item.url && !item.fileType;
-  const isFile = item.url && item.fileType;
+  const isFile = Boolean(item.url && item.fileType);
   const isImage = item.fileType === "image";
   const isVideo = item.fileType === "video";
   const showThumbnail =
     isImage || (item.thumbnailUrl && !item.thumbnailIsGeneric);
   const fileColor = getFileTypeColor(item.fileType);
 
-  const formatDate = (date) => {
-    if (!date) return "";
-    const d = new Date(date);
-    return d.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
+  const handleMouseEnter = () => setIsHovering(true);
+  const handleMouseLeave = () => setIsHovering(false);
+
+  const handleItemClick = () => onClick(item);
+
+  const handleDeleteClick = (e) => {
+    e.stopPropagation();
+    onDelete?.(item._id);
   };
 
-  const getFileSize = (bytes) => {
-    if (!bytes) return "";
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
-    if (bytes < 1024 * 1024 * 1024)
-      return (bytes / 1024 / 1024).toFixed(1) + " MB";
-    return (bytes / 1024 / 1024 / 1024).toFixed(1) + " GB";
+  const handleViewClick = (e) => {
+    e.stopPropagation();
+    if (item.url) {
+      window.open(item.url, "_blank");
+    }
   };
 
-  // Grid View - Enhanced with animations
+  const handleRenameClick = (e) => {
+    e.stopPropagation();
+    handleRename(item, onRename);
+  };
+
+  const handleDeleteFolderClick = (e) => {
+    e.stopPropagation();
+    handleDeleteFolder(item, onDelete);
+  };
+
+  // ─── GRID VIEW ────────────────────────────────────────────────────
   if (viewMode === "grid") {
     return (
       <div
-        onClick={() => onClick(item)}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
+        onClick={handleItemClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         style={{
           position: "relative",
           borderRadius: 16,
@@ -120,7 +164,7 @@ export default function GalleryItem({
         }}
       >
         {isFolder ? (
-          // ─── ENHANCED FOLDER VIEW ──────────────────────────────────
+          // ─── FOLDER VIEW ──────────────────────────────────────────
           <>
             <div
               style={{
@@ -140,7 +184,7 @@ export default function GalleryItem({
               {item.coverPhoto ? (
                 <img
                   src={item.coverPhoto}
-                  alt={item.title}
+                  alt={item.title || "Folder cover"}
                   style={{
                     width: "100%",
                     height: "100%",
@@ -210,7 +254,85 @@ export default function GalleryItem({
                   {item.topics.length > 1 && ` +${item.topics.length - 1}`}
                 </div>
               )}
+
+              {/* Folder Action Buttons - Admin only */}
+              {isAdmin && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 8,
+                    right: 8,
+                    display: "flex",
+                    gap: 4,
+                    opacity: isHovering ? 1 : 0,
+                    transition: "opacity 0.3s ease",
+                    zIndex: 5,
+                  }}
+                >
+                  <button
+                    onClick={handleRenameClick}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      background: "rgba(0,0,0,0.6)",
+                      backdropFilter: "blur(4px)",
+                      border: "none",
+                      color: "#fff",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(0,0,0,0.8)";
+                      e.currentTarget.style.transform = "scale(1.1)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "rgba(0,0,0,0.6)";
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
+                    title="Rename folder"
+                    type="button"
+                  >
+                    <FiEdit2 size={12} />
+                  </button>
+                  <button
+                    onClick={handleDeleteFolderClick}
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      background: "rgba(239,68,68,0.8)",
+                      backdropFilter: "blur(4px)",
+                      border: "none",
+                      color: "#fff",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(239,68,68,1)";
+                      e.currentTarget.style.transform = "scale(1.1)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "rgba(239,68,68,0.8)";
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
+                    title="Delete folder"
+                    type="button"
+                  >
+                    <FiTrash2 size={12} />
+                  </button>
+                </div>
+              )}
             </div>
+
             <div
               style={{
                 padding: "12px 14px",
@@ -237,7 +359,7 @@ export default function GalleryItem({
                 }}
               >
                 <FiFolder size={14} color={C.primary} />
-                {item.title}
+                {item.title || "Untitled Folder"}
               </div>
               {item.weekOf && (
                 <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>
@@ -248,7 +370,7 @@ export default function GalleryItem({
             </div>
           </>
         ) : isFile ? (
-          // ─── ENHANCED FILE VIEW ────────────────────────────────────
+          // ─── FILE VIEW ────────────────────────────────────────────
           <>
             <div
               style={{
@@ -265,7 +387,7 @@ export default function GalleryItem({
               {showThumbnail ? (
                 <img
                   src={item.thumbnailUrl || item.url}
-                  alt={item.title || item.originalFilename}
+                  alt={item.title || item.originalFilename || "File"}
                   style={{
                     width: "100%",
                     height: "100%",
@@ -325,7 +447,7 @@ export default function GalleryItem({
                 </div>
               )}
 
-              {/* File type badge with color */}
+              {/* File type badge */}
               <div
                 style={{
                   position: "absolute",
@@ -351,13 +473,10 @@ export default function GalleryItem({
                 {getFileTypeLabel(item.fileType)}
               </div>
 
-              {/* Delete button - enhanced */}
+              {/* Delete button - Admin only */}
               {isAdmin && (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDelete(item._id);
-                  }}
+                  onClick={handleDeleteClick}
                   style={{
                     position: "absolute",
                     top: 8,
@@ -386,6 +505,7 @@ export default function GalleryItem({
                     e.currentTarget.style.background = "rgba(239,68,68,0.9)";
                     e.currentTarget.style.transform = "scale(1)";
                   }}
+                  type="button"
                 >
                   <FiTrash2 size={14} />
                 </button>
@@ -426,6 +546,7 @@ export default function GalleryItem({
                 </div>
               )}
             </div>
+
             <div
               style={{
                 position: "absolute",
@@ -472,12 +593,12 @@ export default function GalleryItem({
     );
   }
 
-  // ─── ENHANCED LIST VIEW ────────────────────────────────────────────
+  // ─── LIST VIEW ─────────────────────────────────────────────────────
   return (
     <div
-      onClick={() => onClick(item)}
-      onMouseEnter={() => setIsHovering(true)}
-      onMouseLeave={() => setIsHovering(false)}
+      onClick={handleItemClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       style={{
         display: "flex",
         alignItems: "center",
@@ -527,7 +648,7 @@ export default function GalleryItem({
           item.coverPhoto ? (
             <img
               src={item.coverPhoto}
-              alt={item.title}
+              alt={item.title || "Folder"}
               style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
           ) : (
@@ -536,13 +657,69 @@ export default function GalleryItem({
         ) : showThumbnail ? (
           <img
             src={item.thumbnailUrl || item.url}
-            alt={item.title || item.originalFilename}
+            alt={item.title || item.originalFilename || "File"}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : (
           getFileTypeIcon(item.fileType, 28)
         )}
       </div>
+
+      {/* Folder Action Buttons - List View - Admin only */}
+      {isFolder && isAdmin && (
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            marginLeft: "auto",
+            flexShrink: 0,
+            opacity: isHovering ? 1 : 0,
+            transition: "opacity 0.3s ease",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={handleRenameClick}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: isHovering ? "rgba(0,0,0,0.6)" : "transparent",
+              border: "none",
+              color: isHovering ? "#fff" : C.muted,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s ease",
+            }}
+            title="Rename folder"
+            type="button"
+          >
+            <FiEdit2 size={14} />
+          </button>
+          <button
+            onClick={handleDeleteFolderClick}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: "50%",
+              background: isHovering ? "rgba(239,68,68,0.8)" : "transparent",
+              border: "none",
+              color: isHovering ? "#fff" : "#ef4444",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              transition: "all 0.2s ease",
+            }}
+            title="Delete folder"
+            type="button"
+          >
+            <FiTrash2 size={14} />
+          </button>
+        </div>
+      )}
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div
@@ -558,7 +735,7 @@ export default function GalleryItem({
           {isFolder ? (
             <>
               <FiFolder size={14} color={C.primary} />
-              {item.title}
+              {item.title || "Untitled Folder"}
             </>
           ) : (
             item.title || item.originalFilename || "Untitled"
@@ -645,14 +822,11 @@ export default function GalleryItem({
         </div>
       </div>
 
-      {/* Action buttons - enhanced */}
+      {/* Action buttons */}
       <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
         {isFile && (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(item.url, "_blank");
-            }}
+            onClick={handleViewClick}
             style={{
               width: 32,
               height: 32,
@@ -677,6 +851,7 @@ export default function GalleryItem({
                 : "transparent";
               e.currentTarget.style.color = C.muted;
             }}
+            type="button"
           >
             <FiEye size={16} />
           </button>
@@ -684,10 +859,7 @@ export default function GalleryItem({
 
         {isAdmin && isFile && (
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(item._id);
-            }}
+            onClick={handleDeleteClick}
             style={{
               width: 32,
               height: 32,
@@ -712,6 +884,7 @@ export default function GalleryItem({
                 : "transparent";
               e.currentTarget.style.transform = "scale(1)";
             }}
+            type="button"
           >
             <FiTrash2 size={16} />
           </button>
