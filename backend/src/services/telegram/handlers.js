@@ -8,6 +8,9 @@ const {
   handleBranchSelection,
   approveRegistration,
   rejectRegistration,
+  // ✅ NEW IMPORTS
+  handleAppealDeletion,
+  handleAppealReason,
 } = require("./registration");
 
 const {
@@ -202,6 +205,12 @@ async function handleWebhookUpdate(update) {
         return;
       }
 
+      // ✅ NEW: Check if this is an appeal reason
+      if (sessionData && sessionData.step === "awaiting_appeal_reason") {
+        await handleAppealReason(msg);
+        return;
+      }
+
       // Check if this is a presenter unavailable reason
       if (text && !text.startsWith("/")) {
         await handlePresenterUnavailableReason(msg);
@@ -326,6 +335,12 @@ async function handleWebhookUpdate(update) {
         console.warn("⚠️ Could not answer callback query:", err.message);
       }
 
+      // ─── ✅ NEW: APPEAL DELETION ──────────────────────────────
+      if (data.startsWith("appeal_deletion:")) {
+        await handleAppealDeletion(query);
+        return;
+      }
+
       // ─── BRANCH SELECTION ────────────────────────────────────
       if (data.startsWith("branch:")) {
         await handleBranchSelection(query);
@@ -437,7 +452,6 @@ async function handleWebhookUpdate(update) {
       }
 
       // ─── APPROVE/REJECT REGISTRATION ────────────────────────
-      // ✅ FIXED: Properly update the admin message
       if (data.startsWith("approve:") || data.startsWith("reject:")) {
         const [action, pendingId] = data.split(":");
         const reviewer = {
@@ -455,13 +469,12 @@ async function handleWebhookUpdate(update) {
             statusText = `❌ *Rejected* by @${reviewer.name}`;
           }
 
-          // ✅ CRITICAL FIX: Remove buttons and show approval status
           await callTelegramApi("editMessageText", {
             chat_id: chatId,
             message_id: messageId,
             text: `${query.message.text}\n\n${statusText}`,
             parse_mode: "Markdown",
-            reply_markup: { inline_keyboard: [] }, // ← REMOVE ALL BUTTONS
+            reply_markup: { inline_keyboard: [] },
           });
 
           await callTelegramApi("answerCallbackQuery", {

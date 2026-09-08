@@ -16,6 +16,10 @@ const {
   rejectRegistration,
   sendLoginCredentials,
   showBranchSelection,
+  // ✅ NEW EXPORTS
+  notifyEmployeeDeletion,
+  handleAppealDeletion,
+  handleAppealReason,
 } = require("./registration");
 
 const {
@@ -110,6 +114,10 @@ module.exports = {
   rejectRegistration,
   sendLoginCredentials,
   showBranchSelection,
+  // ✅ NEW EXPORTS
+  notifyEmployeeDeletion,
+  handleAppealDeletion,
+  handleAppealReason,
 
   // Presenters
   pendingPresenterConfirmations,
