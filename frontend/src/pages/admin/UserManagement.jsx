@@ -2090,7 +2090,7 @@ export default function UserManagement({ t }) {
         </div>
       )}
 
-      {/* ─── ✅ NEW: RESET PASSWORD MODAL ─── */}
+      {/* ─── ✅ FIXED: RESET PASSWORD MODAL - FULLY VISIBLE & CENTERED ─── */}
       {resetPasswordModal.isOpen && resetPasswordModal.user && (
         <div
           style={{
@@ -2114,21 +2114,24 @@ export default function UserManagement({ t }) {
             style={{
               background: C.white,
               borderRadius: 16,
-              padding: "clamp(20px, 4vw, 32px)",
+              padding: "clamp(16px, 3vw, 28px)",
               width: "min(92%, 450px)",
               maxWidth: 450,
-              maxHeight: "85vh",
+              maxHeight: "75vh", // ← Reduced for better fit
               overflowY: "auto",
               overflowX: "hidden",
               boxShadow: "0 24px 80px rgba(0,0,0,0.3)",
-              margin: "auto",
+              margin: "auto", // ← Key: auto centering
               position: "relative",
               animation: "modalSlideUp 0.3s ease",
               display: "flex",
               flexDirection: "column",
+              scrollbarWidth: "thin",
+              scrollbarColor: `${C.border} transparent`,
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* ─── HEADER ─── */}
             <div style={{ flexShrink: 0 }}>
               <h2
                 style={{
@@ -2149,7 +2152,7 @@ export default function UserManagement({ t }) {
                 style={{
                   fontSize: "clamp(12px, 2.5vw, 13px)",
                   color: C.muted,
-                  marginBottom: 16,
+                  marginBottom: 14,
                   fontFamily: F.sans,
                 }}
               >
@@ -2158,27 +2161,28 @@ export default function UserManagement({ t }) {
               </p>
             </div>
 
+            {/* ─── BODY - SCROLLABLE ─── */}
             <div style={{ flex: 1, overflowY: "auto", paddingRight: 4 }}>
               <div
                 style={{
                   background: "#fef3c7",
                   border: "1px solid #fcd34d",
                   borderRadius: 8,
-                  padding: "12px 16px",
-                  marginBottom: 16,
+                  padding: "10px 14px",
+                  marginBottom: 14,
                 }}
               >
-                <p style={{ fontSize: 13, color: "#92400e", margin: 0 }}>
+                <p style={{ fontSize: 12, color: "#92400e", margin: 0 }}>
                   ⚠️ The user will receive the new password via Telegram if they
                   have a Telegram account linked.
                 </p>
               </div>
 
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 16 }}>
                 <label
                   style={{
                     display: "block",
-                    marginBottom: 6,
+                    marginBottom: 4,
                     fontWeight: 600,
                     fontSize: 12,
                     color: C.dark,
@@ -2190,13 +2194,14 @@ export default function UserManagement({ t }) {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 10,
+                    gap: 8,
                     background: "#f0fdf4",
                     border: `1px solid ${
                       resetPasswordModal.showPassword ? "#10b981" : "#86efac"
                     }`,
                     borderRadius: 8,
-                    padding: "8px 14px",
+                    padding: "6px 12px",
+                    flexWrap: "wrap",
                   }}
                 >
                   <span
@@ -2207,148 +2212,178 @@ export default function UserManagement({ t }) {
                       fontFamily: "monospace",
                       flex: 1,
                       letterSpacing: 0.5,
+                      minWidth: "100px",
+                      wordBreak: "break-all",
                     }}
                   >
                     {resetPasswordModal.showPassword
                       ? resetPasswordModal.newPassword
                       : "••••••••••"}
                   </span>
-                  <button
-                    onClick={() =>
-                      setResetPasswordModal((prev) => ({
-                        ...prev,
-                        showPassword: !prev.showPassword,
-                      }))
-                    }
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "#065f46",
-                      padding: "4px",
-                    }}
-                    title={
-                      resetPasswordModal.showPassword
-                        ? "Hide password"
-                        : "Show password"
-                    }
-                  >
-                    {resetPasswordModal.showPassword ? (
-                      <FiEyeOff size={18} />
-                    ) : (
-                      <FiEye size={18} />
-                    )}
-                  </button>
-                  <button
-                    onClick={copyNewPassword}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "#065f46",
-                      padding: "4px",
-                    }}
-                    title="Copy password"
-                  >
-                    <FiCopy size={18} />
-                  </button>
-                  <button
-                    onClick={() => {
-                      const newPassword = generateCleanPassword();
-                      setResetPasswordModal((prev) => ({
-                        ...prev,
-                        newPassword: newPassword,
-                      }));
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      color: "#065f46",
-                      padding: "4px",
-                    }}
-                    title="Generate new password"
-                  >
-                    <FiRefreshCw size={18} />
-                  </button>
+                  <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
+                    <button
+                      onClick={() =>
+                        setResetPasswordModal((prev) => ({
+                          ...prev,
+                          showPassword: !prev.showPassword,
+                        }))
+                      }
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#065f46",
+                        padding: "4px 6px",
+                        borderRadius: 4,
+                        transition: "all 0.2s ease",
+                      }}
+                      title={
+                        resetPasswordModal.showPassword
+                          ? "Hide password"
+                          : "Show password"
+                      }
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#d1fae5";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      {resetPasswordModal.showPassword ? (
+                        <FiEyeOff size={16} />
+                      ) : (
+                        <FiEye size={16} />
+                      )}
+                    </button>
+                    <button
+                      onClick={copyNewPassword}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#065f46",
+                        padding: "4px 6px",
+                        borderRadius: 4,
+                        transition: "all 0.2s ease",
+                      }}
+                      title="Copy password"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#d1fae5";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      <FiCopy size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newPassword = generateCleanPassword();
+                        setResetPasswordModal((prev) => ({
+                          ...prev,
+                          newPassword: newPassword,
+                        }));
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#065f46",
+                        padding: "4px 6px",
+                        borderRadius: 4,
+                        transition: "all 0.2s ease",
+                      }}
+                      title="Generate new password"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = "#d1fae5";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
+                    >
+                      <FiRefreshCw size={16} />
+                    </button>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              <div
+            {/* ─── ACTIONS - FIXED AT BOTTOM ─── */}
+            <div
+              style={{
+                display: "flex",
+                gap: "10px",
+                justifyContent: "flex-end",
+                borderTop: `1px solid ${C.border}`,
+                paddingTop: 14,
+                marginTop: 4,
+                flexShrink: 0,
+              }}
+            >
+              <button
+                onClick={closeResetPasswordModal}
                 style={{
+                  ...btn.secondary,
+                  padding: "8px 20px",
+                  fontSize: "13px",
                   display: "flex",
-                  gap: 10,
-                  justifyContent: "flex-end",
-                  borderTop: `1px solid ${C.border}`,
-                  paddingTop: 16,
-                  flexShrink: 0,
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: 10,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                  border: `1.5px solid ${C.border}`,
                 }}
+                disabled={resetPasswordModal.isLoading}
               >
-                <button
-                  onClick={closeResetPasswordModal}
-                  style={{
-                    ...btn.secondary,
-                    padding: "10px 22px",
-                    fontSize: "13px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    borderRadius: 10,
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                    border: `1.5px solid ${C.border}`,
-                  }}
-                  disabled={resetPasswordModal.isLoading}
-                >
-                  <FiX size={16} />
-                  Cancel
-                </button>
-                <button
-                  onClick={handleResetPasswordConfirm}
-                  style={{
-                    ...btn.primary,
-                    padding: "10px 26px",
-                    fontSize: "13px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    borderRadius: 10,
-                    background: "#d97706",
-                    boxShadow: "0 4px 14px rgba(217,119,6,0.4)",
-                    cursor: resetPasswordModal.isLoading
-                      ? "not-allowed"
-                      : "pointer",
-                    opacity: resetPasswordModal.isLoading ? 0.7 : 1,
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!resetPasswordModal.isLoading) {
-                      e.currentTarget.style.background = "#b45309";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!resetPasswordModal.isLoading) {
-                      e.currentTarget.style.background = "#d97706";
-                    }
-                  }}
-                  disabled={resetPasswordModal.isLoading}
-                >
-                  {resetPasswordModal.isLoading ? (
-                    <>
-                      <FiLoader
-                        size={16}
-                        style={{ animation: "spin 0.8s linear infinite" }}
-                      />
-                      Resetting...
-                    </>
-                  ) : (
-                    <>
-                      <FiCheck size={16} style={{ marginRight: 6 }} />
-                      Reset Password
-                    </>
-                  )}
-                </button>
-              </div>
+                <FiX size={16} />
+                Cancel
+              </button>
+              <button
+                onClick={handleResetPasswordConfirm}
+                style={{
+                  ...btn.primary,
+                  padding: "8px 22px",
+                  fontSize: "13px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  borderRadius: 10,
+                  background: "#d97706",
+                  boxShadow: "0 4px 14px rgba(217,119,6,0.4)",
+                  cursor: resetPasswordModal.isLoading
+                    ? "not-allowed"
+                    : "pointer",
+                  opacity: resetPasswordModal.isLoading ? 0.7 : 1,
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (!resetPasswordModal.isLoading) {
+                    e.currentTarget.style.background = "#b45309";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!resetPasswordModal.isLoading) {
+                    e.currentTarget.style.background = "#d97706";
+                  }
+                }}
+                disabled={resetPasswordModal.isLoading}
+              >
+                {resetPasswordModal.isLoading ? (
+                  <>
+                    <FiLoader
+                      size={16}
+                      style={{ animation: "spin 0.8s linear infinite" }}
+                    />
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <FiCheck size={16} />
+                    Reset Password
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
