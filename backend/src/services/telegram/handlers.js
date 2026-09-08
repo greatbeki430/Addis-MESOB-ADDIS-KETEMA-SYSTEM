@@ -19,6 +19,10 @@ const {
 const { sendMessage, callTelegramApi } = require("./utils");
 
 const TELEGRAM_ADMIN_GROUP_ID = process.env.TELEGRAM_ADMIN_GROUP_ID;
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://akmesob.vercel.app";
+
+// ─── IMPORT MODELS ──────────────────────────────────────────────
+const GoldenMondaySession = require("../../models/GoldenMondaySession");
 
 async function showMainMenu(chatId) {
   const message =
@@ -49,7 +53,7 @@ async function showMainMenu(chatId) {
         [
           {
             text: "🌐 Visit Website",
-            url: process.env.FRONTEND_URL || "https://akmesob.vercel.app",
+            url: FRONTEND_URL,
           },
         ],
       ],
@@ -82,7 +86,7 @@ async function setupPersistentMenu() {
   }
 }
 
-// ✅ ADD THIS - Handle topic suggestion
+// ─── HANDLE TOPIC SUGGESTION ──────────────────────────────────
 async function handleSuggestTopic(callbackQuery) {
   const chatId = callbackQuery.message.chat.id;
   const messageId = callbackQuery.message.message_id;
@@ -97,7 +101,7 @@ async function handleSuggestTopic(callbackQuery) {
     return;
   }
 
-  const sessionData = registrationSessions.get(chatId.toString()) || {};
+  let sessionData = registrationSessions.get(chatId.toString()) || {};
   sessionData.suggestingTopic = { sessionId, awaitingTopic: true };
   registrationSessions.set(chatId.toString(), sessionData);
 
@@ -114,7 +118,7 @@ async function handleSuggestTopic(callbackQuery) {
   });
 }
 
-// ✅ ADD THIS - Handle topic suggestion text message
+// ─── HANDLE TOPIC SUGGESTION TEXT ─────────────────────────────
 async function handleTopicSuggestionText(msg) {
   const chatId = msg.chat.id.toString();
   const text = (msg.text || "").trim();
@@ -144,14 +148,12 @@ async function handleTopicSuggestionText(msg) {
     return;
   }
 
-  // Add to suggested topics
   if (!session.suggestedTopics) {
     session.suggestedTopics = [];
   }
   session.suggestedTopics.push(text);
   await session.save();
 
-  // Clear the state
   sessionData.suggestingTopic = null;
   registrationSessions.set(chatId, sessionData);
 
@@ -164,7 +166,6 @@ async function handleTopicSuggestionText(msg) {
     { parse_mode: "Markdown" },
   );
 
-  // Notify admin
   if (TELEGRAM_ADMIN_GROUP_ID) {
     await sendMessage(
       TELEGRAM_ADMIN_GROUP_ID,
@@ -177,14 +178,18 @@ async function handleTopicSuggestionText(msg) {
   }
 }
 
+// ─── MAIN WEBHOOK HANDLER ──────────────────────────────────────
 async function handleWebhookUpdate(update) {
   try {
     console.log(`📨 Webhook update received`);
 
+    // ─── HANDLE MESSAGE ──────────────────────────────────────────
     if (update.message) {
       const msg = update.message;
       const text = msg.text || "";
       const chatId = msg.chat.id.toString();
+
+      console.log(`📩 Message from ${chatId}: "${text}"`);
 
       // ✅ Check if this is a topic suggestion
       const sessionData = registrationSessions.get(chatId);
@@ -194,7 +199,7 @@ async function handleWebhookUpdate(update) {
         sessionData.suggestingTopic.awaitingTopic
       ) {
         await handleTopicSuggestionText(msg);
-        // Don't return - allow other handlers to process if needed
+        return;
       }
 
       // Check if this is a presenter unavailable reason
@@ -202,6 +207,7 @@ async function handleWebhookUpdate(update) {
         await handlePresenterUnavailableReason(msg);
       }
 
+      // ─── COMMAND HANDLERS ────────────────────────────────────
       if (text === "/menu" || text === "⊞ Main Menu") {
         return showMainMenu(chatId);
       }
@@ -284,55 +290,63 @@ async function handleWebhookUpdate(update) {
           `📞 *Contact Admin*\n\n` +
             `For support, please:\n` +
             `• Email: admin@addismesob.example\n` +
-            `• Visit: ${process.env.FRONTEND_URL || "https://akmesob.vercel.app"}/support\n` +
+            `• Visit: ${FRONTEND_URL}/support\n` +
             `• Or ask in the office directly`,
           { parse_mode: "Markdown" },
         );
       }
 
       if (text === "/website") {
-        return sendMessage(
-          chatId,
-          `🌐 Visit our website: ${process.env.FRONTEND_URL || "https://akmesob.vercel.app"}`,
-          { parse_mode: "Markdown" },
-        );
+        return sendMessage(chatId, `🌐 Visit our website: ${FRONTEND_URL}`, {
+          parse_mode: "Markdown",
+        });
       }
 
       // Handle registration messages
       if (msg.text || msg.photo) {
         await handleRegistrationMessage(msg);
       }
-    } else if (update.callback_query) {
+    }
+
+    // ─── HANDLE CALLBACK QUERY ──────────────────────────────────
+    else if (update.callback_query) {
       const query = update.callback_query;
       const data = query.data;
       const chatId = query.message.chat.id;
       const messageId = query.message.message_id;
 
-      // Handle branch selection
+      console.log(`📨 Callback query: "${data}" from ${chatId}`);
+
+      // ✅ ANSWER THE CALLBACK IMMEDIATELY - CRITICAL!
+      try {
+        await callTelegramApi("answerCallbackQuery", {
+          callback_query_id: query.id,
+        });
+      } catch (err) {
+        console.warn("⚠️ Could not answer callback query:", err.message);
+      }
+
+      // ─── BRANCH SELECTION ────────────────────────────────────
       if (data.startsWith("branch:")) {
         await handleBranchSelection(query);
         return;
       }
 
-      // Handle presenter availability
+      // ─── PRESENTER AVAILABILITY ─────────────────────────────
       if (data.startsWith("presenter_")) {
         await handlePresenterAvailability(query);
         return;
       }
 
-      // Handle topic suggestion
+      // ─── TOPIC SUGGESTION ────────────────────────────────────
       if (data.startsWith("suggest_topic:")) {
         await handleSuggestTopic(query);
         return;
       }
 
-      // Handle menu actions
+      // ─── MENU ACTIONS ────────────────────────────────────────
       if (data === "menu") {
         await showMainMenu(chatId);
-        await callTelegramApi("answerCallbackQuery", {
-          callback_query_id: query.id,
-          text: "⊞ Opening main menu...",
-        });
         return;
       }
 
@@ -340,10 +354,6 @@ async function handleWebhookUpdate(update) {
         await handleStartRegistration({
           chat: { id: chatId },
           from: { username: "" },
-        });
-        await callTelegramApi("answerCallbackQuery", {
-          callback_query_id: query.id,
-          text: "📝 Starting registration...",
         });
         return;
       }
@@ -359,10 +369,6 @@ async function handleWebhookUpdate(update) {
             `• All employees are encouraged to participate`,
           { parse_mode: "Markdown" },
         );
-        await callTelegramApi("answerCallbackQuery", {
-          callback_query_id: query.id,
-          text: "📖 About Golden Monday",
-        });
         return;
       }
 
@@ -395,10 +401,6 @@ async function handleWebhookUpdate(update) {
             { parse_mode: "Markdown" },
           );
         }
-        await callTelegramApi("answerCallbackQuery", {
-          callback_query_id: query.id,
-          text: "👤 Status checked",
-        });
         return;
       }
 
@@ -418,10 +420,6 @@ async function handleWebhookUpdate(update) {
             `💡 The ⊞ grid icon in your input bar gives you instant access!`,
           { parse_mode: "Markdown" },
         );
-        await callTelegramApi("answerCallbackQuery", {
-          callback_query_id: query.id,
-          text: "ℹ️ Help sent",
-        });
         return;
       }
 
@@ -431,18 +429,14 @@ async function handleWebhookUpdate(update) {
           `📞 *Contact Admin*\n\n` +
             `For support, please:\n` +
             `• Email: admin@addismesob.example\n` +
-            `• Visit: ${process.env.FRONTEND_URL || "https://akmesob.vercel.app"}/support\n` +
+            `• Visit: ${FRONTEND_URL}/support\n` +
             `• Or ask in the office directly`,
           { parse_mode: "Markdown" },
         );
-        await callTelegramApi("answerCallbackQuery", {
-          callback_query_id: query.id,
-          text: "📞 Contact info sent",
-        });
         return;
       }
 
-      // Handle approve/reject
+      // ─── APPROVE/REJECT REGISTRATION ────────────────────────
       if (data.startsWith("approve:") || data.startsWith("reject:")) {
         const [action, pendingId] = data.split(":");
         const reviewer = {
@@ -453,10 +447,6 @@ async function handleWebhookUpdate(update) {
         try {
           if (action === "approve") {
             await approveRegistration(pendingId, reviewer);
-            await callTelegramApi("answerCallbackQuery", {
-              callback_query_id: query.id,
-              text: "✅ Approved!",
-            });
             await callTelegramApi("editMessageText", {
               chat_id: chatId,
               message_id: messageId,
@@ -466,10 +456,6 @@ async function handleWebhookUpdate(update) {
             });
           } else if (action === "reject") {
             await rejectRegistration(pendingId, reviewer);
-            await callTelegramApi("answerCallbackQuery", {
-              callback_query_id: query.id,
-              text: "❌ Rejected",
-            });
             await callTelegramApi("editMessageText", {
               chat_id: chatId,
               message_id: messageId,
@@ -480,15 +466,25 @@ async function handleWebhookUpdate(update) {
           }
         } catch (err) {
           console.error("❌ Error handling approval callback:", err.message);
-          await callTelegramApi("answerCallbackQuery", {
-            callback_query_id: query.id,
-            text: `Error: ${err.message}`,
-          });
         }
+        return;
+      }
+
+      // ─── PRESENTER BACK ──────────────────────────────────────
+      if (data.startsWith("presenter_back:")) {
+        const [, sessionId] = data.split(":");
+        const pending = pendingPresenterConfirmations.get(sessionId);
+        if (pending) {
+          pending.step = null;
+          pendingPresenterConfirmations.set(sessionId, pending);
+        }
+        await showMainMenu(chatId);
+        return;
       }
     }
   } catch (err) {
     console.error("❌ Error handling webhook update:", err.message);
+    console.error(err.stack);
   }
 }
 

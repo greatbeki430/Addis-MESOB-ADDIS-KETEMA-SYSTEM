@@ -8,9 +8,10 @@ const {
   otpExpiry,
   generateTempPassword,
   parseSkills,
+  sendMessage,
+  callTelegramApi,
 } = require("./utils");
 const { BRANCHES, STEPS } = require("./constants");
-const { callTelegramApi, sendMessage } = require("./utils");
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://akmesob.vercel.app";
 const TELEGRAM_ADMIN_GROUP_ID = process.env.TELEGRAM_ADMIN_GROUP_ID;
@@ -48,6 +49,8 @@ function showBranchSelection(chatId) {
 async function handleStartRegistration(msg) {
   const chatId = msg.chat.id.toString();
 
+  console.log(`📝 Starting registration for chat: ${chatId}`);
+
   const existingPending = await PendingRegistration.findOne({
     telegramChatId: chatId,
   }).sort({ createdAt: -1 });
@@ -83,7 +86,7 @@ async function handleStartRegistration(msg) {
     },
   });
 
-  sendMessage(
+  return sendMessage(
     chatId,
     "👋 Welcome to Addis MESOB employee registration!\n\n" +
       "Please provide the following information to register.\n\n" +
@@ -125,12 +128,11 @@ async function handleRegistrationMessage(msg) {
       }
       session.data.name = text;
       session.step = STEPS.EMAIL;
-      sendMessage(
+      return sendMessage(
         chatId,
         "📧 What is your email address?\n\nThis will be your login email.\n\nType /menu to cancel.",
         { parse_mode: "Markdown" },
       );
-      break;
 
     case STEPS.EMAIL: {
       const email = text.toLowerCase();
@@ -149,41 +151,37 @@ async function handleRegistrationMessage(msg) {
       }
       session.data.email = email;
       session.step = STEPS.PHONE;
-      sendMessage(
+      return sendMessage(
         chatId,
         "📱 What is your phone number?\n\nFormat: +251 9XX XXX XXX\nOr type 'skip' to skip\n\nType /menu to cancel.",
         { parse_mode: "Markdown" },
       );
-      break;
     }
 
     case STEPS.PHONE: {
       session.data.phone = text.toLowerCase() === "skip" ? "" : text;
       session.step = STEPS.BRANCH;
-      await showBranchSelection(chatId);
-      break;
+      return showBranchSelection(chatId);
     }
 
     case STEPS.DEPARTMENT: {
       session.data.department = text.toLowerCase() === "skip" ? "" : text;
       session.step = STEPS.POSITION;
-      sendMessage(
+      return sendMessage(
         chatId,
         "💼 What is your position/title?\n\nExamples: Team Leader, Developer, Manager\nOr type 'skip' to skip\n\nType /menu to cancel.",
         { parse_mode: "Markdown" },
       );
-      break;
     }
 
     case STEPS.POSITION: {
       session.data.position = text.toLowerCase() === "skip" ? "" : text;
       session.step = STEPS.SKILLS;
-      sendMessage(
+      return sendMessage(
         chatId,
         "🛠️ What are your skills?\n\nComma-separated: JavaScript, React, MongoDB\nOr type 'skip' to skip\n\nType /menu to cancel.",
         { parse_mode: "Markdown" },
       );
-      break;
     }
 
     case STEPS.SKILLS: {
@@ -193,12 +191,11 @@ async function handleRegistrationMessage(msg) {
         session.data.skills = parseSkills(text);
       }
       session.step = STEPS.PHOTO;
-      sendMessage(
+      return sendMessage(
         chatId,
         "📸 Upload your profile photo\n\nClick the attachment icon (📎) and select a photo.\nOr type 'skip' to skip\n\nType /menu to cancel.",
         { parse_mode: "Markdown" },
       );
-      break;
     }
 
     case STEPS.PHOTO: {
@@ -206,7 +203,7 @@ async function handleRegistrationMessage(msg) {
         session.data.photoUrl = "";
         await completeRegistration(chatId, session);
       } else {
-        sendMessage(
+        return sendMessage(
           chatId,
           "📸 Please upload a photo using the attachment button (📎) or type 'skip'\n\nType /menu to cancel.",
         );
@@ -235,7 +232,8 @@ async function handlePhotoUpload(msg, session, chatId) {
       return;
     }
 
-    const fileUrl = `https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.result.file_path}`;
+    const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+    const fileUrl = `https://api.telegram.org/file/bot${TELEGRAM_BOT_TOKEN}/${file.result.file_path}`;
     const response = await fetch(fileUrl);
     const buffer = await response.arrayBuffer();
     const base64Photo = Buffer.from(buffer).toString("base64");
@@ -274,7 +272,7 @@ async function completeRegistration(chatId, session) {
   session.pendingId = pending._id.toString();
   session.step = STEPS.OTP;
 
-  sendMessage(
+  return sendMessage(
     chatId,
     `✅ Registration almost complete!\n\nYour verification code is: *${otpCode}*\n\nReply with this code to confirm (valid for 10 minutes).\n\nType /menu to cancel.`,
     { parse_mode: "Markdown" },
