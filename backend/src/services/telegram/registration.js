@@ -359,8 +359,13 @@ async function approveRegistration(pendingId, reviewer) {
     throw new Error(`Cannot approve from status "${pending.status}"`);
   }
 
+  // ✅ Generate temporary password
   const tempPassword = generateTempPassword();
 
+  // ✅ DEBUG: Log the password
+  console.log(`🔑 Generated password for ${pending.email}: "${tempPassword}"`);
+
+  // ✅ Create user account with ALL fields
   const user = await createUserAccount({
     name: pending.name,
     email: pending.email,
@@ -370,7 +375,13 @@ async function approveRegistration(pendingId, reviewer) {
     telegramChatId: pending.telegramChatId,
     profilePhotoUrl: pending.profilePhotoUrl || "",
     branch: pending.branch || "Addis Ketema",
+    position: pending.position || "", // ✅ ADDED
   });
+
+  // ✅ Verify user was created correctly
+  const savedUser = await User.findById(user._id);
+  console.log(`✅ User created: ${savedUser.email}`);
+  console.log(`✅ Password hashed: ${savedUser.password.startsWith("$2b$")}`);
 
   // Add to Golden Monday roster
   const existingPresenter = await GoldenMondayPresenter.findOne({
@@ -400,18 +411,6 @@ async function approveRegistration(pendingId, reviewer) {
   pending.reviewedAt = new Date();
   await pending.save();
 
-  // ✅ UPDATE ADMIN MESSAGE - Remove buttons and show approval status
-  if (TELEGRAM_ADMIN_GROUP_ID) {
-    // Find the admin notification message and update it
-    try {
-      // We need to find the message - we'll use a separate call to update it
-      // The message ID is passed from the callback query
-      // This is handled in handlers.js with the editMessageText call
-    } catch (err) {
-      console.warn("Could not update admin message:", err.message);
-    }
-  }
-
   // Send login credentials to the user
   await sendLoginCredentials(pending.telegramChatId, {
     email: pending.email,
@@ -438,9 +437,6 @@ async function rejectRegistration(pendingId, reviewer, reason) {
   pending.reviewedAt = new Date();
   await pending.save();
 
-  // ✅ UPDATE ADMIN MESSAGE - Remove buttons and show rejection status
-  // This is handled in handlers.js with the editMessageText call
-
   sendMessage(
     pending.telegramChatId,
     "❌ Your registration could not be approved.\nPlease contact HR/admin for details.",
@@ -453,6 +449,9 @@ async function rejectRegistration(pendingId, reviewer, reason) {
 async function sendLoginCredentials(chatId, userData) {
   const { email, password, name, department, position, phone, branch } =
     userData;
+
+  // ✅ DEBUG: Log the password being sent
+  console.log(`📤 Sending credentials to ${email}: password = "${password}"`);
 
   const message =
     `✅ *Account Approved!* 🎉\n\n` +
