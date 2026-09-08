@@ -17,6 +17,14 @@ const W_FREQUENCY = 30;
 const W_SKIPPED = 15;
 const NEVER_PRESENTED_DAYS = 100000;
 
+// ─── ✅ ADD THIS ──────────────────────────────────────────────────
+// Determine if user can see salary information
+// Only admin/superadmin may read or write salary.
+const canSeeSalary = (user) =>
+  user &&
+  (["admin", "superadmin"].includes(user.role) ||
+    user.isGoldenMondayAdmin === true);
+
 // ============================================================
 // EMPLOYEE REGISTRATION
 // ============================================================
@@ -462,4 +470,7 @@ module.exports = {
 
   // Telegram
   postToTelegram,
+
+  // ✅ ADD THIS
+  canSeeSalary,
 };
