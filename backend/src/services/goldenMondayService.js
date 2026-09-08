@@ -471,6 +471,5 @@ module.exports = {
   // Telegram
   postToTelegram,
 
-  // ✅ ADD THIS
   canSeeSalary,
 };
