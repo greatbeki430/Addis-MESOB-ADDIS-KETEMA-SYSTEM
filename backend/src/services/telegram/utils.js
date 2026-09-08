@@ -12,8 +12,16 @@ function otpExpiry(minutes = 10) {
   return new Date(Date.now() + minutes * 60 * 1000);
 }
 
+// ✅ SIMPLIFIED: Generate a clean alphanumeric password
 function generateTempPassword() {
-  return crypto.randomBytes(8).toString("base64url").slice(0, 10);
+  // Use only alphanumeric characters - no special chars
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let password = "";
+  for (let i = 0; i < 10; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
 }
 
 function parseSkills(input) {
@@ -41,7 +49,7 @@ function formatDate(date) {
   });
 }
 
-// ✅ FIXED: Unified callTelegramApi function
+// ✅ Unified callTelegramApi function
 async function callTelegramApi(method, params = {}) {
   if (!TELEGRAM_BOT_TOKEN) {
     console.error("❌ TELEGRAM_BOT_TOKEN not configured");
@@ -70,7 +78,7 @@ async function callTelegramApi(method, params = {}) {
   }
 }
 
-// ✅ NEW: Send message function
+// ✅ Send message function
 async function sendMessage(chatId, text, options = {}) {
   if (!chatId) {
     console.error("❌ sendMessage: chatId is required");
@@ -87,7 +95,7 @@ async function sendMessage(chatId, text, options = {}) {
   return callTelegramApi("sendMessage", params);
 }
 
-// ✅ NEW: Set webhook
+// ✅ Set webhook
 async function setWebhook(webhookUrl) {
   if (!TELEGRAM_BOT_TOKEN) {
     console.error("❌ TELEGRAM_BOT_TOKEN not configured");
@@ -113,7 +121,7 @@ async function setWebhook(webhookUrl) {
   }
 }
 
-// ✅ NEW: Get webhook info
+// ✅ Get webhook info
 async function getWebhookInfo() {
   if (!TELEGRAM_BOT_TOKEN) {
     console.error("❌ TELEGRAM_BOT_TOKEN not configured");
@@ -129,7 +137,7 @@ async function getWebhookInfo() {
   }
 }
 
-// ✅ NEW: Test connection
+// ✅ Test connection
 async function testTelegramConnection() {
   if (!TELEGRAM_BOT_TOKEN) {
     console.warn("⚠️ TELEGRAM_BOT_TOKEN not configured");
@@ -147,6 +155,26 @@ async function testTelegramConnection() {
   }
 }
 
+// ✅ Send test message
+async function sendTestMessage() {
+  const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHANNEL_ID) {
+    console.warn("⚠️ Telegram not configured");
+    return false;
+  }
+  try {
+    const result = await sendMessage(
+      TELEGRAM_CHANNEL_ID,
+      "🔧 Test message from Addis MESOB Bot!\n\nIf you see this, the bot is working correctly!",
+      { parse_mode: "Markdown" },
+    );
+    return result && result.ok;
+  } catch (error) {
+    console.error("❌ Test message error:", error.message);
+    return false;
+  }
+}
+
 module.exports = {
   generateOtp,
   otpExpiry,
@@ -159,6 +187,7 @@ module.exports = {
   setWebhook,
   getWebhookInfo,
   testTelegramConnection,
+  sendTestMessage,
   TELEGRAM_API,
   TELEGRAM_BOT_TOKEN,
 };

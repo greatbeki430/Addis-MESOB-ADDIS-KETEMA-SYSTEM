@@ -6,6 +6,7 @@ const Team = require("../models/Team");
 
 /**
  * Core account-creation logic
+ * ✅ FIXED: Include ALL fields including position
  */
 const createUserAccount = async ({
   name,
@@ -20,6 +21,7 @@ const createUserAccount = async ({
   position,
   team,
 }) => {
+  // Check if user exists
   const userExists = await User.findOne({ email });
   if (userExists) {
     const err = new Error("User already exists");
@@ -27,14 +29,22 @@ const createUserAccount = async ({
     throw err;
   }
 
+  // Ensure password is provided
+  if (!password) {
+    const err = new Error("Password is required");
+    err.code = "PASSWORD_REQUIRED";
+    throw err;
+  }
+
+  // ✅ FIX: Include ALL fields in User.create()
   const user = await User.create({
     name,
     email,
-    password,
+    password, // ← This will be hashed by pre('save') hook
     role: role || "employee",
-    phone,
+    phone: phone || "",
     branch: branch || "Addis Ketema",
-    position: position || "",
+    position: position || "", // ✅ ADDED position
     team: team || null,
     ...(telegramChatId ? { telegramChatId } : {}),
     ...(profilePhotoUrl ? { profilePhotoUrl } : {}),
@@ -47,6 +57,10 @@ const createUserAccount = async ({
     });
   }
 
+  // ✅ DEBUG: Log the created user
+  console.log(`✅ User created: ${user.email}`);
+  console.log(`✅ Password hash: ${user.password.substring(0, 20)}...`);
+
   return user;
 };
 
@@ -55,12 +69,6 @@ const registerUser = async (req, res) => {
     const { name, email, password, role, phone, branch, position, team } =
       req.body;
 
-    // ⚠️ This route is now restricted to admin/superadmin callers (see
-    // authRoutes.js), but a plain "admin" should still not be able to
-    // mint another admin or a superadmin — only a superadmin can. Same
-    // rule already enforced on PUT /auth/users/:id; applying it here too
-    // now that this is reachable by an authenticated admin instead of
-    // being wide open to anyone.
     const RANK = { employee: 1, leader: 2, admin: 3, superadmin: 4 };
     if (req.user.role !== "superadmin" && role && RANK[role] >= RANK.admin) {
       return res.status(403).json({
@@ -94,6 +102,10 @@ const registerUser = async (req, res) => {
     if (error.code === "USER_EXISTS") {
       return res.status(400).json({ message: "User already exists" });
     }
+    if (error.code === "PASSWORD_REQUIRED") {
+      return res.status(400).json({ message: "Password is required" });
+    }
+    console.error("❌ Register error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -101,12 +113,28 @@ const registerUser = async (req, res) => {
 const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    // ✅ DEBUG: Log login attempt
+    console.log(`🔐 Login attempt: ${email}`);
+
     const user = await User.findOne({ email }).populate(
       "team",
       "name department",
     );
 
-    if (user && (await bcrypt.compare(password, user.password))) {
+    if (!user) {
+      console.log(`❌ User not found: ${email}`);
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    // ✅ DEBUG: Check password
+    console.log(`🔐 Stored hash: ${user.password.substring(0, 20)}...`);
+    console.log(`🔐 Password length: ${password.length}`);
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    console.log(`🔐 Password match: ${isMatch}`);
+
+    if (isMatch) {
       res.json({
         _id: user._id,
         name: user.name,
@@ -126,9 +154,11 @@ const loginUser = async (req, res) => {
         token: generateToken(user._id),
       });
     } else {
+      console.log(`❌ Invalid password for: ${email}`);
       res.status(401).json({ message: "Invalid email or password" });
     }
   } catch (error) {
+    console.error("❌ Login error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -158,7 +188,6 @@ const getMe = async (req, res) => {
   });
 };
 
-// ✅ Add this for completeness (though route is in authRoutes.js)
 const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -207,7 +236,6 @@ const resetUserPassword = async (req, res) => {
   try {
     const { userId, newPassword } = req.body;
 
-    // Only admins can reset passwords
     if (!["admin", "superadmin"].includes(req.user.role)) {
       return res.status(403).json({ message: "Not authorized" });
     }
@@ -223,16 +251,8 @@ const resetUserPassword = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Hash the new password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    // Update using findByIdAndUpdate to ensure it works
-    await User.findByIdAndUpdate(
-      userId,
-      { $set: { password: hashedPassword } },
-      { new: true },
-    );
+    user.password = newPassword;
+    await user.save();
 
     console.log(`🔑 Password reset for: ${user.email} by ${req.user.email}`);
 
@@ -310,14 +330,8 @@ const resetPasswordByEmail = async (req, res) => {
         .json({ message: `User with email "${email}" not found` });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(newPassword, salt);
-
-    await User.findByIdAndUpdate(
-      user._id,
-      { $set: { password: hashedPassword } },
-      { new: true },
-    );
+    user.password = newPassword;
+    await user.save();
 
     console.log(`🔑 Password reset for: ${user.email} by ${req.user.email}`);
 
