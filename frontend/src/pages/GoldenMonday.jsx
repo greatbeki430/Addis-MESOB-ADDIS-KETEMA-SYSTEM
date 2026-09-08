@@ -1898,53 +1898,54 @@ export default function GoldenMonday() {
           animation: fadeIn 0.4s ease forwards;
         }
 
-        /* ── Mobile responsive button labels ── */
-@media (max-width: 768px) {
-  .btn-label {
-    display: none !important;
-  }
-  .gm-auto-announce-btn,
-  .gm-reminder-btn,
-  .gm-refresh-btn {
-    padding: 8px 10px !important;
-    min-width: 38px !important;
-    min-height: 38px !important;
-    border-radius: 50% !important;
-    width: 38px !important;
-    height: 38px !important;
-  }
-  .gm-auto-announce-btn svg,
-  .gm-reminder-btn svg,
-  .gm-refresh-btn svg {
-    margin: 0 !important;
-    width: 16px !important;
-    height: 16px !important;
-  }
-  .gm-admin-actions {
-    gap: 6px !important;
-  }
-}
+        /* ── ✅ ADD THIS SECTION HERE ── */
+        /* Mobile responsive button labels */
+        @media (max-width: 768px) {
+          .btn-label {
+            display: none !important;
+          }
+          .gm-auto-announce-btn,
+          .gm-reminder-btn,
+          .gm-refresh-btn {
+            padding: 8px 10px !important;
+            min-width: 38px !important;
+            min-height: 38px !important;
+            border-radius: 50% !important;
+            width: 38px !important;
+            height: 38px !important;
+          }
+          .gm-auto-announce-btn svg,
+          .gm-reminder-btn svg,
+          .gm-refresh-btn svg {
+            margin: 0 !important;
+            width: 16px !important;
+            height: 16px !important;
+          }
+          .gm-admin-actions {
+            gap: 6px !important;
+          }
+        }
 
-@media (max-width: 480px) {
-  .gm-auto-announce-btn,
-  .gm-reminder-btn,
-  .gm-refresh-btn {
-    padding: 6px 8px !important;
-    min-width: 34px !important;
-    min-height: 34px !important;
-    width: 34px !important;
-    height: 34px !important;
-  }
-  .gm-auto-announce-btn svg,
-  .gm-reminder-btn svg,
-  .gm-refresh-btn svg {
-    width: 14px !important;
-    height: 14px !important;
-  }
-  .gm-admin-actions {
-    gap: 4px !important;
-  }
-}
+        @media (max-width: 480px) {
+          .gm-auto-announce-btn,
+          .gm-reminder-btn,
+          .gm-refresh-btn {
+            padding: 6px 8px !important;
+            min-width: 34px !important;
+            min-height: 34px !important;
+            width: 34px !important;
+            height: 34px !important;
+          }
+          .gm-auto-announce-btn svg,
+          .gm-reminder-btn svg,
+          .gm-refresh-btn svg {
+            width: 14px !important;
+            height: 14px !important;
+          }
+          .gm-admin-actions {
+            gap: 4px !important;
+          }
+        }
       `}</style>
 
       {/* ── HERO SECTION ── */}
@@ -2134,15 +2135,19 @@ export default function GoldenMonday() {
                       style={{
                         display: "inline-flex",
                         alignItems: "center",
-                        gap: 6,
+                        justifyContent: "center",
+                        gap: "6px",
                         background: "rgba(255,255,255,0.08)",
                         border: `1px solid rgba(255,255,255,0.15)`,
-                        borderRadius: 8,
-                        padding: "6px 16px",
+                        borderRadius: "8px",
+                        padding: "8px 14px",
                         color: "#fff",
-                        fontSize: 12,
+                        fontSize: "clamp(11px, 1.8vw, 13px)",
                         cursor: "pointer",
                         transition: "all 0.3s ease",
+                        whiteSpace: "nowrap",
+                        minHeight: "clamp(32px, 4.5vh, 40px)",
+                        flexShrink: 0,
                       }}
                     >
                       <FiRefreshCw
@@ -2153,9 +2158,11 @@ export default function GoldenMonday() {
                             : "none",
                         }}
                       />
-                      {refreshing
-                        ? t.refreshing || "Refreshing..."
-                        : t.refresh || "Refresh"}
+                      <span className="btn-label">
+                        {refreshing
+                          ? t.refreshing || "..."
+                          : t.refresh || "Refresh"}
+                      </span>
                     </button>
                   </div>
                 )}
