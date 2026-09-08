@@ -78,20 +78,6 @@ const getFileSize = (bytes) => {
   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
 };
 
-const handleRename = (item, onRename) => {
-  const newTitle = window.prompt("Enter new folder name:", item.title);
-  if (newTitle && newTitle.trim()) {
-    onRename?.(item._id, newTitle.trim());
-  }
-};
-
-const handleDeleteFolder = (item, onDelete) => {
-  const msg = `Delete folder "${item.title}" and all its contents?\n\nThis will permanently delete all photos in this folder and cannot be undone.`;
-  if (window.confirm(msg)) {
-    onDelete?.(item._id);
-  }
-};
-
 export default function GalleryItem({
   item,
   viewMode,
@@ -99,6 +85,8 @@ export default function GalleryItem({
   onDelete,
   onRename,
   onClick,
+  onOpenRenameModal, // ← NEW: Modal handler
+  onOpenDeleteModal, // ← NEW: Modal handler
 }) {
   const [isHovering, setIsHovering] = useState(false);
 
@@ -127,14 +115,34 @@ export default function GalleryItem({
     }
   };
 
+  // ✅ UPDATED: Use modal instead of prompt
   const handleRenameClick = (e) => {
     e.stopPropagation();
-    handleRename(item, onRename);
+    // Call the modal handler if available, fallback to onRename
+    if (onOpenRenameModal) {
+      onOpenRenameModal(item);
+    } else if (onRename) {
+      // Fallback to old behavior if modal handler not available
+      const newTitle = window.prompt("Enter new folder name:", item.title);
+      if (newTitle && newTitle.trim()) {
+        onRename(item._id, newTitle.trim());
+      }
+    }
   };
 
+  // ✅ UPDATED: Use modal instead of confirm
   const handleDeleteFolderClick = (e) => {
     e.stopPropagation();
-    handleDeleteFolder(item, onDelete);
+    // Call the modal handler if available, fallback to onDelete
+    if (onOpenDeleteModal) {
+      onOpenDeleteModal(item);
+    } else if (onDelete) {
+      // Fallback to old behavior if modal handler not available
+      const msg = `Delete folder "${item.title}" and all its contents?\n\nThis will permanently delete all photos in this folder and cannot be undone.`;
+      if (window.confirm(msg)) {
+        onDelete(item._id);
+      }
+    }
   };
 
   // ─── GRID VIEW ────────────────────────────────────────────────────
@@ -270,7 +278,8 @@ export default function GalleryItem({
                   }}
                 >
                   <button
-                    onClick={handleRenameClick}
+                    type="button"
+                    onClick={handleRenameClick} // ← UPDATED
                     style={{
                       width: 28,
                       height: 28,
@@ -295,12 +304,12 @@ export default function GalleryItem({
                       e.currentTarget.style.transform = "scale(1)";
                     }}
                     title="Rename folder"
-                    type="button"
                   >
                     <FiEdit2 size={12} />
                   </button>
                   <button
-                    onClick={handleDeleteFolderClick}
+                    type="button"
+                    onClick={handleDeleteFolderClick} // ← UPDATED
                     style={{
                       width: 28,
                       height: 28,
@@ -325,7 +334,6 @@ export default function GalleryItem({
                       e.currentTarget.style.transform = "scale(1)";
                     }}
                     title="Delete folder"
-                    type="button"
                   >
                     <FiTrash2 size={12} />
                   </button>
@@ -476,6 +484,7 @@ export default function GalleryItem({
               {/* Delete button - Admin only */}
               {isAdmin && (
                 <button
+                  type="button"
                   onClick={handleDeleteClick}
                   style={{
                     position: "absolute",
@@ -505,7 +514,6 @@ export default function GalleryItem({
                     e.currentTarget.style.background = "rgba(239,68,68,0.9)";
                     e.currentTarget.style.transform = "scale(1)";
                   }}
-                  type="button"
                 >
                   <FiTrash2 size={14} />
                 </button>
@@ -679,7 +687,8 @@ export default function GalleryItem({
           onClick={(e) => e.stopPropagation()}
         >
           <button
-            onClick={handleRenameClick}
+            type="button"
+            onClick={handleRenameClick} // ← UPDATED
             style={{
               width: 32,
               height: 32,
@@ -694,12 +703,12 @@ export default function GalleryItem({
               transition: "all 0.2s ease",
             }}
             title="Rename folder"
-            type="button"
           >
             <FiEdit2 size={14} />
           </button>
           <button
-            onClick={handleDeleteFolderClick}
+            type="button"
+            onClick={handleDeleteFolderClick} // ← UPDATED
             style={{
               width: 32,
               height: 32,
@@ -714,7 +723,6 @@ export default function GalleryItem({
               transition: "all 0.2s ease",
             }}
             title="Delete folder"
-            type="button"
           >
             <FiTrash2 size={14} />
           </button>
@@ -826,6 +834,7 @@ export default function GalleryItem({
       <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
         {isFile && (
           <button
+            type="button"
             onClick={handleViewClick}
             style={{
               width: 32,
@@ -851,7 +860,6 @@ export default function GalleryItem({
                 : "transparent";
               e.currentTarget.style.color = C.muted;
             }}
-            type="button"
           >
             <FiEye size={16} />
           </button>
@@ -859,6 +867,7 @@ export default function GalleryItem({
 
         {isAdmin && isFile && (
           <button
+            type="button"
             onClick={handleDeleteClick}
             style={{
               width: 32,
@@ -884,7 +893,6 @@ export default function GalleryItem({
                 : "transparent";
               e.currentTarget.style.transform = "scale(1)";
             }}
-            type="button"
           >
             <FiTrash2 size={16} />
           </button>
