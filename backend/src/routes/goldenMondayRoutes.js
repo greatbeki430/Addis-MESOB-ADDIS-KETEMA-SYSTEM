@@ -1600,117 +1600,6 @@ router.get(
 );
 
 // ════════════════════════════════════════════════════════════════
-// ✅ NOTIFICATIONS ROUTES
-// ════════════════════════════════════════════════════════════════
-
-// GET /api/golden-monday/notifications
-router.get("/notifications", protect, anyRole, async (req, res) => {
-  try {
-    const { page = 1, limit = 20 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-
-    // Try to get notifications from database
-    let notifications = [];
-    let total = 0;
-
-    try {
-      // If Notification model exists
-      const query = { userId: req.user._id };
-      const [items, count] = await Promise.all([
-        GoldenMondayNotification.find(query)
-          .sort({ createdAt: -1 })
-          .skip(skip)
-          .limit(parseInt(limit))
-          .lean(),
-        GoldenMondayNotification.countDocuments(query),
-      ]);
-      notifications = items;
-      total = count;
-    } catch (modelError) {
-      // If model doesn't exist yet, return empty array
-      console.warn("⚠️ Notification model not available yet");
-    }
-
-    res.json({
-      success: true,
-      data: notifications,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.max(1, Math.ceil(total / parseInt(limit))),
-      },
-    });
-  } catch (error) {
-    console.error("❌ [GET NOTIFICATIONS] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// PUT /api/golden-monday/notifications/:id/read
-router.put("/notifications/:id/read", protect, anyRole, async (req, res) => {
-  try {
-    try {
-      const notification = await GoldenMondayNotification.findOne({
-        _id: req.params.id,
-        userId: req.user._id,
-      });
-      if (notification) {
-        notification.isRead = true;
-        notification.readAt = new Date();
-        await notification.save();
-      }
-    } catch (modelError) {
-      // Model might not exist yet
-      console.warn("⚠️ Notification model not available yet");
-    }
-
-    res.json({ success: true, message: "Notification marked as read" });
-  } catch (error) {
-    console.error("❌ [MARK NOTIFICATION READ] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// PUT /api/golden-monday/notifications/read-all
-router.put("/notifications/read-all", protect, anyRole, async (req, res) => {
-  try {
-    try {
-      await GoldenMondayNotification.updateMany(
-        { userId: req.user._id, isRead: false },
-        { isRead: true, readAt: new Date() },
-      );
-    } catch (modelError) {
-      console.warn("⚠️ Notification model not available yet");
-    }
-
-    res.json({ success: true, message: "All notifications marked as read" });
-  } catch (error) {
-    console.error("❌ [MARK ALL READ] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// PUT /api/golden-monday/notifications/:id/dismiss
-router.put("/notifications/:id/dismiss", protect, anyRole, async (req, res) => {
-  try {
-    try {
-      await GoldenMondayNotification.findOneAndDelete({
-        _id: req.params.id,
-        userId: req.user._id,
-      });
-    } catch (modelError) {
-      console.warn("⚠️ Notification model not available yet");
-    }
-
-    res.json({ success: true, message: "Notification dismissed" });
-  } catch (error) {
-    console.error("❌ [DISMISS NOTIFICATION] Error:", error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ════════════════════════════════════════════════════════════════
 // 📚 RESOURCES ROUTES
 //
 // ⚠️ REMOVED: this file used to define its own inline
@@ -2359,95 +2248,131 @@ router.get(
 );
 
 // ════════════════════════════════════════════════════════════════
-// ✅ QR CHECK-IN - COMPLETE FIXED VERSION
+// ✅ QR CHECK-IN - COMPLETE (Admin generates + Admin scans + Employee scans)
 // ════════════════════════════════════════════════════════════════
+//
+// ⚠️ ORDER MATTERS: Express matches routes top-to-bottom. The
+// "/qr-checkin/my-qr" route MUST be registered BEFORE any
+// "/qr-checkin/:sessionId" route, otherwise the wildcard :sessionId
+// will swallow "my-qr" and try to look up a session with that ID.
 
-// ─── 1. GENERATE QR CODE (GET) ──────────────────────────────
-// GET /api/golden-monday/qr-checkin/:sessionId
-// This generates a QR code image for the session
-router.get("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
+// ─── 0. GET EMPLOYEE'S OWN QR FOR ADMIN TO SCAN (GET) ────────
+// GET /api/golden-monday/qr-checkin/my-qr
+// Any logged-in user gets a QR encoding THEIR OWN identity.
+// The admin scanning it then calls the admin-scan endpoint below.
+router.get("/qr-checkin/my-qr", protect, anyRole, async (req, res) => {
   try {
-    const { sessionId } = req.params;
     const QRCode = require("qrcode");
 
-    const session = await GoldenMondaySession.findById(sessionId);
-    if (!session) {
-      return res.status(404).json({ error: "Session not found" });
-    }
-
-    // Check if session is active (today or future)
-    const now = new Date();
-    const sessionDate = new Date(session.date);
-    const isActive =
-      sessionDate.toDateString() === now.toDateString() || sessionDate > now;
-
-    if (!isActive && session.status !== "scheduled") {
-      return res.status(400).json({
-        error: "This session is not active for check-in",
-      });
-    }
-
-    // Generate QR code data
-    const qrData = JSON.stringify({
-      sessionId: session._id,
-      userId: req.user._id,
-      timestamp: Date.now(),
-      type: "golden-monday-checkin",
-      sessionTitle: session.title || "Golden Monday Session",
+    const qrPayload = JSON.stringify({
+      type: "gm-employee",
+      userId: req.user._id.toString(),
+      name: req.user.name,
+      email: req.user.email,
+      department: req.user.department || "",
     });
 
-    // Generate QR code as data URL
-    const qrCode = await QRCode.toDataURL(qrData, {
+    const qrCode = await QRCode.toDataURL(qrPayload, {
       errorCorrectionLevel: "H",
       margin: 2,
-      width: 300,
-      color: {
-        dark: "#1a3aad",
-        light: "#ffffff",
-      },
+      width: 340,
+      color: { dark: "#0d1a5e", light: "#ffffff" },
     });
 
     res.json({
       success: true,
       qrCode,
-      session: {
-        id: session._id,
-        title: session.title,
-        date: session.date,
+      employee: {
+        _id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        department: req.user.department || "",
+        profilePhotoUrl: req.user.profilePhotoUrl || "",
       },
     });
   } catch (error) {
-    console.error("❌ [QR GENERATE] Error:", error);
-    res.status(500).json({
-      error: error.message || "Failed to generate QR code",
-    });
+    console.error("❌ [MY QR] Error:", error);
+    res
+      .status(500)
+      .json({ error: error.message || "Failed to generate personal QR" });
   }
 });
 
-// ─── 2. RECORD QR CHECK-IN (POST) ────────────────────────────
+// ─── 1. ADMIN GENERATES SESSION QR (GET) ─────────────────────
+// GET /api/golden-monday/qr-checkin/:sessionId
+// Returns a QR code image. When an EMPLOYEE scans it, their own
+// JWT identifies them — the QR only carries the sessionId.
+router.get(
+  "/qr-checkin/:sessionId",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const QRCode = require("qrcode");
+
+      const session = await GoldenMondaySession.findById(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      const qrPayload = JSON.stringify({
+        type: "gm-session-checkin",
+        sessionId: session._id.toString(),
+        title: session.title || "Golden Monday Session",
+        date: session.date,
+        generatedAt: Date.now(),
+      });
+
+      const qrCode = await QRCode.toDataURL(qrPayload, {
+        errorCorrectionLevel: "H",
+        margin: 2,
+        width: 340,
+        color: { dark: "#0d1a5e", light: "#ffffff" },
+      });
+
+      res.json({
+        success: true,
+        qrCode,
+        session: {
+          id: session._id,
+          title: session.title,
+          date: session.date,
+        },
+      });
+    } catch (error) {
+      console.error("❌ [QR GENERATE] Error:", error);
+      res.status(500).json({ error: error.message || "Failed to generate QR" });
+    }
+  },
+);
+
+// ─── 2. EMPLOYEE SCANS ADMIN'S SESSION QR (POST) ─────────────
 // POST /api/golden-monday/qr-checkin/:sessionId
-// This records the attendance after QR scan
+// The employee is identified by their own JWT. Body may include
+// `location` (optional free-text). Prevents double-check-in.
 router.post("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const { location } = req.body;
+    const { location } = req.body || {};
 
     const session = await GoldenMondaySession.findById(sessionId);
     if (!session) {
       return res.status(404).json({ error: "Session not found" });
     }
 
-    // Check if already checked in
     const existing = await GoldenMondayAttendance.findOne({
       session: sessionId,
       user: req.user._id,
     });
-
     if (existing && existing.attended) {
-      return res.status(400).json({ error: "You have already checked in" });
+      return res.status(400).json({
+        error: "You have already checked in",
+        alreadyCheckedIn: true,
+        checkedInAt: existing.checkedInAt,
+      });
     }
 
-    // Create or update attendance
     const attendance = await GoldenMondayAttendance.findOneAndUpdate(
       { session: sessionId, user: req.user._id },
       {
@@ -2458,16 +2383,15 @@ router.post("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
         department: req.user.department || "",
         attended: true,
         checkedInAt: new Date(),
-        location: location || "",
         recordedBy: req.user._id,
         recordedByName: req.user.name,
       },
-      { upsert: true, new: true },
+      { upsert: true, new: true, setDefaultsOnInsert: true },
     );
 
-    // Update session attendees
+    // Mirror into session.attendees for legacy reporting
     const existingAttendee = session.attendees.find(
-      (a) => a.user.toString() === req.user._id.toString(),
+      (a) => a.user && a.user.toString() === req.user._id.toString(),
     );
     if (existingAttendee) {
       existingAttendee.attended = true;
@@ -2481,10 +2405,15 @@ router.post("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
     }
     await session.save();
 
+    console.log(
+      `✅ [QR CHECK-IN] ${req.user.name} (${req.user.email}) checked in to session ${sessionId}${location ? ` @ ${location}` : ""}`,
+    );
+
     res.json({
       success: true,
-      message: "QR Check-in successful!",
+      message: "QR check-in successful!",
       attendance,
+      session: { id: session._id, title: session.title },
     });
   } catch (error) {
     console.error("❌ [QR CHECK-IN] Error:", error);
@@ -2492,10 +2421,114 @@ router.post("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
   }
 });
 
+// ─── 3. ADMIN SCANS EMPLOYEE'S PERSONAL QR (POST) ────────────
+// POST /api/golden-monday/qr-checkin/admin-scan/:sessionId
+// Body: { employeeQrPayload }  (the raw JSON string decoded from
+// the employee's QR). Only a GM Admin or above can call this.
+router.post(
+  "/qr-checkin/admin-scan/:sessionId",
+  protect,
+  goldenMondayAdminOrAbove,
+  async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { employeeQrPayload } = req.body || {};
+
+      if (!employeeQrPayload) {
+        return res.status(400).json({ error: "employeeQrPayload is required" });
+      }
+
+      // Parse the QR payload — expected shape:
+      // { type: "gm-employee", userId: "<mongo id>", email: "<email>", name: "<name>" }
+      let parsed;
+      try {
+        parsed =
+          typeof employeeQrPayload === "string"
+            ? JSON.parse(employeeQrPayload)
+            : employeeQrPayload;
+      } catch {
+        return res.status(400).json({
+          error: "Invalid QR code format",
+          hint: "Expected JSON with type='gm-employee' and userId field",
+        });
+      }
+
+      if (parsed.type !== "gm-employee" || !parsed.userId) {
+        return res.status(400).json({
+          error: "This QR code is not an employee check-in code",
+        });
+      }
+
+      // Verify the employee actually exists
+      const employee = await User.findById(parsed.userId);
+      if (!employee) {
+        return res.status(404).json({ error: "Employee in QR code not found" });
+      }
+
+      const session = await GoldenMondaySession.findById(sessionId);
+      if (!session) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+
+      // Upsert attendance
+      const attendance = await GoldenMondayAttendance.findOneAndUpdate(
+        { session: sessionId, user: employee._id },
+        {
+          session: sessionId,
+          user: employee._id,
+          name: employee.name,
+          email: employee.email,
+          department: employee.department || "",
+          attended: true,
+          checkedInAt: new Date(),
+          recordedBy: req.user._id,
+          recordedByName: req.user.name,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+
+      // Mirror into session.attendees
+      const existingAttendee = session.attendees.find(
+        (a) => a.user && a.user.toString() === employee._id.toString(),
+      );
+      if (existingAttendee) {
+        existingAttendee.attended = true;
+      } else {
+        session.attendees.push({
+          user: employee._id,
+          name: employee.name,
+          department: employee.department || "",
+          attended: true,
+        });
+      }
+      await session.save();
+
+      console.log(
+        `✅ [ADMIN SCAN] ${req.user.name} checked in ${employee.name} (${employee.email}) to session ${sessionId}`,
+      );
+
+      res.json({
+        success: true,
+        message: `${employee.name} checked in successfully`,
+        employee: {
+          _id: employee._id,
+          name: employee.name,
+          email: employee.email,
+          department: employee.department || "",
+          profilePhotoUrl: employee.profilePhotoUrl || "",
+        },
+        attendance,
+      });
+    } catch (error) {
+      console.error("❌ [ADMIN SCAN] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  },
+);
+
 // GET /api/golden-monday/notifications
 router.get("/notifications", protect, anyRole, async (req, res) => {
   try {
-    const GoldenMondayNotification = require("../models/GoldenMondayNotification");
     const { page = 1, limit = 20 } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -2535,7 +2568,6 @@ router.get("/notifications", protect, anyRole, async (req, res) => {
 // PUT /api/golden-monday/notifications/:id/read
 router.put("/notifications/:id/read", protect, anyRole, async (req, res) => {
   try {
-    const GoldenMondayNotification = require("../models/GoldenMondayNotification");
     const notification = await GoldenMondayNotification.findOne({
       _id: req.params.id,
       user: req.user._id,
@@ -2561,7 +2593,6 @@ router.put("/notifications/:id/read", protect, anyRole, async (req, res) => {
 // PUT /api/golden-monday/notifications/read-all
 router.put("/notifications/read-all", protect, anyRole, async (req, res) => {
   try {
-    const GoldenMondayNotification = require("../models/GoldenMondayNotification");
     await GoldenMondayNotification.updateMany(
       { user: req.user._id, isRead: false },
       { isRead: true, readAt: new Date() },
@@ -2573,28 +2604,32 @@ router.put("/notifications/read-all", protect, anyRole, async (req, res) => {
   }
 });
 
-// PUT /api/golden-monday/notifications/:id/dismiss
-router.put("/notifications/:id/dismiss", protect, anyRole, async (req, res) => {
-  try {
-    const GoldenMondayNotification = require("../models/GoldenMondayNotification");
-    const notification = await GoldenMondayNotification.findOne({
-      _id: req.params.id,
-      user: req.user._id,
-    });
+// DELETE /api/golden-monday/notifications/:id/dismiss
+router.delete(
+  "/notifications/:id/dismiss",
+  protect,
+  anyRole,
+  async (req, res) => {
+    try {
+      const notification = await GoldenMondayNotification.findOne({
+        _id: req.params.id,
+        user: req.user._id,
+      });
 
-    if (!notification) {
-      return res
-        .status(404)
-        .json({ success: false, error: "Notification not found" });
+      if (!notification) {
+        return res
+          .status(404)
+          .json({ success: false, error: "Notification not found" });
+      }
+
+      notification.isDismissed = true;
+      await notification.save();
+
+      res.json({ success: true, notification });
+    } catch (error) {
+      console.error("❌ Error dismissing notification:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
-
-    notification.isDismissed = true;
-    await notification.save();
-
-    res.json({ success: true, notification });
-  } catch (error) {
-    console.error("❌ Error dismissing notification:", error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+  },
+);
 module.exports = router;
