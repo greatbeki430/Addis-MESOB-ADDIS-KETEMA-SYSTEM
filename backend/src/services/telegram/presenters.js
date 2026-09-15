@@ -14,14 +14,9 @@ const pendingPresenterConfirmations = new Map();
 // ─── GENERATE ANNOUNCEMENT IMAGE ────────────────────────────────
 async function generateAnnouncementImage(presenter, session) {
   try {
-    // ⚠️ via.placeholder.com was shut down in 2024. Previously this
-    // returned a fake URL that made Telegram's sendPhoto endpoint fail
-    // with "failed to get HTTP URL content" — which then blocked the
-    // entire channel announcement (the code never fell back to text).
-    //
-    // Now: return the presenter's real Cloudinary photo if they have
-    // one, otherwise null. The caller (postPresenterAnnouncementToChannel)
-    // will fall back to a plain text message.
+    // via.placeholder.com was shut down in 2024. Return the presenter's
+    // real Cloudinary photo if available, else null so the caller
+    // falls back to a text-only message.
     if (
       presenter?.profilePhotoUrl &&
       /^https?:\/\//i.test(presenter.profilePhotoUrl)
@@ -133,8 +128,6 @@ async function postPresenterAnnouncementToChannel(session) {
 }
 
 // ─── REQUEST PRESENTER AVAILABILITY ─────────────────────────────
-const { sendSms, isConfigured: isSmsConfigured } = require("../smsService");
-
 async function requestPresenterAvailability(session) {
   const presenter = session.presenter;
   if (!presenter) {
@@ -144,7 +137,7 @@ async function requestPresenterAvailability(session) {
 
   const sessionId = session._id.toString();
 
-  // Build the message text once — used for Telegram and SMS
+  // Build the message text once
   const messageBody =
     `🎯 Golden Monday - ${formatDate(session.date)}\n\n` +
     `Dear ${presenter.name},\n\n` +
@@ -222,92 +215,38 @@ async function requestPresenterAvailability(session) {
         `❌ Failed to send Telegram DM to ${presenter.name}:`,
         error.message,
       );
-      // Fall through to SMS attempt
+      // Fall through to the "cannot be reached" notification below.
+      // (Do not retry — the error is usually a bad chatId or the user
+      // blocked the bot, neither of which will fix itself on a retry.)
     }
   } else {
     console.warn(
-      `⚠️ Presenter ${presenter.name} has no Telegram chat ID — trying SMS`,
+      `⚠️ Presenter ${presenter.name} has no Telegram chat ID — notifying admin group for manual contact`,
     );
   }
 
-  // ─── Channel 2: SMS (fallback) ──────────────────────────
-  if (presenter.phone) {
-    if (!isSmsConfigured()) {
-      console.warn(
-        `⚠️ SMS not configured (SMS_API_URL/SMS_API_KEY missing) — cannot reach ${presenter.name} (${presenter.phone})`,
-      );
-
-      // Notify admin group that the presenter is unreachable
-      if (TELEGRAM_ADMIN_GROUP_ID) {
-        await sendMessage(
-          TELEGRAM_ADMIN_GROUP_ID,
-          `⚠️ *Presenter Unreachable*\n\n` +
-            `👤 Presenter: ${presenter.name}\n` +
-            `📧 Email: ${presenter.email}\n` +
-            `📱 Phone: ${presenter.phone}\n\n` +
-            `❌ No Telegram chat ID, and SMS gateway not configured.\n` +
-            `🔹 Please contact them manually or configure SMS_API_URL/SMS_API_KEY.`,
-          { parse_mode: "Markdown" },
-        );
-      }
-
-      return false;
-    }
-
-    try {
-      const result = await sendSms(presenter.phone, messageBody);
-
-      if (result.success) {
-        console.log(
-          `📨 Availability request sent to ${presenter.name} via SMS`,
-        );
-
-        // Register the pending confirmation with chatId=null so we can
-        // still accept the admin's manual confirm/decline on the panel
-        pendingPresenterConfirmations.set(sessionId, {
-          sessionId,
-          presenterId: presenter._id,
-          chatId: null,
-          channel: "sms",
-          requestedAt: new Date(),
-          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
-        });
-
-        if (TELEGRAM_ADMIN_GROUP_ID) {
-          await sendMessage(
-            TELEGRAM_ADMIN_GROUP_ID,
-            `📨 *Presenter Availability Request Sent*\n\n` +
-              `👤 Presenter: ${presenter.name}\n` +
-              `📧 Email: ${presenter.email}\n` +
-              `📱 Phone: ${presenter.phone}\n` +
-              `📱 Channel: ✅ SMS\n` +
-              `📅 Session: ${formatDate(session.date)}\n\n` +
-              `⏳ Waiting for response...`,
-            { parse_mode: "Markdown" },
-          );
-        }
-
-        return true;
-      }
-
-      console.error(`❌ SMS failed for ${presenter.name}: ${result.error}`);
-    } catch (error) {
-      console.error(`❌ SMS send threw for ${presenter.name}:`, error.message);
-    }
-  } else {
-    console.warn(`⚠️ Presenter ${presenter.name} has no phone number either`);
-  }
-
-  // ─── Channel 3: Neither worked ───────────────────────────
+  // ─── Fallback: Notify admin group for manual contact ─────────
+  // SMS was removed: no free provider delivers to Ethiopian phone
+  // numbers, and the paid alternatives aren't in scope right now.
+  // Instead, alert the admins so they can call or message the
+  // presenter directly.
   if (TELEGRAM_ADMIN_GROUP_ID) {
+    const reason = presenter.telegramChatId
+      ? "Telegram DM failed to send (user may have blocked the bot)"
+      : "Presenter has not registered with the Telegram bot";
+
     await sendMessage(
       TELEGRAM_ADMIN_GROUP_ID,
-      `🚨 *Presenter Cannot Be Reached*\n\n` +
+      `🚨 *Presenter Cannot Be Reached Automatically*\n\n` +
         `👤 Presenter: ${presenter.name}\n` +
         `📧 Email: ${presenter.email || "Not provided"}\n` +
         `📱 Phone: ${presenter.phone || "Not provided"}\n` +
-        `💬 Telegram: ${presenter.telegramChatId ? "Set" : "Not set"}\n\n` +
-        `⚠️ Please assign a replacement or contact them manually.`,
+        `📅 Session: ${formatDate(session.date)}\n` +
+        `📖 Topic: ${session.presentationTitle || "TBD"}\n\n` +
+        `⚠️ ${reason}\n\n` +
+        `🔹 Please contact them manually to confirm availability.\n\n` +
+        `💡 To enable automatic notifications, ask them to register at:\n` +
+        `https://t.me/addis_mesob_gm_bot`,
       { parse_mode: "Markdown" },
     );
   }
