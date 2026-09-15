@@ -695,13 +695,23 @@ export const goldenMondayAPI = {
   dismiss: (id) => api.delete(`/notifications/${id}/dismiss`), // Alias
 
   // ─── QR Check-in ──────────────────────────────────────────────
-  // ✅ FIXED: GET for QR generation (was POST)
+  // Admin: generate a session QR that employees scan (GET)
   generateQRCheckIn: (sessionId) =>
     api.get(`/golden-monday/qr-checkin/${sessionId}`),
 
-  // ✅ FIXED: POST for recording the actual check-in
+  // Employee: record own check-in after scanning admin's session QR (POST)
   recordQRCheckIn: (sessionId, data) =>
     api.post(`/golden-monday/qr-checkin/${sessionId}`, data || {}),
+
+  // Any logged-in user: get their OWN personal QR (for admin to scan)
+  getMyQR: () => api.get(`/golden-monday/qr-checkin/my-qr`),
+
+  // Admin: scan an employee's QR and mark them present
+  // `employeeQrPayload` is the raw JSON string decoded from the employee QR
+  adminScanQRCheckIn: (sessionId, employeeQrPayload) =>
+    api.post(`/golden-monday/qr-checkin/admin-scan/${sessionId}`, {
+      employeeQrPayload,
+    }),
 
   // ─── TELEGRAM AUTOMATION ──────────────────────────────────────
   sendReminders: () => api.post("/telegram/send-reminders"),
