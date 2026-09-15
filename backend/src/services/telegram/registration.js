@@ -360,31 +360,69 @@ async function approveRegistration(pendingId, reviewer) {
   }
 
   const tempPassword = generateTempPassword();
+  let user;
 
-  console.log(`🔑 Generated password for ${pending.email}: "${tempPassword}"`);
+  try {
+    // 1. Create the User
+    user = await createUserAccount({
+      name: pending.name,
+      email: pending.email,
+      password: tempPassword,
+      role: "employee",
+      phone: pending.phone,
+      telegramChatId: pending.telegramChatId,
+      profilePhotoUrl: pending.profilePhotoUrl || "",
+      branch: pending.branch || "Addis Ketema",
+      position: pending.position || "",
+    });
+  } catch (error) {
+    // 🚨 CRITICAL FIX: Handle duplicate email error.
+    // authController's createUserAccount does an explicit
+    // User.findOne({ email }) check BEFORE insert, and throws a CUSTOM
+    // error with code "USER_EXISTS" — NOT a raw MongoDB E11000.
+    // We check for both so this is resilient to future refactors.
+    if (error.code === "USER_EXISTS" || error.code === 11000) {
+      console.error(
+        `⚠️ User with email ${pending.email} already exists — linking to existing user`,
+      );
+      user = await User.findOne({ email: pending.email });
+      if (!user) {
+        throw new Error(
+          "User exists check passed but user could not be found. Data inconsistency.",
+        );
+      }
+      // Update the existing user with fresh data from this registration
+      user.telegramChatId = pending.telegramChatId;
+      user.name = pending.name;
+      user.phone = pending.phone || user.phone;
+      user.position = pending.position || user.position;
+      user.branch = pending.branch || user.branch || "Addis Ketema";
+      if (pending.profilePhotoUrl && !user.profilePhotoUrl) {
+        user.profilePhotoUrl = pending.profilePhotoUrl;
+      }
+      await user.save();
+      console.log(`✅ Linked existing user: ${pending.email}`);
+    } else {
+      console.error("❌ Failed to create user during approval:", error);
+      throw new Error(
+        `Failed to create user account: ${error.message || "Unknown error"}`,
+      );
+    }
+  }
 
-  const user = await createUserAccount({
-    name: pending.name,
-    email: pending.email,
-    password: tempPassword,
-    role: "employee",
-    phone: pending.phone,
-    telegramChatId: pending.telegramChatId,
-    profilePhotoUrl: pending.profilePhotoUrl || "",
-    branch: pending.branch || "Addis Ketema",
-    position: pending.position || "",
-  });
-
+  // 2. Verify user was saved
   const savedUser = await User.findById(user._id);
-  console.log(`✅ User created: ${savedUser.email}`);
-  console.log(`✅ Password hashed: ${savedUser.password.startsWith("$2b$")}`);
+  if (!savedUser) {
+    throw new Error("User creation failed silently — no document found.");
+  }
 
+  // 3. Add to Golden Monday Roster (if not already there)
   const existingPresenter = await GoldenMondayPresenter.findOne({
-    user: user._id,
+    user: savedUser._id,
   });
   if (!existingPresenter) {
     await GoldenMondayPresenter.create({
-      user: user._id,
+      user: savedUser._id,
       name: pending.name,
       email: pending.email,
       department: pending.department || "",
@@ -397,15 +435,20 @@ async function approveRegistration(pendingId, reviewer) {
       registeredAt: new Date(),
       registeredBy: reviewer?._id || undefined,
     });
+    console.log(`✅ Added to Golden Monday roster: ${pending.email}`);
+  } else {
+    console.log(`ℹ️ User already on roster: ${pending.email}`);
   }
 
+  // 4. Mark PendingRegistration as approved
   pending.status = "approved";
-  pending.createdUser = user._id;
+  pending.createdUser = savedUser._id;
   pending.reviewedBy = reviewer?._id || undefined;
   pending.reviewedByName = reviewer?.name || "unknown";
   pending.reviewedAt = new Date();
   await pending.save();
 
+  // 5. Send credentials
   await sendLoginCredentials(pending.telegramChatId, {
     email: pending.email,
     password: tempPassword,
@@ -416,7 +459,7 @@ async function approveRegistration(pendingId, reviewer) {
     branch: pending.branch || "Addis Ketema",
   });
 
-  return { pending, user };
+  return { pending, user: savedUser };
 }
 
 // ─── REJECT REGISTRATION ──────────────────────────────────────
@@ -444,7 +487,7 @@ async function sendLoginCredentials(chatId, userData) {
   const { email, password, name, department, position, phone, branch } =
     userData;
 
-  console.log(`📤 Sending credentials to ${email}: password = "${password}"`);
+  console.log(`📤 Sending credentials to ${email}`);
 
   const message =
     `✅ *Account Approved!* 🎉\n\n` +
@@ -511,7 +554,7 @@ async function handleBranchSelection(callbackQuery) {
   });
 }
 
-// ─── ✅ NEW: NOTIFY EMPLOYEE DELETION ──────────────────────────
+// ─── ✅ NOTIFY EMPLOYEE DELETION ──────────────────────────────
 async function notifyEmployeeDeletion({
   userId,
   employeeName,
@@ -609,7 +652,7 @@ async function notifyEmployeeDeletion({
   }
 }
 
-// ─── ✅ NEW: HANDLE APPEAL DELETION ─────────────────────────────
+// ─── ✅ HANDLE APPEAL DELETION ─────────────────────────────────
 async function handleAppealDeletion(callbackQuery) {
   const chatId = callbackQuery.message.chat.id;
   const messageId = callbackQuery.message.message_id;
@@ -645,7 +688,7 @@ async function handleAppealDeletion(callbackQuery) {
   });
 }
 
-// ─── ✅ NEW: HANDLE APPEAL REASON ──────────────────────────────
+// ─── ✅ HANDLE APPEAL REASON ──────────────────────────────────
 async function handleAppealReason(msg) {
   const chatId = msg.chat.id.toString();
   const text = (msg.text || "").trim();
