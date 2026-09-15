@@ -14,11 +14,21 @@ const pendingPresenterConfirmations = new Map();
 // ─── GENERATE ANNOUNCEMENT IMAGE ────────────────────────────────
 async function generateAnnouncementImage(presenter, session) {
   try {
-    const name = encodeURIComponent(presenter?.name || "Presenter");
-    const title = encodeURIComponent(
-      session?.presentationTitle || "Golden Monday",
-    );
-    return `https://via.placeholder.com/800x400/1a1a2e/ffd700?text=${name}%20-%20${title}`;
+    // ⚠️ via.placeholder.com was shut down in 2024. Previously this
+    // returned a fake URL that made Telegram's sendPhoto endpoint fail
+    // with "failed to get HTTP URL content" — which then blocked the
+    // entire channel announcement (the code never fell back to text).
+    //
+    // Now: return the presenter's real Cloudinary photo if they have
+    // one, otherwise null. The caller (postPresenterAnnouncementToChannel)
+    // will fall back to a plain text message.
+    if (
+      presenter?.profilePhotoUrl &&
+      /^https?:\/\//i.test(presenter.profilePhotoUrl)
+    ) {
+      return presenter.profilePhotoUrl;
+    }
+    return null;
   } catch (err) {
     console.error("Failed to generate announcement image:", err.message);
     return null;
@@ -74,6 +84,24 @@ async function postPresenterAnnouncementToChannel(session) {
           parse_mode: "Markdown",
         }),
       });
+
+      // If sendPhoto failed (bad URL, blocked host, etc.), retry as
+      // plain text so the announcement isn't silently lost.
+      const photoResult = await response.clone().json();
+      if (!photoResult.ok) {
+        console.warn(
+          `⚠️ sendPhoto failed (${photoResult.description}), falling back to text`,
+        );
+        response = await fetch(`${TELEGRAM_API}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chat_id: TELEGRAM_CHANNEL_ID,
+            text: message,
+            parse_mode: "Markdown",
+          }),
+        });
+      }
     } else {
       response = await fetch(`${TELEGRAM_API}/sendMessage`, {
         method: "POST",
@@ -105,87 +133,186 @@ async function postPresenterAnnouncementToChannel(session) {
 }
 
 // ─── REQUEST PRESENTER AVAILABILITY ─────────────────────────────
+const { sendSms, isConfigured: isSmsConfigured } = require("../smsService");
+
 async function requestPresenterAvailability(session) {
   const presenter = session.presenter;
-  if (!presenter || !presenter.telegramChatId) {
-    console.warn(`⚠️ Presenter ${presenter?.name} has no Telegram chat ID`);
-    return;
-  }
-
-  const chatId = presenter.telegramChatId.toString();
-  const sessionId = session._id.toString();
-
-  const message =
-    `🎯 *Golden Monday - ${formatDate(session.date)}*\n\n` +
-    `Dear ${presenter.name},\n\n` +
-    `You have been selected as the presenter for the upcoming Golden Monday session.\n\n` +
-    `📖 *Topic:* ${session.presentationTitle || "Your choice"}\n` +
-    `🕒 *Time:* 2:00 - 2:50 PM\n` +
-    `📍 *Location:* Addis MESOB Conference Hall\n\n` +
-    `Please confirm your availability within 48 hours:\n\n` +
-    `✅ *I'm Available* - Click to confirm\n` +
-    `❌ *Not Available* - Click and provide a reason\n\n` +
-    `⚠️ If you don't respond within 48 hours, a replacement will be assigned.`;
-
-  pendingPresenterConfirmations.set(sessionId, {
-    sessionId,
-    presenterId: presenter._id,
-    chatId,
-    requestedAt: new Date(),
-    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
-  });
-
-  try {
-    await sendMessage(chatId, message, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            {
-              text: "✅ I'm Available",
-              callback_data: `presenter_available:${sessionId}`,
-            },
-            {
-              text: "❌ Not Available",
-              callback_data: `presenter_unavailable:${sessionId}`,
-            },
-          ],
-          [
-            {
-              text: "📝 Suggest Topic",
-              callback_data: `suggest_topic:${sessionId}`,
-            },
-          ],
-          [{ text: "📞 Contact Admin", callback_data: "contact_admin" }],
-        ],
-        resize_keyboard: true,
-      },
-    });
-
-    console.log(`📨 Availability request sent to ${presenter.name}`);
-
-    if (TELEGRAM_ADMIN_GROUP_ID) {
-      await sendMessage(
-        TELEGRAM_ADMIN_GROUP_ID,
-        `📨 *Presenter Availability Request Sent*\n\n` +
-          `👤 Presenter: ${presenter.name}\n` +
-          `📧 Email: ${presenter.email}\n` +
-          `📅 Session: ${formatDate(session.date)}\n` +
-          `📖 Topic: ${session.presentationTitle || "TBD"}\n\n` +
-          `⏳ Waiting for response...\n` +
-          `⏰ Expires: ${new Date(Date.now() + 48 * 60 * 60 * 1000).toLocaleString()}`,
-        { parse_mode: "Markdown" },
-      );
-    }
-
-    return true;
-  } catch (error) {
-    console.error(
-      "❌ Failed to request presenter availability:",
-      error.message,
-    );
+  if (!presenter) {
+    console.warn(`⚠️ No presenter on session ${session._id}`);
     return false;
   }
+
+  const sessionId = session._id.toString();
+
+  // Build the message text once — used for Telegram and SMS
+  const messageBody =
+    `🎯 Golden Monday - ${formatDate(session.date)}\n\n` +
+    `Dear ${presenter.name},\n\n` +
+    `You have been selected as the presenter for the upcoming Golden Monday session.\n\n` +
+    `📖 Topic: ${session.presentationTitle || "Your choice"}\n` +
+    `🕒 Time: 2:00 - 2:50 PM\n` +
+    `📍 Location: Addis MESOB Conference Hall\n\n` +
+    `Please confirm your availability within 48 hours:\n\n` +
+    `✅ I'm Available - Click to confirm\n` +
+    `❌ Not Available - Click and provide a reason\n\n` +
+    `⚠️ If you don't respond within 48 hours, a replacement will be assigned.`;
+
+  // ─── Channel 1: Telegram (preferred) ─────────────────────
+  if (presenter.telegramChatId) {
+    try {
+      const chatId = presenter.telegramChatId.toString();
+
+      pendingPresenterConfirmations.set(sessionId, {
+        sessionId,
+        presenterId: presenter._id,
+        chatId,
+        requestedAt: new Date(),
+        expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+      });
+
+      await sendMessage(chatId, messageBody, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "✅ I'm Available",
+                callback_data: `presenter_available:${sessionId}`,
+              },
+              {
+                text: "❌ Not Available",
+                callback_data: `presenter_unavailable:${sessionId}`,
+              },
+            ],
+            [
+              {
+                text: "📝 Suggest Topic",
+                callback_data: `suggest_topic:${sessionId}`,
+              },
+            ],
+            [{ text: "📞 Contact Admin", callback_data: "contact_admin" }],
+          ],
+          resize_keyboard: true,
+        },
+      });
+
+      console.log(
+        `📨 Availability request sent to ${presenter.name} via Telegram`,
+      );
+
+      // Notify admin group
+      if (TELEGRAM_ADMIN_GROUP_ID) {
+        await sendMessage(
+          TELEGRAM_ADMIN_GROUP_ID,
+          `📨 *Presenter Availability Request Sent*\n\n` +
+            `👤 Presenter: ${presenter.name}\n` +
+            `📧 Email: ${presenter.email}\n` +
+            `📱 Channel: ✅ Telegram\n` +
+            `📅 Session: ${formatDate(session.date)}\n` +
+            `📖 Topic: ${session.presentationTitle || "TBD"}\n\n` +
+            `⏳ Waiting for response...\n` +
+            `⏰ Expires: ${new Date(Date.now() + 48 * 60 * 60 * 1000).toLocaleString()}`,
+          { parse_mode: "Markdown" },
+        );
+      }
+
+      return true;
+    } catch (error) {
+      console.error(
+        `❌ Failed to send Telegram DM to ${presenter.name}:`,
+        error.message,
+      );
+      // Fall through to SMS attempt
+    }
+  } else {
+    console.warn(
+      `⚠️ Presenter ${presenter.name} has no Telegram chat ID — trying SMS`,
+    );
+  }
+
+  // ─── Channel 2: SMS (fallback) ──────────────────────────
+  if (presenter.phone) {
+    if (!isSmsConfigured()) {
+      console.warn(
+        `⚠️ SMS not configured (SMS_API_URL/SMS_API_KEY missing) — cannot reach ${presenter.name} (${presenter.phone})`,
+      );
+
+      // Notify admin group that the presenter is unreachable
+      if (TELEGRAM_ADMIN_GROUP_ID) {
+        await sendMessage(
+          TELEGRAM_ADMIN_GROUP_ID,
+          `⚠️ *Presenter Unreachable*\n\n` +
+            `👤 Presenter: ${presenter.name}\n` +
+            `📧 Email: ${presenter.email}\n` +
+            `📱 Phone: ${presenter.phone}\n\n` +
+            `❌ No Telegram chat ID, and SMS gateway not configured.\n` +
+            `🔹 Please contact them manually or configure SMS_API_URL/SMS_API_KEY.`,
+          { parse_mode: "Markdown" },
+        );
+      }
+
+      return false;
+    }
+
+    try {
+      const result = await sendSms(presenter.phone, messageBody);
+
+      if (result.success) {
+        console.log(
+          `📨 Availability request sent to ${presenter.name} via SMS`,
+        );
+
+        // Register the pending confirmation with chatId=null so we can
+        // still accept the admin's manual confirm/decline on the panel
+        pendingPresenterConfirmations.set(sessionId, {
+          sessionId,
+          presenterId: presenter._id,
+          chatId: null,
+          channel: "sms",
+          requestedAt: new Date(),
+          expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        });
+
+        if (TELEGRAM_ADMIN_GROUP_ID) {
+          await sendMessage(
+            TELEGRAM_ADMIN_GROUP_ID,
+            `📨 *Presenter Availability Request Sent*\n\n` +
+              `👤 Presenter: ${presenter.name}\n` +
+              `📧 Email: ${presenter.email}\n` +
+              `📱 Phone: ${presenter.phone}\n` +
+              `📱 Channel: ✅ SMS\n` +
+              `📅 Session: ${formatDate(session.date)}\n\n` +
+              `⏳ Waiting for response...`,
+            { parse_mode: "Markdown" },
+          );
+        }
+
+        return true;
+      }
+
+      console.error(`❌ SMS failed for ${presenter.name}: ${result.error}`);
+    } catch (error) {
+      console.error(`❌ SMS send threw for ${presenter.name}:`, error.message);
+    }
+  } else {
+    console.warn(`⚠️ Presenter ${presenter.name} has no phone number either`);
+  }
+
+  // ─── Channel 3: Neither worked ───────────────────────────
+  if (TELEGRAM_ADMIN_GROUP_ID) {
+    await sendMessage(
+      TELEGRAM_ADMIN_GROUP_ID,
+      `🚨 *Presenter Cannot Be Reached*\n\n` +
+        `👤 Presenter: ${presenter.name}\n` +
+        `📧 Email: ${presenter.email || "Not provided"}\n` +
+        `📱 Phone: ${presenter.phone || "Not provided"}\n` +
+        `💬 Telegram: ${presenter.telegramChatId ? "Set" : "Not set"}\n\n` +
+        `⚠️ Please assign a replacement or contact them manually.`,
+      { parse_mode: "Markdown" },
+    );
+  }
+
+  return false;
 }
 
 // ─── POST NEXT PRESENTER ANNOUNCEMENT ──────────────────────────
