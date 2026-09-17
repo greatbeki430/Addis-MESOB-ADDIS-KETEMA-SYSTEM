@@ -2,6 +2,7 @@
 // QR Check-In card — supports three modes:
 //   • Admin:    "Show Session QR"  (employees scan this)
 //   • Admin:    "Scan Employee QR" (camera)
+//   • Admin:    "Manage Check-ins" (undo a scan for re-testing)
 //   • Employee: "Scan Session QR"  (camera) + "Show My QR"
 import { useState, useEffect, useRef, useCallback } from "react";
 import { C, F } from "../../styles/theme";
@@ -19,6 +20,7 @@ import {
   FiAlertTriangle,
   FiUser,
   FiMaximize2,
+  FiRotateCcw,
 } from "react-icons/fi";
 import { RiQrCodeLine } from "react-icons/ri";
 
@@ -366,6 +368,244 @@ function QRLargeModal({ isOpen, onClose, qrCode, title, subtitle }) {
   );
 }
 
+// ─── Admin: Un-sign / roll back a check-in ──────────────────
+// Small list modal. Shows all currently checked-in attendees for
+// the session. Each row has an "Un-sign" button that calls the
+// DELETE endpoint and updates the parent's list in place.
+function UndoCheckInModal({ isOpen, onClose, attendees, sessionId, onUndone }) {
+  const [busyId, setBusyId] = useState(null);
+  const [filter, setFilter] = useState("");
+
+  if (!isOpen) return null;
+
+  const filtered = (attendees || []).filter((a) => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      (a.name || "").toLowerCase().includes(q) ||
+      (a.email || "").toLowerCase().includes(q) ||
+      (a.department || "").toLowerCase().includes(q)
+    );
+  });
+
+  const handleUndo = async (userId, name) => {
+    if (!userId) return;
+    setBusyId(userId);
+    try {
+      await goldenMondayAPI.undoQRCheckIn(sessionId, userId);
+      showToast(`↩️ ${name}'s check-in removed`, "success");
+      if (onUndone) await onUndone();
+    } catch (err) {
+      console.error("[UndoCheckIn] failed:", err);
+      showToast(
+        err.response?.data?.error || "Failed to undo check-in",
+        "error",
+      );
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <Portal>
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.75)",
+          backdropFilter: "blur(6px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 2147483647,
+          padding: 16,
+        }}
+        onClick={onClose}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: "#fff",
+            borderRadius: 20,
+            padding: "22px 22px 20px",
+            maxWidth: 520,
+            width: "100%",
+            maxHeight: "85vh",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "0 40px 100px rgba(0,0,0,0.5)",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: 12,
+            }}
+          >
+            <div>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: C.dark,
+                  fontFamily: F.serif,
+                }}
+              >
+                Manage check-ins
+              </h3>
+              <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>
+                Remove a check-in to let that person scan again.
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              style={{
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                color: "#999",
+                padding: 6,
+              }}
+            >
+              <FiX size={22} />
+            </button>
+          </div>
+
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filter by name, email, or department"
+            style={{
+              width: "100%",
+              padding: "9px 12px",
+              borderRadius: 10,
+              border: `1.5px solid ${C.border}`,
+              fontSize: 13,
+              outline: "none",
+              boxSizing: "border-box",
+              marginBottom: 10,
+            }}
+          />
+
+          <div
+            style={{
+              flex: 1,
+              overflowY: "auto",
+              border: `1px solid ${C.border}`,
+              borderRadius: 12,
+            }}
+          >
+            {filtered.length === 0 ? (
+              <div
+                style={{
+                  padding: "30px 16px",
+                  textAlign: "center",
+                  color: C.muted,
+                  fontSize: 13,
+                }}
+              >
+                {attendees && attendees.length === 0
+                  ? "No one is checked in yet."
+                  : "No matches for your filter."}
+              </div>
+            ) : (
+              filtered.map((a) => {
+                const rowId = a.userId || a.user?._id || a._id;
+                const isBusy = busyId === rowId;
+                return (
+                  <div
+                    key={rowId}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      padding: "10px 14px",
+                      borderBottom: `1px solid ${C.border}`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: "50%",
+                        background: C.primary,
+                        color: "#fff",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontWeight: 700,
+                        fontSize: 13,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {(a.name || "?").charAt(0)}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          color: C.dark,
+                          fontSize: 13,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {a.name || "Unknown"}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: C.muted,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {a.department ? `${a.department} · ` : ""}
+                        {a.checkedInAt
+                          ? new Date(a.checkedInAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })
+                          : ""}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleUndo(rowId, a.name || "this user")}
+                      disabled={isBusy}
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 4,
+                        padding: "6px 12px",
+                        borderRadius: 8,
+                        border: "none",
+                        background: isBusy ? C.border : "#dc2626",
+                        color: isBusy ? C.muted : "#fff",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: isBusy ? "not-allowed" : "pointer",
+                        fontFamily: F.sans,
+                      }}
+                    >
+                      <FiRotateCcw size={12} />
+                      Un-sign
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    </Portal>
+  );
+}
+
 // ─── Main QRCheckIn Card ───
 export default function QRCheckIn({ sessionId, onCheckIn }) {
   const { user } = useAuth();
@@ -385,6 +625,29 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
   const [showSessionQR, setShowSessionQR] = useState(false);
   const [showMyQR, setShowMyQR] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Undo / manage check-ins (admin only)
+  const [undoModalOpen, setUndoModalOpen] = useState(false);
+  const [attendees, setAttendees] = useState([]);
+  const [loadingAttendees, setLoadingAttendees] = useState(false);
+
+  // ─── Load checked-in attendees (admin) ───
+  const loadAttendees = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      setLoadingAttendees(true);
+      const res = await goldenMondayAPI.getAttendance(sessionId);
+      // getAttendance returns { attendance: [...] } where each row
+      // has { userId, name, email, department, attended, checkedInAt }
+      const checkedIn = (res.data?.attendance || []).filter((a) => a.attended);
+      setAttendees(checkedIn);
+    } catch (err) {
+      console.error("[QRCheckIn] loadAttendees failed:", err);
+      showToast("Failed to load attendees", "error");
+    } finally {
+      setLoadingAttendees(false);
+    }
+  }, [sessionId]);
 
   // ─── Load session QR (admin) ───
   const loadSessionQR = useCallback(async () => {
@@ -452,6 +715,8 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
       } catch (err) {
         console.error("Employee check-in failed:", err);
         const msg = err.response?.data?.error || "Check-in failed";
+        // The backend now returns 200 for repeat check-ins, but if a
+        // proxy or cache serves an old 400 we still handle it.
         if (err.response?.data?.alreadyCheckedIn) {
           showToast("You've already checked in to this session", "info");
         } else {
@@ -488,6 +753,12 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
     },
     [sessionId, onCheckIn],
   );
+
+  // ─── Open the manage-check-ins modal ───
+  const handleOpenManage = useCallback(async () => {
+    await loadAttendees();
+    setUndoModalOpen(true);
+  }, [loadAttendees]);
 
   // ─── Render ───
   return (
@@ -551,7 +822,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           </h4>
           <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>
             {isAdmin
-              ? "Show session QR or scan employee QR"
+              ? "Show session QR, scan employee QR, or manage check-ins"
               : "Scan the session QR to check in"}
           </p>
         </div>
@@ -673,6 +944,61 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
               }}
             >
               Point camera at employee's QR
+            </span>
+          </button>
+        )}
+
+        {/* ADMIN: Manage Check-Ins (undo / un-sign) */}
+        {isAdmin && (
+          <button
+            onClick={handleOpenManage}
+            disabled={loadingAttendees || !sessionId}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 10,
+              padding: "20px 14px",
+              borderRadius: 14,
+              border: `2px solid #f59e0b`,
+              background: `linear-gradient(135deg, #f59e0b08, #fbbf2408)`,
+              color: "#92400e",
+              cursor:
+                loadingAttendees || !sessionId ? "not-allowed" : "pointer",
+              fontWeight: 700,
+              fontSize: 13,
+              transition: "all 0.25s ease",
+              opacity: !sessionId ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => {
+              if (loadingAttendees || !sessionId) return;
+              e.currentTarget.style.transform = "translateY(-3px)";
+              e.currentTarget.style.boxShadow = `0 8px 24px #f59e0b33`;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = "none";
+            }}
+          >
+            {loadingAttendees ? (
+              <FiRefreshCw
+                size={26}
+                style={{ animation: "spin 1s linear infinite" }}
+              />
+            ) : (
+              <FiRotateCcw size={26} />
+            )}
+            <span>Manage Check-ins</span>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 500,
+                color: C.muted,
+                textAlign: "center",
+              }}
+            >
+              Un-sign someone to retry the scan
             </span>
           </button>
         )}
@@ -836,6 +1162,17 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             ? "Point camera at the employee's personal QR"
             : "Point camera at the coordinator's session QR"
         }
+      />
+
+      <UndoCheckInModal
+        isOpen={undoModalOpen}
+        onClose={() => setUndoModalOpen(false)}
+        attendees={attendees}
+        sessionId={sessionId}
+        onUndone={async () => {
+          await loadAttendees();
+          if (onCheckIn) onCheckIn();
+        }}
       />
 
       <style>{`

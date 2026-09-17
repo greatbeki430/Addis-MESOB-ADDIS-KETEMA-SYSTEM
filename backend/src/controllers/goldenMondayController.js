@@ -1239,6 +1239,79 @@ const getMyQRHistory = async (req, res) => {
   }
 };
 
+// ============================================================
+// DELETE /api/golden-monday/qr-checkin/:sessionId/:userId
+// Admin-only: undo a check-in.
+//
+// Why this exists: check-ins are intentionally idempotent, so a
+// repeat scan is a no-op. That makes testing awkward — once a user
+// is marked present, the scanner "locks" and can't be exercised
+// again without touching the database directly. This endpoint
+// lets an admin or superadmin (or isGoldenMondayAdmin) wipe a
+// single attendance record so the flow can be re-run.
+//
+// Also removes the user from session.attendees (the legacy mirror)
+// so the roster view stays consistent.
+// ============================================================
+const undoQRCheckIn = async (req, res) => {
+  try {
+    const { sessionId, userId } = req.params;
+    if (!sessionId || !userId) {
+      return res
+        .status(400)
+        .json({ error: "sessionId and userId are required" });
+    }
+
+    const session = await GoldenMondaySession.findById(sessionId);
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const deleted = await GoldenMondayAttendance.findOneAndDelete({
+      session: sessionId,
+      user: userId,
+    });
+
+    // Mirror into session.attendees — remove the embedded copy so the
+    // legacy reporting path doesn't keep showing them as present.
+    if (Array.isArray(session.attendees)) {
+      const before = session.attendees.length;
+      session.attendees = session.attendees.filter(
+        (a) => !a.user || a.user.toString() !== userId.toString(),
+      );
+      if (session.attendees.length !== before) {
+        await session.save();
+      }
+    }
+
+    console.log(
+      `↩️  [UNDO QR] ${req.user.name} removed check-in for user ${userId} on session ${sessionId} (deleted=${!!deleted})`,
+    );
+
+    // Return a fresh summary so the caller's UI can update counts
+    // immediately without a second round-trip.
+    const [totalCheckedIn, totalEligible] = await Promise.all([
+      GoldenMondayAttendance.countDocuments({
+        session: sessionId,
+        attended: true,
+      }),
+      GoldenMondayPresenter.countDocuments({ isEligible: true }),
+    ]);
+
+    res.json({
+      success: true,
+      message: deleted
+        ? "Check-in removed"
+        : "No check-in existed for this user (nothing to remove)",
+      removed: !!deleted,
+      summary: { totalCheckedIn, totalEligible },
+    });
+  } catch (error) {
+    console.error("❌ [undoQRCheckIn] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getSessions,
   previewRecap,
@@ -1261,4 +1334,5 @@ module.exports = {
   postWithPoster,
   getMyQRStatus,
   getMyQRHistory,
+  undoQRCheckIn,
 };
