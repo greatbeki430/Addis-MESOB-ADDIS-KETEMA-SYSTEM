@@ -28,6 +28,27 @@ export const isLeaderOrAbove = (user) =>
   hasMinRole(user?.role, ROLES.TEAM_LEADER);
 export const isEmployee = (user) => user?.role === ROLES.EMPLOYEE;
 
+// ─── GOLDEN MONDAY COORDINATOR CHECK ────────────────────────────────
+
+/**
+ * Golden Monday coordinators.
+ *
+ * A user is treated as a GM admin if they hold a leader-or-above role
+ * OR they've been explicitly flagged with `isGoldenMondayAdmin` in
+ * User Management. This is the single source of truth for the
+ * frontend's GM gating — every GM component should call this instead
+ * of checking the raw role list, so adding a coordinator via the 🌅
+ * toggle instantly grants them the full GM UI.
+ *
+ * SCOPE: This only unlocks Golden Monday features. It does NOT grant
+ * user management, team management, or any system-admin capability.
+ */
+export const isGoldenMondayAdminOrAbove = (user) => {
+  if (!user) return false;
+  if (user.isGoldenMondayAdmin === true) return true;
+  return isLeaderOrAbove(user);
+};
+
 export const isOwner = (user, resource) => {
   if (!user || !resource) return false;
   const ownerId =
