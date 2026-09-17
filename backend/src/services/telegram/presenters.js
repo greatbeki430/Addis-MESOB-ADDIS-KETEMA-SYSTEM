@@ -685,16 +685,31 @@ async function postPresenterAnnouncementWithPhoto(session, options = {}) {
     const base64Body = match[2];
     const buffer = Buffer.from(base64Body, "base64");
 
+    console.log(
+      `[postWithPoster] uploading ${buffer.length} bytes as ${mimeType}`,
+    );
+
     // Telegram requires multipart/form-data for binary uploads.
     // Node 18+ has FormData and Blob globally available.
+    // Telegram's sendPhoto expects the file to be a proper multipart
+    // file part with a filename. undici's FormData serializes a bare
+    // Blob differently than a File — in some versions it drops the
+    // filename, which makes Telegram parse the part as an empty field
+    // and reject with "there is no photo in the request". Use File
+    // (which extends Blob) instead. Node exposes File as a global
+    // since v20; for older runtimes, fall back to node:buffer.
+    let FileImpl = globalThis.File;
+    if (!FileImpl) {
+      FileImpl = require("node:buffer").File;
+    }
+
     const form = new FormData();
     form.append("chat_id", TELEGRAM_CHANNEL_ID);
     form.append("caption", caption);
     form.append("parse_mode", "Markdown");
     form.append(
       "photo",
-      new Blob([buffer], { type: mimeType }),
-      "golden-monday-poster.png",
+      new FileImpl([buffer], "golden-monday-poster.png", { type: mimeType }),
     );
 
     const response = await fetch(`${TELEGRAM_API}/sendPhoto`, {
