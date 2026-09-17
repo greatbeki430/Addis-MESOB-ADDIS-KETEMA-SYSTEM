@@ -1,21 +1,5 @@
 // frontend/src/components/golden-monday/PosterStudio.jsx
-//
-// Coordinator tool: renders a branded A-MESOB poster from presenter
-// data on an HTML canvas, then uploads + posts it to Telegram.
-//
-// Layout matches the committee's manual design:
-//   - Blue background
-//   - A-MESOB logo top-left
-//   - Amharic header top-center
-//   - "Golden monday committee 2026" box top-right
-//   - Presenter photo left column (large, framed)
-//   - Clock image bottom-left (static asset)
-//   - Right column: 📢, presenter name line, center, date, time
-//   - Website URL bottom
-//
-// The canvas is hidden from the user; they see a live preview img.
-
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import {
@@ -25,42 +9,37 @@ import {
   FiRefreshCw,
   FiUpload,
   FiImage,
+  FiCheck,
 } from "react-icons/fi";
 import { C, F } from "../../styles/theme";
 import { goldenMondayAPI } from "../../services/api";
+import { TEMPLATES, TEMPLATE_ORDER, DEFAULT_TEMPLATE } from "./templates";
 
 // ─── Canvas dimensions ──────────────────────────────────────────
-// Matches the committee's 900×1280 aspect. Larger canvas = sharper
-// text and photo, at the cost of base64 upload size.
 const POSTER_W = 900;
 const POSTER_H = 1280;
 
-// ─── Brand colors (from the sample image) ───────────────────────
-const BRAND_BLUE = "#2C3E8F";
-const BRAND_GOLD = "#F5C518";
-const BRAND_WHITE = "#FFFFFF";
-
 // ─── Static asset URLs ──────────────────────────────────────────
-// Drop these files in frontend/public/ so they resolve at runtime.
 const LOGO_URL = "/brand/amesob-logo.png";
 const CLOCK_URL = "/brand/clock.png";
 
 export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
-  // ── Form state (initialised from the session) ───────────────
+  // ── Form state ──────────────────────────────────────────────
   const [form, setForm] = useState({
     presenterName: "",
     title: "",
     center: "Addis Ketema Center",
     ethiopianDate: "",
     time: "1:30 - 2:30 ከሰዓት",
-    audienceLine: "", // "ከአቶ ታሪኩ ጉሉማ ጋር" style
+    audienceLine: "",
     websiteUrl: "addis.mesobcenter.et",
   });
 
   // ── Photo state ─────────────────────────────────────────────
-  // By default we pull the presenter's Cloudinary photo. The
-  // coordinator can override with a local file if they want.
   const [photoSrc, setPhotoSrc] = useState(null);
+
+  // ── Template picker ─────────────────────────────────────────
+  const [selectedTemplate, setSelectedTemplate] = useState(DEFAULT_TEMPLATE);
 
   // ── Preview + submit state ──────────────────────────────────
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -68,6 +47,16 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
   const [posting, setPosting] = useState(false);
 
   const canvasRef = useRef(null);
+
+  // ── AI suggested topics (if available on session) ───────────
+  const suggestedTopics = useMemo(() => {
+    if (!session?.suggestedTopics) return [];
+    if (!Array.isArray(session.suggestedTopics)) return [];
+    return session.suggestedTopics
+      .map((t) => (typeof t === "string" ? t : t?.title || ""))
+      .filter(Boolean)
+      .slice(0, 6);
+  }, [session]);
 
   // ── Initialise form from session when opened ────────────────
   useEffect(() => {
@@ -78,10 +67,9 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         ...f,
         presenterName: session.presenterName || "",
         title: session.presentationTitle || "",
-        ethiopianDate: "", // coordinator fills; conversion not attempted here
+        ethiopianDate: "",
       }));
 
-      // Prefer the session's cached photo URL
       if (session.presenterPhotoUrl) {
         setPhotoSrc(session.presenterPhotoUrl);
       } else {
@@ -93,14 +81,10 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
     return () => clearTimeout(timeoutId);
   }, [isOpen, session]);
 
-  // ── Load an image from a URL or a File ──────────────────────
+  // ── Image loader ────────────────────────────────────────────
   const loadImage = useCallback((src) => {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      // Cloudinary URLs are on a different origin, so we need
-      // crossOrigin="anonymous" for canvas readback to work. If the
-      // CDN doesn't send CORS headers, this will fail — in that case
-      // the user must upload a local file instead.
       img.crossOrigin = "anonymous";
       img.onload = () => resolve(img);
       img.onerror = (e) => {
@@ -120,146 +104,30 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
 
-      // Solid brand background
-      ctx.fillStyle = BRAND_BLUE;
-      ctx.fillRect(0, 0, POSTER_W, POSTER_H);
+      // Reset any lingering state from the previous render
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, POSTER_W, POSTER_H);
+      ctx.globalAlpha = 1;
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
 
-      // ── Top-left logo ─────────────────────────────────────
-      try {
-        const logo = await loadImage(LOGO_URL);
-        // Draw at natural aspect; fits ~180px wide
-        const lw = 180;
-        const lh = (logo.height / logo.width) * lw;
-        ctx.drawImage(logo, 40, 40, lw, lh);
-      } catch (e) {
-        console.warn("[PosterStudio] logo missing:", e.message);
-      }
+      const template =
+        TEMPLATES[selectedTemplate] || TEMPLATES[DEFAULT_TEMPLATE];
 
-      // ── Top-center Amharic header ─────────────────────────
-      ctx.fillStyle = BRAND_GOLD;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.font = "bold 34px 'Noto Sans Ethiopic', 'Nyala', serif";
-      ctx.fillText("የወርቃማ ሰኞ ፕሮግራም ተናጋሪ", POSTER_W / 2 + 40, 90);
+      await template.render(ctx, {
+        form,
+        photoSrc,
+        assets: {
+          logo: LOGO_URL,
+          clock: CLOCK_URL,
+        },
+        W: POSTER_W,
+        H: POSTER_H,
+        loadImage,
+      });
 
-      // ── Top-right "committee" box ─────────────────────────
-      const boxX = POSTER_W - 260;
-      const boxY = 40;
-      const boxW = 220;
-      const boxH = 140;
-      ctx.strokeStyle = BRAND_GOLD;
-      ctx.lineWidth = 3;
-      ctx.strokeRect(boxX, boxY, boxW, boxH);
-      ctx.fillStyle = BRAND_GOLD;
-      ctx.font = "bold 28px Georgia, serif";
-      ctx.fillText("Golden monday", boxX + boxW / 2, boxY + 40);
-      ctx.fillText("committee", boxX + boxW / 2, boxY + 75);
-      ctx.fillText("2026", boxX + boxW / 2, boxY + 115);
-
-      // ── Presenter photo (left, framed) ────────────────────
-      const photoX = 20;
-      const photoY = 230;
-      const photoW = POSTER_W / 2 - 30;
-      const photoH = 560;
-      if (photoSrc) {
-        try {
-          const photo = await loadImage(photoSrc);
-          // Cover-fit: crop source to target aspect
-          const targetAspect = photoW / photoH;
-          const sourceAspect = photo.width / photo.height;
-          let sx = 0,
-            sy = 0,
-            sw = photo.width,
-            sh = photo.height;
-          if (sourceAspect > targetAspect) {
-            sw = photo.height * targetAspect;
-            sx = (photo.width - sw) / 2;
-          } else {
-            sh = photo.width / targetAspect;
-            sy = (photo.height - sh) / 2;
-          }
-          ctx.drawImage(photo, sx, sy, sw, sh, photoX, photoY, photoW, photoH);
-          // Thin gold frame
-          ctx.strokeStyle = BRAND_GOLD;
-          ctx.lineWidth = 2;
-          ctx.strokeRect(photoX, photoY, photoW, photoH);
-        } catch (e) {
-          console.warn("[PosterStudio] presenter photo failed:", e.message);
-        }
-      } else {
-        // Placeholder rectangle with instructions
-        ctx.fillStyle = "rgba(255,255,255,0.15)";
-        ctx.fillRect(photoX, photoY, photoW, photoH);
-        ctx.fillStyle = BRAND_WHITE;
-        ctx.font = "italic 20px sans-serif";
-        ctx.fillText(
-          "Presenter photo",
-          photoX + photoW / 2,
-          photoY + photoH / 2,
-        );
-      }
-
-      // ── Clock (bottom-left) ───────────────────────────────
-      try {
-        const clock = await loadImage(CLOCK_URL);
-        const cw = 420;
-        const ch = (clock.height / clock.width) * cw;
-        ctx.drawImage(clock, -20, POSTER_H - ch + 20, cw, ch);
-      } catch (e) {
-        console.warn("[PosterStudio] clock missing:", e.message);
-      }
-
-      // ── Right column ──────────────────────────────────────
-      const rightX = POSTER_W / 2 + 60;
-      ctx.textAlign = "left";
-
-      // 📢 megaphone emoji
-      ctx.font = "70px serif";
-      ctx.fillText("📢", rightX + 80, 420);
-
-      // Presenter audience line ("ከአቶ ታሪኩ ጉሉማ ጋር")
-      ctx.fillStyle = BRAND_GOLD;
-      ctx.font = "bold 32px 'Noto Sans Ethiopic', 'Nyala', serif";
-      ctx.textAlign = "center";
-      const audienceLine =
-        form.audienceLine || `ከ ${form.presenterName || "አቅራቢ"} ጋር`;
-      ctx.fillText(audienceLine, rightX + 180, 530);
-
-      // Center name
-      ctx.font = "italic bold 40px Georgia, serif";
-      ctx.fillText(form.center || "Addis Ketema Center", rightX + 180, 700);
-
-      // Gold divider
-      ctx.fillStyle = BRAND_GOLD;
-      ctx.fillRect(rightX + 20, 730, 320, 6);
-
-      // Ethiopian date
-      ctx.font = "bold 34px 'Noto Sans Ethiopic', 'Nyala', serif";
-      ctx.fillText(
-        form.ethiopianDate || "መስከረም 1, 2018 ዓ.ም.",
-        rightX + 180,
-        810,
-      );
-
-      // Time
-      ctx.font = "italic bold 30px Georgia, serif";
-      ctx.fillText(form.time || "1:30 – 2:30 ከሰዓት", rightX + 180, 880);
-
-      // ── Title (below clock, small) ────────────────────────
-      if (form.title) {
-        ctx.fillStyle = BRAND_WHITE;
-        ctx.font = "bold 26px 'Noto Sans Ethiopic', 'Nyala', serif";
-        ctx.textAlign = "left";
-        ctx.fillText(`"${form.title}"`, 40, POSTER_H - 130);
-      }
-
-      // ── Website URL (bottom-right) ────────────────────────
-      ctx.fillStyle = BRAND_GOLD;
-      ctx.font = "italic 22px Georgia, serif";
-      ctx.textAlign = "right";
-      ctx.fillText(form.websiteUrl, POSTER_W - 40, POSTER_H - 40);
-
-      // ── Export to preview image ───────────────────────────
       const dataUrl = canvas.toDataURL("image/png", 0.92);
       setPreviewUrl(dataUrl);
     } catch (err) {
@@ -267,17 +135,16 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
     } finally {
       setRendering(false);
     }
-  }, [form, photoSrc, loadImage]);
+  }, [form, photoSrc, selectedTemplate, loadImage]);
 
-  // Re-render whenever the form or photo changes
+  // Re-render whenever form, photo, or template changes
   useEffect(() => {
     if (!isOpen) return;
-    // Small debounce so typing doesn't re-render on every keystroke
     const timer = setTimeout(renderPoster, 200);
     return () => clearTimeout(timer);
-  }, [isOpen, form, photoSrc, renderPoster]);
+  }, [isOpen, form, photoSrc, selectedTemplate, renderPoster]);
 
-  // ── Handle local photo upload ───────────────────────────────
+  // ── Photo upload ────────────────────────────────────────────
   const handlePhotoUpload = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -290,7 +157,7 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
     reader.readAsDataURL(file);
   }, []);
 
-  // ── Submit: upload the rendered poster + post to Telegram ───
+  // ── Submit ──────────────────────────────────────────────────
   const handlePost = useCallback(async () => {
     if (!session?._id) return;
     if (!previewUrl) {
@@ -305,7 +172,6 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
       });
       if (onPosted) await onPosted();
       if (onClose) onClose();
-      // Toast handled by the parent component
       return res;
     } catch (err) {
       console.error("[PosterStudio] post failed:", err);
@@ -317,7 +183,7 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
     } finally {
       setPosting(false);
     }
-  }, [session, previewUrl, form, onPosted, onClose]);
+  }, [session, previewUrl, onPosted, onClose]);
 
   if (!isOpen) return null;
 
@@ -339,6 +205,36 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         padding: 16,
       }}
     >
+      {/* ✅ Invisible text — forces Google Fonts to load before the
+          canvas tries to render. Without these, the first poster of
+          a session falls back to system serif fonts until some other
+          part of the app happens to use Noto Serif Ethiopic or
+          Playfair Display in the DOM. */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          opacity: 0,
+          pointerEvents: "none",
+          fontFamily: "'Noto Serif Ethiopic', serif",
+          fontSize: 1,
+        }}
+      >
+        ወርቃማ
+      </span>
+      <span
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          opacity: 0,
+          pointerEvents: "none",
+          fontFamily: "'Playfair Display', serif",
+          fontSize: 1,
+        }}
+      >
+        Golden
+      </span>
+
       <motion.div
         initial={{ scale: 0.9, y: 20, opacity: 0 }}
         animate={{ scale: 1, y: 0, opacity: 1 }}
@@ -395,7 +291,7 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
           </button>
         </div>
 
-        {/* Body: two columns — form on left, preview on right */}
+        {/* Body: two columns */}
         <div
           style={{
             flex: 1,
@@ -413,6 +309,70 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
               borderRight: `1px solid ${C.border}`,
             }}
           >
+            {/* Template picker */}
+            <Field label="Design template">
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 8,
+                }}
+              >
+                {TEMPLATE_ORDER.map((id) => {
+                  const t = TEMPLATES[id];
+                  const active = selectedTemplate === id;
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => setSelectedTemplate(id)}
+                      title={t.meta.description}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        border: active
+                          ? `2px solid ${C.primary}`
+                          : `1.5px solid ${C.border}`,
+                        background: active ? `${C.primary}08` : "#fff",
+                        cursor: "pointer",
+                        textAlign: "left",
+                        fontFamily: F.sans,
+                        transition: "all 0.15s ease",
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 24,
+                          height: 32,
+                          borderRadius: 4,
+                          background: t.meta.thumbnailColor,
+                          border: "1px solid rgba(0,0,0,0.1)",
+                          flexShrink: 0,
+                        }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: active ? 700 : 600,
+                            color: C.dark,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 4,
+                          }}
+                        >
+                          {t.meta.name}
+                          {active && <FiCheck size={12} color={C.primary} />}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+
             <Field label="Presenter name">
               <input
                 value={form.presenterName}
@@ -427,8 +387,63 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
               <input
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
+                placeholder="e.g. Digital Transformation in Public Service"
                 style={inputStyle}
               />
+              {suggestedTopics.length > 0 && (
+                <div style={{ marginTop: 8 }}>
+                  <p
+                    style={{
+                      fontSize: 11,
+                      color: C.muted,
+                      margin: "0 0 6px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    💡 AI suggested — click to use:
+                  </p>
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 6,
+                    }}
+                  >
+                    {suggestedTopics.map((topic, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setForm({ ...form, title: topic })}
+                        style={{
+                          background: `${C.primary}08`,
+                          border: `1px solid ${C.primary}22`,
+                          borderRadius: 999,
+                          padding: "4px 12px",
+                          fontSize: 11,
+                          color: C.primary,
+                          cursor: "pointer",
+                          fontFamily: F.sans,
+                          textAlign: "left",
+                          maxWidth: "100%",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          transition: "all 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = `${C.primary}15`;
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = `${C.primary}08`;
+                        }}
+                      >
+                        {topic}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </Field>
 
             <Field label="Audience line (Amharic)">
@@ -580,6 +595,7 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
                   style={{
                     aspectRatio: `${POSTER_W}/${POSTER_H}`,
                     display: "flex",
+                    flexDirection: "column",
                     alignItems: "center",
                     justifyContent: "center",
                     borderRadius: 8,
@@ -658,7 +674,7 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
           </button>
         </div>
 
-        {/* Hidden canvas used for rendering */}
+        {/* Hidden canvas */}
         <canvas
           ref={canvasRef}
           width={POSTER_W}
