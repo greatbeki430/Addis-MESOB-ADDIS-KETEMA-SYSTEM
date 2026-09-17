@@ -4,7 +4,6 @@
 // as a global since Node 18, so just use the native one. Destructuring both
 // from undici caused 'Blob is not a constructor' on the current Node 26
 // runtime — undici's Blob export is undefined in the resolved version.
-const { FormData } = require("undici");
 const GoldenMondaySession = require("../../models/GoldenMondaySession");
 const { formatDate, sendMessage, callTelegramApi } = require("./utils");
 const {
@@ -674,8 +673,6 @@ async function postPresenterAnnouncementWithPhoto(session, options = {}) {
         "\n\n_… (truncated)_";
     }
 
-    // Telegram's sendPhoto accepts multipart uploads (file) or a URL.
-    // A data: URL is NOT accepted, so we need to upload the binary.
     // Parse the data URL to get the MIME type and bytes.
     const match = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(photoDataUrl);
     if (!match) {
@@ -689,32 +686,70 @@ async function postPresenterAnnouncementWithPhoto(session, options = {}) {
       `[postWithPoster] uploading ${buffer.length} bytes as ${mimeType}`,
     );
 
-    // Telegram requires multipart/form-data for binary uploads.
-    // Node 18+ has FormData and Blob globally available.
-    // Telegram's sendPhoto expects the file to be a proper multipart
-    // file part with a filename. undici's FormData serializes a bare
-    // Blob differently than a File — in some versions it drops the
-    // filename, which makes Telegram parse the part as an empty field
-    // and reject with "there is no photo in the request". Use File
-    // (which extends Blob) instead. Node exposes File as a global
-    // since v20; for older runtimes, fall back to node:buffer.
-    let FileImpl = globalThis.File;
-    if (!FileImpl) {
-      FileImpl = require("node:buffer").File;
-    }
+    // ─── Manual multipart/form-data construction ──────────────
+    // We build the multipart body by hand instead of relying on
+    // undici's FormData. undici's FormData checks `instanceof File`
+    // against ITS OWN File class, which differs from the native
+    // globalThis.File — so when we pass a native File, undici
+    // serializes it as a plain field, Telegram sees no `photo` part,
+    // and rejects with "there is no photo in the request". Manual
+    // construction sidesteps this entirely and works identically on
+    // every Node version.
+    const boundary =
+      "----GoldenMondayPosterBoundary" +
+      Date.now().toString(36) +
+      Math.random().toString(36).slice(2);
 
-    const form = new FormData();
-    form.append("chat_id", TELEGRAM_CHANNEL_ID);
-    form.append("caption", caption);
-    form.append("parse_mode", "Markdown");
-    form.append(
-      "photo",
-      new FileImpl([buffer], "golden-monday-poster.png", { type: mimeType }),
+    // Each part is: --<boundary>\r\n<headers>\r\n\r\n<body>\r\n
+    // The body ends with: --<boundary>--\r\n
+    const CRLF = "\r\n";
+    const parts = [];
+
+    const addTextField = (name, value) => {
+      parts.push(
+        Buffer.from(
+          `--${boundary}${CRLF}` +
+            `Content-Disposition: form-data; name="${name}"${CRLF}${CRLF}` +
+            `${value}${CRLF}`,
+          "utf8",
+        ),
+      );
+    };
+
+    const addFileField = (name, filename, contentType, data) => {
+      parts.push(
+        Buffer.from(
+          `--${boundary}${CRLF}` +
+            `Content-Disposition: form-data; name="${name}"; filename="${filename}"${CRLF}` +
+            `Content-Type: ${contentType}${CRLF}${CRLF}`,
+          "utf8",
+        ),
+      );
+      parts.push(data);
+      parts.push(Buffer.from(CRLF, "utf8"));
+    };
+
+    addTextField("chat_id", TELEGRAM_CHANNEL_ID);
+    addTextField("caption", caption);
+    addTextField("parse_mode", "Markdown");
+    addFileField("photo", "golden-monday-poster.png", mimeType, buffer);
+
+    // Closing boundary
+    parts.push(Buffer.from(`--${boundary}--${CRLF}`, "utf8"));
+
+    const bodyBuffer = Buffer.concat(parts);
+
+    console.log(
+      `[postWithPoster] multipart body: ${bodyBuffer.length} bytes, boundary=${boundary}`,
     );
 
     const response = await fetch(`${TELEGRAM_API}/sendPhoto`, {
       method: "POST",
-      body: form,
+      headers: {
+        "Content-Type": `multipart/form-data; boundary=${boundary}`,
+        "Content-Length": String(bodyBuffer.length),
+      },
+      body: bodyBuffer,
     });
 
     const data = await response.json();
