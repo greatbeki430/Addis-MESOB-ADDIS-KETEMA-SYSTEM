@@ -151,7 +151,7 @@ export async function render(ctx, helpers) {
   ctx.textBaseline = "middle";
   ctx.fillStyle = T.accent;
   ctx.font = "bold 38px 'Noto Serif Ethiopic', 'Nyala', serif";
-  ctx.fillText("የወርቃማ ሰኞ ፕሮግራም ተናጋሪ", W / 2 + 60, 100);
+  ctx.fillText("የወርቃማ ሰኞ ፕሮግራም ተረኛ", W / 2 + 60, 100);
 
   // Committee label top-right
   ctx.fillStyle = hexAlpha(T.accent, 0.7);

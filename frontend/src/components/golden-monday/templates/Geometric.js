@@ -152,7 +152,7 @@ export async function render(ctx, helpers) {
 
   // Line 3 — cream
   ctx.fillStyle = CREAM;
-  ctx.fillText("ተናጋሪ", LEFT_X, HERO_TOP + HERO_LINE_H * 2);
+  ctx.fillText("ተረኛ", LEFT_X, HERO_TOP + HERO_LINE_H * 2);
 
   // ── Gold divider with diamond ───────────────────────────────
   ctx.strokeStyle = YELLOW;
