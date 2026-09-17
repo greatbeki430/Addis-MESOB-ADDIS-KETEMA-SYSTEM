@@ -1246,7 +1246,14 @@ Analyze and return ONLY valid JSON (no markdown):
 // 11. AMHARIC / ENGLISH TRANSLATION
 // ============================================================
 const translateContent = async (text, targetLanguage) => {
-  const prompt = `Translate the following text to ${targetLanguage === "am" ? "Amharic (አማርኛ)" : "English"}.
+  const langNames = {
+    am: "Amharic (አማርኛ)",
+    en: "English",
+    om: "Afaan Oromoo (Oromo)",
+  };
+  const target = langNames[targetLanguage] || "English";
+
+  const prompt = `Translate the following text to ${target}.
 This is government/administrative content for Addis Ketema sub-city CRRSA services.
 Maintain formal, professional tone appropriate for government documents.
 
@@ -1256,6 +1263,9 @@ Return ONLY the translated text, nothing else.`;
 
   return generateText(prompt);
 };
+
+// Alias so downstream helpers looking for `translateText` find it.
+const translateText = translateContent;
 
 // ============================================================
 // 12. SMART REPORT TITLE GENERATOR
@@ -1415,6 +1425,10 @@ module.exports = {
   generatePerformanceTrend,
   categorizeComplaint,
   translateContent,
+  // Aliases so services/telegram/trilingual.js (and anything else
+  // that expects one of these names) can call into the translator.
+  translate: translateContent,
+  translateText: translateContent,
   generateReportTitle,
   generateGoldenMondayRecap,
   generateGoldenMondayTopics,
