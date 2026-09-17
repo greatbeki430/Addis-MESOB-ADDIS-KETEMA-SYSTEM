@@ -638,6 +638,88 @@ async function forceRenotifyPresenter(sessionId) {
   return { success: ok };
 }
 
+// ─── POST WITH A CUSTOM UPLOADED PHOTO ──────────────────────────
+// Like postPresenterAnnouncementToChannel, but uses a coordinator-
+// rendered poster (base64 data URL) instead of the presenter's
+// profile photo. Used by the Poster Studio.
+async function postPresenterAnnouncementWithPhoto(session, options = {}) {
+  // Note: `options.overrides` is accepted by the controller but not
+  // currently applied to the trilingual caption. If a future iteration
+  // wants coordinator-edited title/date to override the caption, plumb
+  // it into buildTrilingualAnnouncement.
+  const { photoDataUrl } = options;
+
+  if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHANNEL_ID) {
+    console.warn("⚠️ Telegram not configured - skipping post");
+    return { postId: null, messageUrl: null };
+  }
+
+  if (!photoDataUrl) {
+    console.warn("⚠️ No photoDataUrl supplied, falling back to text");
+    return postPresenterAnnouncementToChannel(session);
+  }
+
+  try {
+    // Build the same trilingual caption as the regular channel post.
+    let caption = await buildTrilingualAnnouncement(session);
+    if (caption.length > TELEGRAM_MAX_BODY) {
+      caption =
+        caption.slice(0, TELEGRAM_MAX_BODY - 40).trimEnd() +
+        "\n\n_… (truncated)_";
+    }
+
+    // Telegram's sendPhoto accepts multipart uploads (file) or a URL.
+    // A data: URL is NOT accepted, so we need to upload the binary.
+    // Parse the data URL to get the MIME type and bytes.
+    const match = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(photoDataUrl);
+    if (!match) {
+      throw new Error("Invalid poster data URL format");
+    }
+    const mimeType = match[1];
+    const base64Body = match[2];
+    const buffer = Buffer.from(base64Body, "base64");
+
+    // Telegram requires multipart/form-data for binary uploads.
+    // Node 18+ has FormData and Blob globally available.
+    const form = new FormData();
+    form.append("chat_id", TELEGRAM_CHANNEL_ID);
+    form.append("caption", caption);
+    form.append("parse_mode", "Markdown");
+    form.append(
+      "photo",
+      new Blob([buffer], { type: mimeType }),
+      "golden-monday-poster.png",
+    );
+
+    const response = await fetch(`${TELEGRAM_API}/sendPhoto`, {
+      method: "POST",
+      body: form,
+    });
+
+    const data = await response.json();
+    if (!data.ok) {
+      console.error(
+        `❌ Telegram sendPhoto (poster) failed: ${data.description}`,
+      );
+      return {
+        postId: null,
+        messageUrl: null,
+        error: data.description,
+      };
+    }
+
+    const postId = data.result?.message_id;
+    const channelUsername = data.result?.chat?.username || "AddisMESOBGM";
+    const messageUrl = `https://t.me/${channelUsername}/${postId}`;
+
+    console.log(`✅ Posted coordinator poster to channel: ${messageUrl}`);
+    return { postId, messageUrl };
+  } catch (error) {
+    console.error("❌ Failed to post poster to Telegram:", error.message);
+    return { postId: null, messageUrl: null, error: error.message };
+  }
+}
+
 module.exports = {
   postNextPresenterAnnouncement,
   postPresenterAnnouncementToChannel,
@@ -648,4 +730,5 @@ module.exports = {
   generateAnnouncementImage,
   forceRepostToChannel,
   forceRenotifyPresenter,
+  postPresenterAnnouncementWithPhoto,
 };

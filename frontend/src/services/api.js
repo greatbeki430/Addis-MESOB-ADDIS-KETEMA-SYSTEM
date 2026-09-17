@@ -741,6 +741,14 @@ export const goldenMondayAPI = {
     api.post(`/golden-monday/${sessionId}/confirm`),
   declineAvailability: (sessionId, reason) =>
     api.post(`/golden-monday/${sessionId}/decline`, { reason }),
+
+  // Poster Studio: upload a rendered PNG + post it to Telegram
+  postWithPoster: (sessionId, { posterDataUrl, captionOverrides }) =>
+    api.post(
+      `/golden-monday/${sessionId}/post-with-poster`,
+      { posterDataUrl, captionOverrides },
+      { timeout: 120000 },
+    ),
 };
 
 // ============================================================

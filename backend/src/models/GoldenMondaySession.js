@@ -8,7 +8,13 @@ const goldenMondaySessionSchema = new mongoose.Schema(
     // Basic Info
     title: { type: String, required: true, trim: true },
     date: { type: Date, default: Date.now },
-    weekOf: { type: Date, required: true, index: true },
+    weekOf: {
+      type: Date,
+      required: true,
+      // Uniqueness + indexing handled by the explicit
+      // schema.index({ weekOf: 1 }, { unique: true, sparse: true })
+      // below. `index: true` here would duplicate that declaration.
+    },
 
     // Organization
     organization: { type: String, trim: true, default: "Addis MESOB" },

@@ -25,12 +25,13 @@ const {
   pendingPresenterConfirmations,
   postNextPresenterAnnouncement,
   postPresenterAnnouncementToChannel,
+  postPresenterAnnouncementWithPhoto, // ✅ ADDED — Poster Studio
   requestPresenterAvailability,
   handlePresenterAvailability,
   handlePresenterUnavailableReason,
-  generateAnnouncementImage, // ✅ ADDED — was pulled directly before
-  forceRepostToChannel, // ✅ ADDED
-  forceRenotifyPresenter, // ✅ ADDED
+  generateAnnouncementImage,
+  forceRepostToChannel,
+  forceRenotifyPresenter,
 
   // Notifications
   createNotification,
@@ -117,12 +118,13 @@ module.exports = {
   postNextPresenterAnnouncement,
   postPresenterAnnouncementToChannel,
   postPresenterAnnouncement, // Legacy alias
+  postPresenterAnnouncementWithPhoto, // ✅ ADDED
   requestPresenterAvailability,
   handlePresenterAvailability,
   handlePresenterUnavailableReason,
   generateAnnouncementImage,
-  forceRepostToChannel, // ✅ ADDED
-  forceRenotifyPresenter, // ✅ ADDED
+  forceRepostToChannel,
+  forceRenotifyPresenter,
 
   // Notifications
   createNotification,
