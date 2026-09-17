@@ -27,18 +27,24 @@ const TELEGRAM_MAX_BODY = 4000;
 // or Telegram rejects the poster with 'message caption is too long'.
 const TELEGRAM_MAX_CAPTION = 1024;
 
-// ─── MARKDOWN ESCAPING ──────────────────────────────────────────
-// Telegram's legacy Markdown parse_mode treats *, _, `, and [ as
-// special characters. If any of these appear in dynamic content
-// (presenter names, titles, departments, AI-generated topics,
-// translation output), the parser fails with:
+// ─── HTML ESCAPING ──────────────────────────────────────────────
+// The trilingual caption used to be built for parse_mode: "Markdown"
+// and escaped with a backslash-escape helper. Telegram's LEGACY
+// Markdown parser has no reliable backslash-escape behavior for
+// *, _, `, [ — so any dynamic string (presenter name, department,
+// title, description, AI topics, AI translations) containing one of
+// those characters could still produce:
 //   "can't parse entities: Can't find end of the entity starting
 //    at byte offset N"
-// because it sees an opening marker with no matching closing one.
-// Escape every occurrence in user-supplied or AI-generated text
-// before inserting it into a Markdown caption.
-const escapeMarkdown = (text) =>
-  String(text ?? "").replace(/([_*`\[])/g, "\\$1");
+// even after escaping. Switching to parse_mode: "HTML" removes the
+// ambiguity: only &, <, > are special, the escaping rule is
+// unambiguous, and formatting uses explicitly-paired <b>...</b> tags
+// instead of *...* markers that can be broken by stray content.
+const escapeHtml = (text) =>
+  String(text ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
 // ─── PENDING CONFIRMATIONS ──────────────────────────────────────
 const pendingPresenterConfirmations = new Map();
@@ -67,10 +73,13 @@ async function generateAnnouncementImage(presenter, session) {
 // with per-string fallback to the original on any failure.
 //
 // IMPORTANT: every dynamic string that lands in the caption goes
-// through escapeMarkdown() so a stray * _ ` [ in a presenter name,
-// title, translation, or AI topic can't break Telegram's Markdown
-// parser. The *bold* markers we write ourselves stay literal — they
-// are always paired on the same line.
+// through escapeHtml() so a stray & < > in a presenter name, title,
+// translation, or AI topic can't break Telegram's HTML parser. Bold
+// formatting uses <b>...</b> instead of *...* — HTML tags are always
+// paired explicitly, so there's no "unpaired marker" failure mode.
+// This string is consumed by BOTH postPresenterAnnouncementToChannel
+// and postPresenterAnnouncementWithPhoto — both must send it with
+// parse_mode: "HTML" (see those functions below).
 async function buildTrilingualAnnouncement(session) {
   const presenter = session.presenter;
 
@@ -98,43 +107,41 @@ async function buildTrilingualAnnouncement(session) {
     const presenterHashtag = buildPresenterHashtag(presenterName);
 
     const lines = [];
-    lines.push(`🎯 *${escapeMarkdown(L.header)} — ${escapeMarkdown(dateStr)}*`);
+    lines.push(`🎯 <b>${escapeHtml(L.header)} — ${escapeHtml(dateStr)}</b>`);
     lines.push("");
     lines.push(
-      `👤 *${escapeMarkdown(L.presenter)}:* ${escapeMarkdown(presenterName)}`,
+      `👤 <b>${escapeHtml(L.presenter)}:</b> ${escapeHtml(presenterName)}`,
     );
     if (presenter?.department) {
       lines.push(
-        `🏛️ *${escapeMarkdown(L.department)}:* ${escapeMarkdown(presenter.department)}`,
+        `🏛️ <b>${escapeHtml(L.department)}:</b> ${escapeHtml(presenter.department)}`,
       );
     }
     if (dynamic.title) {
       lines.push(
-        `📖 *${escapeMarkdown(L.topic)}:* "${escapeMarkdown(dynamic.title)}"`,
+        `📖 <b>${escapeHtml(L.topic)}:</b> "${escapeHtml(dynamic.title)}"`,
       );
     }
     if (dynamic.description) {
       lines.push(
-        `📝 *${escapeMarkdown(L.description)}:* ${escapeMarkdown(dynamic.description)}`,
+        `📝 <b>${escapeHtml(L.description)}:</b> ${escapeHtml(dynamic.description)}`,
       );
     }
     lines.push("");
+    lines.push(`🕒 <b>${escapeHtml(L.time)}:</b> ${escapeHtml(L.timeValue)}`);
     lines.push(
-      `🕒 *${escapeMarkdown(L.time)}:* ${escapeMarkdown(L.timeValue)}`,
-    );
-    lines.push(
-      `📍 *${escapeMarkdown(L.location)}:* ${escapeMarkdown(L.locationValue)}`,
+      `📍 <b>${escapeHtml(L.location)}:</b> ${escapeHtml(L.locationValue)}`,
     );
     if (dynamic.topics.length > 0) {
       lines.push("");
-      lines.push(`💡 *${escapeMarkdown(L.aiTopics)}:*`);
+      lines.push(`💡 <b>${escapeHtml(L.aiTopics)}:</b>`);
       dynamic.topics.forEach((topic, i) => {
-        lines.push(`   ${i + 1}. ${escapeMarkdown(topic)}`);
+        lines.push(`   ${i + 1}. ${escapeHtml(topic)}`);
       });
     }
     lines.push("");
     lines.push(
-      `${L.hashtags.map(escapeMarkdown).join(" ")} ${escapeMarkdown(presenterHashtag)}`,
+      `${L.hashtags.map(escapeHtml).join(" ")} ${escapeHtml(presenterHashtag)}`,
     );
     return lines.join("\n");
   };
@@ -162,16 +169,17 @@ async function buildTrilingualAnnouncement(session) {
 }
 
 // ─── SAFE CAPTION TRIM ──────────────────────────────────────────
-// Truncates a Markdown caption to maxLen without leaving a dangling
-// escape sequence (\X). Returns the trimmed string with the
-// standard "truncated" suffix appended.
+// Truncates a caption to maxLen. Now that the caption is HTML rather
+// than Markdown, there's no backslash-escape sequence to worry about
+// splitting, so the "\\" back-off check is no longer needed — kept
+// harmless (it just won't match) in case a stray backslash appears
+// in user content. The truncated-suffix marker uses <i> instead of
+// the old Markdown _..._ so it still renders as italic under HTML.
 const trimCaption = (text, maxLen) => {
   if (text.length <= maxLen) return text;
   let cut = maxLen - 40;
-  // If the character immediately before the cut is a backslash, back
-  // off one position so we don't split an escape sequence.
   if (text[cut - 1] === "\\") cut -= 1;
-  return text.slice(0, cut).trimEnd() + "\n\n_… (truncated)_";
+  return text.slice(0, cut).trimEnd() + "\n\n<i>… (truncated)</i>";
 };
 
 // ─── POST TO CHANNEL ─────────────────────────────────────────────
@@ -213,7 +221,7 @@ async function postPresenterAnnouncementToChannel(session) {
           chat_id: TELEGRAM_CHANNEL_ID,
           photo: imageUrl,
           caption: photoCaption,
-          parse_mode: "Markdown",
+          parse_mode: "HTML", // was "Markdown" — see buildTrilingualAnnouncement note above
         }),
       });
 
@@ -228,7 +236,7 @@ async function postPresenterAnnouncementToChannel(session) {
           body: JSON.stringify({
             chat_id: TELEGRAM_CHANNEL_ID,
             text: message,
-            parse_mode: "Markdown",
+            parse_mode: "HTML", // was "Markdown"
           }),
         });
       }
@@ -239,7 +247,7 @@ async function postPresenterAnnouncementToChannel(session) {
         body: JSON.stringify({
           chat_id: TELEGRAM_CHANNEL_ID,
           text: message,
-          parse_mode: "Markdown",
+          parse_mode: "HTML", // was "Markdown"
         }),
       });
     }
@@ -264,6 +272,9 @@ async function postPresenterAnnouncementToChannel(session) {
 
 // ─── REQUEST PRESENTER AVAILABILITY ─────────────────────────────
 // Accepts `{ force }`. Also hydrates a bare ObjectId presenter.
+// NOTE: unchanged — this builds its own plain-text message and stays
+// on parse_mode: "Markdown" per the requested scope (poster-posting
+// issue only). It doesn't go through buildTrilingualAnnouncement.
 async function requestPresenterAvailability(session, { force = false } = {}) {
   // Hydrate presenter if it's just an ObjectId
   let presenter = session.presenter;
@@ -699,7 +710,9 @@ async function forceRenotifyPresenter(sessionId) {
 // ─── POST WITH A CUSTOM UPLOADED PHOTO ──────────────────────────
 // Like postPresenterAnnouncementToChannel, but uses a coordinator-
 // rendered poster (base64 data URL) instead of the presenter's
-// profile photo. Used by the Poster Studio.
+// profile photo. Used by the Poster Studio. This is the path that
+// was throwing "can't parse entities: Can't find end of the entity
+// starting at byte offset 1454" in production.
 async function postPresenterAnnouncementWithPhoto(session, options = {}) {
   // Note: `options.overrides` is accepted by the controller but not
   // currently applied to the trilingual caption. If a future iteration
@@ -724,6 +737,18 @@ async function postPresenterAnnouncementWithPhoto(session, options = {}) {
     let caption = await buildTrilingualAnnouncement(session);
     caption = trimCaption(caption, TELEGRAM_MAX_CAPTION);
 
+    // Diagnostic: log byte length and a preview so any future parse
+    // failure can be matched against the exact character at the
+    // reported byte offset. Use Buffer, not caption.length — Amharic/
+    // Afaan Oromoo characters and emoji are multi-byte, so JS string
+    // index drifts from Telegram's reported byte offset.
+    console.log(
+      `[postWithPoster] caption bytes=${Buffer.byteLength(caption, "utf8")} chars=${caption.length}`,
+    );
+    console.log(
+      `[postWithPoster] caption preview: ${JSON.stringify(caption.slice(0, 1500))}`,
+    );
+
     // Parse the data URL to get the MIME type and bytes.
     const match = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(photoDataUrl);
     if (!match) {
@@ -745,7 +770,7 @@ async function postPresenterAnnouncementWithPhoto(session, options = {}) {
     // serializes it as a plain field, Telegram sees no `photo` part,
     // and rejects with "there is no photo in the request". Manual
     // construction sidesteps this entirely and works identically on
-    // every Node version.
+    // every Node version. (Unchanged — this part works.)
     const boundary =
       "----GoldenMondayPosterBoundary" +
       Date.now().toString(36) +
@@ -782,7 +807,7 @@ async function postPresenterAnnouncementWithPhoto(session, options = {}) {
 
     addTextField("chat_id", TELEGRAM_CHANNEL_ID);
     addTextField("caption", caption);
-    addTextField("parse_mode", "Markdown");
+    addTextField("parse_mode", "HTML"); // was "Markdown" — root cause of the parse error
     addFileField("photo", "golden-monday-poster.png", mimeType, buffer);
 
     // Closing boundary
