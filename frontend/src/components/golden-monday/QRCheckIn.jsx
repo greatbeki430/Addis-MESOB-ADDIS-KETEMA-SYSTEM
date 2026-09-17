@@ -59,7 +59,6 @@ function QRScannerModal({ isOpen, onClose, onDecoded, title, hint }) {
             if (hasScannedRef.current) return;
             hasScannedRef.current = true;
             onDecoded(decodedText);
-            // Stop and close after successful scan
             html5QrCode
               .stop()
               .then(() => html5QrCode.clear())
@@ -199,7 +198,6 @@ function QRScannerModal({ isOpen, onClose, onDecoded, title, hint }) {
               <button
                 onClick={() => {
                   setError(null);
-                  // force re-mount
                   onClose();
                 }}
                 style={{
