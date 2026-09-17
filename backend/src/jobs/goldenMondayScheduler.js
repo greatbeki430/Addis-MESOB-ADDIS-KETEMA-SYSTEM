@@ -21,8 +21,19 @@ const rotation = require("../services/goldenMondayRotationService");
 const {
   sweepExpiredRecordings,
 } = require("../services/goldenMondayRecordingService");
+// use the modern presenter-announcement path (which sets
+// session.announcementSent and uses the fixed channel poster with
+// text fallback), instead of the deprecated
+// notifyAndAnnouncePresenter, which never set that flag and used
+// its own plain-text DM without the availability buttons.
 const {
-  notifyAndAnnouncePresenter,
+  postNextPresenterAnnouncement,
+} = require("../services/telegramService");
+// ⚠️ sendPresenterReminder is still imported from the deprecated
+// file. That function itself works correctly — it's a plain-text
+// reminder DM, no buttons needed. The bug was only in
+// notifyAndAnnouncePresenter (which we no longer import).
+const {
   sendPresenterReminder,
 } = require("../services/goldenMondayNotificationService");
 const GoldenMondaySession = require("../models/GoldenMondaySession");
@@ -58,8 +69,11 @@ const startGoldenMondayScheduler = () => {
           console.log(
             `[goldenMondayScheduler] ✅ Auto-assigned ${result.session.presenterName} for ${result.session.weekOf.toDateString()}`,
           );
-          // ✅ New: auto-post + notify on the automatic path too.
-          await notifyAndAnnouncePresenter(result.session);
+          // ✅ FIX: call postNextPresenterAnnouncement() — it internally
+          // finds the next unannounced session and posts it. If a
+          // session already has announcementSent=true, it silently
+          // skips (no duplicate channel posts).
+          await postNextPresenterAnnouncement();
         } else {
           console.log(
             `[goldenMondayScheduler] ⚠️ No eligible presenters found for ${mondayOf(new Date()).toDateString()}`,

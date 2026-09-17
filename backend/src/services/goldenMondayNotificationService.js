@@ -1,5 +1,40 @@
 // backend/src/services/goldenMondayNotificationService.js
 //
+// ⚠️ DEPRECATED — do not use.
+//
+// This file was an earlier, parallel implementation of the same side
+// effects now handled by services/telegram/presenters.js
+// (postNextPresenterAnnouncement + requestPresenterAvailability).
+//
+// Two problems made it the source of a silent "presenter assigned
+// but nobody was notified" bug:
+//
+//   1. autoPostAssignmentToTelegram() sets telegramPostId /
+//      telegramPostedAt / telegramMessageUrl — but never sets
+//      session.announcementSent. The modern presenter flow in
+//      presenters.js checks that flag and skips sessions where it's
+//      true, fires on those where it's false. Because this file never
+//      touches that flag, sessions "announced" by this path could be
+//      re-announced by the modern path — or, more commonly, the two
+//      paths would race and only one would win, depending on order.
+//
+//   2. notifyPresenterAssigned() sends its own plain-text DM without
+//      the [✅ I'm Available] [❌ Not Available] [📝 Suggest Topic]
+//      buttons the modern flow uses. Presenters notified via this
+//      path couldn't confirm or decline from the DM.
+//
+// Nothing imports this file anymore. The only caller was
+// goldenMondayController.assignRotation, which now calls
+// postNextPresenterAnnouncement from telegram/presenters.js instead.
+//
+// Safe to delete once you've confirmed with:
+//   grep -rn "goldenMondayNotificationService" src/
+// returns only this file.
+//
+// ─────────────────────────────────────────────────────────────────
+//
+// Original header (kept for reference):
+//
 // Everything that needs to happen once a presenter is assigned to a
 // Golden Monday session, beyond the assignment record itself:
 //   1. Post the announcement to the public Telegram channel.

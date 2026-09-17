@@ -12,9 +12,12 @@ const {
 } = require("../services/aiService");
 const rotation = require("../services/goldenMondayRotationService");
 const recording = require("../services/goldenMondayRecordingService");
+// const {
+//   notifyAndAnnouncePresenter,
+// } = require("../services/goldenMondayNotificationService");
 const {
-  notifyAndAnnouncePresenter,
-} = require("../services/goldenMondayNotificationService");
+  postNextPresenterAnnouncement,
+} = require("../services/telegramService");
 
 // ─── Helper: Determine if user can see salary information ─────
 // Only admin/superadmin may read or write salary. This includes
@@ -450,14 +453,16 @@ const assignRotation = async (req, res) => {
       actorUser: req.user,
     });
 
-    // ✅ New: auto-post to Telegram + notify the presenter, but only
-    // when this call actually assigned someone new (not when the week
-    // already had a presenter).
-    if (!result.alreadyAssigned && result.session) {
-      notifyAndAnnouncePresenter(result.session).catch((err) =>
-        console.error("[assignRotation] notify/announce failed:", err.message),
-      );
-    }
+    // call postNextPresenterAnnouncement() regardless of
+    // alreadyAssigned, so a presenter assigned while the flag was
+    // false still gets announced. postNextPresenterAnnouncement()
+    // internally checks session.announcementSent and skips if true.
+    postNextPresenterAnnouncement().catch((err) =>
+      console.error(
+        "[assignRotation] postNextPresenterAnnouncement failed:",
+        err.message,
+      ),
+    );
 
     res.status(result.alreadyAssigned ? 200 : 201).json(result);
   } catch (error) {
