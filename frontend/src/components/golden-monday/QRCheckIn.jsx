@@ -1,10 +1,25 @@
 // frontend/src/components/golden-monday/QRCheckIn.jsx
-// QR Check-In card — supports three modes:
+// QR Check-In card — supports these modes:
 //   • Admin:    "Show Session QR"  (employees scan this)
 //   • Admin:    "Scan Employee QR" (camera)
 //   • Admin:    "Manage Check-ins" (undo a scan for re-testing)
 //   • Employee: "Scan Session QR"  (camera) + "Show My QR"
-import { useState, useEffect, useRef, useCallback } from "react";
+//
+// ⚠️ WHITE-SCREEN FIX (read before editing the scanner):
+// html5-qrcode injects and destroys its own DOM (<video>, overlay, canvas)
+// inside the element it is given, and clear() does `element.innerHTML = ""`.
+// Previously that element was rendered by React. When the modal closed in the
+// same tick the library was tearing down, React's commit phase tried to
+// removeChild a node the library had already detached → NotFoundError thrown
+// during commit → React 18 unmounts the whole root → blank white page with
+// nothing in the console. Two structural rules now prevent that:
+//   1. The scanner's host element is created with document.createElement and
+//      appended to a React wrapper that has NO React children. React never
+//      tracks the host, so React can never try to remove a node the library
+//      already removed. We detach the host ourselves during teardown.
+//   2. The camera is fully stopped BEFORE the parent is asked to close the
+//      modal, so unmount and library teardown can never overlap.
+import { useState, useEffect, useRef, useCallback, Component } from "react";
 import { C, F } from "../../styles/theme";
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
@@ -21,36 +36,220 @@ import {
   FiUser,
   FiMaximize2,
   FiRotateCcw,
+  FiUsers,
 } from "react-icons/fi";
 import { RiQrCodeLine } from "react-icons/ri";
 
+// ─────────────────────────────────────────────────────────────
+// Safe helpers — never let a shape change from the API throw
+// during render. Every list we map over goes through this.
+// ─────────────────────────────────────────────────────────────
+const safeArray = (data) => {
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === "object" && Array.isArray(data.data))
+    return data.data;
+  return [];
+};
+
+const safeInt = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const safeTime = (value) => {
+  if (!value) return "";
+  try {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// Local error boundary.
+// A boundary cannot catch errors thrown from async callbacks, which is why
+// the scanner race is fixed structurally above — but it DOES catch commit
+// and render phase failures, so a future regression shows a readable card
+// instead of unmounting the whole application. The fallback is on-screen,
+// not console-only, because mobile Safari/Chrome swallow console output.
+// ─────────────────────────────────────────────────────────────
+class QRErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+    this.handleRetry = this.handleRetry.bind(this);
+  }
+
+  static getDerivedStateFromError(error) {
+    return {
+      hasError: true,
+      message: (error && error.message) || "Unexpected error",
+    };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("[QRCheckIn] crashed:", error, info);
+  }
+
+  handleRetry() {
+    this.setState({ hasError: false, message: "" });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          style={{
+            background: C.white,
+            borderRadius: 20,
+            padding: "22px 20px",
+            border: "1px solid #fecaca",
+            fontFamily: F.sans,
+            textAlign: "center",
+          }}
+        >
+          <FiAlertTriangle size={28} color="#dc2626" />
+          <p
+            style={{
+              margin: "10px 0 4px",
+              fontSize: 14,
+              fontWeight: 700,
+              color: C.dark,
+            }}
+          >
+            QR check-in is temporarily unavailable
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: C.muted }}>
+            {this.state.message}
+          </p>
+          <button
+            onClick={this.handleRetry}
+            style={{
+              marginTop: 14,
+              padding: "8px 20px",
+              borderRadius: 8,
+              border: "none",
+              background: C.primary,
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 700,
+              fontFamily: F.sans,
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // ─── Camera Scanner Modal (reusable for admin & employee) ───
-function QRScannerModal({ isOpen, onClose, onDecoded, title, hint }) {
+function QRScannerModal({ isOpen, onClose, onDecoded, title, hint, t }) {
+  // React owns ONLY this wrapper. It never receives React children, so React
+  // has nothing inside it to reconcile or remove.
+  const wrapperRef = useRef(null);
   const scannerRef = useRef(null);
-  const [containerId] = useState(
-    () => `qr-scanner-${Math.random().toString(36).slice(2, 9)}`,
-  );
+  const mountedRef = useRef(true);
   const [error, setError] = useState(null);
   const [starting, setStarting] = useState(true);
-  const hasScannedRef = useRef(false);
+
+  // Handlers live in refs so that changing their identity (the parent passes
+  // an inline arrow for onClose) can never re-trigger the camera effect.
+  // The old dependency array [isOpen, onDecoded, onClose, containerId]
+  // restarted the scanner on EVERY parent re-render, which is what made the
+  // teardown race fire reliably on phones.
+  const onDecodedRef = useRef(onDecoded);
+  const onCloseRef = useRef(onClose);
 
   useEffect(() => {
-    if (!isOpen) return;
+    onDecodedRef.current = onDecoded;
+  }, [onDecoded]);
 
-    let html5QrCode = null;
-    hasScannedRef.current = false;
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    let cancelled = false;
+    let hostEl = null;
+    let handled = false;
+
+    const setErrorSafe = (value) => {
+      if (!cancelled && mountedRef.current) setError(value);
+    };
+    const setStartingSafe = (value) => {
+      if (!cancelled && mountedRef.current) setStarting(value);
+    };
+
+    // Stop the camera and detach the host element ourselves. Because the host
+    // was created imperatively, removing it here is the ONLY removal that ever
+    // happens for that node — React is not involved and cannot double-remove.
+    const teardown = async () => {
+      const instance = scannerRef.current;
+      scannerRef.current = null;
+      if (instance) {
+        try {
+          await instance.stop();
+        } catch {
+          /* already stopped / never started — safe to ignore */
+        }
+        try {
+          instance.clear();
+        } catch {
+          /* container may already be gone — safe to ignore */
+        }
+      }
+      if (hostEl && hostEl.parentNode) {
+        try {
+          hostEl.parentNode.removeChild(hostEl);
+        } catch {
+          /* ignore */
+        }
+      }
+      hostEl = null;
+    };
 
     const start = async () => {
       try {
-        setStarting(true);
-        setError(null);
+        setStartingSafe(true);
+        setErrorSafe(null);
+
+        const wrapper = wrapperRef.current;
+        if (!wrapper || cancelled) return;
+
+        hostEl = document.createElement("div");
+        hostEl.id = `qr-host-${Math.random().toString(36).slice(2, 9)}`;
+        hostEl.style.width = "100%";
+        hostEl.style.minHeight = "300px";
+        hostEl.style.borderRadius = "14px";
+        hostEl.style.overflow = "hidden";
+        hostEl.style.background = "#000";
+        wrapper.appendChild(hostEl);
 
         const { Html5Qrcode } = await import("html5-qrcode");
+        if (cancelled) {
+          await teardown();
+          return;
+        }
 
-        html5QrCode = new Html5Qrcode(containerId);
-        scannerRef.current = html5QrCode;
+        const instance = new Html5Qrcode(hostEl.id);
+        scannerRef.current = instance;
 
-        await html5QrCode.start(
+        await instance.start(
           { facingMode: "environment" },
           {
             fps: 10,
@@ -58,54 +257,69 @@ function QRScannerModal({ isOpen, onClose, onDecoded, title, hint }) {
             aspectRatio: 1.0,
           },
           (decodedText) => {
-            if (hasScannedRef.current) return;
-            hasScannedRef.current = true;
-            onDecoded(decodedText);
-            html5QrCode
-              .stop()
-              .then(() => html5QrCode.clear())
-              .catch(() => {});
-            onClose();
+            if (handled || cancelled) return;
+            handled = true;
+            // Release the camera and detach our host FIRST, then hand the
+            // payload up and close. Ordering is what removes the race: by the
+            // time React unmounts this modal there is no library-owned DOM
+            // left to collide with.
+            teardown()
+              .catch(() => {})
+              .then(() => {
+                try {
+                  if (onDecodedRef.current) onDecodedRef.current(decodedText);
+                } catch (cbErr) {
+                  console.error("[QRScannerModal] onDecoded threw:", cbErr);
+                }
+                try {
+                  if (onCloseRef.current) onCloseRef.current();
+                } catch (closeErr) {
+                  console.error("[QRScannerModal] onClose threw:", closeErr);
+                }
+              });
           },
           () => {
             /* per-frame decode failures are normal — ignore */
           },
         );
-        setStarting(false);
+
+        setStartingSafe(false);
       } catch (err) {
         console.error("Camera start failed:", err);
-        setStarting(false);
+        setStartingSafe(false);
+        await teardown();
         if (
           err?.name === "NotAllowedError" ||
           err?.message?.includes("Permission")
         ) {
-          setError(
-            "Camera permission denied. Please allow camera access in your browser settings.",
+          setErrorSafe(
+            t?.qrCameraPermissionDenied ||
+              "Camera permission denied. Please allow camera access in your browser settings.",
           );
         } else if (
-          err?.message?.includes("NotFoundError") ||
-          err?.name === "NotFoundError"
+          err?.name === "NotFoundError" ||
+          err?.message?.includes("NotFoundError")
         ) {
-          setError("No camera found on this device.");
+          setErrorSafe(
+            t?.qrCameraNotFound || "No camera found on this device.",
+          );
         } else {
-          setError(err?.message || "Failed to open camera.");
+          setErrorSafe(
+            err?.message || t?.qrCameraOpenFailed || "Failed to open camera.",
+          );
         }
       }
     };
 
-    const timeout = setTimeout(start, 100);
+    const timer = setTimeout(start, 80);
 
     return () => {
-      clearTimeout(timeout);
-      const s = scannerRef.current;
-      scannerRef.current = null;
-      if (s) {
-        s.stop()
-          .then(() => s.clear())
-          .catch(() => {});
-      }
+      cancelled = true;
+      clearTimeout(timer);
+      teardown();
     };
-  }, [isOpen, onDecoded, onClose, containerId]);
+    // Deliberately depends on isOpen only — see the refs above.
+  }, [isOpen, t]);
 
   if (!isOpen) return null;
 
@@ -155,10 +369,12 @@ function QRScannerModal({ isOpen, onClose, onDecoded, title, hint }) {
                   fontFamily: F.serif,
                 }}
               >
-                {title || "Scan QR Code"}
+                {title || t?.qrScannerDefaultTitle || "Scan QR Code"}
               </h3>
               <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>
-                {hint || "Point the camera at the QR code"}
+                {hint ||
+                  t?.qrScannerDefaultHint ||
+                  "Point the camera at the QR code"}
               </p>
             </div>
             <button
@@ -214,27 +430,28 @@ function QRScannerModal({ isOpen, onClose, onDecoded, title, hint }) {
                   fontWeight: 600,
                 }}
               >
-                Close
+                {t?.qrCameraCloseBtn || "Close"}
               </button>
             </div>
           ) : (
-            <>
+            <div style={{ position: "relative" }}>
+              {/* React-owned wrapper with NO React children. html5-qrcode's
+                  host node is appended here imperatively and removed by us. */}
               <div
-                id={containerId}
+                ref={wrapperRef}
                 style={{
                   width: "100%",
                   minHeight: 300,
                   borderRadius: 14,
                   overflow: "hidden",
                   background: "#000",
-                  position: "relative",
                 }}
               />
               {starting && (
                 <div
                   style={{
                     position: "absolute",
-                    inset: "70px 20px 24px",
+                    inset: 0,
                     background: "rgba(0,0,0,0.7)",
                     borderRadius: 14,
                     display: "flex",
@@ -243,6 +460,7 @@ function QRScannerModal({ isOpen, onClose, onDecoded, title, hint }) {
                     color: "#fff",
                     flexDirection: "column",
                     gap: 12,
+                    pointerEvents: "none",
                   }}
                 >
                   <div
@@ -255,10 +473,12 @@ function QRScannerModal({ isOpen, onClose, onDecoded, title, hint }) {
                       animation: "spin 0.8s linear infinite",
                     }}
                   />
-                  <span style={{ fontSize: 13 }}>Starting camera…</span>
+                  <span style={{ fontSize: 13 }}>
+                    {t?.qrCameraStarting || "Starting camera…"}
+                  </span>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -267,7 +487,7 @@ function QRScannerModal({ isOpen, onClose, onDecoded, title, hint }) {
 }
 
 // ─── Big QR Display Modal (admin shows, or employee shows own) ───
-function QRLargeModal({ isOpen, onClose, qrCode, title, subtitle }) {
+function QRLargeModal({ isOpen, onClose, qrCode, title, subtitle, hint }) {
   if (!isOpen) return null;
   return (
     <Portal>
@@ -331,6 +551,8 @@ function QRLargeModal({ isOpen, onClose, qrCode, title, subtitle }) {
             </p>
           )}
 
+          {/* qrCode can legitimately be null while it loads — render a
+              placeholder instead of a broken <img>. */}
           <div
             style={{
               display: "inline-block",
@@ -339,29 +561,244 @@ function QRLargeModal({ isOpen, onClose, qrCode, title, subtitle }) {
               background: "#fff",
               border: `3px solid ${C.primary}`,
               boxShadow: `0 0 0 6px ${C.primary}15`,
+              minWidth: 160,
+              minHeight: 160,
             }}
           >
-            <img
-              src={qrCode}
-              alt="QR Code"
-              style={{
-                width: "min(100%, 320px)",
-                height: "auto",
-                display: "block",
-              }}
-            />
+            {qrCode ? (
+              <img
+                src={qrCode}
+                alt="QR Code"
+                style={{
+                  width: "min(100%, 320px)",
+                  height: "auto",
+                  display: "block",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: 200,
+                  height: 200,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "column",
+                  gap: 10,
+                  color: C.muted,
+                }}
+              >
+                <FiRefreshCw
+                  size={26}
+                  style={{ animation: "spin 1s linear infinite" }}
+                />
+                <span style={{ fontSize: 12 }}>Generating QR code…</span>
+              </div>
+            )}
           </div>
 
-          <p
+          {hint && (
+            <p
+              style={{
+                marginTop: 16,
+                fontSize: 12,
+                color: C.muted,
+                lineHeight: 1.5,
+              }}
+            >
+              {hint}
+            </p>
+          )}
+        </div>
+      </div>
+    </Portal>
+  );
+}
+
+// ─── Success confirmation (employee + admin scan) ───────────
+// Rendered from the richer backend payload. All numbers pass through
+// safeInt so a string or missing field can never throw during render.
+function CheckInSuccessModal({ isOpen, onClose, info, t }) {
+  if (!isOpen || !info) return null;
+
+  const already = Boolean(info.already);
+  const rank = safeInt(info.rank);
+  const total = safeInt(info.totalCheckedIn);
+  const eligible = safeInt(info.totalEligible);
+  const time = safeTime(info.checkedInAt);
+
+  return (
+    <Portal>
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(0,0,0,0.75)",
+          backdropFilter: "blur(8px)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          zIndex: 2147483647,
+          padding: 16,
+        }}
+        onClick={onClose}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: "#fff",
+            borderRadius: 22,
+            padding: "28px 24px 24px",
+            maxWidth: 400,
+            width: "100%",
+            textAlign: "center",
+            boxShadow: "0 40px 100px rgba(0,0,0,0.5)",
+            fontFamily: F.sans,
+            position: "relative",
+          }}
+        >
+          <button
+            onClick={onClose}
             style={{
-              marginTop: 16,
-              fontSize: 12,
-              color: C.muted,
-              lineHeight: 1.5,
+              position: "absolute",
+              top: 12,
+              right: 14,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              color: "#999",
+              padding: 6,
             }}
           >
-            📱 Ask the person to open Golden Monday → "Scan QR" on their phone
-          </p>
+            <FiX size={20} />
+          </button>
+
+          <div
+            style={{
+              width: 76,
+              height: 76,
+              borderRadius: "50%",
+              margin: "0 auto",
+              background: already ? `${C.gold}22` : "#d1fae5",
+              color: already ? "#92400e" : "#059669",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              animation: "qr-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            }}
+          >
+            <FiCheckCircle size={40} />
+          </div>
+
+          <h3
+            style={{
+              margin: "16px 0 4px",
+              fontSize: 20,
+              fontWeight: 800,
+              color: C.dark,
+              fontFamily: F.serif,
+            }}
+          >
+            {already
+              ? t?.alreadyCheckedIn || "Already Checked In"
+              : t?.checkInSuccess || "✅ Check-in successful!"}
+          </h3>
+
+          {info.name && (
+            <p style={{ margin: "0 0 2px", fontSize: 14, color: C.dark }}>
+              {info.name}
+            </p>
+          )}
+          {info.department && (
+            <p style={{ margin: 0, fontSize: 12, color: C.muted }}>
+              {info.department}
+            </p>
+          )}
+          {info.sessionTitle && (
+            <p style={{ margin: "10px 0 0", fontSize: 12, color: C.muted }}>
+              {info.sessionTitle}
+            </p>
+          )}
+
+          {(total !== null || rank !== null || time) && (
+            <div
+              style={{
+                marginTop: 18,
+                padding: "12px 14px",
+                background: C.bg,
+                borderRadius: 12,
+                display: "flex",
+                justifyContent: "center",
+                gap: 22,
+                flexWrap: "wrap",
+              }}
+            >
+              {total !== null && (
+                <div>
+                  <div
+                    style={{
+                      fontSize: 20,
+                      fontWeight: 800,
+                      color: C.primary,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      justifyContent: "center",
+                    }}
+                  >
+                    <FiUsers size={16} />
+                    {eligible !== null ? `${total}/${eligible}` : total}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.muted }}>
+                    {t?.present || "Present"}
+                  </div>
+                </div>
+              )}
+              {rank !== null && (
+                <div>
+                  <div
+                    style={{ fontSize: 20, fontWeight: 800, color: C.primary }}
+                  >
+                    #{rank}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.muted }}>
+                    {t?.checkIn || "Check In"}
+                  </div>
+                </div>
+              )}
+              {time && (
+                <div>
+                  <div
+                    style={{ fontSize: 20, fontWeight: 800, color: C.primary }}
+                  >
+                    {time}
+                  </div>
+                  <div style={{ fontSize: 11, color: C.muted }}>
+                    {t?.uploadedAt || "Time"}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button
+            onClick={onClose}
+            style={{
+              marginTop: 20,
+              width: "100%",
+              padding: "11px 20px",
+              borderRadius: 12,
+              border: "none",
+              background: C.primary,
+              color: "#fff",
+              fontWeight: 700,
+              fontSize: 14,
+              cursor: "pointer",
+              fontFamily: F.sans,
+            }}
+          >
+            {t?.close || "Close"}
+          </button>
         </div>
       </div>
     </Portal>
@@ -369,42 +806,59 @@ function QRLargeModal({ isOpen, onClose, qrCode, title, subtitle }) {
 }
 
 // ─── Admin: Un-sign / roll back a check-in ──────────────────
-// Small list modal. Shows all currently checked-in attendees for
-// the session. Each row has an "Un-sign" button that calls the
-// DELETE endpoint and updates the parent's list in place.
-function UndoCheckInModal({ isOpen, onClose, attendees, sessionId, onUndone }) {
+function UndoCheckInModal({
+  isOpen,
+  onClose,
+  attendees,
+  sessionId,
+  onUndone,
+  t,
+}) {
   const [busyId, setBusyId] = useState(null);
   const [filter, setFilter] = useState("");
 
+  const handleUndo = useCallback(
+    async (userId, name) => {
+      if (!userId) return;
+      setBusyId(userId);
+      try {
+        await goldenMondayAPI.undoQRCheckIn(sessionId, userId);
+        showToast(`↩️ ${name}'s check-in removed`, "success");
+        if (onUndone) {
+          try {
+            await onUndone();
+          } catch (refreshErr) {
+            // A parent refresh failure must never bubble out of a click
+            // handler — an unhandled rejection here would surface as an
+            // unexplained failure on mobile.
+            console.error("[UndoCheckIn] onUndone threw:", refreshErr);
+          }
+        }
+      } catch (err) {
+        console.error("[UndoCheckIn] failed:", err);
+        showToast(
+          err.response?.data?.error || "Failed to undo check-in",
+          "error",
+        );
+      } finally {
+        setBusyId(null);
+      }
+    },
+    [sessionId, onUndone],
+  );
+
   if (!isOpen) return null;
 
-  const filtered = (attendees || []).filter((a) => {
+  const list = safeArray(attendees);
+  const filtered = list.filter((a) => {
     const q = filter.trim().toLowerCase();
     if (!q) return true;
     return (
-      (a.name || "").toLowerCase().includes(q) ||
-      (a.email || "").toLowerCase().includes(q) ||
-      (a.department || "").toLowerCase().includes(q)
+      (a?.name || "").toLowerCase().includes(q) ||
+      (a?.email || "").toLowerCase().includes(q) ||
+      (a?.department || "").toLowerCase().includes(q)
     );
   });
-
-  const handleUndo = async (userId, name) => {
-    if (!userId) return;
-    setBusyId(userId);
-    try {
-      await goldenMondayAPI.undoQRCheckIn(sessionId, userId);
-      showToast(`↩️ ${name}'s check-in removed`, "success");
-      if (onUndone) await onUndone();
-    } catch (err) {
-      console.error("[UndoCheckIn] failed:", err);
-      showToast(
-        err.response?.data?.error || "Failed to undo check-in",
-        "error",
-      );
-    } finally {
-      setBusyId(null);
-    }
-  };
 
   return (
     <Portal>
@@ -487,6 +941,7 @@ function UndoCheckInModal({ isOpen, onClose, attendees, sessionId, onUndone }) {
               outline: "none",
               boxSizing: "border-box",
               marginBottom: 10,
+              fontFamily: F.sans,
             }}
           />
 
@@ -507,13 +962,14 @@ function UndoCheckInModal({ isOpen, onClose, attendees, sessionId, onUndone }) {
                   fontSize: 13,
                 }}
               >
-                {attendees && attendees.length === 0
+                {list.length === 0
                   ? "No one is checked in yet."
                   : "No matches for your filter."}
               </div>
             ) : (
-              filtered.map((a) => {
-                const rowId = a.userId || a.user?._id || a._id;
+              filtered.map((a, idx) => {
+                const rowId =
+                  a?.userId || a?.user?._id || a?._id || `row-${idx}`;
                 const isBusy = busyId === rowId;
                 return (
                   <div
@@ -541,7 +997,7 @@ function UndoCheckInModal({ isOpen, onClose, attendees, sessionId, onUndone }) {
                         flexShrink: 0,
                       }}
                     >
-                      {(a.name || "?").charAt(0)}
+                      {(a?.name || "?").charAt(0)}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div
@@ -554,7 +1010,7 @@ function UndoCheckInModal({ isOpen, onClose, attendees, sessionId, onUndone }) {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {a.name || "Unknown"}
+                        {a?.name || t?.unknown || "Unknown"}
                       </div>
                       <div
                         style={{
@@ -565,17 +1021,12 @@ function UndoCheckInModal({ isOpen, onClose, attendees, sessionId, onUndone }) {
                           whiteSpace: "nowrap",
                         }}
                       >
-                        {a.department ? `${a.department} · ` : ""}
-                        {a.checkedInAt
-                          ? new Date(a.checkedInAt).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : ""}
+                        {a?.department ? `${a.department} · ` : ""}
+                        {safeTime(a?.checkedInAt)}
                       </div>
                     </div>
                     <button
-                      onClick={() => handleUndo(rowId, a.name || "this user")}
+                      onClick={() => handleUndo(rowId, a?.name || "this user")}
                       disabled={isBusy}
                       style={{
                         display: "inline-flex",
@@ -607,7 +1058,7 @@ function UndoCheckInModal({ isOpen, onClose, attendees, sessionId, onUndone }) {
 }
 
 // ─── Main QRCheckIn Card ───
-export default function QRCheckIn({ sessionId, onCheckIn }) {
+function QRCheckInCard({ sessionId, onCheckIn }) {
   const { user } = useAuth();
   const { language } = useLanguage();
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
@@ -626,10 +1077,18 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
   const [showMyQR, setShowMyQR] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Success confirmation state (built from the richer backend payload)
+  const [successInfo, setSuccessInfo] = useState(null);
+
   // Undo / manage check-ins (admin only)
   const [undoModalOpen, setUndoModalOpen] = useState(false);
   const [attendees, setAttendees] = useState([]);
   const [loadingAttendees, setLoadingAttendees] = useState(false);
+
+  // Stable close handler. Passing an inline arrow here previously changed the
+  // scanner effect's dependency identity on every render and restarted the
+  // camera mid-scan — the trigger for the teardown race.
+  const closeScanner = useCallback(() => setScannerOpen(false), []);
 
   // ─── Load checked-in attendees (admin) ───
   const loadAttendees = useCallback(async () => {
@@ -637,12 +1096,13 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
     try {
       setLoadingAttendees(true);
       const res = await goldenMondayAPI.getAttendance(sessionId);
-      // getAttendance returns { attendance: [...] } where each row
-      // has { userId, name, email, department, attended, checkedInAt }
-      const checkedIn = (res.data?.attendance || []).filter((a) => a.attended);
+      const checkedIn = safeArray(res?.data?.attendance).filter(
+        (a) => a && a.attended,
+      );
       setAttendees(checkedIn);
     } catch (err) {
       console.error("[QRCheckIn] loadAttendees failed:", err);
+      setAttendees([]);
       showToast("Failed to load attendees", "error");
     } finally {
       setLoadingAttendees(false);
@@ -655,7 +1115,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
     try {
       setLoadingSessionQR(true);
       const res = await goldenMondayAPI.generateQRCheckIn(sessionId);
-      if (res.data?.qrCode) setSessionQR(res.data.qrCode);
+      if (res?.data?.qrCode) setSessionQR(res.data.qrCode);
     } catch (err) {
       console.error("Failed to load session QR:", err);
       showToast(
@@ -672,7 +1132,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
     try {
       setLoadingMyQR(true);
       const res = await goldenMondayAPI.getMyQR();
-      if (res.data?.qrCode) setMyQR(res.data.qrCode);
+      if (res?.data?.qrCode) setMyQR(res.data.qrCode);
     } catch (err) {
       console.error("Failed to load my QR:", err);
       showToast(err.response?.data?.error || "Failed to load your QR", "error");
@@ -682,14 +1142,25 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin || !sessionId) return;
-
+    if (!isAdmin || !sessionId) return undefined;
     const timer = setTimeout(() => {
       loadSessionQR();
     }, 0);
-
     return () => clearTimeout(timer);
   }, [isAdmin, sessionId, loadSessionQR]);
+
+  // Shared: notify the parent without ever letting its failure escape.
+  // refreshData() is an async function; an unhandled rejection from it inside
+  // a scan handler is exactly the kind of silent failure that is impossible
+  // to diagnose on a phone.
+  const notifyParent = useCallback(async () => {
+    if (!onCheckIn) return;
+    try {
+      await onCheckIn();
+    } catch (refreshErr) {
+      console.error("[QRCheckIn] onCheckIn threw:", refreshErr);
+    }
+  }, [onCheckIn]);
 
   // ─── Handle employee scanning admin's session QR ───
   const handleEmployeeScan = useCallback(
@@ -700,31 +1171,58 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
         try {
           payload = JSON.parse(decodedText);
         } catch {
-          showToast("Invalid QR code — not a session code", "error");
+          showToast(
+            t.qrInvalidNotSessionShort ||
+              "Invalid QR code — not a session code",
+            "error",
+          );
           return;
         }
-        if (payload.type !== "gm-session-checkin" || !payload.sessionId) {
-          showToast("This QR is not a Golden Monday session code", "error");
+        if (payload?.type !== "gm-session-checkin" || !payload?.sessionId) {
+          showToast(
+            t.qrInvalidNotSession ||
+              "This QR is not a Golden Monday session code",
+            "error",
+          );
           return;
         }
-        await goldenMondayAPI.recordQRCheckIn(payload.sessionId, {
+
+        const res = await goldenMondayAPI.recordQRCheckIn(payload.sessionId, {
           location: "qr-scan",
         });
-        showToast("✅ Checked in successfully!", "success");
-        if (onCheckIn) {
-          try {
-            await onCheckIn();
-          } catch (refreshErr) {
-            console.error("[QRCheckIn] onCheckIn threw:", refreshErr);
-          }
-        }
+        const data = res?.data || {};
+
+        setSuccessInfo({
+          name: data.employee?.name || user?.name || "",
+          department: data.employee?.department || "",
+          sessionTitle:
+            data.session?.presentationTitle || data.session?.title || "",
+          checkedInAt: data.attendance?.checkedInAt || null,
+          rank: data.summary?.yourRank,
+          totalCheckedIn: data.summary?.totalCheckedIn,
+          totalEligible: data.summary?.totalEligible,
+          already: Boolean(data.summary?.alreadyCheckedIn),
+        });
+
+        showToast(
+          data.summary?.alreadyCheckedIn
+            ? t.qrAlreadyCheckedInShort ||
+                "You've already checked in to this session"
+            : t.checkInSuccess || "✅ Checked in successfully!",
+          data.summary?.alreadyCheckedIn ? "info" : "success",
+        );
+
+        await notifyParent();
       } catch (err) {
         console.error("Employee check-in failed:", err);
-        const msg = err.response?.data?.error || "Check-in failed";
-        // The backend now returns 200 for repeat check-ins, but if a
-        // proxy or cache serves an old 400 we still handle it.
+        const msg =
+          err.response?.data?.error || t.checkInError || "Check-in failed";
         if (err.response?.data?.alreadyCheckedIn) {
-          showToast("You've already checked in to this session", "info");
+          showToast(
+            t.qrAlreadyCheckedInShort ||
+              "You've already checked in to this session",
+            "info",
+          );
         } else {
           showToast(msg, "error");
         }
@@ -732,7 +1230,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
         setSubmitting(false);
       }
     },
-    [onCheckIn],
+    [notifyParent, t, user],
   );
 
   // ─── Handle admin scanning employee's personal QR ───
@@ -744,26 +1242,36 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           sessionId,
           decodedText,
         );
-        const name = res.data?.employee?.name || "Employee";
+        const data = res?.data || {};
+        const name = data.employee?.name || t.staff || "Employee";
+
+        setSuccessInfo({
+          name,
+          department: data.employee?.department || "",
+          sessionTitle:
+            data.session?.presentationTitle || data.session?.title || "",
+          checkedInAt: data.attendance?.checkedInAt || null,
+          rank: data.summary?.yourRank,
+          totalCheckedIn: data.summary?.totalCheckedIn,
+          totalEligible: data.summary?.totalEligible,
+          already: Boolean(data.summary?.alreadyCheckedIn),
+        });
+
         showToast(`✅ ${name} checked in successfully!`, "success");
-        if (onCheckIn) {
-          try {
-            await onCheckIn();
-          } catch (refreshErr) {
-            console.error("[QRCheckIn] onCheckIn threw:", refreshErr);
-          }
-        }
+        await notifyParent();
       } catch (err) {
         console.error("Admin scan failed:", err);
         showToast(
-          err.response?.data?.error || "Failed to check in employee",
+          err.response?.data?.error ||
+            t.qrCheckInEmployeeFailed ||
+            "Failed to check in employee",
           "error",
         );
       } finally {
         setSubmitting(false);
       }
     },
-    [sessionId, onCheckIn],
+    [sessionId, notifyParent, t],
   );
 
   // ─── Open the manage-check-ins modal ───
@@ -771,6 +1279,17 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
     await loadAttendees();
     setUndoModalOpen(true);
   }, [loadAttendees]);
+
+  const handleDecoded = useCallback(
+    (text) => {
+      if (scannerMode === "admin") {
+        handleAdminScan(text);
+      } else {
+        handleEmployeeScan(text);
+      }
+    },
+    [scannerMode, handleAdminScan, handleEmployeeScan],
+  );
 
   // ─── Render ───
   return (
@@ -834,8 +1353,9 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           </h4>
           <p style={{ margin: "2px 0 0", fontSize: 12, color: C.muted }}>
             {isAdmin
-              ? "Show session QR, scan employee QR, or manage check-ins"
-              : "Scan the session QR to check in"}
+              ? t.qrHeaderAdminHint ||
+                "Show session QR, scan employee QR, or manage check-ins"
+              : t.qrHeaderEmployeeHint || "Scan the session QR to check in"}
           </p>
         </div>
       </div>
@@ -871,6 +1391,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
               fontWeight: 700,
               fontSize: 13,
               transition: "all 0.25s ease",
+              fontFamily: F.sans,
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateY(-3px)";
@@ -889,7 +1410,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             ) : (
               <FiMaximize2 size={26} />
             )}
-            <span>Show Session QR</span>
+            <span>{t.qrShowSessionQR || "Show Session QR"}</span>
             <span
               style={{
                 fontSize: 10,
@@ -898,7 +1419,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
                 textAlign: "center",
               }}
             >
-              Employees scan this to check in
+              {t.qrShowSessionQRSub || "Employees scan this to check in"}
             </span>
           </button>
         )}
@@ -927,6 +1448,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
               fontSize: 13,
               transition: "all 0.25s ease",
               opacity: !sessionId ? 0.5 : 1,
+              fontFamily: F.sans,
             }}
             onMouseEnter={(e) => {
               if (submitting || !sessionId) return;
@@ -946,7 +1468,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             ) : (
               <FiCamera size={26} />
             )}
-            <span>Scan Employee QR</span>
+            <span>{t.qrScanEmployeeQR || "Scan Employee QR"}</span>
             <span
               style={{
                 fontSize: 10,
@@ -955,7 +1477,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
                 textAlign: "center",
               }}
             >
-              Point camera at employee's QR
+              {t.qrScanEmployeeQRSub || "Point camera at employee's QR"}
             </span>
           </button>
         )}
@@ -982,6 +1504,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
               fontSize: 13,
               transition: "all 0.25s ease",
               opacity: !sessionId ? 0.5 : 1,
+              fontFamily: F.sans,
             }}
             onMouseEnter={(e) => {
               if (loadingAttendees || !sessionId) return;
@@ -1037,6 +1560,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             fontWeight: 700,
             fontSize: 13,
             transition: "all 0.25s ease",
+            fontFamily: F.sans,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.transform = "translateY(-3px)";
@@ -1055,7 +1579,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           ) : (
             <FiUser size={26} />
           )}
-          <span>Show My QR</span>
+          <span>{t.qrShowMyQR || "Show My QR"}</span>
           <span
             style={{
               fontSize: 10,
@@ -1064,11 +1588,11 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
               textAlign: "center",
             }}
           >
-            Let the coordinator scan you
+            {t.qrShowMyQRSub || "Let the coordinator scan you"}
           </span>
         </button>
 
-        {/* EMPLOYEE-ONLY: Scan Session QR */}
+        {/* EVERYONE: Scan Session QR (the employee check-in path) */}
         <button
           onClick={() => {
             setScannerMode("employee");
@@ -1090,6 +1614,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
             fontWeight: 700,
             fontSize: 13,
             transition: "all 0.25s ease",
+            fontFamily: F.sans,
           }}
           onMouseEnter={(e) => {
             if (submitting) return;
@@ -1109,7 +1634,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           ) : (
             <FiCamera size={26} />
           )}
-          <span>Scan Session QR</span>
+          <span>{t.qrScanSessionQR || "Scan Session QR"}</span>
           <span
             style={{
               fontSize: 10,
@@ -1118,7 +1643,7 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
               textAlign: "center",
             }}
           >
-            Point camera at coordinator's QR
+            {t.qrScanSessionQRSub || "Point camera at coordinator's QR"}
           </span>
         </button>
       </div>
@@ -1138,7 +1663,8 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
         }}
       >
         <FiCheckCircle size={14} color="#10b981" />
-        Identity is verified server-side — no spoofing possible.
+        {t.qrVerifiedNote ||
+          "Identity is verified server-side — no spoofing possible."}
       </div>
 
       {/* ── Modals ── */}
@@ -1146,34 +1672,51 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
         isOpen={showSessionQR}
         onClose={() => setShowSessionQR(false)}
         qrCode={sessionQR}
-        title="Session Check-In QR"
-        subtitle="Employees scan this to mark themselves present"
+        title={t.qrSessionModalTitle || "Session Check-In QR"}
+        subtitle={
+          t.qrSessionModalSub ||
+          "Employees scan this to mark themselves present"
+        }
+        hint={
+          t.qrSessionModalHint ||
+          '📱 Ask the person to open Golden Monday → "Scan QR" on their phone'
+        }
       />
 
       <QRLargeModal
         isOpen={showMyQR}
         onClose={() => setShowMyQR(false)}
         qrCode={myQR}
-        title="Your Personal QR"
-        subtitle="Show this to the Golden Monday coordinator"
+        title={t.qrPersonalModalTitle || "Your Personal QR"}
+        subtitle={
+          t.qrPersonalModalSub || "Show this to the Golden Monday coordinator"
+        }
       />
 
       <QRScannerModal
         isOpen={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onDecoded={
-          scannerMode === "admin" ? handleAdminScan : handleEmployeeScan
-        }
+        onClose={closeScanner}
+        onDecoded={handleDecoded}
+        t={t}
         title={
           scannerMode === "admin"
-            ? "Scan Employee's QR"
-            : "Scan Session QR to Check In"
+            ? t.qrScannerTitleEmployee || "Scan Employee's QR"
+            : t.qrScannerTitleSession || "Scan Session QR to Check In"
         }
         hint={
           scannerMode === "admin"
-            ? "Point camera at the employee's personal QR"
-            : "Point camera at the coordinator's session QR"
+            ? t.qrScannerHintEmployee ||
+              "Point camera at the employee's personal QR"
+            : t.qrScannerHintSession ||
+              "Point camera at the coordinator's session QR"
         }
+      />
+
+      <CheckInSuccessModal
+        isOpen={Boolean(successInfo)}
+        onClose={() => setSuccessInfo(null)}
+        info={successInfo}
+        t={t}
       />
 
       <UndoCheckInModal
@@ -1181,9 +1724,10 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
         onClose={() => setUndoModalOpen(false)}
         attendees={attendees}
         sessionId={sessionId}
+        t={t}
         onUndone={async () => {
           await loadAttendees();
-          if (onCheckIn) onCheckIn();
+          await notifyParent();
         }}
       />
 
@@ -1196,7 +1740,22 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
         }
+        @keyframes qr-pop {
+          0% { transform: scale(0.4); opacity: 0; }
+          70% { transform: scale(1.08); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
       `}</style>
     </div>
+  );
+}
+
+// Public contract is unchanged: QRCheckIn({ sessionId, onCheckIn }).
+// The boundary wrapper is invisible to callers.
+export default function QRCheckIn({ sessionId, onCheckIn }) {
+  return (
+    <QRErrorBoundary>
+      <QRCheckInCard sessionId={sessionId} onCheckIn={onCheckIn} />
+    </QRErrorBoundary>
   );
 }
