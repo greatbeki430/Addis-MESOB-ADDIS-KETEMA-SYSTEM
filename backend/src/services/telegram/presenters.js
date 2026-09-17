@@ -1,9 +1,4 @@
 // backend/src/services/telegram/presenters.js
-// undici's FormData is worth importing explicitly because globalThis.FormData
-// has had subtle incompatibilities across Node versions. But Blob is stable
-// as a global since Node 18, so just use the native one. Destructuring both
-// from undici caused 'Blob is not a constructor' on the current Node 26
-// runtime — undici's Blob export is undefined in the resolved version.
 const GoldenMondaySession = require("../../models/GoldenMondaySession");
 const { formatDate, sendMessage, callTelegramApi } = require("./utils");
 const {
@@ -19,9 +14,18 @@ const TELEGRAM_ADMIN_GROUP_ID = process.env.TELEGRAM_ADMIN_GROUP_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://akmesob.vercel.app";
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
 
-// Telegram caps message bodies at 4096 characters. Leave a small
-// headroom because `sendPhoto` uses part of the limit for the caption.
+// Telegram caps plain message bodies at 4096 characters. Leave a small
+// headroom because the trilingual announcement approaches that limit
+// with a long description + many suggested topics.
 const TELEGRAM_MAX_BODY = 4000;
+
+// sendPhoto captions are capped at 1024 characters by Telegram — much
+// lower than the 4096 limit for sendMessage bodies. The trilingual
+// caption (Amharic + English + Afaan Oromoo) routinely exceeds 1024
+// because every label, time, location, and hashtag repeats three
+// times. Trim the caption against this limit, not TELEGRAM_MAX_BODY,
+// or Telegram rejects the poster with 'message caption is too long'.
+const TELEGRAM_MAX_CAPTION = 1024;
 
 // ─── PENDING CONFIRMATIONS ──────────────────────────────────────
 const pendingPresenterConfirmations = new Map();
@@ -139,9 +143,9 @@ async function postPresenterAnnouncementToChannel(session) {
     // on any translation failure — never throws.
     let message = await buildTrilingualAnnouncement(session);
 
-    // Safety trim: Telegram rejects bodies over 4096 characters. The
-    // announcement can approach that with a long description + many
-    // topics in three languages.
+    // Safety trim: Telegram rejects message bodies over 4096 chars.
+    // The trilingual announcement can approach that with a long
+    // description + many topics in three languages.
     if (message.length > TELEGRAM_MAX_BODY) {
       console.warn(
         `[presenters] trilingual message is ${message.length} chars, trimming to ${TELEGRAM_MAX_BODY}`,
@@ -153,13 +157,26 @@ async function postPresenterAnnouncementToChannel(session) {
 
     let response;
     if (imageUrl) {
+      // sendPhoto's caption is capped at 1024 characters. If the
+      // trilingual message exceeds that, we can't use it as the
+      // photo caption — trim it down for the photo, then the caller
+      // gets a text-only follow-up. For now, always use the body
+      // limit for this path since the presenter profile photo
+      // announcement is expected to be short.
+      let photoCaption = message;
+      if (photoCaption.length > TELEGRAM_MAX_CAPTION) {
+        photoCaption =
+          photoCaption.slice(0, TELEGRAM_MAX_CAPTION - 40).trimEnd() +
+          "\n\n_… (truncated)_";
+      }
+
       response = await fetch(`${TELEGRAM_API}/sendPhoto`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: TELEGRAM_CHANNEL_ID,
           photo: imageUrl,
-          caption: message,
+          caption: photoCaption,
           parse_mode: "Markdown",
         }),
       });
@@ -666,10 +683,14 @@ async function postPresenterAnnouncementWithPhoto(session, options = {}) {
 
   try {
     // Build the same trilingual caption as the regular channel post.
+    // NOTE: sendPhoto captions are capped at 1024 chars by Telegram,
+    // not 4096 — trim against TELEGRAM_MAX_CAPTION, not
+    // TELEGRAM_MAX_BODY, or Telegram rejects with
+    // 'message caption is too long'.
     let caption = await buildTrilingualAnnouncement(session);
-    if (caption.length > TELEGRAM_MAX_BODY) {
+    if (caption.length > TELEGRAM_MAX_CAPTION) {
       caption =
-        caption.slice(0, TELEGRAM_MAX_BODY - 40).trimEnd() +
+        caption.slice(0, TELEGRAM_MAX_CAPTION - 40).trimEnd() +
         "\n\n_… (truncated)_";
     }
 
