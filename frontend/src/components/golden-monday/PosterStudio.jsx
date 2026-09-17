@@ -369,14 +369,7 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
       window.addEventListener("touchmove", onMove, { passive: false });
       window.addEventListener("touchend", onEnd);
     },
-    [
-      previewScale,
-      studioLayout.photo,
-      studioLayout.name,
-      studioLayout.info,
-      studioLayout.badge,
-      studioLayout.title,
-    ],
+    [previewScale, studioLayout],
   );
 
   // ── Reset studio layout ─────────────────────────────────────
