@@ -14,6 +14,10 @@ import {
 import { C, F } from "../../styles/theme";
 import { goldenMondayAPI } from "../../services/api";
 import { TEMPLATES, TEMPLATE_ORDER, DEFAULT_TEMPLATE } from "./templates";
+import {
+  formatEthiopianDate,
+  todayGregorianISODate,
+} from "../../utils/ethiopianDate";
 
 // ─── Canvas dimensions ──────────────────────────────────────────
 const POSTER_W = 900;
@@ -34,6 +38,14 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
     audienceLine: "",
     websiteUrl: "addis.mesobcenter.et",
   });
+
+  // ── Gregorian picker state ──────────────────────────────────
+  // The native <input type="date"> always works in the Gregorian
+  // calendar. The coordinator picks a GC date here; a small effect
+  // converts it to the Ethiopian equivalent and writes it into
+  // form.ethiopianDate. The coordinator can still override the
+  // Ethiopian string manually if needed.
+  const [gregorianDate, setGregorianDate] = useState(todayGregorianISODate);
 
   // ── Photo state ─────────────────────────────────────────────
   const [photoSrc, setPhotoSrc] = useState(null);
@@ -57,7 +69,9 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         ...f,
         presenterName: session.presenterName || "",
         title: session.presentationTitle || "",
-        ethiopianDate: "",
+        // NOTE: ethiopianDate is intentionally NOT reset here.
+        // The gregorianDate → ethiopianDate effect below owns it.
+        // If we reset it here, the two would fight on every open.
       }));
 
       if (session.presenterPhotoUrl) {
@@ -85,14 +99,28 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
     });
   }, []);
 
-  // ── Render the poster onto the canvas ───────────────────────
+  // ── Render-token guard ──────────────────────────────────────
+  // Every call to renderPoster grabs a fresh token. Before touching
+  // the canvas and after every await, it checks whether it's still
+  // the latest render. If a newer render started, the older one
+  // bails out without clearing or drawing. This prevents two
+  // concurrent async renders from racing on the same canvas and
+  // leaving the preview showing stale form data.
+  const renderTokenRef = useRef(0);
+
   const renderPoster = useCallback(async () => {
     if (!canvasRef.current) return;
+
+    const myToken = ++renderTokenRef.current;
+    const isStale = () => renderTokenRef.current !== myToken;
+
     setRendering(true);
 
     try {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
+
+      if (isStale()) return;
 
       // Reset any lingering state from the previous render
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -118,12 +146,20 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         loadImage,
       });
 
+      // The template has been awaiting image loads; check again for
+      // staleness before committing the result.
+      if (isStale()) return;
+
       const dataUrl = canvas.toDataURL("image/png", 0.92);
       setPreviewUrl(dataUrl);
     } catch (err) {
-      console.error("[PosterStudio] render failed:", err);
+      if (!isStale()) {
+        console.error("[PosterStudio] render failed:", err);
+      }
     } finally {
-      setRendering(false);
+      if (!isStale()) {
+        setRendering(false);
+      }
     }
   }, [form, photoSrc, selectedTemplate, loadImage]);
 
@@ -375,11 +411,10 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
 
             <Field label="Presentation title">
               {/*
-    The title is chosen by the assigned presenter (via the Telegram DM
-    or the rotation panel). Admins coordinate the poster but don't
-    author the title — that keeps the "peer-led" spirit intact and
-    prevents accidental overwrites. See Policy A in the release notes.
-  */}
+                The title is chosen by the assigned presenter (via
+                the Telegram DM or the rotation panel). Admins
+                coordinate the poster but don't author the title.
+              */}
               <div
                 style={{
                   ...inputStyle,
@@ -436,15 +471,76 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
               />
             </Field>
 
-            <Field label="Ethiopian date">
+            <Field label="Date">
+              {/* Native GC date picker drives the Ethiopian field. */}
               <input
-                value={form.ethiopianDate}
-                onChange={(e) =>
-                  setForm({ ...form, ethiopianDate: e.target.value })
-                }
-                placeholder="e.g. ኅዳር 25, 2018 ዓ.ም."
+                type="date"
+                value={gregorianDate}
+                onChange={(e) => {
+                  const nextDate = e.target.value;
+                  setGregorianDate(nextDate);
+                  const formatted = formatEthiopianDate(nextDate, "am");
+                  if (formatted) {
+                    setForm((f) => ({ ...f, ethiopianDate: formatted }));
+                  }
+                }}
                 style={inputStyle}
               />
+
+              {/* Auto-converted Ethiopian date, shown read-only. */}
+              <div
+                style={{
+                  marginTop: 8,
+                  padding: "8px 12px",
+                  borderRadius: 8,
+                  background: "#f5f7ff",
+                  border: `1px solid ${C.primary}22`,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: C.muted,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.5,
+                    marginBottom: 2,
+                  }}
+                >
+                  Ethiopian calendar
+                </div>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: C.dark,
+                  }}
+                >
+                  {form.ethiopianDate || "—"}
+                </div>
+              </div>
+
+              {/* Override is collapsed by default. Most coordinators
+                  won't touch this; it's here for edge cases. */}
+              <details style={{ marginTop: 6 }}>
+                <summary
+                  style={{
+                    fontSize: 11,
+                    color: C.muted,
+                    cursor: "pointer",
+                    userSelect: "none",
+                  }}
+                >
+                  Override manually
+                </summary>
+                <input
+                  value={form.ethiopianDate}
+                  onChange={(e) =>
+                    setForm({ ...form, ethiopianDate: e.target.value })
+                  }
+                  placeholder="e.g. ኅዳር 25, 2018 ዓ.ም."
+                  style={{ ...inputStyle, marginTop: 6 }}
+                />
+              </details>
             </Field>
 
             <Field label="Time">
