@@ -27,6 +27,19 @@ const TELEGRAM_MAX_BODY = 4000;
 // or Telegram rejects the poster with 'message caption is too long'.
 const TELEGRAM_MAX_CAPTION = 1024;
 
+// ─── MARKDOWN ESCAPING ──────────────────────────────────────────
+// Telegram's legacy Markdown parse_mode treats *, _, `, and [ as
+// special characters. If any of these appear in dynamic content
+// (presenter names, titles, departments, AI-generated topics,
+// translation output), the parser fails with:
+//   "can't parse entities: Can't find end of the entity starting
+//    at byte offset N"
+// because it sees an opening marker with no matching closing one.
+// Escape every occurrence in user-supplied or AI-generated text
+// before inserting it into a Markdown caption.
+const escapeMarkdown = (text) =>
+  String(text ?? "").replace(/([_*`\[])/g, "\\$1");
+
 // ─── PENDING CONFIRMATIONS ──────────────────────────────────────
 const pendingPresenterConfirmations = new Map();
 
@@ -52,6 +65,12 @@ async function generateAnnouncementImage(presenter, session) {
 // Fixed labels come from the LABELS map; dynamic strings (title,
 // description, suggested topics) are translated via the AI service
 // with per-string fallback to the original on any failure.
+//
+// IMPORTANT: every dynamic string that lands in the caption goes
+// through escapeMarkdown() so a stray * _ ` [ in a presenter name,
+// title, translation, or AI topic can't break Telegram's Markdown
+// parser. The *bold* markers we write ourselves stay literal — they
+// are always paired on the same line.
 async function buildTrilingualAnnouncement(session) {
   const presenter = session.presenter;
 
@@ -79,30 +98,44 @@ async function buildTrilingualAnnouncement(session) {
     const presenterHashtag = buildPresenterHashtag(presenterName);
 
     const lines = [];
-    lines.push(`🎯 *${L.header} — ${dateStr}*`);
+    lines.push(`🎯 *${escapeMarkdown(L.header)} — ${escapeMarkdown(dateStr)}*`);
     lines.push("");
-    lines.push(`👤 *${L.presenter}:* ${presenterName}`);
+    lines.push(
+      `👤 *${escapeMarkdown(L.presenter)}:* ${escapeMarkdown(presenterName)}`,
+    );
     if (presenter?.department) {
-      lines.push(`🏛️ *${L.department}:* ${presenter.department}`);
+      lines.push(
+        `🏛️ *${escapeMarkdown(L.department)}:* ${escapeMarkdown(presenter.department)}`,
+      );
     }
     if (dynamic.title) {
-      lines.push(`📖 *${L.topic}:* "${dynamic.title}"`);
+      lines.push(
+        `📖 *${escapeMarkdown(L.topic)}:* "${escapeMarkdown(dynamic.title)}"`,
+      );
     }
     if (dynamic.description) {
-      lines.push(`📝 *${L.description}:* ${dynamic.description}`);
+      lines.push(
+        `📝 *${escapeMarkdown(L.description)}:* ${escapeMarkdown(dynamic.description)}`,
+      );
     }
     lines.push("");
-    lines.push(`🕒 *${L.time}:* ${L.timeValue}`);
-    lines.push(`📍 *${L.location}:* ${L.locationValue}`);
+    lines.push(
+      `🕒 *${escapeMarkdown(L.time)}:* ${escapeMarkdown(L.timeValue)}`,
+    );
+    lines.push(
+      `📍 *${escapeMarkdown(L.location)}:* ${escapeMarkdown(L.locationValue)}`,
+    );
     if (dynamic.topics.length > 0) {
       lines.push("");
-      lines.push(`💡 *${L.aiTopics}:*`);
+      lines.push(`💡 *${escapeMarkdown(L.aiTopics)}:*`);
       dynamic.topics.forEach((topic, i) => {
-        lines.push(`   ${i + 1}. ${topic}`);
+        lines.push(`   ${i + 1}. ${escapeMarkdown(topic)}`);
       });
     }
     lines.push("");
-    lines.push(`${L.hashtags.join(" ")} ${presenterHashtag}`);
+    lines.push(
+      `${L.hashtags.map(escapeMarkdown).join(" ")} ${escapeMarkdown(presenterHashtag)}`,
+    );
     return lines.join("\n");
   };
 
@@ -128,6 +161,19 @@ async function buildTrilingualAnnouncement(session) {
   return sectionAm + divider + sectionEn + divider + sectionOm;
 }
 
+// ─── SAFE CAPTION TRIM ──────────────────────────────────────────
+// Truncates a Markdown caption to maxLen without leaving a dangling
+// escape sequence (\X). Returns the trimmed string with the
+// standard "truncated" suffix appended.
+const trimCaption = (text, maxLen) => {
+  if (text.length <= maxLen) return text;
+  let cut = maxLen - 40;
+  // If the character immediately before the cut is a backslash, back
+  // off one position so we don't split an escape sequence.
+  if (text[cut - 1] === "\\") cut -= 1;
+  return text.slice(0, cut).trimEnd() + "\n\n_… (truncated)_";
+};
+
 // ─── POST TO CHANNEL ─────────────────────────────────────────────
 async function postPresenterAnnouncementToChannel(session) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHANNEL_ID) {
@@ -144,31 +190,21 @@ async function postPresenterAnnouncementToChannel(session) {
     let message = await buildTrilingualAnnouncement(session);
 
     // Safety trim: Telegram rejects message bodies over 4096 chars.
-    // The trilingual announcement can approach that with a long
-    // description + many topics in three languages.
     if (message.length > TELEGRAM_MAX_BODY) {
       console.warn(
         `[presenters] trilingual message is ${message.length} chars, trimming to ${TELEGRAM_MAX_BODY}`,
       );
-      message =
-        message.slice(0, TELEGRAM_MAX_BODY - 40).trimEnd() +
-        "\n\n_… (truncated)_";
+      message = trimCaption(message, TELEGRAM_MAX_BODY);
     }
 
     let response;
     if (imageUrl) {
-      // sendPhoto's caption is capped at 1024 characters. If the
-      // trilingual message exceeds that, we can't use it as the
-      // photo caption — trim it down for the photo, then the caller
-      // gets a text-only follow-up. For now, always use the body
-      // limit for this path since the presenter profile photo
-      // announcement is expected to be short.
-      let photoCaption = message;
-      if (photoCaption.length > TELEGRAM_MAX_CAPTION) {
-        photoCaption =
-          photoCaption.slice(0, TELEGRAM_MAX_CAPTION - 40).trimEnd() +
-          "\n\n_… (truncated)_";
-      }
+      // sendPhoto's caption is capped at 1024 chars, well under the
+      // 4096 limit for sendMessage. Trim the caption specifically
+      // for the photo; the full message is not lost — this path is
+      // the presenter-photo announcement, which is expected to be
+      // short in practice.
+      const photoCaption = trimCaption(message, TELEGRAM_MAX_CAPTION);
 
       response = await fetch(`${TELEGRAM_API}/sendPhoto`, {
         method: "POST",
@@ -683,16 +719,10 @@ async function postPresenterAnnouncementWithPhoto(session, options = {}) {
 
   try {
     // Build the same trilingual caption as the regular channel post.
-    // NOTE: sendPhoto captions are capped at 1024 chars by Telegram,
-    // not 4096 — trim against TELEGRAM_MAX_CAPTION, not
-    // TELEGRAM_MAX_BODY, or Telegram rejects with
-    // 'message caption is too long'.
+    // Caption gets its own trim limit (1024) because sendPhoto caps
+    // captions well below the sendMessage body limit.
     let caption = await buildTrilingualAnnouncement(session);
-    if (caption.length > TELEGRAM_MAX_CAPTION) {
-      caption =
-        caption.slice(0, TELEGRAM_MAX_CAPTION - 40).trimEnd() +
-        "\n\n_… (truncated)_";
-    }
+    caption = trimCaption(caption, TELEGRAM_MAX_CAPTION);
 
     // Parse the data URL to get the MIME type and bytes.
     const match = /^data:(image\/[a-z+]+);base64,(.+)$/i.exec(photoDataUrl);
