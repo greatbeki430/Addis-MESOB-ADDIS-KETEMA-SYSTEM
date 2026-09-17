@@ -37,6 +37,7 @@ const {
   postWithPoster,
   getMyQRStatus,
   getMyQRHistory,
+  undoQRCheckIn,
 } = require("../controllers/goldenMondayController");
 const {
   createNotification,
@@ -2649,6 +2650,23 @@ router.post(
       res.status(500).json({ error: error.message });
     }
   },
+);
+
+// ─── 4. ADMIN: UNDO A CHECK-IN (DELETE) ──────────────────────
+// DELETE /api/golden-monday/qr-checkin/:sessionId/:userId
+// Admin-only. Removes a single attendance record so the check-in
+// flow can be re-tested or a mistaken scan corrected. Also removes
+// the user from session.attendees to keep the legacy mirror in sync.
+//
+// ⚠️ Registered AFTER the wildcard GET/POST routes above on purpose:
+// the DELETE method is distinct from those, and the two-segment path
+// (`:sessionId/:userId`) cannot be matched by the single-segment
+// `/qr-checkin/:sessionId` GET or POST routes. No collision.
+router.delete(
+  "/qr-checkin/:sessionId/:userId",
+  protect,
+  goldenMondayAdminOrAbove,
+  undoQRCheckIn,
 );
 
 // GET /api/golden-monday/notifications

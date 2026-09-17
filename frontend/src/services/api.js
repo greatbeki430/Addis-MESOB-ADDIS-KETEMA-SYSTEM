@@ -723,8 +723,13 @@ export const goldenMondayAPI = {
     api.post(`/golden-monday/qr-checkin/${sessionId}`, data || {}),
 
   // Any logged-in user: get their OWN personal QR (for admin to scan)
+  // Any logged-in user: get their OWN personal QR (for admin to scan)
   getMyQR: () => api.get(`/golden-monday/qr-checkin/my-qr`),
 
+  // Admin-only: undo a check-in. Wipes the attendance record for
+  // (sessionId, userId) so the scanner can be exercised again.
+  undoQRCheckIn: (sessionId, userId) =>
+    api.delete(`/golden-monday/qr-checkin/${sessionId}/${userId}`),
   // Admin: scan an employee's QR and mark them present
   // `employeeQrPayload` is the raw JSON string decoded from the employee QR
   adminScanQRCheckIn: (sessionId, employeeQrPayload) =>
