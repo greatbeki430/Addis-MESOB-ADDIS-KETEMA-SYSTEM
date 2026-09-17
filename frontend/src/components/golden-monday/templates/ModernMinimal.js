@@ -29,6 +29,13 @@ export async function render(ctx, helpers) {
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, W, H);
 
+  // Soft diagonal tint for depth
+  const tint = ctx.createLinearGradient(0, 0, W, H);
+  tint.addColorStop(0, "rgba(13,26,94,0.02)");
+  tint.addColorStop(1, "rgba(184,134,11,0.05)");
+  ctx.fillStyle = tint;
+  ctx.fillRect(0, 0, W, H);
+
   // ── Top accent bar ──────────────────────────────────────────
   ctx.fillStyle = ACCENT;
   ctx.fillRect(0, 0, W, 12);
@@ -64,18 +71,17 @@ export async function render(ctx, helpers) {
   ctx.fillText("የወርቃማ ሰኞ", 60, 250);
   ctx.fillText("ፕሮግራም ተናጋሪ", 60, 312);
 
-  // Accent underline
   fillRoundedRect(ctx, 60, 340, 120, 5, 3, ACCENT);
 
-  // ── Presenter photo: rounded square, right column ───────────
+  // ── Presenter photo: rounded card (right column) ────────────
   const photoX = W - 500;
   const photoY = 400;
   const photoW = 440;
   const photoH = 440;
   const photoRadius = 32;
 
-  // Soft shadow behind the photo card
-  applySoftShadow(ctx, 30, 14, 0.16);
+  // Soft drop-shadow card behind
+  applySoftShadow(ctx, 34, 16, 0.16);
   fillRoundedRect(
     ctx,
     photoX - 12,
@@ -86,6 +92,17 @@ export async function render(ctx, helpers) {
     CARD,
   );
   clearShadow(ctx);
+
+  // A gold strip accent under the card
+  fillRoundedRect(
+    ctx,
+    photoX - 12,
+    photoY + photoH + 12 + 6,
+    photoW + 24,
+    6,
+    3,
+    GOLD,
+  );
 
   await drawRoundedImage(
     ctx,
@@ -99,6 +116,18 @@ export async function render(ctx, helpers) {
     { fallbackColor: "#e5e1d8", fallbackText: "Presenter photo" },
   );
 
+  // Subtle inner border on the photo
+  strokeRoundedRect(
+    ctx,
+    photoX,
+    photoY,
+    photoW,
+    photoH,
+    photoRadius,
+    "rgba(0,0,0,0.06)",
+    1,
+  );
+
   // ── Presenter name / role (left column) ─────────────────────
   ctx.textAlign = "left";
 
@@ -108,13 +137,11 @@ export async function render(ctx, helpers) {
 
   ctx.fillStyle = INK;
   ctx.font = "bold 38px 'Playfair Display', Georgia, serif";
-  const name = form.presenterName || "TBD";
-  const nameWidth = W / 2 - 140; // fits left column
-  ctx.fillText(fitText(ctx, name, nameWidth), 60, 480);
+  const nameWidth = W / 2 - 140;
+  ctx.fillText(fitText(ctx, form.presenterName || "TBD", nameWidth), 60, 480);
 
-  // Audience line (Amharic)
   ctx.fillStyle = ACCENT;
-  ctx.font = "bold 28px 'Noto Serif Ethiopic', 'Nyala', serif";
+  ctx.font = "bold 26px 'Noto Serif Ethiopic', 'Nyala', serif";
   const audience = form.audienceLine || `ከ ${form.presenterName || "አቅራቢ"} ጋር`;
   ctx.fillText(fitText(ctx, audience, nameWidth), 60, 550);
 
@@ -131,13 +158,16 @@ export async function render(ctx, helpers) {
     clearShadow(ctx);
     strokeRoundedRect(ctx, cardX, y, cardW, cardH, cardRadius, CARD_BORDER, 1);
 
+    // Small gold accent bar on the left edge of the card
+    fillRoundedRect(ctx, cardX + 12, y + 18, 4, cardH - 36, 2, GOLD);
+
     ctx.fillStyle = GOLD;
     ctx.font = "italic 16px 'Playfair Display', Georgia, serif";
-    ctx.fillText(label, cardX + 20, y + 30);
+    ctx.fillText(label, cardX + 30, y + 30);
 
     ctx.fillStyle = INK;
     ctx.font = "bold 22px 'Noto Serif Ethiopic', 'Nyala', serif";
-    ctx.fillText(fitText(ctx, value, cardW - 40), cardX + 20, y + 62);
+    ctx.fillText(fitText(ctx, value, cardW - 50), cardX + 30, y + 62);
 
     y += cardH + 14;
   };
@@ -154,18 +184,26 @@ export async function render(ctx, helpers) {
     ctx.fillStyle = ACCENT;
     ctx.fillRect(0, bandY, W, bandH);
 
-    // Accent strip at top of band
     ctx.fillStyle = GOLD;
     ctx.fillRect(0, bandY, W, 4);
+
+    // Small gold diamond accent at top-center of the band
+    ctx.beginPath();
+    ctx.moveTo(W / 2, bandY - 10);
+    ctx.lineTo(W / 2 + 12, bandY + 2);
+    ctx.lineTo(W / 2, bandY + 14);
+    ctx.lineTo(W / 2 - 12, bandY + 2);
+    ctx.closePath();
+    ctx.fill();
 
     ctx.fillStyle = GOLD;
     ctx.font = "italic 20px 'Playfair Display', Georgia, serif";
     ctx.textAlign = "left";
-    ctx.fillText("TOPIC", 60, bandY + 50);
+    ctx.fillText("TOPIC", 60, bandY + 55);
 
     ctx.fillStyle = "#fff";
     ctx.font = "bold 30px 'Noto Serif Ethiopic', 'Nyala', serif";
-    ctx.fillText(fitText(ctx, `"${form.title}"`, W - 120), 60, bandY + 105);
+    ctx.fillText(fitText(ctx, `"${form.title}"`, W - 120), 60, bandY + 110);
   }
 
   // ── Website URL (bottom-right) ──────────────────────────────

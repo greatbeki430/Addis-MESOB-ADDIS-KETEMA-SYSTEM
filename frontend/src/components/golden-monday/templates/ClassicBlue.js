@@ -19,7 +19,7 @@ export async function render(ctx, helpers) {
   const { form, photoSrc, assets, W, H, loadImage } = helpers;
 
   const BRAND_BLUE = "#2C3E8F";
-  const BRAND_BLUE_DEEP = "#1e2c6b";
+  const BRAND_BLUE_DEEP = "#1a2764";
   const BRAND_GOLD = "#F5C518";
   const BRAND_WHITE = "#FFFFFF";
 
@@ -28,6 +28,13 @@ export async function render(ctx, helpers) {
   bg.addColorStop(0, BRAND_BLUE);
   bg.addColorStop(1, BRAND_BLUE_DEEP);
   ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Subtle radial highlight top-right ───────────────────────
+  const glow = ctx.createRadialGradient(W, 0, 100, W, 0, 900);
+  glow.addColorStop(0, "rgba(245,197,24,0.10)");
+  glow.addColorStop(1, "rgba(245,197,24,0)");
+  ctx.fillStyle = glow;
   ctx.fillRect(0, 0, W, H);
 
   // ── Top-left logo ────────────────────────────────────────────
@@ -46,7 +53,7 @@ export async function render(ctx, helpers) {
   ctx.fillStyle = BRAND_GOLD;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.font = "bold 36px 'Noto Serif Ethiopic', 'Nyala', serif";
+  ctx.font = "bold 34px 'Noto Serif Ethiopic', 'Nyala', serif";
   ctx.fillText("የወርቃማ ሰኞ ፕሮግራም ተናጋሪ", W / 2 + 40, 90);
 
   // ── Top-right committee badge (rounded) ─────────────────────
@@ -55,7 +62,9 @@ export async function render(ctx, helpers) {
   const badgeW = 210;
   const badgeH = 130;
 
-  fillRoundedRect(ctx, badgeX, badgeY, badgeW, badgeH, 18, "rgba(0,0,0,0.15)");
+  applySoftShadow(ctx, 20, 8, 0.25);
+  fillRoundedRect(ctx, badgeX, badgeY, badgeW, badgeH, 18, "rgba(0,0,0,0.20)");
+  clearShadow(ctx);
   strokeRoundedRect(ctx, badgeX, badgeY, badgeW, badgeH, 18, BRAND_GOLD, 2);
 
   ctx.fillStyle = BRAND_GOLD;
@@ -65,19 +74,19 @@ export async function render(ctx, helpers) {
   ctx.font = "italic 22px 'Playfair Display', Georgia, serif";
   ctx.fillText("· 2026 ·", badgeX + badgeW / 2, badgeY + 105);
 
-  // ── Presenter photo (rounded, with shadow) ──────────────────
+  // ── Presenter photo (rounded, shadowed, framed) ─────────────
   const photoX = 40;
   const photoY = 230;
   const photoW = W / 2 - 50;
   const photoH = 540;
   const photoRadius = 28;
 
-  // Soft drop shadow behind the photo
-  applySoftShadow(ctx, 30, 14, 0.28);
+  // Outer soft shadow
+  applySoftShadow(ctx, 30, 16, 0.28);
   fillRoundedRect(ctx, photoX, photoY, photoW, photoH, photoRadius, "#0d1447");
   clearShadow(ctx);
 
-  // The photo itself, clipped to the same rounded rect
+  // The photo itself
   await drawRoundedImage(
     ctx,
     loadImage,
@@ -90,7 +99,7 @@ export async function render(ctx, helpers) {
     { fallbackColor: "#243c8a", fallbackText: "Presenter photo" },
   );
 
-  // Gold frame around the photo
+  // Gold frame
   strokeRoundedRect(
     ctx,
     photoX,
@@ -117,45 +126,39 @@ export async function render(ctx, helpers) {
   // ── Right column ─────────────────────────────────────────────
   const rightX = W / 2 + 60;
 
-  // Megaphone emoji
   ctx.textAlign = "left";
   ctx.font = "72px serif";
   ctx.fillText("📢", rightX + 60, 400);
 
-  // Presenter audience line
   ctx.fillStyle = BRAND_GOLD;
-  ctx.font = "bold 34px 'Noto Serif Ethiopic', 'Nyala', serif";
+  ctx.font = "bold 32px 'Noto Serif Ethiopic', 'Nyala', serif";
   ctx.textAlign = "center";
   const audienceLine =
     form.audienceLine || `ከ ${form.presenterName || "አቅራቢ"} ጋር`;
   ctx.fillText(audienceLine, rightX + 180, 500);
 
-  // Center name with serif italic
   ctx.fillStyle = BRAND_WHITE;
-  ctx.font = "italic bold 42px 'Playfair Display', Georgia, serif";
+  ctx.font = "italic bold 40px 'Playfair Display', Georgia, serif";
   ctx.fillText(form.center || "Addis Ketema Center", rightX + 180, 620);
 
-  // Gold divider
-  ctx.fillStyle = BRAND_GOLD;
   fillRoundedRect(ctx, rightX + 40, 650, 280, 5, 3, BRAND_GOLD);
 
-  // Ethiopian date
   ctx.fillStyle = BRAND_GOLD;
-  ctx.font = "bold 34px 'Noto Serif Ethiopic', 'Nyala', serif";
+  ctx.font = "bold 32px 'Noto Serif Ethiopic', 'Nyala', serif";
   ctx.fillText(form.ethiopianDate || "መስከረም 1, 2018 ዓ.ም.", rightX + 180, 730);
 
-  // Time
   ctx.fillStyle = BRAND_WHITE;
-  ctx.font = "italic bold 32px 'Playfair Display', Georgia, serif";
+  ctx.font = "italic bold 30px 'Playfair Display', Georgia, serif";
   ctx.fillText(form.time || "1:30 – 2:30 ከሰዓት", rightX + 180, 800);
 
-  // ── Title (below photo, in a rounded "ribbon") ───────────────
+  // ── Title ribbon at the bottom ──────────────────────────────
   if (form.title) {
     const ribbonX = 40;
     const ribbonY = H - 200;
     const ribbonW = W - 80;
     const ribbonH = 100;
 
+    applySoftShadow(ctx, 22, 10, 0.24);
     fillRoundedRect(
       ctx,
       ribbonX,
@@ -163,8 +166,9 @@ export async function render(ctx, helpers) {
       ribbonW,
       ribbonH,
       18,
-      "rgba(0,0,0,0.25)",
+      "rgba(0,0,0,0.28)",
     );
+    clearShadow(ctx);
     strokeRoundedRect(
       ctx,
       ribbonX,
@@ -183,8 +187,11 @@ export async function render(ctx, helpers) {
 
     ctx.fillStyle = BRAND_WHITE;
     ctx.font = "bold 26px 'Noto Serif Ethiopic', 'Nyala', serif";
-    const titleText = fitText(ctx, form.title, ribbonW - 48);
-    ctx.fillText(titleText, ribbonX + 24, ribbonY + 72);
+    ctx.fillText(
+      fitText(ctx, form.title, ribbonW - 48),
+      ribbonX + 24,
+      ribbonY + 72,
+    );
   }
 
   // ── Website URL ──────────────────────────────────────────────

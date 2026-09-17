@@ -1,9 +1,13 @@
 // frontend/src/components/golden-monday/templates/CeremonialRed.js
-//
-// A formal, ceremonial look: deep burgundy background with layered
-// gold ornamental borders, a large centered portrait inside a gold
-// arch, and serif typography throughout. Reads like an official
-// invitation or award certificate.
+import {
+  // drawRoundedImage,
+  drawArchImage,
+  // fillRoundedRect,
+  strokeRoundedRect,
+  applySoftShadow,
+  clearShadow,
+  fitText,
+} from "./drawHelpers";
 
 export const meta = {
   id: "ceremonial-red",
@@ -22,7 +26,7 @@ export async function render(ctx, helpers) {
   const GOLD_LIGHT = "#f5e6a8";
   const CREAM = "#f4ecd8";
 
-  // ── Background: subtle vertical gradient ────────────────────
+  // ── Background gradient ─────────────────────────────────────
   const bg = ctx.createLinearGradient(0, 0, 0, H);
   bg.addColorStop(0, MAROON);
   bg.addColorStop(0.55, MAROON_LIGHT);
@@ -30,14 +34,16 @@ export async function render(ctx, helpers) {
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
-  // ── Double gold frame (outer thick, inner thin) ────────────
-  ctx.strokeStyle = GOLD;
-  ctx.lineWidth = 4;
-  ctx.strokeRect(24, 24, W - 48, H - 48);
+  // Radial glow top-center
+  const glow = ctx.createRadialGradient(W / 2, 0, 50, W / 2, 0, 900);
+  glow.addColorStop(0, "rgba(212,175,55,0.14)");
+  glow.addColorStop(1, "rgba(212,175,55,0)");
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, W, H);
 
-  ctx.strokeStyle = GOLD_LIGHT;
-  ctx.lineWidth = 1;
-  ctx.strokeRect(34, 34, W - 68, H - 68);
+  // ── Double gold frame (rounded) ─────────────────────────────
+  strokeRoundedRect(ctx, 24, 24, W - 48, H - 48, 28, GOLD, 4);
+  strokeRoundedRect(ctx, 34, 34, W - 68, H - 68, 22, GOLD_LIGHT, 1);
 
   // ── Ornamental corner flourishes ────────────────────────────
   const flourish = (x, y, dx, dy) => {
@@ -45,7 +51,6 @@ export async function render(ctx, helpers) {
     ctx.translate(x, y);
     ctx.scale(dx, dy);
 
-    // L-shaped bracket
     ctx.strokeStyle = GOLD;
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -54,7 +59,6 @@ export async function render(ctx, helpers) {
     ctx.lineTo(60, 0);
     ctx.stroke();
 
-    // Diamond accent at the corner
     ctx.fillStyle = GOLD;
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -64,7 +68,6 @@ export async function render(ctx, helpers) {
     ctx.closePath();
     ctx.fill();
 
-    // Small decorative dots
     ctx.beginPath();
     ctx.arc(80, 0, 3, 0, Math.PI * 2);
     ctx.arc(0, 80, 3, 0, Math.PI * 2);
@@ -78,12 +81,12 @@ export async function render(ctx, helpers) {
   flourish(50, H - 50, 1, -1);
   flourish(W - 50, H - 50, -1, -1);
 
-  // ── Top logo (centered on a gold medallion) ─────────────────
+  // ── Top logo on a gold medallion ────────────────────────────
   const medallionX = W / 2;
   const medallionY = 130;
   const medallionR = 70;
 
-  // Gold disc
+  applySoftShadow(ctx, 24, 10, 0.35);
   const discGrad = ctx.createRadialGradient(
     medallionX - 20,
     medallionY - 20,
@@ -98,8 +101,8 @@ export async function render(ctx, helpers) {
   ctx.beginPath();
   ctx.arc(medallionX, medallionY, medallionR, 0, Math.PI * 2);
   ctx.fill();
+  clearShadow(ctx);
 
-  // Thin inner ring
   ctx.strokeStyle = MAROON_DARK;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -122,7 +125,7 @@ export async function render(ctx, helpers) {
     }
   }
 
-  // ── Header: "Golden Monday" in small caps over Amharic ──────
+  // ── Header ──────────────────────────────────────────────────
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
@@ -134,7 +137,7 @@ export async function render(ctx, helpers) {
   ctx.font = "bold 42px 'Noto Serif Ethiopic', 'Nyala', serif";
   ctx.fillText("የወርቃማ ሰኞ ፕሮግራም ተናጋሪ", W / 2, 300);
 
-  // Ornamental line under header
+  // Ornamental line
   const lineY = 335;
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 1;
@@ -145,7 +148,6 @@ export async function render(ctx, helpers) {
   ctx.lineTo(W / 2 + 260, lineY);
   ctx.stroke();
 
-  // Central diamond on the line
   ctx.fillStyle = GOLD;
   ctx.beginPath();
   ctx.moveTo(W / 2, lineY - 8);
@@ -162,53 +164,33 @@ export async function render(ctx, helpers) {
   const photoY = 400;
   const archRadius = photoW / 2;
 
-  // Draw the arch outline (thick gold)
-  ctx.save();
+  // Soft shadow behind the arch
+  applySoftShadow(ctx, 28, 14, 0.35);
+  ctx.fillStyle = MAROON_DARK;
   ctx.beginPath();
-  // Arch path: semicircle on top + rectangle below
   ctx.moveTo(photoX, photoY + archRadius);
   ctx.arc(photoX + archRadius, photoY + archRadius, archRadius, Math.PI, 0);
   ctx.lineTo(photoX + photoW, photoY + photoH);
   ctx.lineTo(photoX, photoY + photoH);
   ctx.closePath();
-
-  // Fill with a subtle maroon first, in case photo load fails
-  ctx.fillStyle = MAROON_DARK;
   ctx.fill();
+  clearShadow(ctx);
 
-  // Clip the photo to the arch
-  ctx.clip();
+  // The photo, clipped to the arch
+  await drawArchImage(
+    ctx,
+    loadImage,
+    photoSrc,
+    photoX,
+    photoY,
+    photoW,
+    photoH,
+    {
+      fallbackColor: MAROON_DARK,
+    },
+  );
 
-  if (photoSrc) {
-    try {
-      const photo = await loadImage(photoSrc);
-      const targetAspect = photoW / photoH;
-      const sourceAspect = photo.width / photo.height;
-      let sx = 0,
-        sy = 0,
-        sw = photo.width,
-        sh = photo.height;
-      if (sourceAspect > targetAspect) {
-        sw = photo.height * targetAspect;
-        sx = (photo.width - sw) / 2;
-      } else {
-        sh = photo.width / targetAspect;
-        sy = (photo.height - sh) / 2;
-      }
-      ctx.drawImage(photo, sx, sy, sw, sh, photoX, photoY, photoW, photoH);
-    } catch (e) {
-      console.warn("[CeremonialRed] presenter photo failed:", e.message);
-    }
-  } else {
-    ctx.fillStyle = MAROON_DARK;
-    ctx.fillRect(photoX, photoY, photoW, photoH);
-    ctx.fillStyle = GOLD;
-    ctx.font = "italic 22px Georgia, serif";
-    ctx.fillText("Presenter photo", W / 2, photoY + photoH / 2);
-  }
-  ctx.restore();
-
-  // Draw the gold arch outline on top
+  // Gold arch outline
   ctx.save();
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 4;
@@ -221,7 +203,7 @@ export async function render(ctx, helpers) {
   ctx.stroke();
   ctx.restore();
 
-  // Small gold diamond at the arch's apex
+  // Diamond at the arch's apex
   ctx.fillStyle = GOLD_LIGHT;
   ctx.beginPath();
   ctx.moveTo(W / 2, photoY + 4);
@@ -253,7 +235,6 @@ export async function render(ctx, helpers) {
   // ── Info block ──────────────────────────────────────────────
   const infoY = nameY + 150;
 
-  // Center
   ctx.fillStyle = GOLD;
   ctx.font = "italic 18px Georgia, serif";
   ctx.fillText("CENTER", W / 2, infoY - 30);
@@ -261,7 +242,6 @@ export async function render(ctx, helpers) {
   ctx.font = "bold 26px Georgia, serif";
   ctx.fillText(form.center || "Addis Ketema Center", W / 2, infoY);
 
-  // Small decorative divider between center and date
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -269,7 +249,6 @@ export async function render(ctx, helpers) {
   ctx.lineTo(W / 2 + 180, infoY + 30);
   ctx.stroke();
 
-  // Date
   ctx.fillStyle = GOLD;
   ctx.font = "italic 18px Georgia, serif";
   ctx.fillText("DATE", W / 2, infoY + 75);
@@ -277,16 +256,14 @@ export async function render(ctx, helpers) {
   ctx.font = "bold 24px 'Noto Serif Ethiopic', 'Nyala', serif";
   ctx.fillText(form.ethiopianDate || "መስከረም 1, 2018 ዓ.ም.", W / 2, infoY + 108);
 
-  // Time (with small "at" ornament)
   ctx.fillStyle = GOLD;
   ctx.font = "italic 20px Georgia, serif";
   ctx.fillText(form.time || "1:30 – 2:30 ከሰዓት", W / 2, infoY + 150);
 
-  // ── Title band (bottom) ─────────────────────────────────────
+  // ── Title band ──────────────────────────────────────────────
   if (form.title) {
     const bandTop = H - 180;
 
-    // Gold ornamental line above the title
     ctx.strokeStyle = GOLD;
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -294,7 +271,6 @@ export async function render(ctx, helpers) {
     ctx.lineTo(W - 100, bandTop);
     ctx.stroke();
 
-    // Central diamond on the line
     ctx.fillStyle = GOLD;
     ctx.beginPath();
     ctx.moveTo(W / 2, bandTop - 8);
@@ -310,20 +286,10 @@ export async function render(ctx, helpers) {
 
     ctx.fillStyle = CREAM;
     ctx.font = "bold 26px 'Noto Serif Ethiopic', 'Nyala', serif";
-    let title = `"${form.title}"`;
-    if (ctx.measureText(title).width > W - 180) {
-      while (
-        ctx.measureText(title + "…").width > W - 180 &&
-        title.length > 20
-      ) {
-        title = title.slice(0, -1);
-      }
-      title += "…";
-    }
-    ctx.fillText(title, W / 2, bandTop + 90);
+    ctx.fillText(fitText(ctx, `"${form.title}"`, W - 180), W / 2, bandTop + 90);
   }
 
-  // ── Website URL (bottom) ────────────────────────────────────
+  // ── Website ─────────────────────────────────────────────────
   ctx.fillStyle = GOLD_LIGHT;
   ctx.font = "italic 18px 'Playfair Display', Georgia, serif";
   ctx.fillText(form.websiteUrl, W / 2, H - 55);
