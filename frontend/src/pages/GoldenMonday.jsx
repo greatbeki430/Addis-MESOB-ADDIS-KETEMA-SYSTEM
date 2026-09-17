@@ -1542,9 +1542,15 @@ export default function GoldenMonday() {
 
   const refreshData = useCallback(async () => {
     setRefreshing(true);
-    await loadAllData();
-    setRefreshing(false);
-    showToast(t.success || "Data refreshed", "success");
+    try {
+      await loadAllData();
+      showToast(t.success || "Data refreshed", "success");
+    } catch (err) {
+      console.error("[GoldenMonday] refreshData failed:", err);
+      showToast(t.error || "Failed to refresh data", "error");
+    } finally {
+      setRefreshing(false);
+    }
   }, [loadAllData, t]);
 
   // ── Auto-refresh every 5 minutes ──

@@ -711,7 +711,13 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
           location: "qr-scan",
         });
         showToast("✅ Checked in successfully!", "success");
-        if (onCheckIn) onCheckIn();
+        if (onCheckIn) {
+          try {
+            await onCheckIn();
+          } catch (refreshErr) {
+            console.error("[QRCheckIn] onCheckIn threw:", refreshErr);
+          }
+        }
       } catch (err) {
         console.error("Employee check-in failed:", err);
         const msg = err.response?.data?.error || "Check-in failed";
@@ -740,7 +746,13 @@ export default function QRCheckIn({ sessionId, onCheckIn }) {
         );
         const name = res.data?.employee?.name || "Employee";
         showToast(`✅ ${name} checked in successfully!`, "success");
-        if (onCheckIn) onCheckIn();
+        if (onCheckIn) {
+          try {
+            await onCheckIn();
+          } catch (refreshErr) {
+            console.error("[QRCheckIn] onCheckIn threw:", refreshErr);
+          }
+        }
       } catch (err) {
         console.error("Admin scan failed:", err);
         showToast(
