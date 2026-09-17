@@ -17,7 +17,6 @@ const {
   rejectRegistration,
   sendLoginCredentials,
   showBranchSelection,
-  // ✅ NEW IMPORTS
   notifyEmployeeDeletion,
   handleAppealDeletion,
   handleAppealReason,
@@ -29,6 +28,9 @@ const {
   requestPresenterAvailability,
   handlePresenterAvailability,
   handlePresenterUnavailableReason,
+  generateAnnouncementImage, // ✅ ADDED — was pulled directly before
+  forceRepostToChannel, // ✅ ADDED
+  forceRenotifyPresenter, // ✅ ADDED
 
   // Notifications
   createNotification,
@@ -39,7 +41,7 @@ const {
   // Reminders
   sendPresenterReminders,
 
-  // Utils - ✅ ADDED setWebhook and getWebhookInfo
+  // Utils
   sendMessage,
   callTelegramApi,
   generateOtp,
@@ -63,10 +65,7 @@ const {
 } = require("./telegram");
 
 // ─── LEGACY SUPPORT ──────────────────────────────────────────────
-// These are kept for backward compatibility with existing routes
 const postPresenterAnnouncement = postPresenterAnnouncementToChannel;
-const generateAnnouncementImage =
-  require("./telegram/presenters").generateAnnouncementImage;
 
 const setChatMenuButton = async (chatId) => {
   const result = await callTelegramApi("setChatMenuButton", {
@@ -109,7 +108,6 @@ module.exports = {
   rejectRegistration,
   sendLoginCredentials,
   showBranchSelection,
-  // ✅ NEW EXPORTS
   notifyEmployeeDeletion,
   handleAppealDeletion,
   handleAppealReason,
@@ -123,6 +121,8 @@ module.exports = {
   handlePresenterAvailability,
   handlePresenterUnavailableReason,
   generateAnnouncementImage,
+  forceRepostToChannel, // ✅ ADDED
+  forceRenotifyPresenter, // ✅ ADDED
 
   // Notifications
   createNotification,
@@ -133,7 +133,7 @@ module.exports = {
   // Reminders
   sendPresenterReminders,
 
-  // Utils - ✅ Includes setWebhook and getWebhookInfo
+  // Utils
   sendMessage,
   callTelegramApi,
   generateOtp,

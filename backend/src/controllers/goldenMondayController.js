@@ -12,11 +12,10 @@ const {
 } = require("../services/aiService");
 const rotation = require("../services/goldenMondayRotationService");
 const recording = require("../services/goldenMondayRecordingService");
-// const {
-//   notifyAndAnnouncePresenter,
-// } = require("../services/goldenMondayNotificationService");
 const {
   postNextPresenterAnnouncement,
+  forceRepostToChannel,
+  forceRenotifyPresenter,
 } = require("../services/telegramService");
 
 // ─── Helper: Determine if user can see salary information ─────
@@ -1025,6 +1024,52 @@ const analyzeAndCategorizePhoto = async (req, res) => {
   }
 };
 
+// ============================================================
+// FORCE RE-ANNOUNCE — re-post to the public channel
+// POST /api/golden-monday/:sessionId/re-announce
+// ============================================================
+const reAnnounceSession = async (req, res) => {
+  try {
+    const result = await forceRepostToChannel(req.params.sessionId);
+    if (!result.postId) {
+      return res.status(500).json({
+        message: "Failed to post to channel",
+        error: result.error || "Unknown error",
+      });
+    }
+    res.json({
+      success: true,
+      message: "Re-posted to channel",
+      postId: result.postId,
+      messageUrl: result.messageUrl,
+    });
+  } catch (error) {
+    console.error("❌ [reAnnounceSession] Error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// ============================================================
+// FORCE RE-NOTIFY — re-send the presenter availability DM
+// POST /api/golden-monday/:sessionId/re-notify-presenter
+// ============================================================
+const reNotifyPresenter = async (req, res) => {
+  try {
+    const result = await forceRenotifyPresenter(req.params.sessionId);
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Could not re-send the DM. The presenter may not have a Telegram chat ID or may have blocked the bot. Check the admin group for details.",
+      });
+    }
+    res.json({ success: true, message: "Presenter DM re-sent" });
+  } catch (error) {
+    console.error("❌ [reNotifyPresenter] Error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getSessions,
   previewRecap,
@@ -1042,4 +1087,6 @@ module.exports = {
   removeSessionRecording,
   getLiveRecordings,
   analyzeAndCategorizePhoto,
+  reAnnounceSession,
+  reNotifyPresenter,
 };
