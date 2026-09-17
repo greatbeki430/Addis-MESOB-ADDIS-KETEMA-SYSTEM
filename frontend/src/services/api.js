@@ -553,8 +553,16 @@ export const goldenMondayAPI = {
   getNextPresenter: () => api.get("/golden-monday/rotation/next"),
   assignRotation: (weekOf, manualPresenterId) =>
     api.post("/golden-monday/rotation/assign", { weekOf, manualPresenterId }),
-  assignPresenter: (userId) =>
-    api.post("/golden-monday/rotation/assign", { manualPresenterId: userId }),
+
+  // ✅ Manual override — assign a specific presenter for a specific week.
+  // The backend still credits a "skip" to everyone the algorithm would
+  // have picked ahead of them, so fairness tracking stays honest.
+  assignPresenter: (userId, weekOf) =>
+    api.post("/golden-monday/rotation/assign", {
+      manualPresenterId: userId,
+      weekOf: weekOf || undefined,
+    }),
+
   reassignRotation: (sessionId, reason) =>
     api.post(`/golden-monday/rotation/${sessionId}/reassign`, { reason }),
 
@@ -563,6 +571,17 @@ export const goldenMondayAPI = {
   // ──────────────────────────────────────────────────────────────
   setPresentationTitle: (sessionId, title) =>
     api.put(`/golden-monday/${sessionId}/title`, { title }),
+
+  // ✅ Force re-post the announcement to the public channel. Ignores
+  // the session.announcementSent flag on purpose — the point is to
+  // re-post even if it was already sent once.
+  reAnnounceSession: (sessionId) =>
+    api.post(`/golden-monday/${sessionId}/re-announce`),
+
+  // ✅ Force re-send the presenter availability DM. Ignores any
+  // existing pending-confirmation entry and restarts the 48h clock.
+  reNotifyPresenter: (sessionId) =>
+    api.post(`/golden-monday/${sessionId}/re-notify-presenter`),
 
   // ──────────────────────────────────────────────────────────────
   // 📊 STATISTICS & ANALYTICS
