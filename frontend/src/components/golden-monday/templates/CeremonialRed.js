@@ -135,7 +135,7 @@ export async function render(ctx, helpers) {
 
   ctx.fillStyle = CREAM;
   ctx.font = "bold 42px 'Noto Serif Ethiopic', 'Nyala', serif";
-  ctx.fillText("የወርቃማ ሰኞ ፕሮግራም ተናጋሪ", W / 2, 300);
+  ctx.fillText("የወርቃማ ሰኞ ፕሮግራም ተረኛ", W / 2, 300);
 
   // Ornamental line
   const lineY = 335;
