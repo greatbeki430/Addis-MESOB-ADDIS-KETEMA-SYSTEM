@@ -44,14 +44,32 @@ const STUDIO_THEMES = [
 // ─── Snap grid (px in canvas space) ─────────────────────────────
 const SNAP_GRID = 20;
 
+// ─── Draggable block list ───────────────────────────────────────
+// One list drives the drag handler, the reset, the overlay rects,
+// and the JSX map below. Adding a new draggable block means adding
+// one entry here and one entry in DEFAULT_STUDIO_LAYOUT, nothing
+// else. Kept in module scope because it's static.
+const STUDIO_BLOCKS = ["photo", "name", "info", "badge", "title"];
+
 export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
   // ── Form state ──────────────────────────────────────────────
   // Note: ethiopianDate is NOT in here. It's derived from
   // gregorianDate at render time, with a manual override stored
   // separately so the two paths don't fight each other.
+  //
+  // Optional fields (sessionNumber, subtitle, department,
+  // description, weekOf, qrDataUrl) are declared here with empty
+  // defaults so the Studio template always gets a full shape and
+  // the input elements below stay controlled.
   const [form, setForm] = useState({
     presenterName: "",
     title: "",
+    subtitle: "",
+    department: "",
+    description: "",
+    sessionNumber: "",
+    weekOf: "",
+    qrDataUrl: "",
     center: "Addis Ketema Center",
     time: "1:30 - 2:30 ከሰዓት",
     audienceLine: "",
@@ -60,12 +78,8 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
 
   // ── Date state ──────────────────────────────────────────────
   const [gregorianDate, setGregorianDate] = useState(todayGregorianISODate);
-  // Manual override for the Ethiopian string. When empty, the
-  // derived value from gregorianDate wins. When non-empty, this
-  // takes priority so a coordinator can force a specific string.
   const [ethiopianOverride, setEthiopianOverride] = useState("");
 
-  // Derived every render — no effect, no state sync, no cascade.
   const derivedEthiopianDate = useMemo(
     () => formatEthiopianDate(gregorianDate, "am"),
     [gregorianDate],
@@ -79,10 +93,14 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
   const [selectedTemplate, setSelectedTemplate] = useState(DEFAULT_TEMPLATE);
 
   // ── Studio layout state (only used by the Studio template) ──
+  // Initialised from DEFAULT_STUDIO_LAYOUT so any block added there
+  // is picked up here without having to update both places.
   const [studioLayout, setStudioLayout] = useState(() => ({
     photo: { ...DEFAULT_STUDIO_LAYOUT.photo },
     name: { ...DEFAULT_STUDIO_LAYOUT.name },
     info: { ...DEFAULT_STUDIO_LAYOUT.info },
+    badge: { ...DEFAULT_STUDIO_LAYOUT.badge },
+    title: { ...DEFAULT_STUDIO_LAYOUT.title },
     theme: DEFAULT_STUDIO_LAYOUT.theme,
   }));
 
@@ -91,16 +109,16 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
   const [rendering, setRendering] = useState(false);
   const [posting, setPosting] = useState(false);
 
-  // Preview container size — set from the img's own onLoad so the
-  // drag overlay can scale canvas coordinates correctly.
   const [previewSize, setPreviewSize] = useState({ w: 400, h: 569 });
 
   const canvasRef = useRef(null);
 
-  // Scale factor from canvas → preview.
   const previewScale = previewSize.w / POSTER_W;
 
   // ── Initialise form from session ────────────────────────────
+  // Pre-populates any optional field the session carries. Missing
+  // fields stay as their empty default — the template treats empty
+  // strings as "don't draw this".
   useEffect(() => {
     if (!isOpen || !session) return;
 
@@ -109,6 +127,14 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         ...f,
         presenterName: session.presenterName || "",
         title: session.presentationTitle || "",
+        subtitle: session.presenterTitle || f.subtitle,
+        department: session.presenterDepartment || f.department,
+        description: session.presentationDescription || f.description,
+        sessionNumber:
+          session.sessionNumber !== undefined && session.sessionNumber !== null
+            ? String(session.sessionNumber)
+            : f.sessionNumber,
+        weekOf: session.weekOf || f.weekOf,
       }));
 
       if (session.presenterPhotoUrl) {
@@ -164,9 +190,6 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
       const template =
         TEMPLATES[selectedTemplate] || TEMPLATES[DEFAULT_TEMPLATE];
 
-      // Pass the derived Ethiopian date into the template via a
-      // merged form object so templates keep their existing
-      // `form.ethiopianDate` contract without us storing it in state.
       const formForTemplate = {
         ...form,
         ethiopianDate,
@@ -207,7 +230,6 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
     loadImage,
   ]);
 
-  // Re-render on any state change
   useEffect(() => {
     if (!isOpen) return;
     const timer = setTimeout(renderPoster, 200);
@@ -264,9 +286,10 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
   }, [session, previewUrl, onPosted, onClose]);
 
   // ── Drag handling ───────────────────────────────────────────
-  // One ref tracks the active drag. The move/up listeners are
-  // registered inside handleDragStart and removed by cleanup — no
-  // circular reference between the callbacks.
+  // Single ref tracks the active drag; move/up listeners are
+  // registered inside handleDragStart and cleaned up on release.
+  // A block-name lookup replaces the old chained ternary so adding
+  // a block only requires extending STUDIO_BLOCKS and the defaults.
   const dragRef = useRef(null);
 
   const handleDragStart = useCallback(
@@ -276,19 +299,15 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
 
       const point = e.touches ? e.touches[0] : e;
 
-      const origin =
-        target === "photo"
-          ? { x: studioLayout.photo.x, y: studioLayout.photo.y }
-          : target === "name"
-            ? { x: studioLayout.name.x, y: studioLayout.name.y }
-            : { x: studioLayout.info.x, y: studioLayout.info.y };
+      const block = studioLayout[target];
+      if (!block) return;
 
       dragRef.current = {
         target,
         startX: point.clientX,
         startY: point.clientY,
-        originX: origin.x,
-        originY: origin.y,
+        originX: block.x,
+        originY: block.y,
       };
 
       const onMove = (moveEvent) => {
@@ -304,10 +323,18 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         let nx = drag.originX + dx;
         let ny = drag.originY + dy;
 
+        // Clamp per block. The lower bound of 180 on y keeps every
+        // draggable out of the fixed hero band.
         if (drag.target === "photo") {
           const { w, h } = studioLayout.photo;
           nx = Math.max(0, Math.min(POSTER_W - w, nx));
           ny = Math.max(180, Math.min(POSTER_H - h, ny));
+        } else if (drag.target === "badge") {
+          nx = Math.max(0, Math.min(POSTER_W - 100, nx));
+          ny = Math.max(180, Math.min(POSTER_H - 100, ny));
+        } else if (drag.target === "title") {
+          nx = Math.max(20, Math.min(POSTER_W - 300, nx));
+          ny = Math.max(180, Math.min(POSTER_H - 120, ny));
         } else {
           nx = Math.max(20, Math.min(POSTER_W - 200, nx));
           ny = Math.max(180, Math.min(POSTER_H - 100, ny));
@@ -318,13 +345,15 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
           ny = Math.round(ny / SNAP_GRID) * SNAP_GRID;
         }
 
-        setStudioLayout((prev) => ({
-          ...prev,
-          [drag.target]:
-            drag.target === "photo"
-              ? { ...prev.photo, x: nx, y: ny }
-              : { x: nx, y: ny },
-        }));
+        setStudioLayout((prev) => {
+          const next = { ...prev };
+          if (drag.target === "photo") {
+            next.photo = { ...prev.photo, x: nx, y: ny };
+          } else {
+            next[drag.target] = { x: nx, y: ny };
+          }
+          return next;
+        });
       };
 
       const onEnd = () => {
@@ -340,7 +369,14 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
       window.addEventListener("touchmove", onMove, { passive: false });
       window.addEventListener("touchend", onEnd);
     },
-    [previewScale, studioLayout.photo, studioLayout.name, studioLayout.info],
+    [
+      previewScale,
+      studioLayout.photo,
+      studioLayout.name,
+      studioLayout.info,
+      studioLayout.badge,
+      studioLayout.title,
+    ],
   );
 
   // ── Reset studio layout ─────────────────────────────────────
@@ -349,6 +385,8 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
       photo: { ...DEFAULT_STUDIO_LAYOUT.photo },
       name: { ...DEFAULT_STUDIO_LAYOUT.name },
       info: { ...DEFAULT_STUDIO_LAYOUT.info },
+      badge: { ...DEFAULT_STUDIO_LAYOUT.badge },
+      title: { ...DEFAULT_STUDIO_LAYOUT.title },
       theme: DEFAULT_STUDIO_LAYOUT.theme,
     });
   }, []);
@@ -357,6 +395,8 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
   const isStudio = selectedTemplate === "studio";
 
   // ── Preview overlay rects ───────────────────────────────────
+  // Sizes approximate the visual bounds of each drawn block, scaled
+  // from canvas space to preview pixel space.
   const overlayRects = useMemo(() => {
     const s = previewScale;
     return {
@@ -370,13 +410,25 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         left: studioLayout.name.x * s,
         top: studioLayout.name.y * s,
         width: 400 * s,
-        height: 160 * s,
+        height: 200 * s,
       },
       info: {
         left: (studioLayout.info.x - 20) * s,
         top: (studioLayout.info.y - 20) * s,
         width: 380 * s,
-        height: 240 * s,
+        height: 260 * s,
+      },
+      badge: {
+        left: studioLayout.badge.x * s,
+        top: studioLayout.badge.y * s,
+        width: 92 * s,
+        height: 92 * s,
+      },
+      title: {
+        left: (studioLayout.title.x - 20) * s,
+        top: (studioLayout.title.y - 20) * s,
+        width: 700 * s,
+        height: 120 * s,
       },
     };
   }, [studioLayout, previewScale]);
@@ -654,7 +706,8 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
                     }}
                   >
                     Click and drag the <strong>photo</strong>,{" "}
-                    <strong>name</strong>, or <strong>info card</strong> in the
+                    <strong>name</strong>, <strong>info card</strong>,{" "}
+                    <strong>badge</strong>, or <strong>title</strong> in the
                     preview. Hold <strong>Shift</strong> while dragging to snap
                     to a 20px grid.
                   </div>
@@ -731,6 +784,62 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
               )}
             </Field>
 
+            {/* ─── Optional fields, read by the Studio template only ─── */}
+            {/* These are new. Other templates ignore them. */}
+            {isStudio && (
+              <>
+                <Field label="Session number">
+                  <input
+                    type="number"
+                    value={form.sessionNumber}
+                    onChange={(e) =>
+                      setForm({ ...form, sessionNumber: e.target.value })
+                    }
+                    placeholder="e.g. 42"
+                    style={inputStyle}
+                  />
+                </Field>
+
+                <Field label="Subtitle (under presenter name)">
+                  <input
+                    value={form.subtitle}
+                    onChange={(e) =>
+                      setForm({ ...form, subtitle: e.target.value })
+                    }
+                    placeholder="Optional — e.g. Distinguished Lecturer"
+                    style={inputStyle}
+                  />
+                </Field>
+
+                <Field label="Department">
+                  <input
+                    value={form.department}
+                    onChange={(e) =>
+                      setForm({ ...form, department: e.target.value })
+                    }
+                    placeholder="Optional — e.g. Urban Planning"
+                    style={inputStyle}
+                  />
+                </Field>
+
+                <Field label="Description (short)">
+                  <textarea
+                    value={form.description}
+                    onChange={(e) =>
+                      setForm({ ...form, description: e.target.value })
+                    }
+                    placeholder="Optional — one line under the topic"
+                    rows={2}
+                    style={{
+                      ...inputStyle,
+                      resize: "vertical",
+                      fontFamily: "inherit",
+                    }}
+                  />
+                </Field>
+              </>
+            )}
+
             <Field label="Audience line (Amharic)">
               <input
                 value={form.audienceLine}
@@ -751,15 +860,11 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
             </Field>
 
             <Field label="Date">
-              {/* Native GC date picker. The Ethiopian string is derived
-                  from this value — no effect, no sync. */}
               <input
                 type="date"
                 value={gregorianDate}
                 onChange={(e) => {
                   setGregorianDate(e.target.value);
-                  // Any manual override becomes stale the moment the
-                  // picker changes; drop it so the derived value wins.
                   setEthiopianOverride("");
                 }}
                 style={inputStyle}
@@ -942,25 +1047,16 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
                     }}
                   />
 
-                  {/* Drag overlay — only when Studio is active */}
+                  {/* Drag overlay — only when Studio is active.
+                      The list of overlays is derived from
+                      STUDIO_BLOCKS so adding a block to that array
+                      lights up a drag handle here automatically. */}
                   {isStudio &&
-                    [
-                      {
-                        key: "photo",
-                        rect: overlayRects.photo,
-                        label: "Photo",
-                      },
-                      {
-                        key: "name",
-                        rect: overlayRects.name,
-                        label: "Name",
-                      },
-                      {
-                        key: "info",
-                        rect: overlayRects.info,
-                        label: "Info",
-                      },
-                    ].map((item) => (
+                    STUDIO_BLOCKS.map((key) => ({
+                      key,
+                      rect: overlayRects[key],
+                      label: key.charAt(0).toUpperCase() + key.slice(1),
+                    })).map((item) => (
                       <div
                         key={item.key}
                         onMouseDown={handleDragStart(item.key)}
