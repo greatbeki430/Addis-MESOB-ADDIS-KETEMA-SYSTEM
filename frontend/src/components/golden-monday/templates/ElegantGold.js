@@ -76,7 +76,7 @@ export async function render(ctx, helpers) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.font = "bold 40px 'Noto Serif Ethiopic', 'Nyala', serif";
-  ctx.fillText("የወርቃማ ሰኞ ፕሮግራም ተናጋሪ", W / 2, 260);
+  ctx.fillText("የወርቃማ ሰኞ ፕሮግራም ተረኛ", W / 2, 260);
 
   ctx.strokeStyle = GOLD;
   ctx.lineWidth = 1;

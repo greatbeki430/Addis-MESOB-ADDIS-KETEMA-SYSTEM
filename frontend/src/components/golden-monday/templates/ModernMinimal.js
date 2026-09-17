@@ -69,7 +69,7 @@ export async function render(ctx, helpers) {
   ctx.textAlign = "left";
   ctx.font = "bold 46px 'Noto Serif Ethiopic', 'Nyala', serif";
   ctx.fillText("የወርቃማ ሰኞ", 60, 250);
-  ctx.fillText("ፕሮግራም ተናጋሪ", 60, 312);
+  ctx.fillText("ፕሮግራም ተረኛ", 60, 312);
 
   fillRoundedRect(ctx, 60, 340, 120, 5, 3, ACCENT);
 
