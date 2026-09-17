@@ -29,6 +29,11 @@ const {
   requestPresenterAvailability,
   handlePresenterAvailability,
   handlePresenterUnavailableReason,
+  // ✅ ADDED — required by telegramService.js façade
+  generateAnnouncementImage,
+  // ✅ ADDED — force actions (admin overrides)
+  forceRepostToChannel,
+  forceRenotifyPresenter,
 } = require("./presenters");
 
 const {
@@ -126,6 +131,10 @@ module.exports = {
   requestPresenterAvailability,
   handlePresenterAvailability,
   handlePresenterUnavailableReason,
+  // ✅ ADDED
+  generateAnnouncementImage,
+  forceRepostToChannel,
+  forceRenotifyPresenter,
 
   // Notifications
   createNotification,

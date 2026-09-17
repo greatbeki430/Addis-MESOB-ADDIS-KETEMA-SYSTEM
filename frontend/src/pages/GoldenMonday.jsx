@@ -1503,7 +1503,6 @@ export default function GoldenMonday() {
           .getPastSessions()
           .catch(() => ({ data: { sessions: [], pagination: {} } })),
         goldenMondayAPI.getNextPresenter().catch(() => ({ data: null })),
-        goldenMondayAPI.getRanking().catch(() => ({ data: [] })),
         goldenMondayAPI.getEmployees().catch(() => ({ data: [] })),
         goldenMondayAPI.getStats().catch(() => ({ data: null })),
         goldenMondayAPI.getPillars().catch(() => ({ data: FALLBACK_PILLARS })),
@@ -1925,6 +1924,13 @@ export default function GoldenMonday() {
           .gm-admin-actions {
             gap: 6px !important;
           }
+        }
+
+        /* ── Tab labels hidden on narrow screens ── */
+        @media (max-width: 600px) {
+        .tab-label {
+           display: none !important;
+         }
         }
 
         @media (max-width: 480px) {
@@ -2355,11 +2361,7 @@ export default function GoldenMonday() {
               }}
             >
               {tab.icon}
-              <span
-                style={{ display: window.innerWidth < 600 ? "none" : "inline" }}
-              >
-                {tab.label}
-              </span>
+              <span className="tab-label">{tab.label}</span>
               {tab.badge > 0 && (
                 <span
                   style={{

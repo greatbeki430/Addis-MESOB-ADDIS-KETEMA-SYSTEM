@@ -32,6 +32,8 @@ const {
   getLiveRecordings,
   analyzeAndCategorizePhoto,
   canSeeSalary,
+  reAnnounceSession,
+  reNotifyPresenter,
 } = require("../controllers/goldenMondayController");
 const {
   createNotification,
@@ -298,6 +300,21 @@ router.post(
 // ════════════════════════════════════════════════════════════════
 
 router.put("/:sessionId/title", protect, anyRole, setPresentationTitle);
+
+// ✅ ADDED — force re-post to channel + force re-send presenter DM
+router.post(
+  "/:sessionId/re-announce",
+  protect,
+  goldenMondayAdminOrAbove,
+  reAnnounceSession,
+);
+router.post(
+  "/:sessionId/re-notify-presenter",
+  protect,
+  goldenMondayAdminOrAbove,
+  reNotifyPresenter,
+);
+
 router.post(
   "/:sessionId/recording",
   protect,

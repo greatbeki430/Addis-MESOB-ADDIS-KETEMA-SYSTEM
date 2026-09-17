@@ -14,9 +14,6 @@ const pendingPresenterConfirmations = new Map();
 // ─── GENERATE ANNOUNCEMENT IMAGE ────────────────────────────────
 async function generateAnnouncementImage(presenter, session) {
   try {
-    // via.placeholder.com was shut down in 2024. Return the presenter's
-    // real Cloudinary photo if available, else null so the caller
-    // falls back to a text-only message.
     if (
       presenter?.profilePhotoUrl &&
       /^https?:\/\//i.test(presenter.profilePhotoUrl)
@@ -43,22 +40,22 @@ async function postPresenterAnnouncementToChannel(session) {
 
     const imageUrl = await generateAnnouncementImage(presenter, session);
 
-    let message = `🎯 *Golden Monday - ${dateFormatted}*\n\n`;
-    message += `👤 *Presenter:* ${presenter?.name || "TBD"}\n`;
+    let message = `🎯 Golden Monday - ${dateFormatted}\n\n`;
+    message += `👤 Presenter: ${presenter?.name || "TBD"}\n`;
     if (presenter?.department) {
-      message += `🏛️ *Department:* ${presenter.department}\n`;
+      message += `🏛️ Department: ${presenter.department}\n`;
     }
     if (session.presentationTitle) {
-      message += `📖 *Topic:* "${session.presentationTitle}"\n`;
+      message += `📖 Topic: "${session.presentationTitle}"\n`;
     }
     if (session.presentationDescription) {
-      message += `📝 *Description:* ${session.presentationDescription}\n`;
+      message += `📝 Description: ${session.presentationDescription}\n`;
     }
-    message += `\n🕒 *Time:* 2:00 - 2:50 PM\n`;
-    message += `📍 *Location:* Addis MESOB Conference Hall\n\n`;
+    message += `\n🕒 Time: 2:00 - 2:50 PM\n`;
+    message += `📍 Location: Addis MESOB Conference Hall\n\n`;
 
     if (session.suggestedTopics && session.suggestedTopics.length > 0) {
-      message += `💡 *AI Suggested Topics:*\n`;
+      message += `💡 AI Suggested Topics:\n`;
       session.suggestedTopics.forEach((topic, i) => {
         message += `   ${i + 1}. ${topic}\n`;
       });
@@ -80,8 +77,6 @@ async function postPresenterAnnouncementToChannel(session) {
         }),
       });
 
-      // If sendPhoto failed (bad URL, blocked host, etc.), retry as
-      // plain text so the announcement isn't silently lost.
       const photoResult = await response.clone().json();
       if (!photoResult.ok) {
         console.warn(
@@ -128,8 +123,19 @@ async function postPresenterAnnouncementToChannel(session) {
 }
 
 // ─── REQUEST PRESENTER AVAILABILITY ─────────────────────────────
-async function requestPresenterAvailability(session) {
-  const presenter = session.presenter;
+// ✅ NEW: accepts `{ force }`. Also hydrates a bare ObjectId presenter.
+async function requestPresenterAvailability(session, { force = false } = {}) {
+  // Hydrate presenter if it's just an ObjectId
+  let presenter = session.presenter;
+  if (presenter && !presenter.name) {
+    const User = require("../../models/User");
+    presenter = await User.findById(presenter);
+    if (!presenter) {
+      console.warn(`⚠️ Presenter ${session.presenter} not found`);
+      return false;
+    }
+  }
+
   if (!presenter) {
     console.warn(`⚠️ No presenter on session ${session._id}`);
     return false;
@@ -137,7 +143,11 @@ async function requestPresenterAvailability(session) {
 
   const sessionId = session._id.toString();
 
-  // Build the message text once
+  // ✅ NEW: on force, drop any stale entry so the deadline resets
+  if (force) {
+    pendingPresenterConfirmations.delete(sessionId);
+  }
+
   const messageBody =
     `🎯 Golden Monday - ${formatDate(session.date)}\n\n` +
     `Dear ${presenter.name},\n\n` +
@@ -150,7 +160,6 @@ async function requestPresenterAvailability(session) {
     `❌ Not Available - Click and provide a reason\n\n` +
     `⚠️ If you don't respond within 48 hours, a replacement will be assigned.`;
 
-  // ─── Channel 1: Telegram (preferred) ─────────────────────
   if (presenter.telegramChatId) {
     try {
       const chatId = presenter.telegramChatId.toString();
@@ -190,14 +199,15 @@ async function requestPresenterAvailability(session) {
       });
 
       console.log(
-        `📨 Availability request sent to ${presenter.name} via Telegram`,
+        `📨 Availability request sent to ${presenter.name} via Telegram${
+          force ? " (forced re-send)" : ""
+        }`,
       );
 
-      // Notify admin group
       if (TELEGRAM_ADMIN_GROUP_ID) {
         await sendMessage(
           TELEGRAM_ADMIN_GROUP_ID,
-          `📨 *Presenter Availability Request Sent*\n\n` +
+          `📨 Presenter Availability Request Sent\n\n` +
             `👤 Presenter: ${presenter.name}\n` +
             `📧 Email: ${presenter.email}\n` +
             `📱 Channel: ✅ Telegram\n` +
@@ -215,9 +225,6 @@ async function requestPresenterAvailability(session) {
         `❌ Failed to send Telegram DM to ${presenter.name}:`,
         error.message,
       );
-      // Fall through to the "cannot be reached" notification below.
-      // (Do not retry — the error is usually a bad chatId or the user
-      // blocked the bot, neither of which will fix itself on a retry.)
     }
   } else {
     console.warn(
@@ -225,11 +232,6 @@ async function requestPresenterAvailability(session) {
     );
   }
 
-  // ─── Fallback: Notify admin group for manual contact ─────────
-  // SMS was removed: no free provider delivers to Ethiopian phone
-  // numbers, and the paid alternatives aren't in scope right now.
-  // Instead, alert the admins so they can call or message the
-  // presenter directly.
   if (TELEGRAM_ADMIN_GROUP_ID) {
     const reason = presenter.telegramChatId
       ? "Telegram DM failed to send (user may have blocked the bot)"
@@ -237,7 +239,7 @@ async function requestPresenterAvailability(session) {
 
     await sendMessage(
       TELEGRAM_ADMIN_GROUP_ID,
-      `🚨 *Presenter Cannot Be Reached Automatically*\n\n` +
+      `🚨 Presenter Cannot Be Reached Automatically\n\n` +
         `👤 Presenter: ${presenter.name}\n` +
         `📧 Email: ${presenter.email || "Not provided"}\n` +
         `📱 Phone: ${presenter.phone || "Not provided"}\n` +
@@ -372,7 +374,7 @@ async function handlePresenterAvailability(callbackQuery) {
     await callTelegramApi("editMessageText", {
       chat_id: chatId,
       message_id: messageId,
-      text: `${callbackQuery.message.text}\n\n✅ *You have confirmed your availability!*\n\nThank you for presenting at Golden Monday! 🎉`,
+      text: `${callbackQuery.message.text}\n\n✅ You have confirmed your availability!\n\nThank you for presenting at Golden Monday! 🎉`,
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [
@@ -389,7 +391,7 @@ async function handlePresenterAvailability(callbackQuery) {
     if (TELEGRAM_ADMIN_GROUP_ID) {
       await sendMessage(
         TELEGRAM_ADMIN_GROUP_ID,
-        `✅ *Presenter Confirmed*\n\n` +
+        `✅ Presenter Confirmed\n\n` +
           `👤 Presenter: ${session.presenter?.name || "Unknown"}\n` +
           `📅 Session: ${formatDate(session.date)}\n` +
           `📖 Topic: ${session.presentationTitle || "TBD"}`,
@@ -397,20 +399,19 @@ async function handlePresenterAvailability(callbackQuery) {
       );
     }
 
-    // Send preparation tips
     await sendMessage(
       chatId,
-      `🎯 *Golden Monday - Preparation Tips*\n\n` +
+      `🎯 Golden Monday - Preparation Tips\n\n` +
         `Here are some tips to help you prepare:\n\n` +
-        `📝 *Prepare your presentation:*\n` +
+        `📝 Prepare your presentation:\n` +
         `• Keep it engaging and interactive\n` +
         `• Duration: 45-50 minutes\n` +
         `• Use visuals if possible\n\n` +
-        `💡 *Topic Suggestions:*\n` +
+        `💡 Topic Suggestions:\n` +
         `• Share your expertise\n` +
         `• Focus on practical knowledge\n` +
         `• Encourage participation\n\n` +
-        `📎 *Resources:*\n` +
+        `📎 Resources:\n` +
         `• ${FRONTEND_URL}/golden-monday/resources\n` +
         `• Contact admin for support`,
       { parse_mode: "Markdown" },
@@ -429,7 +430,7 @@ async function handlePresenterAvailability(callbackQuery) {
     await callTelegramApi("editMessageText", {
       chat_id: chatId,
       message_id: messageId,
-      text: `${callbackQuery.message.text}\n\n❌ *You indicated you're not available.*\n\nPlease type your reason for not being able to present.\n\n⚠️ A valid reason is required and will be reviewed.`,
+      text: `${callbackQuery.message.text}\n\n❌ You indicated you're not available.\n\nPlease type your reason for not being able to present.\n\n⚠️ A valid reason is required and will be reviewed.`,
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [
@@ -450,7 +451,6 @@ async function handlePresenterUnavailableReason(msg) {
   const chatId = msg.chat.id.toString();
   const text = (msg.text || "").trim();
 
-  // Find the pending session with awaiting_reason
   let sessionId = null;
   for (const [key, value] of pendingPresenterConfirmations) {
     if (value.chatId === chatId && value.step === "awaiting_reason") {
@@ -492,7 +492,7 @@ async function handlePresenterUnavailableReason(msg) {
   await sendMessage(
     chatId,
     `✅ Your reason has been recorded.\n\n` +
-      `📝 *Reason:* ${text}\n\n` +
+      `📝 Reason: ${text}\n\n` +
       `An administrator will review this and follow up with you.`,
     { parse_mode: "Markdown" },
   );
@@ -500,16 +500,60 @@ async function handlePresenterUnavailableReason(msg) {
   if (TELEGRAM_ADMIN_GROUP_ID) {
     await sendMessage(
       TELEGRAM_ADMIN_GROUP_ID,
-      `⚠️ *Presenter Declined*\n\n` +
+      `⚠️ Presenter Declined\n\n` +
         `👤 Presenter: ${session.presenter?.name || "Unknown"}\n` +
         `📧 Email: ${session.presenter?.email || "Unknown"}\n` +
         `📅 Session: ${formatDate(session.date)}\n` +
         `📖 Topic: ${session.presentationTitle || "TBD"}\n\n` +
-        `📝 *Reason given:*\n${text}\n\n` +
+        `📝 Reason given:\n${text}\n\n` +
         `🔹 Please find a replacement presenter.`,
       { parse_mode: "Markdown" },
     );
   }
+}
+
+// ════════════════════════════════════════════════════════════════
+// ✅ NEW FUNCTIONS — force actions
+// ════════════════════════════════════════════════════════════════
+
+// ─── FORCE RE-POST ANNOUNCEMENT TO CHANNEL ──────────────────────
+async function forceRepostToChannel(sessionId) {
+  const session = await GoldenMondaySession.findById(sessionId).populate(
+    "presenter",
+    "name email department profilePhotoUrl telegramChatId phone",
+  );
+  if (!session) throw new Error("Session not found");
+
+  const result = await postPresenterAnnouncementToChannel(session);
+  if (result.postId) {
+    session.announcementSent = true;
+    session.announcementMessageId = String(result.postId);
+    session.telegramPostId = String(result.postId);
+    session.telegramPostedAt = new Date();
+    session.telegramMessageUrl = result.messageUrl || "";
+    await session.save();
+  }
+  return result;
+}
+
+// ─── FORCE RE-SEND PRESENTER AVAILABILITY DM ────────────────────
+async function forceRenotifyPresenter(sessionId) {
+  const session = await GoldenMondaySession.findById(sessionId).populate(
+    "presenter",
+    "name email department profilePhotoUrl telegramChatId phone",
+  );
+  if (!session) throw new Error("Session not found");
+  if (!session.presenter) throw new Error("No presenter assigned");
+
+  const ok = await requestPresenterAvailability(session, { force: true });
+  if (ok) {
+    session.availabilityRequestSentAt = new Date();
+    session.availabilityResponseDeadline = new Date(
+      Date.now() + 48 * 60 * 60 * 1000,
+    );
+    await session.save();
+  }
+  return { success: ok };
 }
 
 module.exports = {
@@ -519,4 +563,7 @@ module.exports = {
   handlePresenterAvailability,
   handlePresenterUnavailableReason,
   pendingPresenterConfirmations,
+  generateAnnouncementImage,
+  forceRepostToChannel,
+  forceRenotifyPresenter,
 };
