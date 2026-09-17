@@ -4,6 +4,7 @@
 const GoldenMondaySession = require("../models/GoldenMondaySession");
 const GoldenMondayPresenter = require("../models/GoldenMondayPresenter");
 const GoldenMondayGallery = require("../models/GoldenMondayGallery");
+const GoldenMondayAttendance = require("../models/GoldenMondayAttendance");
 const User = require("../models/User");
 const {
   generateGoldenMondayRecap,
@@ -1141,6 +1142,103 @@ const postWithPoster = async (req, res) => {
   }
 };
 
+// ============================================================
+// GET /api/golden-monday/qr-checkin/my-status
+// Query: ?sessionId=<id>
+//
+// Returns whether the CURRENT user has checked in to the given
+// session, when they did it, and the current attendance counts.
+// Used by the QRCheckIn card on mount to decide whether to show
+// the "Scan Session QR" button or a static "already checked in"
+// pill, and to display the live counter in the header.
+// ============================================================
+const getMyQRStatus = async (req, res) => {
+  try {
+    const { sessionId } = req.query;
+    if (!sessionId) {
+      return res.status(400).json({ error: "sessionId is required" });
+    }
+
+    const session = await GoldenMondaySession.findById(sessionId).select(
+      "title date presentationTitle",
+    );
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    const attendance = await GoldenMondayAttendance.findOne({
+      session: sessionId,
+      user: req.user._id,
+    });
+
+    const [totalCheckedIn, totalEligible] = await Promise.all([
+      GoldenMondayAttendance.countDocuments({
+        session: sessionId,
+        attended: true,
+      }),
+      GoldenMondayPresenter.countDocuments({ isEligible: true }),
+    ]);
+
+    res.json({
+      success: true,
+      checkedIn: !!(attendance && attendance.attended),
+      checkedInAt: attendance?.checkedInAt || null,
+      session: {
+        id: session._id,
+        title:
+          session.title || session.presentationTitle || "Golden Monday Session",
+        date: session.date,
+      },
+      summary: {
+        totalCheckedIn,
+        totalEligible,
+      },
+    });
+  } catch (error) {
+    console.error("❌ [getMyQRStatus] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// ============================================================
+// GET /api/golden-monday/qr-checkin/my-history
+// Query: ?limit=5
+//
+// Returns the current user's last N attendance records across all
+// sessions, most recent first.
+// ============================================================
+const getMyQRHistory = async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 5, 20);
+
+    const records = await GoldenMondayAttendance.find({
+      user: req.user._id,
+      attended: true,
+    })
+      .sort({ checkedInAt: -1 })
+      .limit(limit)
+      .populate("session", "title date presentationTitle")
+      .lean();
+
+    const history = records
+      .filter((r) => r.session) // skip orphans where session was deleted
+      .map((r) => ({
+        sessionId: r.session._id,
+        sessionTitle:
+          r.session.title ||
+          r.session.presentationTitle ||
+          "Golden Monday Session",
+        date: r.session.date,
+        checkedInAt: r.checkedInAt,
+      }));
+
+    res.json({ success: true, history });
+  } catch (error) {
+    console.error("❌ [getMyQRHistory] Error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 module.exports = {
   getSessions,
   previewRecap,
@@ -1161,4 +1259,6 @@ module.exports = {
   reAnnounceSession,
   reNotifyPresenter,
   postWithPoster,
+  getMyQRStatus,
+  getMyQRHistory,
 };
