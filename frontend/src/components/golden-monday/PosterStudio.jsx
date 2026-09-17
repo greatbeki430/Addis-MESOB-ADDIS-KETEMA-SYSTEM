@@ -1,5 +1,5 @@
 // frontend/src/components/golden-monday/PosterStudio.jsx
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import {
@@ -10,10 +10,16 @@ import {
   FiUpload,
   FiImage,
   FiCheck,
+  FiMove,
 } from "react-icons/fi";
 import { C, F } from "../../styles/theme";
 import { goldenMondayAPI } from "../../services/api";
-import { TEMPLATES, TEMPLATE_ORDER, DEFAULT_TEMPLATE } from "./templates";
+import {
+  TEMPLATES,
+  TEMPLATE_ORDER,
+  DEFAULT_TEMPLATE,
+  DEFAULT_STUDIO_LAYOUT,
+} from "./templates";
 import {
   formatEthiopianDate,
   todayGregorianISODate,
@@ -27,40 +33,74 @@ const POSTER_H = 1280;
 const LOGO_URL = "/brand/amesob-logo.png";
 const CLOCK_URL = "/brand/clock.png";
 
+// ─── Studio template theme options ──────────────────────────────
+const STUDIO_THEMES = [
+  { id: "midnight", label: "Midnight", swatch: "#0d1a5e" },
+  { id: "forest", label: "Forest", swatch: "#0f3d2e" },
+  { id: "sunset", label: "Sunset", swatch: "#7B1818" },
+  { id: "mono", label: "Mono", swatch: "#1a1a1a" },
+];
+
+// ─── Snap grid (px in canvas space) ─────────────────────────────
+const SNAP_GRID = 20;
+
 export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
   // ── Form state ──────────────────────────────────────────────
+  // Note: ethiopianDate is NOT in here. It's derived from
+  // gregorianDate at render time, with a manual override stored
+  // separately so the two paths don't fight each other.
   const [form, setForm] = useState({
     presenterName: "",
     title: "",
     center: "Addis Ketema Center",
-    ethiopianDate: "",
     time: "1:30 - 2:30 ከሰዓት",
     audienceLine: "",
     websiteUrl: "addis.mesobcenter.et",
   });
 
-  // ── Gregorian picker state ──────────────────────────────────
-  // The native <input type="date"> always works in the Gregorian
-  // calendar. The coordinator picks a GC date here; a small effect
-  // converts it to the Ethiopian equivalent and writes it into
-  // form.ethiopianDate. The coordinator can still override the
-  // Ethiopian string manually if needed.
+  // ── Date state ──────────────────────────────────────────────
   const [gregorianDate, setGregorianDate] = useState(todayGregorianISODate);
+  // Manual override for the Ethiopian string. When empty, the
+  // derived value from gregorianDate wins. When non-empty, this
+  // takes priority so a coordinator can force a specific string.
+  const [ethiopianOverride, setEthiopianOverride] = useState("");
 
-  // ── Photo state ─────────────────────────────────────────────
+  // Derived every render — no effect, no state sync, no cascade.
+  const derivedEthiopianDate = useMemo(
+    () => formatEthiopianDate(gregorianDate, "am"),
+    [gregorianDate],
+  );
+  const ethiopianDate = ethiopianOverride || derivedEthiopianDate;
+
+  // ── Photo ───────────────────────────────────────────────────
   const [photoSrc, setPhotoSrc] = useState(null);
 
   // ── Template picker ─────────────────────────────────────────
   const [selectedTemplate, setSelectedTemplate] = useState(DEFAULT_TEMPLATE);
+
+  // ── Studio layout state (only used by the Studio template) ──
+  const [studioLayout, setStudioLayout] = useState(() => ({
+    photo: { ...DEFAULT_STUDIO_LAYOUT.photo },
+    name: { ...DEFAULT_STUDIO_LAYOUT.name },
+    info: { ...DEFAULT_STUDIO_LAYOUT.info },
+    theme: DEFAULT_STUDIO_LAYOUT.theme,
+  }));
 
   // ── Preview + submit state ──────────────────────────────────
   const [previewUrl, setPreviewUrl] = useState(null);
   const [rendering, setRendering] = useState(false);
   const [posting, setPosting] = useState(false);
 
+  // Preview container size — set from the img's own onLoad so the
+  // drag overlay can scale canvas coordinates correctly.
+  const [previewSize, setPreviewSize] = useState({ w: 400, h: 569 });
+
   const canvasRef = useRef(null);
 
-  // ── Initialise form from session when opened ────────────────
+  // Scale factor from canvas → preview.
+  const previewScale = previewSize.w / POSTER_W;
+
+  // ── Initialise form from session ────────────────────────────
   useEffect(() => {
     if (!isOpen || !session) return;
 
@@ -69,9 +109,6 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         ...f,
         presenterName: session.presenterName || "",
         title: session.presentationTitle || "",
-        // NOTE: ethiopianDate is intentionally NOT reset here.
-        // The gregorianDate → ethiopianDate effect below owns it.
-        // If we reset it here, the two would fight on every open.
       }));
 
       if (session.presenterPhotoUrl) {
@@ -99,13 +136,7 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
     });
   }, []);
 
-  // ── Render-token guard ──────────────────────────────────────
-  // Every call to renderPoster grabs a fresh token. Before touching
-  // the canvas and after every await, it checks whether it's still
-  // the latest render. If a newer render started, the older one
-  // bails out without clearing or drawing. This prevents two
-  // concurrent async renders from racing on the same canvas and
-  // leaving the preview showing stale form data.
+  // ── Render token guard ──────────────────────────────────────
   const renderTokenRef = useRef(0);
 
   const renderPoster = useCallback(async () => {
@@ -122,7 +153,6 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
 
       if (isStale()) return;
 
-      // Reset any lingering state from the previous render
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, POSTER_W, POSTER_H);
       ctx.globalAlpha = 1;
@@ -134,8 +164,16 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
       const template =
         TEMPLATES[selectedTemplate] || TEMPLATES[DEFAULT_TEMPLATE];
 
+      // Pass the derived Ethiopian date into the template via a
+      // merged form object so templates keep their existing
+      // `form.ethiopianDate` contract without us storing it in state.
+      const formForTemplate = {
+        ...form,
+        ethiopianDate,
+      };
+
       await template.render(ctx, {
-        form,
+        form: formForTemplate,
         photoSrc,
         assets: {
           logo: LOGO_URL,
@@ -144,10 +182,9 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         W: POSTER_W,
         H: POSTER_H,
         loadImage,
+        layout: selectedTemplate === "studio" ? studioLayout : undefined,
       });
 
-      // The template has been awaiting image loads; check again for
-      // staleness before committing the result.
       if (isStale()) return;
 
       const dataUrl = canvas.toDataURL("image/png", 0.92);
@@ -161,14 +198,29 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         setRendering(false);
       }
     }
-  }, [form, photoSrc, selectedTemplate, loadImage]);
+  }, [
+    form,
+    ethiopianDate,
+    photoSrc,
+    selectedTemplate,
+    studioLayout,
+    loadImage,
+  ]);
 
-  // Re-render whenever form, photo, or template changes
+  // Re-render on any state change
   useEffect(() => {
     if (!isOpen) return;
     const timer = setTimeout(renderPoster, 200);
     return () => clearTimeout(timer);
-  }, [isOpen, form, photoSrc, selectedTemplate, renderPoster]);
+  }, [
+    isOpen,
+    form,
+    ethiopianDate,
+    photoSrc,
+    selectedTemplate,
+    studioLayout,
+    renderPoster,
+  ]);
 
   // ── Photo upload ────────────────────────────────────────────
   const handlePhotoUpload = useCallback((e) => {
@@ -211,6 +263,124 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
     }
   }, [session, previewUrl, onPosted, onClose]);
 
+  // ── Drag handling ───────────────────────────────────────────
+  // One ref tracks the active drag. The move/up listeners are
+  // registered inside handleDragStart and removed by cleanup — no
+  // circular reference between the callbacks.
+  const dragRef = useRef(null);
+
+  const handleDragStart = useCallback(
+    (target) => (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const point = e.touches ? e.touches[0] : e;
+
+      const origin =
+        target === "photo"
+          ? { x: studioLayout.photo.x, y: studioLayout.photo.y }
+          : target === "name"
+            ? { x: studioLayout.name.x, y: studioLayout.name.y }
+            : { x: studioLayout.info.x, y: studioLayout.info.y };
+
+      dragRef.current = {
+        target,
+        startX: point.clientX,
+        startY: point.clientY,
+        originX: origin.x,
+        originY: origin.y,
+      };
+
+      const onMove = (moveEvent) => {
+        const drag = dragRef.current;
+        if (!drag) return;
+
+        if (moveEvent.cancelable) moveEvent.preventDefault();
+
+        const movePoint = moveEvent.touches ? moveEvent.touches[0] : moveEvent;
+        const dx = (movePoint.clientX - drag.startX) / previewScale;
+        const dy = (movePoint.clientY - drag.startY) / previewScale;
+
+        let nx = drag.originX + dx;
+        let ny = drag.originY + dy;
+
+        if (drag.target === "photo") {
+          const { w, h } = studioLayout.photo;
+          nx = Math.max(0, Math.min(POSTER_W - w, nx));
+          ny = Math.max(180, Math.min(POSTER_H - h, ny));
+        } else {
+          nx = Math.max(20, Math.min(POSTER_W - 200, nx));
+          ny = Math.max(180, Math.min(POSTER_H - 100, ny));
+        }
+
+        if (moveEvent.shiftKey) {
+          nx = Math.round(nx / SNAP_GRID) * SNAP_GRID;
+          ny = Math.round(ny / SNAP_GRID) * SNAP_GRID;
+        }
+
+        setStudioLayout((prev) => ({
+          ...prev,
+          [drag.target]:
+            drag.target === "photo"
+              ? { ...prev.photo, x: nx, y: ny }
+              : { x: nx, y: ny },
+        }));
+      };
+
+      const onEnd = () => {
+        dragRef.current = null;
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onEnd);
+        window.removeEventListener("touchmove", onMove);
+        window.removeEventListener("touchend", onEnd);
+      };
+
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onEnd);
+      window.addEventListener("touchmove", onMove, { passive: false });
+      window.addEventListener("touchend", onEnd);
+    },
+    [previewScale, studioLayout.photo, studioLayout.name, studioLayout.info],
+  );
+
+  // ── Reset studio layout ─────────────────────────────────────
+  const resetStudioLayout = useCallback(() => {
+    setStudioLayout({
+      photo: { ...DEFAULT_STUDIO_LAYOUT.photo },
+      name: { ...DEFAULT_STUDIO_LAYOUT.name },
+      info: { ...DEFAULT_STUDIO_LAYOUT.info },
+      theme: DEFAULT_STUDIO_LAYOUT.theme,
+    });
+  }, []);
+
+  // ── Is the Studio template active? ──────────────────────────
+  const isStudio = selectedTemplate === "studio";
+
+  // ── Preview overlay rects ───────────────────────────────────
+  const overlayRects = useMemo(() => {
+    const s = previewScale;
+    return {
+      photo: {
+        left: studioLayout.photo.x * s,
+        top: studioLayout.photo.y * s,
+        width: studioLayout.photo.w * s,
+        height: studioLayout.photo.h * s,
+      },
+      name: {
+        left: studioLayout.name.x * s,
+        top: studioLayout.name.y * s,
+        width: 400 * s,
+        height: 160 * s,
+      },
+      info: {
+        left: (studioLayout.info.x - 20) * s,
+        top: (studioLayout.info.y - 20) * s,
+        width: 380 * s,
+        height: 240 * s,
+      },
+    };
+  }, [studioLayout, previewScale]);
+
   if (!isOpen) return null;
 
   return createPortal(
@@ -231,11 +401,8 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
         padding: 16,
       }}
     >
-      {/* ✅ Invisible text — forces Google Fonts to load before the
-          canvas tries to render. Without these, the first poster of
-          a session falls back to system serif fonts until some other
-          part of the app happens to use Noto Serif Ethiopic or
-          Playfair Display in the DOM. */}
+      {/* Invisible text — forces Google Fonts to load before the
+          canvas renders. */}
       <span
         aria-hidden="true"
         style={{
@@ -317,7 +484,7 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
           </button>
         </div>
 
-        {/* Body: two columns */}
+        {/* Body */}
         <div
           style={{
             flex: 1,
@@ -399,6 +566,123 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
               </div>
             </Field>
 
+            {/* Studio-only controls: theme + reset */}
+            {isStudio && (
+              <>
+                <Field label="Colour theme">
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: 8,
+                    }}
+                  >
+                    {STUDIO_THEMES.map((th) => {
+                      const active = studioLayout.theme === th.id;
+                      return (
+                        <button
+                          key={th.id}
+                          onClick={() =>
+                            setStudioLayout((prev) => ({
+                              ...prev,
+                              theme: th.id,
+                            }))
+                          }
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: "8px 12px",
+                            borderRadius: 10,
+                            border: active
+                              ? `2px solid ${C.primary}`
+                              : `1.5px solid ${C.border}`,
+                            background: active ? `${C.primary}08` : "#fff",
+                            cursor: "pointer",
+                            fontFamily: F.sans,
+                            fontSize: 12,
+                            fontWeight: active ? 700 : 500,
+                            color: C.dark,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 18,
+                              height: 18,
+                              borderRadius: "50%",
+                              background: th.swatch,
+                              border: "1px solid rgba(0,0,0,0.15)",
+                              flexShrink: 0,
+                            }}
+                          />
+                          {th.label}
+                          {active && <FiCheck size={12} color={C.primary} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+
+                <div
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 10,
+                    background: "#eef2ff",
+                    border: `1px solid ${C.primary}22`,
+                    marginBottom: 14,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: C.primary,
+                      fontWeight: 600,
+                      marginBottom: 4,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                  >
+                    <FiMove size={12} />
+                    Drag the poster pieces to reposition them
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: C.muted,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    Click and drag the <strong>photo</strong>,{" "}
+                    <strong>name</strong>, or <strong>info card</strong> in the
+                    preview. Hold <strong>Shift</strong> while dragging to snap
+                    to a 20px grid.
+                  </div>
+                  <button
+                    onClick={resetStudioLayout}
+                    style={{
+                      marginTop: 8,
+                      padding: "6px 12px",
+                      borderRadius: 8,
+                      border: `1px solid ${C.primary}33`,
+                      background: "#fff",
+                      color: C.primary,
+                      fontWeight: 600,
+                      fontSize: 11,
+                      cursor: "pointer",
+                      fontFamily: F.sans,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <FiRefreshCw size={11} />
+                    Reset layout
+                  </button>
+                </div>
+              </>
+            )}
+
             <Field label="Presenter name">
               <input
                 value={form.presenterName}
@@ -410,11 +694,6 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
             </Field>
 
             <Field label="Presentation title">
-              {/*
-                The title is chosen by the assigned presenter (via
-                the Telegram DM or the rotation panel). Admins
-                coordinate the poster but don't author the title.
-              */}
               <div
                 style={{
                   ...inputStyle,
@@ -472,22 +751,20 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
             </Field>
 
             <Field label="Date">
-              {/* Native GC date picker drives the Ethiopian field. */}
+              {/* Native GC date picker. The Ethiopian string is derived
+                  from this value — no effect, no sync. */}
               <input
                 type="date"
                 value={gregorianDate}
                 onChange={(e) => {
-                  const nextDate = e.target.value;
-                  setGregorianDate(nextDate);
-                  const formatted = formatEthiopianDate(nextDate, "am");
-                  if (formatted) {
-                    setForm((f) => ({ ...f, ethiopianDate: formatted }));
-                  }
+                  setGregorianDate(e.target.value);
+                  // Any manual override becomes stale the moment the
+                  // picker changes; drop it so the derived value wins.
+                  setEthiopianOverride("");
                 }}
                 style={inputStyle}
               />
 
-              {/* Auto-converted Ethiopian date, shown read-only. */}
               <div
                 style={{
                   marginTop: 8,
@@ -515,12 +792,10 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
                     color: C.dark,
                   }}
                 >
-                  {form.ethiopianDate || "—"}
+                  {ethiopianDate || "—"}
                 </div>
               </div>
 
-              {/* Override is collapsed by default. Most coordinators
-                  won't touch this; it's here for edge cases. */}
               <details style={{ marginTop: 6 }}>
                 <summary
                   style={{
@@ -533,11 +808,9 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
                   Override manually
                 </summary>
                 <input
-                  value={form.ethiopianDate}
-                  onChange={(e) =>
-                    setForm({ ...form, ethiopianDate: e.target.value })
-                  }
-                  placeholder="e.g. ኅዳር 25, 2018 ዓ.ም."
+                  value={ethiopianOverride}
+                  onChange={(e) => setEthiopianOverride(e.target.value)}
+                  placeholder={derivedEthiopianDate || "e.g. ኅዳር 25, 2018 ዓ.ም."}
                   style={{ ...inputStyle, marginTop: 6 }}
                 />
               </details>
@@ -637,8 +910,9 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    zIndex: 2,
+                    zIndex: 3,
                     borderRadius: 8,
+                    pointerEvents: "none",
                   }}
                 >
                   <FiLoader
@@ -647,16 +921,95 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
                   />
                 </div>
               )}
+
               {previewUrl ? (
-                <img
-                  src={previewUrl}
-                  alt="Poster preview"
-                  style={{
-                    width: "100%",
-                    borderRadius: 8,
-                    boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
-                  }}
-                />
+                <>
+                  <img
+                    src={previewUrl}
+                    alt="Poster preview"
+                    onLoad={(e) => {
+                      const el = e.currentTarget;
+                      setPreviewSize({
+                        w: el.clientWidth,
+                        h: el.clientHeight,
+                      });
+                    }}
+                    style={{
+                      width: "100%",
+                      borderRadius: 8,
+                      boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
+                      display: "block",
+                    }}
+                  />
+
+                  {/* Drag overlay — only when Studio is active */}
+                  {isStudio &&
+                    [
+                      {
+                        key: "photo",
+                        rect: overlayRects.photo,
+                        label: "Photo",
+                      },
+                      {
+                        key: "name",
+                        rect: overlayRects.name,
+                        label: "Name",
+                      },
+                      {
+                        key: "info",
+                        rect: overlayRects.info,
+                        label: "Info",
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.key}
+                        onMouseDown={handleDragStart(item.key)}
+                        onTouchStart={handleDragStart(item.key)}
+                        title={`Drag to reposition the ${item.label}`}
+                        style={{
+                          position: "absolute",
+                          left: item.rect.left,
+                          top: item.rect.top,
+                          width: item.rect.width,
+                          height: item.rect.height,
+                          border: "2px dashed rgba(123,77,255,0.7)",
+                          borderRadius: 10,
+                          cursor: "grab",
+                          background: "rgba(123,77,255,0.06)",
+                          zIndex: 2,
+                          touchAction: "none",
+                          transition: "background 0.15s ease",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background =
+                            "rgba(123,77,255,0.12)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background =
+                            "rgba(123,77,255,0.06)";
+                        }}
+                      >
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: -10,
+                            left: 8,
+                            background: "#7B4DFF",
+                            color: "#fff",
+                            fontSize: 9,
+                            fontWeight: 700,
+                            padding: "2px 6px",
+                            borderRadius: 999,
+                            letterSpacing: 0.5,
+                            textTransform: "uppercase",
+                            pointerEvents: "none",
+                          }}
+                        >
+                          {item.label}
+                        </div>
+                      </div>
+                    ))}
+                </>
               ) : (
                 <div
                   style={{
@@ -741,7 +1094,6 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
           </button>
         </div>
 
-        {/* Hidden canvas */}
         <canvas
           ref={canvasRef}
           width={POSTER_W}
