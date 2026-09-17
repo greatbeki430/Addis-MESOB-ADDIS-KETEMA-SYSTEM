@@ -1,5 +1,10 @@
 // backend/src/services/telegram/presenters.js
-const { FormData, Blob } = require("undici");
+// undici's FormData is worth importing explicitly because globalThis.FormData
+// has had subtle incompatibilities across Node versions. But Blob is stable
+// as a global since Node 18, so just use the native one. Destructuring both
+// from undici caused 'Blob is not a constructor' on the current Node 26
+// runtime — undici's Blob export is undefined in the resolved version.
+const { FormData } = require("undici");
 const GoldenMondaySession = require("../../models/GoldenMondaySession");
 const { formatDate, sendMessage, callTelegramApi } = require("./utils");
 const {
