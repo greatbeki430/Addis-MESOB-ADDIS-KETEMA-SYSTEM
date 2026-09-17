@@ -11,7 +11,7 @@ import { useAuth } from "../hooks/useAuth";
 import { useLanguage } from "../hooks/useLanguage";
 import { goldenMondayAPI, authAPI, uploadAPI } from "../services/api";
 import { showToast } from "../utils/toastHelper";
-import { ROLES, hasMinRole } from "../utils/roles";
+import { ROLES, isGoldenMondayAdminOrAbove } from "../utils/roles";
 import { goldenMondayTranslations } from "../constants/goldenMondayTranslations";
 import GoldenMondayRotationPanel from "../components/golden-monday/GoldenMondayRotationPanel";
 import AttendancePanel from "../components/golden-monday/AttendancePanel";
@@ -1404,9 +1404,12 @@ export default function GoldenMonday() {
 
   // ── Role-based access ──
   const userRole = user?.role || ROLES.EMPLOYEE;
-  const isLeaderOrAbove = hasMinRole(userRole, ROLES.TEAM_LEADER);
-  const isAdminOrAbove = hasMinRole(userRole, ROLES.ADMIN);
   const isSuperAdmin = userRole === ROLES.SUPER_ADMIN;
+
+  // ✅ GM-specific gate. Coordinators (isGoldenMondayAdmin === true) pass
+  // this even though their role is still "employee". Use it for every
+  // Golden-Monday-owned control below.
+  const isGmAdmin = isGoldenMondayAdminOrAbove(user);
 
   // ── State ──
   const [upcomingSessions, setUpcomingSessions] = useState([]);
@@ -2156,7 +2159,7 @@ export default function GoldenMonday() {
                   {t.scroll || "Explore the story"} <FiChevronDown size={16} />
                 </a>
 
-                {(isAdminOrAbove || isSuperAdmin) && (
+                {isGmAdmin && (
                   <div
                     style={{ display: "flex", gap: 8, alignItems: "center" }}
                   >
@@ -2527,7 +2530,7 @@ export default function GoldenMonday() {
               </div>
 
               {/* AI SESSION STUDIO */}
-              {isLeaderOrAbove && (
+              {isGmAdmin && (
                 <div
                   ref={registerRef("aiStudio")}
                   data-reveal="aiStudio"
@@ -2849,7 +2852,7 @@ export default function GoldenMonday() {
                             key={session._id}
                             session={session}
                             language={language}
-                            isAdmin={isAdminOrAbove}
+                            isAdmin={isGmAdmin}
                             user={user}
                             onRefresh={refreshData}
                             t={t}
@@ -2889,7 +2892,7 @@ export default function GoldenMonday() {
                             key={session._id}
                             session={session}
                             language={language}
-                            isAdmin={isAdminOrAbove}
+                            isAdmin={isGmAdmin}
                             user={user}
                             onRefresh={refreshData}
                             t={t}
@@ -2940,7 +2943,7 @@ export default function GoldenMonday() {
               </div>
 
               {/* ADMIN PANEL */}
-              {isAdminOrAbove && (
+              {isGmAdmin && (
                 <div
                   ref={registerRef("admin")}
                   data-reveal="admin"

@@ -15,6 +15,7 @@ import { useAuth } from "../../../hooks/useAuth";
 import { useLanguage } from "../../../hooks/useLanguage";
 import { goldenMondayAPI } from "../../../services/api";
 import { goldenMondayTranslations } from "../../../constants/goldenMondayTranslations";
+import { isGoldenMondayAdminOrAbove } from "../../../utils/roles";
 import AutoAnnounceButton from "../AutoAnnounceButton";
 import { glass, useRotationData, notify, fileToBase64 } from "./helpers";
 import PresenterTab from "./PresenterTab";
@@ -33,7 +34,11 @@ export default function RotationPanel({ onRefresh }) {
   const { user } = useAuth();
   const { language } = useLanguage();
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
-  const isPrivileged = ["leader", "admin", "superadmin"].includes(user?.role);
+
+  // ✅ Single source of truth for GM gating. Coordinators flagged with
+  // isGoldenMondayAdmin === true get the same UI as leaders/admins —
+  // but only inside Golden Monday. No system-admin capabilities leak.
+  const isPrivileged = isGoldenMondayAdminOrAbove(user);
 
   const [activeTab, setActiveTab] = useState("presenter");
   const [assigning, setAssigning] = useState(false);
