@@ -114,7 +114,7 @@ export async function render(ctx, helpers) {
 
   // Try 34px first; if it doesn't fit, shrink down to 24px.
   let headerFont = 34;
-  const headerText = "የወርቃማ ሰኞ ፕሮግራም ተናጋሪ";
+  const headerText = "የወርቃማ ሰኞ ፕሮግራም ተረኛ";
   while (headerFont > 24) {
     ctx.font = `bold ${headerFont}px 'Noto Serif Ethiopic', 'Nyala', serif`;
     if (ctx.measureText(headerText).width <= headerWidth) break;
