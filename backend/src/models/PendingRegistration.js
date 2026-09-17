@@ -50,7 +50,9 @@ const pendingRegistrationSchema = new mongoose.Schema(
 // ── Indexes for performance ──
 pendingRegistrationSchema.index({ status: 1, createdAt: -1 });
 pendingRegistrationSchema.index({ email: 1 });
-pendingRegistrationSchema.index({ telegramChatId: 1 });
+// Note: telegramChatId is already indexed by the field-level
+// `index: true` above. Adding an explicit schema.index() for it
+// here was producing a "Duplicate schema index" warning.
 
 module.exports = mongoose.model(
   "PendingRegistration",

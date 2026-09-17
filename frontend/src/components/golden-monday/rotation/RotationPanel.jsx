@@ -22,6 +22,7 @@ import RankingTab from "./RankingTab";
 import RecordingsTab from "./RecordingsTab";
 import AlreadyAssignedDialog from "./AlreadyAssignedDialog";
 import ManualPresenterPicker from "./ManualPresenterPicker";
+import PosterStudio from "../PosterStudio";
 
 // Base64 encoding inflates the payload by ~33%. Express's default
 // JSON body limit is 50MB. Keeping the raw file under ~35MB leaves
@@ -56,6 +57,7 @@ export default function RotationPanel({ onRefresh }) {
   // mutation, no cascading renders.
   const [alreadyAssignedFor, setAlreadyAssignedFor] = useState(null);
   const [manualPickerFor, setManualPickerFor] = useState(null);
+  const [posterStudioOpen, setPosterStudioOpen] = useState(false);
 
   const { ranking, currentSession, recordings, loading, loadAll } =
     useRotationData({ onRefresh });
@@ -73,6 +75,12 @@ export default function RotationPanel({ onRefresh }) {
   // Only privileged users can open it; if privileges are revoked
   // mid-flight, this drops to false automatically.
   const manualPickerOpen = isPrivileged && !!manualPickerFor;
+
+  // ─── Derived: is the poster studio open? ─────────────────────
+  // Same pattern — only privileged users, and only when a session
+  // exists to fill the form from.
+  const posterStudioVisible =
+    isPrivileged && posterStudioOpen && !!currentSession;
 
   // ─── Title draft: dirty flag + session scoping ───────────────
   // The draft is only "yours" if it was typed for the session
@@ -195,6 +203,24 @@ export default function RotationPanel({ onRefresh }) {
     setManualPickerFor(null);
     await loadAll();
   }, [loadAll]);
+
+  // ─── Open/close Poster Studio ───────────────────────────────
+  const openPosterStudio = useCallback(() => {
+    setPosterStudioOpen(true);
+  }, []);
+
+  const closePosterStudio = useCallback(() => {
+    setPosterStudioOpen(false);
+  }, []);
+
+  const handlePosterPosted = useCallback(async () => {
+    setPosterStudioOpen(false);
+    notify(
+      t.posterPosted || "Poster posted to the Telegram channel",
+      "success",
+    );
+    await loadAll();
+  }, [t, loadAll]);
 
   // ─── Title save ─────────────────────────────────────────────
   const handleSaveTitle = useCallback(async () => {
@@ -406,6 +432,31 @@ export default function RotationPanel({ onRefresh }) {
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <AutoAnnounceButton onDone={loadAll} t={t} />
 
+            {/* ✅ Poster Studio trigger — only when a session exists */}
+            {isPrivileged && currentSession && (
+              <button
+                onClick={openPosterStudio}
+                title="Open Poster Studio"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 18px",
+                  borderRadius: 10,
+                  border: "none",
+                  background: "linear-gradient(135deg, #3b82f6, #1e40af)",
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: 12,
+                  cursor: "pointer",
+                  fontFamily: F.sans,
+                  boxShadow: "0 4px 16px rgba(59,130,246,0.3)",
+                }}
+              >
+                🎨 {t.posterStudio || "Poster Studio"}
+              </button>
+            )}
+
             {isPrivileged && (
               <button
                 onClick={handleAssignNext}
@@ -600,6 +651,14 @@ export default function RotationPanel({ onRefresh }) {
         targetWeekOf={manualPickerFor?.targetWeekOf || null}
         onAssigned={handleManualAssigned}
         t={t}
+      />
+
+      {/* ✅ Poster Studio — coordinator tool */}
+      <PosterStudio
+        isOpen={posterStudioVisible}
+        onClose={closePosterStudio}
+        session={currentSession}
+        onPosted={handlePosterPosted}
       />
     </div>
   );

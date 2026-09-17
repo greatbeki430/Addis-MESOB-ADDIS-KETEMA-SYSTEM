@@ -146,10 +146,12 @@ const goldenMondayGallerySchema = new mongoose.Schema(
 );
 
 // Indexes
+// Note: `session` and `folder` are already indexed by the field-level
+// `index: true` in their schema declarations above. The previous
+// schema.index() calls for them were duplicates and produced
+// "Duplicate schema index" warnings on every backend start.
 goldenMondayGallerySchema.index({ category: 1, createdAt: -1 });
 goldenMondayGallerySchema.index({ fileType: 1, createdAt: -1 });
-goldenMondayGallerySchema.index({ session: 1 });
-goldenMondayGallerySchema.index({ folder: 1 });
 goldenMondayGallerySchema.index({ tags: 1 });
 
 module.exports = mongoose.model(

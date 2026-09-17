@@ -16,7 +16,6 @@ const {
   rejectRegistration,
   sendLoginCredentials,
   showBranchSelection,
-  // ✅ NEW EXPORTS
   notifyEmployeeDeletion,
   handleAppealDeletion,
   handleAppealReason,
@@ -26,12 +25,11 @@ const {
   pendingPresenterConfirmations,
   postNextPresenterAnnouncement,
   postPresenterAnnouncementToChannel,
+  postPresenterAnnouncementWithPhoto, // ✅ ADDED — Poster Studio
   requestPresenterAvailability,
   handlePresenterAvailability,
   handlePresenterUnavailableReason,
-  // ✅ ADDED — required by telegramService.js façade
   generateAnnouncementImage,
-  // ✅ ADDED — force actions (admin overrides)
   forceRepostToChannel,
   forceRenotifyPresenter,
 } = require("./presenters");
@@ -119,7 +117,6 @@ module.exports = {
   rejectRegistration,
   sendLoginCredentials,
   showBranchSelection,
-  // ✅ NEW EXPORTS
   notifyEmployeeDeletion,
   handleAppealDeletion,
   handleAppealReason,
@@ -128,10 +125,10 @@ module.exports = {
   pendingPresenterConfirmations,
   postNextPresenterAnnouncement,
   postPresenterAnnouncementToChannel,
+  postPresenterAnnouncementWithPhoto, // ✅ ADDED
   requestPresenterAvailability,
   handlePresenterAvailability,
   handlePresenterUnavailableReason,
-  // ✅ ADDED
   generateAnnouncementImage,
   forceRepostToChannel,
   forceRenotifyPresenter,

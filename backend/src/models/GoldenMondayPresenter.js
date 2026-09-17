@@ -9,7 +9,9 @@ const goldenMondayPresenterSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-      unique: true,
+      // Uniqueness is enforced by the explicit
+      // schema.index({ user: 1 }, { unique: true }) below.
+      // Having `unique: true` here as well produces a duplicate index.
     },
     name: { type: String, required: true, trim: true },
     email: { type: String, required: true, trim: true },

@@ -34,6 +34,7 @@ const {
   canSeeSalary,
   reAnnounceSession,
   reNotifyPresenter,
+  postWithPoster,
 } = require("../controllers/goldenMondayController");
 const {
   createNotification,
@@ -326,6 +327,14 @@ router.delete(
   protect,
   goldenMondayAdminOrAbove,
   removeSessionRecording,
+);
+
+// ─── Poster Studio ──────────────────────────────────────────────
+router.post(
+  "/:sessionId/post-with-poster",
+  protect,
+  goldenMondayAdminOrAbove,
+  postWithPoster,
 );
 
 // ════════════════════════════════════════════════════════════════

@@ -16,6 +16,7 @@ const {
   postNextPresenterAnnouncement,
   forceRepostToChannel,
   forceRenotifyPresenter,
+  postPresenterAnnouncementWithPhoto,
 } = require("../services/telegramService");
 
 // ─── Helper: Determine if user can see salary information ─────
@@ -1070,6 +1071,69 @@ const reNotifyPresenter = async (req, res) => {
   }
 };
 
+// ============================================================
+// POST /api/golden-monday/:sessionId/post-with-poster
+// Coordinator renders a branded PNG in the browser, uploads it,
+// and we post it to the Telegram channel with the trilingual
+// caption attached as the photo's caption.
+// ============================================================
+const postWithPoster = async (req, res) => {
+  try {
+    const { posterDataUrl, captionOverrides = {} } = req.body;
+    if (!posterDataUrl || !posterDataUrl.startsWith("data:image/")) {
+      return res.status(400).json({
+        success: false,
+        message: "posterDataUrl must be a data:image/... string",
+      });
+    }
+
+    const session = await GoldenMondaySession.findById(
+      req.params.sessionId,
+    ).populate(
+      "presenter",
+      "name email department profilePhotoUrl telegramChatId phone",
+    );
+    if (!session) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Session not found" });
+    }
+
+    // postPresenterAnnouncementWithPhoto is already imported at the
+    // top of this file from ../services/telegramService.
+    const result = await postPresenterAnnouncementWithPhoto(session, {
+      photoDataUrl: posterDataUrl,
+      overrides: captionOverrides,
+    });
+
+    if (!result.postId) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to post to Telegram",
+        error: result.error,
+      });
+    }
+
+    // Track that this session was announced with a poster
+    session.announcementSent = true;
+    session.announcementMessageId = String(result.postId);
+    session.telegramPostId = String(result.postId);
+    session.telegramPostedAt = new Date();
+    session.telegramMessageUrl = result.messageUrl || "";
+    await session.save();
+
+    res.json({
+      success: true,
+      message: "Poster posted to Telegram",
+      postId: result.postId,
+      messageUrl: result.messageUrl,
+    });
+  } catch (error) {
+    console.error("❌ [postWithPoster] Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 module.exports = {
   getSessions,
   previewRecap,
@@ -1089,4 +1153,5 @@ module.exports = {
   analyzeAndCategorizePhoto,
   reAnnounceSession,
   reNotifyPresenter,
+  postWithPoster,
 };
