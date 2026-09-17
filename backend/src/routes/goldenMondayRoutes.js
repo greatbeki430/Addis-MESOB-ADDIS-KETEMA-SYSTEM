@@ -35,6 +35,8 @@ const {
   reAnnounceSession,
   reNotifyPresenter,
   postWithPoster,
+  getMyQRStatus,
+  getMyQRHistory,
 } = require("../controllers/goldenMondayController");
 const {
   createNotification,
@@ -2277,10 +2279,42 @@ router.get(
 // ✅ QR CHECK-IN - COMPLETE (Admin generates + Admin scans + Employee scans)
 // ════════════════════════════════════════════════════════════════
 //
-// ⚠️ ORDER MATTERS: Express matches routes top-to-bottom. The
-// "/qr-checkin/my-qr" route MUST be registered BEFORE any
-// "/qr-checkin/:sessionId" route, otherwise the wildcard :sessionId
-// will swallow "my-qr" and try to look up a session with that ID.
+// ⚠️ ORDER MATTERS: Express matches routes top-to-bottom. All the
+// specific "/qr-checkin/<literal>" routes (my-qr, my-status,
+// my-history) MUST be registered BEFORE the wildcard
+// "/qr-checkin/:sessionId" route, otherwise the wildcard will
+// swallow them and try to look up a session with an id like
+// "my-qr". Keep them grouped at the top of this block.
+
+// ─── Helper: build the attendance summary for a session ────────
+// Shared by the employee check-in, admin scan, and my-status
+// endpoints so all three return identical counts.
+const buildAttendanceSummary = async (sessionId, userId = null) => {
+  const [totalCheckedIn, totalEligible, allCheckIns] = await Promise.all([
+    GoldenMondayAttendance.countDocuments({
+      session: sessionId,
+      attended: true,
+    }),
+    GoldenMondayPresenter.countDocuments({ isEligible: true }),
+    GoldenMondayAttendance.find({
+      session: sessionId,
+      attended: true,
+    })
+      .sort({ checkedInAt: 1 })
+      .select("user checkedInAt")
+      .lean(),
+  ]);
+
+  let yourRank = null;
+  if (userId) {
+    const idx = allCheckIns.findIndex(
+      (a) => a.user && a.user.toString() === userId.toString(),
+    );
+    yourRank = idx >= 0 ? idx + 1 : null;
+  }
+
+  return { totalCheckedIn, totalEligible, yourRank };
+};
 
 // ─── 0. GET EMPLOYEE'S OWN QR FOR ADMIN TO SCAN (GET) ────────
 // GET /api/golden-monday/qr-checkin/my-qr
@@ -2323,6 +2357,17 @@ router.get("/qr-checkin/my-qr", protect, anyRole, async (req, res) => {
       .json({ error: error.message || "Failed to generate personal QR" });
   }
 });
+
+// ─── 0b. GET MY CHECK-IN STATUS FOR A SESSION (GET) ──────────
+// GET /api/golden-monday/qr-checkin/my-status?sessionId=<id>
+// Returns whether the current user has checked in to the given
+// session, when, and the current attendance counts.
+router.get("/qr-checkin/my-status", protect, anyRole, getMyQRStatus);
+
+// ─── 0c. GET MY ATTENDANCE HISTORY (GET) ─────────────────────
+// GET /api/golden-monday/qr-checkin/my-history?limit=5
+// Returns the current user's last N check-in records.
+router.get("/qr-checkin/my-history", protect, anyRole, getMyQRHistory);
 
 // ─── 1. ADMIN GENERATES SESSION QR (GET) ─────────────────────
 // GET /api/golden-monday/qr-checkin/:sessionId
@@ -2376,7 +2421,12 @@ router.get(
 // ─── 2. EMPLOYEE SCANS ADMIN'S SESSION QR (POST) ─────────────
 // POST /api/golden-monday/qr-checkin/:sessionId
 // The employee is identified by their own JWT. Body may include
-// `location` (optional free-text). Prevents double-check-in.
+// `location` (optional free-text).
+//
+// Duplicate check-ins return 200 with `summary.alreadyCheckedIn: true`
+// rather than 400. A repeat is a no-op, not an error — this lets the
+// frontend show a single "you're checked in" modal regardless of
+// whether the check-in just happened or was already recorded.
 router.post("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
   try {
     const { sessionId } = req.params;
@@ -2391,55 +2441,80 @@ router.post("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
       session: sessionId,
       user: req.user._id,
     });
+
+    let alreadyCheckedIn = false;
+    let attendance;
+
     if (existing && existing.attended) {
-      return res.status(400).json({
-        error: "You have already checked in",
-        alreadyCheckedIn: true,
-        checkedInAt: existing.checkedInAt,
-      });
-    }
-
-    const attendance = await GoldenMondayAttendance.findOneAndUpdate(
-      { session: sessionId, user: req.user._id },
-      {
-        session: sessionId,
-        user: req.user._id,
-        name: req.user.name,
-        email: req.user.email,
-        department: req.user.department || "",
-        attended: true,
-        checkedInAt: new Date(),
-        recordedBy: req.user._id,
-        recordedByName: req.user.name,
-      },
-      { upsert: true, new: true, setDefaultsOnInsert: true },
-    );
-
-    // Mirror into session.attendees for legacy reporting
-    const existingAttendee = session.attendees.find(
-      (a) => a.user && a.user.toString() === req.user._id.toString(),
-    );
-    if (existingAttendee) {
-      existingAttendee.attended = true;
+      // No-op path — return the existing record plus fresh summary
+      alreadyCheckedIn = true;
+      attendance = existing;
     } else {
-      session.attendees.push({
-        user: req.user._id,
-        name: req.user.name,
-        department: req.user.department || "",
-        attended: true,
-      });
+      attendance = await GoldenMondayAttendance.findOneAndUpdate(
+        { session: sessionId, user: req.user._id },
+        {
+          session: sessionId,
+          user: req.user._id,
+          name: req.user.name,
+          email: req.user.email,
+          department: req.user.department || "",
+          attended: true,
+          checkedInAt: new Date(),
+          recordedBy: req.user._id,
+          recordedByName: req.user.name,
+        },
+        { upsert: true, new: true, setDefaultsOnInsert: true },
+      );
+
+      // Mirror into session.attendees for legacy reporting
+      const existingAttendee = session.attendees.find(
+        (a) => a.user && a.user.toString() === req.user._id.toString(),
+      );
+      if (existingAttendee) {
+        existingAttendee.attended = true;
+      } else {
+        session.attendees.push({
+          user: req.user._id,
+          name: req.user.name,
+          department: req.user.department || "",
+          attended: true,
+        });
+      }
+      await session.save();
     }
-    await session.save();
+
+    const summary = await buildAttendanceSummary(sessionId, req.user._id);
+    summary.alreadyCheckedIn = alreadyCheckedIn;
 
     console.log(
-      `✅ [QR CHECK-IN] ${req.user.name} (${req.user.email}) checked in to session ${sessionId}${location ? ` @ ${location}` : ""}`,
+      `✅ [QR CHECK-IN] ${req.user.name} (${req.user.email}) ${
+        alreadyCheckedIn ? "already checked in to" : "checked in to"
+      } session ${sessionId}${location ? ` @ ${location}` : ""}`,
     );
 
     res.json({
       success: true,
-      message: "QR check-in successful!",
-      attendance,
-      session: { id: session._id, title: session.title },
+      message: alreadyCheckedIn
+        ? "You are already checked in"
+        : "QR check-in successful!",
+      attendance: {
+        _id: attendance._id,
+        checkedInAt: attendance.checkedInAt,
+      },
+      session: {
+        id: session._id,
+        title: session.title,
+        date: session.date,
+        presentationTitle: session.presentationTitle || "",
+      },
+      summary,
+      employee: {
+        _id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        department: req.user.department || "",
+        profilePhotoUrl: req.user.profilePhotoUrl || "",
+      },
     });
   } catch (error) {
     console.error("❌ [QR CHECK-IN] Error:", error);
@@ -2496,6 +2571,14 @@ router.post(
         return res.status(404).json({ error: "Session not found" });
       }
 
+      // Detect repeat scans so the caller can distinguish "just now"
+      // from "already present" — same rule as the employee-side path.
+      const prior = await GoldenMondayAttendance.findOne({
+        session: sessionId,
+        user: employee._id,
+      });
+      const alreadyCheckedIn = !!(prior && prior.attended);
+
       // Upsert attendance
       const attendance = await GoldenMondayAttendance.findOneAndUpdate(
         { session: sessionId, user: employee._id },
@@ -2529,13 +2612,20 @@ router.post(
       }
       await session.save();
 
+      const summary = await buildAttendanceSummary(sessionId, employee._id);
+      summary.alreadyCheckedIn = alreadyCheckedIn;
+
       console.log(
-        `✅ [ADMIN SCAN] ${req.user.name} checked in ${employee.name} (${employee.email}) to session ${sessionId}`,
+        `✅ [ADMIN SCAN] ${req.user.name} checked in ${employee.name} (${
+          employee.email
+        }) to session ${sessionId}${alreadyCheckedIn ? " (already present)" : ""}`,
       );
 
       res.json({
         success: true,
-        message: `${employee.name} checked in successfully`,
+        message: alreadyCheckedIn
+          ? `${employee.name} was already checked in`
+          : `${employee.name} checked in successfully`,
         employee: {
           _id: employee._id,
           name: employee.name,
@@ -2543,7 +2633,16 @@ router.post(
           department: employee.department || "",
           profilePhotoUrl: employee.profilePhotoUrl || "",
         },
-        attendance,
+        attendance: {
+          _id: attendance._id,
+          checkedInAt: attendance.checkedInAt,
+        },
+        session: {
+          id: session._id,
+          title: session.title,
+          date: session.date,
+        },
+        summary,
       });
     } catch (error) {
       console.error("❌ [ADMIN SCAN] Error:", error);
