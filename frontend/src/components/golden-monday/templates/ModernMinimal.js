@@ -1,8 +1,12 @@
 // frontend/src/components/golden-monday/templates/ModernMinimal.js
-//
-// A cleaner, modern take: off-white background, deep navy accents,
-// presenter photo on the right, and the information hierarchy
-// flowing down the left. Airy, editorial, restrained.
+import {
+  drawRoundedImage,
+  fillRoundedRect,
+  strokeRoundedRect,
+  applySoftShadow,
+  clearShadow,
+  fitText,
+} from "./drawHelpers";
 
 export const meta = {
   id: "modern-minimal",
@@ -18,18 +22,20 @@ export async function render(ctx, helpers) {
   const INK = "#1a1f36";
   const ACCENT = "#0d1a5e";
   const GOLD = "#b8860b";
+  const CARD = "#ffffff";
+  const CARD_BORDER = "#e7e1d2";
 
-  // ── Background ────────────────────────────────────────────
+  // ── Background ──────────────────────────────────────────────
   ctx.fillStyle = BG;
   ctx.fillRect(0, 0, W, H);
 
-  // ── Top blue ribbon (thin) ────────────────────────────────
+  // ── Top accent bar ──────────────────────────────────────────
   ctx.fillStyle = ACCENT;
   ctx.fillRect(0, 0, W, 12);
   ctx.fillStyle = GOLD;
   ctx.fillRect(0, 12, W, 3);
 
-  // ── Top-left logo ─────────────────────────────────────────
+  // ── Top-left logo ───────────────────────────────────────────
   if (assets.logo) {
     try {
       const logo = await loadImage(assets.logo);
@@ -41,150 +47,131 @@ export async function render(ctx, helpers) {
     }
   }
 
-  // ── Small "committee" label top-right ─────────────────────
+  // ── Committee label (top-right) ─────────────────────────────
   ctx.fillStyle = ACCENT;
-  ctx.font = "bold 20px Georgia, serif";
+  ctx.font = "bold 20px 'Playfair Display', Georgia, serif";
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   ctx.fillText("GOLDEN MONDAY", W - 60, 70);
   ctx.fillStyle = GOLD;
-  ctx.font = "italic 18px Georgia, serif";
-  ctx.fillText("committee 2026", W - 60, 100);
+  ctx.font = "italic 18px 'Playfair Display', Georgia, serif";
+  ctx.fillText("committee · 2026", W - 60, 100);
 
-  // ── Big Amharic heading ───────────────────────────────────
+  // ── Amharic heading (two lines) ─────────────────────────────
   ctx.fillStyle = INK;
   ctx.textAlign = "left";
-  ctx.font = "bold 44px 'Noto Serif Ethiopic', 'Nyala', serif";
-  ctx.fillText("የወርቃማ ሰኞ", 60, 240);
-  ctx.fillText("ፕሮግራም ተናጋሪ", 60, 300);
+  ctx.font = "bold 46px 'Noto Serif Ethiopic', 'Nyala', serif";
+  ctx.fillText("የወርቃማ ሰኞ", 60, 250);
+  ctx.fillText("ፕሮግራም ተናጋሪ", 60, 312);
 
-  // Thin accent line under heading
-  ctx.fillStyle = ACCENT;
-  ctx.fillRect(60, 330, 120, 4);
+  // Accent underline
+  fillRoundedRect(ctx, 60, 340, 120, 5, 3, ACCENT);
 
-  // ── Presenter photo (right side) ──────────────────────────
-  const photoX = W - 480;
-  const photoY = 380;
-  const photoW = 420;
-  const photoH = 560;
+  // ── Presenter photo: rounded square, right column ───────────
+  const photoX = W - 500;
+  const photoY = 400;
+  const photoW = 440;
+  const photoH = 440;
+  const photoRadius = 32;
 
-  if (photoSrc) {
-    try {
-      const photo = await loadImage(photoSrc);
-      const targetAspect = photoW / photoH;
-      const sourceAspect = photo.width / photo.height;
-      let sx = 0,
-        sy = 0,
-        sw = photo.width,
-        sh = photo.height;
-      if (sourceAspect > targetAspect) {
-        sw = photo.height * targetAspect;
-        sx = (photo.width - sw) / 2;
-      } else {
-        sh = photo.width / targetAspect;
-        sy = (photo.height - sh) / 2;
-      }
-      // Drop shadow
-      ctx.shadowColor = "rgba(0,0,0,0.15)";
-      ctx.shadowBlur = 30;
-      ctx.shadowOffsetY = 10;
-      ctx.fillStyle = "#fff";
-      ctx.fillRect(photoX - 8, photoY - 8, photoW + 16, photoH + 16);
-      ctx.shadowColor = "transparent";
-      ctx.shadowBlur = 0;
-      ctx.shadowOffsetY = 0;
+  // Soft shadow behind the photo card
+  applySoftShadow(ctx, 30, 14, 0.16);
+  fillRoundedRect(
+    ctx,
+    photoX - 12,
+    photoY - 12,
+    photoW + 24,
+    photoH + 24,
+    photoRadius + 4,
+    CARD,
+  );
+  clearShadow(ctx);
 
-      ctx.drawImage(photo, sx, sy, sw, sh, photoX, photoY, photoW, photoH);
-    } catch (e) {
-      console.warn("[ModernMinimal] presenter photo failed:", e.message);
-    }
-  } else {
-    ctx.fillStyle = "#e5e1d8";
-    ctx.fillRect(photoX, photoY, photoW, photoH);
-    ctx.fillStyle = "#999";
-    ctx.font = "italic 22px sans-serif";
-    ctx.textAlign = "center";
-    ctx.fillText("Presenter photo", photoX + photoW / 2, photoY + photoH / 2);
-  }
-
-  // ── Presenter name (left column, below heading) ───────────
-  ctx.textAlign = "left";
-  ctx.fillStyle = GOLD;
-  ctx.font = "italic 22px Georgia, serif";
-  ctx.fillText("PRESENTED BY", 60, 420);
-
-  ctx.fillStyle = INK;
-  ctx.font = "bold 36px Georgia, serif";
-  // Split long names onto two lines
-  const nameWords = (form.presenterName || "TBD").split(" ");
-  if (nameWords.length > 3) {
-    const mid = Math.ceil(nameWords.length / 2);
-    ctx.fillText(nameWords.slice(0, mid).join(" "), 60, 470);
-    ctx.fillText(nameWords.slice(mid).join(" "), 60, 515);
-  } else {
-    ctx.fillText(form.presenterName || "TBD", 60, 470);
-  }
-
-  // Presenter audience line (Amharic)
-  ctx.fillStyle = ACCENT;
-  ctx.font = "bold 26px 'Noto Serif Ethiopic', 'Nyala', serif";
-  ctx.fillText(
-    form.audienceLine || `ከ ${form.presenterName || "አቅራቢ"} ጋር`,
-    60,
-    590,
+  await drawRoundedImage(
+    ctx,
+    loadImage,
+    photoSrc,
+    photoX,
+    photoY,
+    photoW,
+    photoH,
+    photoRadius,
+    { fallbackColor: "#e5e1d8", fallbackText: "Presenter photo" },
   );
 
-  // ── Metadata block (left column, lower) ───────────────────
-  let y = 720;
+  // ── Presenter name / role (left column) ─────────────────────
+  ctx.textAlign = "left";
 
   ctx.fillStyle = GOLD;
-  ctx.font = "italic 20px Georgia, serif";
-  ctx.fillText("CENTER", 60, y);
-  ctx.fillStyle = INK;
-  ctx.font = "bold 26px Georgia, serif";
-  ctx.fillText(form.center || "Addis Ketema Center", 60, y + 36);
-  y += 90;
+  ctx.font = "italic 22px 'Playfair Display', Georgia, serif";
+  ctx.fillText("PRESENTED BY", 60, 430);
 
-  ctx.fillStyle = GOLD;
-  ctx.font = "italic 20px Georgia, serif";
-  ctx.fillText("DATE", 60, y);
   ctx.fillStyle = INK;
-  ctx.font = "bold 26px 'Noto Serif Ethiopic', 'Nyala', serif";
-  ctx.fillText(form.ethiopianDate || "መስከረም 1, 2018 ዓ.ም.", 60, y + 36);
-  y += 90;
+  ctx.font = "bold 38px 'Playfair Display', Georgia, serif";
+  const name = form.presenterName || "TBD";
+  const nameWidth = W / 2 - 140; // fits left column
+  ctx.fillText(fitText(ctx, name, nameWidth), 60, 480);
 
-  ctx.fillStyle = GOLD;
-  ctx.font = "italic 20px Georgia, serif";
-  ctx.fillText("TIME", 60, y);
-  ctx.fillStyle = INK;
-  ctx.font = "bold 26px Georgia, serif";
-  ctx.fillText(form.time || "1:30 – 2:30 ከሰዓት", 60, y + 36);
+  // Audience line (Amharic)
+  ctx.fillStyle = ACCENT;
+  ctx.font = "bold 28px 'Noto Serif Ethiopic', 'Nyala', serif";
+  const audience = form.audienceLine || `ከ ${form.presenterName || "አቅራቢ"} ጋር`;
+  ctx.fillText(fitText(ctx, audience, nameWidth), 60, 550);
 
-  // ── Presentation title (bottom band) ──────────────────────
+  // ── Info cards (left column) ────────────────────────────────
+  let y = 640;
+  const cardX = 60;
+  const cardW = W / 2 - 140;
+  const cardH = 82;
+  const cardRadius = 16;
+
+  const drawInfoCard = (label, value) => {
+    applySoftShadow(ctx, 16, 6, 0.08);
+    fillRoundedRect(ctx, cardX, y, cardW, cardH, cardRadius, CARD);
+    clearShadow(ctx);
+    strokeRoundedRect(ctx, cardX, y, cardW, cardH, cardRadius, CARD_BORDER, 1);
+
+    ctx.fillStyle = GOLD;
+    ctx.font = "italic 16px 'Playfair Display', Georgia, serif";
+    ctx.fillText(label, cardX + 20, y + 30);
+
+    ctx.fillStyle = INK;
+    ctx.font = "bold 22px 'Noto Serif Ethiopic', 'Nyala', serif";
+    ctx.fillText(fitText(ctx, value, cardW - 40), cardX + 20, y + 62);
+
+    y += cardH + 14;
+  };
+
+  drawInfoCard("CENTER", form.center || "Addis Ketema Center");
+  drawInfoCard("DATE", form.ethiopianDate || "መስከረም 1, 2018 ዓ.ም.");
+  drawInfoCard("TIME", form.time || "1:30 – 2:30 ከሰዓት");
+
+  // ── Title band (bottom) ─────────────────────────────────────
   if (form.title) {
+    const bandH = 180;
+    const bandY = H - bandH;
+
     ctx.fillStyle = ACCENT;
-    ctx.fillRect(0, H - 160, W, 160);
+    ctx.fillRect(0, bandY, W, bandH);
+
+    // Accent strip at top of band
+    ctx.fillStyle = GOLD;
+    ctx.fillRect(0, bandY, W, 4);
+
+    ctx.fillStyle = GOLD;
+    ctx.font = "italic 20px 'Playfair Display', Georgia, serif";
+    ctx.textAlign = "left";
+    ctx.fillText("TOPIC", 60, bandY + 50);
+
     ctx.fillStyle = "#fff";
-    ctx.font = "italic 22px Georgia, serif";
-    ctx.fillText("TOPIC", 60, H - 100);
     ctx.font = "bold 30px 'Noto Serif Ethiopic', 'Nyala', serif";
-    // Truncate if too long
-    let title = `"${form.title}"`;
-    if (ctx.measureText(title).width > W - 120) {
-      while (
-        ctx.measureText(title + "…").width > W - 120 &&
-        title.length > 20
-      ) {
-        title = title.slice(0, -1);
-      }
-      title += "…";
-    }
-    ctx.fillText(title, 60, H - 55);
+    ctx.fillText(fitText(ctx, `"${form.title}"`, W - 120), 60, bandY + 105);
   }
 
-  // ── Website URL bottom-right ──────────────────────────────
+  // ── Website URL (bottom-right) ──────────────────────────────
   ctx.fillStyle = GOLD;
-  ctx.font = "italic 20px Georgia, serif";
+  ctx.font = "italic 20px 'Playfair Display', Georgia, serif";
   ctx.textAlign = "right";
-  ctx.fillText(form.websiteUrl, W - 60, H - 30);
+  const urlY = form.title ? H - 30 : H - 40;
+  ctx.fillText(form.websiteUrl, W - 60, urlY);
 }

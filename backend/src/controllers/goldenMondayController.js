@@ -496,14 +496,21 @@ const setPresentationTitle = async (req, res) => {
     const session = await GoldenMondaySession.findById(req.params.sessionId);
     if (!session) return res.status(404).json({ message: "Session not found" });
 
+    // Policy: only the assigned presenter may set the title. Admins
+    // coordinate the session but don't author the topic — this keeps the
+    // peer-led spirit of Golden Monday intact and prevents the coordinator
+    // from accidentally overwriting the presenter's chosen title.
+    //
+    // If a future policy change needs admin override (e.g. presenter is
+    // unresponsive and a title must be locked in before the poster goes
+    // out), re-add "leader", "admin", "superadmin" to the list below.
     const isOwner = session.presenter?.toString() === req.user._id.toString();
-    const isPrivileged = ["leader", "admin", "superadmin"].includes(
-      req.user.role,
-    );
-    if (!isOwner && !isPrivileged) {
+    if (!isOwner) {
       return res.status(403).json({
         message:
-          "Only the assigned presenter or a leader/admin can set the title",
+          "Only the assigned presenter can set the presentation title. " +
+          "Admins should ask the presenter to choose one via Telegram or " +
+          "the rotation panel.",
       });
     }
 

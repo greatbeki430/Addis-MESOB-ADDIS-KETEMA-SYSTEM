@@ -1,5 +1,5 @@
 // frontend/src/components/golden-monday/PosterStudio.jsx
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import {
@@ -47,16 +47,6 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
   const [posting, setPosting] = useState(false);
 
   const canvasRef = useRef(null);
-
-  // ── AI suggested topics (if available on session) ───────────
-  const suggestedTopics = useMemo(() => {
-    if (!session?.suggestedTopics) return [];
-    if (!Array.isArray(session.suggestedTopics)) return [];
-    return session.suggestedTopics
-      .map((t) => (typeof t === "string" ? t : t?.title || ""))
-      .filter(Boolean)
-      .slice(0, 6);
-  }, [session]);
 
   // ── Initialise form from session when opened ────────────────
   useEffect(() => {
@@ -384,65 +374,46 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
             </Field>
 
             <Field label="Presentation title">
-              <input
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                placeholder="e.g. Digital Transformation in Public Service"
-                style={inputStyle}
-              />
-              {suggestedTopics.length > 0 && (
-                <div style={{ marginTop: 8 }}>
-                  <p
-                    style={{
-                      fontSize: 11,
-                      color: C.muted,
-                      margin: "0 0 6px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                    }}
-                  >
-                    💡 AI suggested — click to use:
-                  </p>
-                  <div
-                    style={{
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 6,
-                    }}
-                  >
-                    {suggestedTopics.map((topic, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setForm({ ...form, title: topic })}
-                        style={{
-                          background: `${C.primary}08`,
-                          border: `1px solid ${C.primary}22`,
-                          borderRadius: 999,
-                          padding: "4px 12px",
-                          fontSize: 11,
-                          color: C.primary,
-                          cursor: "pointer",
-                          fontFamily: F.sans,
-                          textAlign: "left",
-                          maxWidth: "100%",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          transition: "all 0.15s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = `${C.primary}15`;
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = `${C.primary}08`;
-                        }}
-                      >
-                        {topic}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {/*
+    The title is chosen by the assigned presenter (via the Telegram DM
+    or the rotation panel). Admins coordinate the poster but don't
+    author the title — that keeps the "peer-led" spirit intact and
+    prevents accidental overwrites. See Policy A in the release notes.
+  */}
+              <div
+                style={{
+                  ...inputStyle,
+                  background: "#f9fafb",
+                  color: form.title ? C.dark : C.muted,
+                  fontStyle: form.title ? "normal" : "italic",
+                  display: "flex",
+                  alignItems: "center",
+                  minHeight: 38,
+                  cursor: "not-allowed",
+                }}
+                title={
+                  form.title
+                    ? "Chosen by the presenter — read-only here"
+                    : "The presenter hasn't chosen a title yet"
+                }
+              >
+                {form.title || "Presenter has not chosen a title yet"}
+              </div>
+
+              {!form.title && (
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: "#b45309",
+                    marginTop: 6,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  💡 The assigned presenter chooses the title from the Telegram
+                  DM or the rotation panel. If they haven't yet, use{" "}
+                  <strong>Re-send Presenter DM</strong> in the rotation panel to
+                  nudge them.
+                </p>
               )}
             </Field>
 
