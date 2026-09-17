@@ -3,7 +3,14 @@
 // COMPLETE Golden Monday Management System - Premium Redesign
 // ════════════════════════════════════════════════════════════
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+  Component,
+} from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { C, F } from "../styles/theme";
@@ -59,6 +66,7 @@ import {
   FiMessageCircle,
   FiFile,
   FiPlay,
+  FiAlertTriangle,
 } from "react-icons/fi";
 import { LuSparkles } from "react-icons/lu";
 
@@ -74,6 +82,104 @@ const safeArray = (data, fallback = []) => {
   }
   return fallback;
 };
+
+const safeFixed = (value, digits = 1) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n.toFixed(digits) : null;
+};
+
+const safeDate = (value, locale, options) => {
+  try {
+    const d = value ? new Date(value) : null;
+    if (!d || Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString(locale || "en-US", options);
+  } catch {
+    return "";
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// SECTION ERROR BOUNDARY
+// ─────────────────────────────────────────────────────────────
+class SectionErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, message: "" };
+    this.handleRetry = this.handleRetry.bind(this);
+  }
+
+  static getDerivedStateFromError(error) {
+    return {
+      hasError: true,
+      message: (error && error.message) || "Unexpected error",
+    };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("[GoldenMonday] section crashed:", error, info);
+  }
+
+  componentDidUpdate(prevProps) {
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false, message: "" });
+    }
+  }
+
+  handleRetry() {
+    this.setState({ hasError: false, message: "" });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div
+          style={{
+            background: C.white,
+            borderRadius: 16,
+            padding: "24px 20px",
+            border: "1px solid #fecaca",
+            textAlign: "center",
+            fontFamily: F.sans,
+            margin: "12px 0",
+          }}
+        >
+          <FiAlertTriangle size={28} color="#dc2626" />
+          <p
+            style={{
+              margin: "10px 0 4px",
+              fontSize: 14,
+              fontWeight: 700,
+              color: C.dark,
+            }}
+          >
+            {this.props.label || "This section"} couldn&apos;t be displayed
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: C.muted }}>
+            {this.state.message}
+          </p>
+          <button
+            onClick={this.handleRetry}
+            style={{
+              marginTop: 14,
+              padding: "8px 20px",
+              borderRadius: 8,
+              border: "none",
+              background: C.primary,
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 700,
+              fontFamily: F.sans,
+            }}
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // ─────────────────────────────────────────────────────────────
 // GLASSMORPHISM STYLES
@@ -293,9 +399,7 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
     },
     {
       label: t.statAvgRating || "Avg Rating",
-      value: stats.averageRating
-        ? stats.averageRating.toFixed(1)
-        : t.statNoRating || "N/A",
+      value: safeFixed(stats.averageRating) || t.statNoRating || "N/A",
       icon: <FiStar size={20} />,
       color: "#f5c518",
     },
@@ -427,7 +531,13 @@ function TelegramPostButton({ sessionId, onPosted, t }) {
         t.postedToTelegramToast || "Posted to Telegram successfully!",
         "success",
       );
-      if (onPosted) onPosted();
+      if (onPosted) {
+        try {
+          await onPosted();
+        } catch (refreshErr) {
+          console.error("[TelegramPostButton] onPosted threw:", refreshErr);
+        }
+      }
     } catch {
       showToast(t.failedPostTelegram || "Failed to post to Telegram", "error");
     } finally {
@@ -471,9 +581,12 @@ function SessionCard({ session, language, isAdmin, user, onRefresh, t }) {
   if (!session) return null;
 
   const date = session.date ? new Date(session.date) : new Date();
-  const isUpcoming = session.status === "scheduled" || date > new Date();
+  const validDate = !Number.isNaN(date.getTime());
+  const isUpcoming =
+    session.status === "scheduled" || (validDate && date > new Date());
   const isMyTurn =
     session.presenter?._id === user?._id || session.presenter === user?._id;
+  const ratingLabel = safeFixed(session.averageRating);
 
   return (
     <motion.div
@@ -504,7 +617,6 @@ function SessionCard({ session, language, isAdmin, user, onRefresh, t }) {
       }}
       onClick={() => setExpanded(!expanded)}
     >
-      {/* Glow accent for upcoming */}
       {isUpcoming && (
         <div
           style={{
@@ -547,7 +659,7 @@ function SessionCard({ session, language, isAdmin, user, onRefresh, t }) {
               flexShrink: 0,
             }}
           >
-            {date.getDate()}
+            {validDate ? date.getDate() : "–"}
           </div>
           <div>
             <div
@@ -614,13 +726,13 @@ function SessionCard({ session, language, isAdmin, user, onRefresh, t }) {
               </span>
               <span>·</span>
               <span>
-                {date.toLocaleDateString(t.locale || "en-US", {
+                {safeDate(session.date, t.locale, {
                   month: "short",
                   day: "numeric",
                   year: "numeric",
                 })}
               </span>
-              {session.averageRating > 0 && (
+              {ratingLabel && (
                 <span
                   style={{
                     fontSize: 12,
@@ -630,7 +742,7 @@ function SessionCard({ session, language, isAdmin, user, onRefresh, t }) {
                     gap: 2,
                   }}
                 >
-                  <FiStar size={12} /> {session.averageRating.toFixed(1)}
+                  <FiStar size={12} /> {ratingLabel}
                 </span>
               )}
             </div>
@@ -811,8 +923,8 @@ function SessionCard({ session, language, isAdmin, user, onRefresh, t }) {
                   {session.photos.slice(0, 4).map((photo, i) => (
                     <img
                       key={i}
-                      src={photo.url}
-                      alt={photo.caption || "Session photo"}
+                      src={photo?.url}
+                      alt={photo?.caption || "Session photo"}
                       style={{
                         width: 64,
                         height: 64,
@@ -874,6 +986,8 @@ function EmployeeRegistrationModal({
 }) {
   if (!show) return null;
 
+  const users = safeArray(filteredUsers);
+
   return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
@@ -909,7 +1023,6 @@ function EmployeeRegistrationModal({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Decorative header */}
         <div
           style={{
             position: "absolute",
@@ -957,7 +1070,6 @@ function EmployeeRegistrationModal({
         </div>
 
         <div style={{ display: "grid", gap: 18 }}>
-          {/* Employee Selection */}
           <div>
             <label
               style={{
@@ -1047,7 +1159,7 @@ function EmployeeRegistrationModal({
                     background: C.white,
                   }}
                 >
-                  {filteredUsers.length === 0 ? (
+                  {users.length === 0 ? (
                     <div
                       style={{
                         padding: 14,
@@ -1059,7 +1171,7 @@ function EmployeeRegistrationModal({
                       {t.noMatchingUsers || "No matching users found"}
                     </div>
                   ) : (
-                    filteredUsers.map((u) => (
+                    users.map((u) => (
                       <div
                         key={u._id}
                         onClick={() => handleSelectUser(u)}
@@ -1112,7 +1224,6 @@ function EmployeeRegistrationModal({
             )}
           </div>
 
-          {/* Department */}
           <div>
             <label
               style={{
@@ -1135,7 +1246,6 @@ function EmployeeRegistrationModal({
             />
           </div>
 
-          {/* Position */}
           <div>
             <label
               style={{
@@ -1158,7 +1268,6 @@ function EmployeeRegistrationModal({
             />
           </div>
 
-          {/* Photo Upload */}
           <div>
             <label
               style={{
@@ -1244,7 +1353,6 @@ function EmployeeRegistrationModal({
             </div>
           </div>
 
-          {/* Photo URL */}
           <div>
             <label
               style={{
@@ -1272,7 +1380,6 @@ function EmployeeRegistrationModal({
             />
           </div>
 
-          {/* Action Buttons */}
           <div
             style={{
               display: "flex",
@@ -1355,14 +1462,11 @@ export default function GoldenMonday() {
   const { language } = useLanguage();
   const { user } = useAuth();
 
-  // ── Get translations from goldenMondayTranslations ──
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
-  // ── Active Tab State ──
   const [activeTab, setActiveTab] = useState("overview");
   const [selectedSessionId, setSelectedSessionId] = useState(null);
 
-  // ── Tabs with translations ──
   const tabs = useMemo(
     () => [
       {
@@ -1402,16 +1506,18 @@ export default function GoldenMonday() {
   const [visible, setVisible] = useState({});
   const sectionRefs = useRef({});
 
-  // ── Role-based access ──
   const userRole = user?.role || ROLES.EMPLOYEE;
   const isSuperAdmin = userRole === ROLES.SUPER_ADMIN;
 
-  // ✅ GM-specific gate. Coordinators (isGoldenMondayAdmin === true) pass
-  // this even though their role is still "employee". Use it for every
-  // Golden-Monday-owned control below.
-  const isGmAdmin = isGoldenMondayAdminOrAbove(user);
+  const isGmAdmin = useMemo(() => {
+    try {
+      return Boolean(isGoldenMondayAdminOrAbove(user));
+    } catch (err) {
+      console.error("[GoldenMonday] role check failed:", err);
+      return false;
+    }
+  }, [user]);
 
-  // ── State ──
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [pastSessions, setPastSessions] = useState([]);
   const [nextPresenter, setNextPresenter] = useState(null);
@@ -1421,7 +1527,6 @@ export default function GoldenMonday() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // ── AI Studio State ──
   const [showComposer, setShowComposer] = useState(false);
   const [form, setForm] = useState({
     title: "",
@@ -1433,7 +1538,6 @@ export default function GoldenMonday() {
   });
   const [generating, setGenerating] = useState(false);
 
-  // ── Admin Panel State ──
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [employeeForm, setEmployeeForm] = useState({
     userId: "",
@@ -1451,14 +1555,14 @@ export default function GoldenMonday() {
     userId: null,
     name: "",
   });
-  // ── Photo Upload State ──
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
 
   const pendingConfirmations = useMemo(
     () =>
-      upcomingSessions.filter(
+      safeArray(upcomingSessions).filter(
         (s) =>
+          s &&
           s.presenterStatus === "pending" &&
           s.availabilityResponseDeadline &&
           new Date(s.availabilityResponseDeadline) > new Date(),
@@ -1466,7 +1570,6 @@ export default function GoldenMonday() {
     [upcomingSessions],
   );
 
-  // ── Compute tabs with badges ──
   const tabsWithBadges = useMemo(() => {
     return tabs.map((tab) => {
       if (tab.id === "overview" && pendingConfirmations > 0) {
@@ -1479,7 +1582,6 @@ export default function GoldenMonday() {
     });
   }, [tabs, pendingConfirmations]);
 
-  // ── Translation helper for objects - stable reference ──
   const getTranslatedText = useCallback(
     (obj) => {
       if (!obj) return "";
@@ -1489,7 +1591,6 @@ export default function GoldenMonday() {
     [language],
   );
 
-  // ── Load all data from API ──
   const loadAllData = useCallback(async () => {
     setLoading(true);
     try {
@@ -1511,13 +1612,13 @@ export default function GoldenMonday() {
         goldenMondayAPI.getPillars().catch(() => ({ data: FALLBACK_PILLARS })),
       ]);
 
-      setUpcomingSessions(safeArray(upcomingRes.data));
-      setPastSessions(safeArray(pastRes.data?.sessions));
-      setNextPresenter(nextPresenterRes.data || null);
-      setEmployees(safeArray(employeesRes.data));
-      setStats(statsRes.data || null);
+      setUpcomingSessions(safeArray(upcomingRes?.data));
+      setPastSessions(safeArray(pastRes?.data?.sessions));
+      setNextPresenter(nextPresenterRes?.data || null);
+      setEmployees(safeArray(employeesRes?.data));
+      setStats(statsRes?.data || null);
 
-      const pillarsData = pillarsRes.data;
+      const pillarsData = pillarsRes?.data;
       if (Array.isArray(pillarsData) && pillarsData.length > 0) {
         setPillars(pillarsData);
       } else {
@@ -1525,13 +1626,14 @@ export default function GoldenMonday() {
         setPillars(extracted.length > 0 ? extracted : FALLBACK_PILLARS);
       }
 
-      const upcoming = safeArray(upcomingRes.data);
-      const past = safeArray(pastRes.data?.sessions);
-      if (upcoming.length > 0) {
-        setSelectedSessionId(upcoming[0]._id);
-      } else if (past.length > 0) {
-        setSelectedSessionId(past[0]._id);
-      }
+      const upcoming = safeArray(upcomingRes?.data);
+      const past = safeArray(pastRes?.data?.sessions);
+      setSelectedSessionId((current) => {
+        if (current) return current;
+        if (upcoming.length > 0 && upcoming[0]?._id) return upcoming[0]._id;
+        if (past.length > 0 && past[0]?._id) return past[0]._id;
+        return current;
+      });
     } catch (error) {
       console.error("Failed to load Golden Monday data:", error);
       showToast(t.error || "Failed to load data", "error");
@@ -1544,16 +1646,13 @@ export default function GoldenMonday() {
     setRefreshing(true);
     try {
       await loadAllData();
-      showToast(t.success || "Data refreshed", "success");
     } catch (err) {
       console.error("[GoldenMonday] refreshData failed:", err);
-      showToast(t.error || "Failed to refresh data", "error");
     } finally {
       setRefreshing(false);
     }
-  }, [loadAllData, t]);
+  }, [loadAllData]);
 
-  // ── Auto-refresh every 5 minutes ──
   useEffect(() => {
     if (activeTab === "overview") {
       const interval = setInterval(
@@ -1568,7 +1667,6 @@ export default function GoldenMonday() {
     return undefined;
   }, [activeTab, loadAllData]);
 
-  // ── Load on mount ──
   useEffect(() => {
     let isMounted = true;
     const fetchData = async () => {
@@ -1582,7 +1680,6 @@ export default function GoldenMonday() {
     };
   }, [loadAllData]);
 
-  // ── Register refs ──
   const registerRef = useCallback(
     (key) => (el) => {
       if (el) sectionRefs.current[key] = el;
@@ -1590,8 +1687,8 @@ export default function GoldenMonday() {
     [],
   );
 
-  // ── Intersection Observer ──
   useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return undefined;
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -1607,15 +1704,23 @@ export default function GoldenMonday() {
     const elements = Object.values(currentRefs).filter(Boolean);
     elements.forEach((el) => observer.observe(el));
 
-    return () => elements.forEach((el) => observer.unobserve(el));
+    return () => {
+      elements.forEach((el) => {
+        try {
+          observer.unobserve(el);
+        } catch {
+          /* node may already be detached */
+        }
+      });
+      observer.disconnect();
+    };
   }, []);
 
-  // ── Load users when modal opens ──
   useEffect(() => {
     if (!showEmployeeModal) return;
     authAPI
       .getUsers()
-      .then((res) => setAllUsers(res.data || []))
+      .then((res) => setAllUsers(safeArray(res?.data)))
       .catch(() =>
         showToast(t.failedLoadUsers || "Failed to load users", "error"),
       );
@@ -1623,18 +1728,20 @@ export default function GoldenMonday() {
 
   const rosterUserIds = useMemo(() => {
     return new Set(
-      employees.map((e) => (e.user?._id || e.user || "").toString()),
+      safeArray(employees).map((e) =>
+        (e?.user?._id || e?.user || "").toString(),
+      ),
     );
   }, [employees]);
 
   const filteredUsers = useMemo(() => {
-    return allUsers.filter((u) => {
-      if (rosterUserIds.has(u._id)) return false;
+    return safeArray(allUsers).filter((u) => {
+      if (!u || rosterUserIds.has(u._id)) return false;
       const q = userSearch.toLowerCase();
       return (
         !q ||
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q)
+        (u.name || "").toLowerCase().includes(q) ||
+        (u.email || "").toLowerCase().includes(q)
       );
     });
   }, [allUsers, rosterUserIds, userSearch]);
@@ -1644,10 +1751,9 @@ export default function GoldenMonday() {
     setEmployeeForm((f) => ({ ...f, userId: u._id }));
   }, []);
 
-  // ── Photo Upload Handler ──
   const handlePhotoChange = useCallback(
     (e) => {
-      const file = e.target.files[0];
+      const file = e.target.files?.[0];
       if (file) {
         if (file.size > 5 * 1024 * 1024) {
           showToast(t.photoTooLarge || "Photo must be less than 5MB", "error");
@@ -1669,7 +1775,6 @@ export default function GoldenMonday() {
     transition: "opacity 0.7s ease, transform 0.7s ease",
   });
 
-  // ── AI Studio Handlers ──
   const handleFormChange = useCallback(
     (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value })),
     [],
@@ -1712,7 +1817,6 @@ export default function GoldenMonday() {
     }
   }, [form, t, refreshData]);
 
-  // ── Admin Handlers ──
   const handleRegisterEmployee = useCallback(async () => {
     if (!employeeForm.userId) {
       showToast(t.selectEmployeeWarn || "Please select an employee", "warning");
@@ -1727,7 +1831,7 @@ export default function GoldenMonday() {
         const formData = new FormData();
         formData.append("photo", photoFile);
         const response = await uploadAPI.uploadEmployeePhoto(formData);
-        profilePhotoUrl = response.data.url;
+        profilePhotoUrl = response?.data?.url || profilePhotoUrl;
         setUploadingPhoto(false);
       }
 
@@ -1806,23 +1910,24 @@ export default function GoldenMonday() {
     [t, refreshData],
   );
 
-  // ── Get sessions for dropdown ──
   const allSessions = useMemo(
-    () => [...upcomingSessions, ...pastSessions],
+    () => [...safeArray(upcomingSessions), ...safeArray(pastSessions)],
     [upcomingSessions, pastSessions],
   );
 
   const sessionOptions = useMemo(() => {
-    return allSessions.map((s) => ({
-      id: s._id,
-      label: `${s.presentationTitle || s.title || t.untitledSession || "Untitled"} - ${new Date(
-        s.date,
-      ).toLocaleDateString(t.locale || "en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })}`,
-    }));
+    return allSessions
+      .filter((s) => s && s._id)
+      .map((s) => ({
+        id: s._id,
+        label: `${
+          s.presentationTitle || s.title || t.untitledSession || "Untitled"
+        } - ${safeDate(s.date, t.locale, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })}`,
+      }));
   }, [allSessions, t]);
 
   return (
@@ -1907,7 +2012,6 @@ export default function GoldenMonday() {
           animation: fadeIn 0.4s ease forwards;
         }
 
-        /* ── ✅ ADD THIS SECTION HERE ── */
         /* Mobile responsive button labels */
         @media (max-width: 768px) {
           .btn-label {
@@ -1935,7 +2039,6 @@ export default function GoldenMonday() {
           }
         }
 
-        /* ── Tab labels hidden on narrow screens ── */
         @media (max-width: 600px) {
         .tab-label {
            display: none !important;
@@ -1962,7 +2065,7 @@ export default function GoldenMonday() {
             gap: 4px !important;
           }
         }
-          /* ── Stats Grid - Mobile Equal Width ── */
+
 @media (max-width: 768px) {
   .stats-grid {
     grid-template-columns: repeat(2, 1fr) !important;
@@ -2002,7 +2105,6 @@ export default function GoldenMonday() {
           color: "#fff",
         }}
       >
-        {/* Animated background orbs */}
         <div
           style={{
             position: "absolute",
@@ -2166,55 +2268,59 @@ export default function GoldenMonday() {
                 </a>
 
                 {isGmAdmin && (
-                  <div
-                    style={{ display: "flex", gap: 8, alignItems: "center" }}
-                  >
-                    <AutoAnnounceButton onDone={refreshData} t={t} />
-                    <ReminderControls sessionId={selectedSessionId} t={t} />
-                    <button
-                      onClick={refreshData}
-                      disabled={refreshing}
-                      className="gm-refresh-btn"
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "6px",
-                        background: "rgba(255,255,255,0.08)",
-                        border: `1px solid rgba(255,255,255,0.15)`,
-                        borderRadius: "8px",
-                        padding: "8px 14px",
-                        color: "#fff",
-                        fontSize: "clamp(11px, 1.8vw, 13px)",
-                        cursor: "pointer",
-                        transition: "all 0.3s ease",
-                        whiteSpace: "nowrap",
-                        minHeight: "clamp(32px, 4.5vh, 40px)",
-                        flexShrink: 0,
-                      }}
+                  <SectionErrorBoundary label="Admin actions">
+                    <div
+                      className="gm-admin-actions"
+                      style={{ display: "flex", gap: 8, alignItems: "center" }}
                     >
-                      <FiRefreshCw
-                        size={14}
+                      <AutoAnnounceButton onDone={refreshData} t={t} />
+                      <ReminderControls sessionId={selectedSessionId} t={t} />
+                      <button
+                        onClick={refreshData}
+                        disabled={refreshing}
+                        className="gm-refresh-btn"
                         style={{
-                          animation: refreshing
-                            ? "spin 1s linear infinite"
-                            : "none",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px",
+                          background: "rgba(255,255,255,0.08)",
+                          border: `1px solid rgba(255,255,255,0.15)`,
+                          borderRadius: "8px",
+                          padding: "8px 14px",
+                          color: "#fff",
+                          fontSize: "clamp(11px, 1.8vw, 13px)",
+                          cursor: "pointer",
+                          transition: "all 0.3s ease",
+                          whiteSpace: "nowrap",
+                          minHeight: "clamp(32px, 4.5vh, 40px)",
+                          flexShrink: 0,
                         }}
-                      />
-                      <span className="btn-label">
-                        {refreshing
-                          ? t.refreshing || "..."
-                          : t.refresh || "Refresh"}
-                      </span>
-                    </button>
-                  </div>
+                      >
+                        <FiRefreshCw
+                          size={14}
+                          style={{
+                            animation: refreshing
+                              ? "spin 1s linear infinite"
+                              : "none",
+                          }}
+                        />
+                        <span className="btn-label">
+                          {refreshing
+                            ? t.refreshing || "..."
+                            : t.refresh || "Refresh"}
+                        </span>
+                      </button>
+                    </div>
+                  </SectionErrorBoundary>
                 )}
 
-                <NotificationBell />
+                <SectionErrorBoundary label="Notifications">
+                  <NotificationBell />
+                </SectionErrorBoundary>
               </div>
             </div>
 
-            {/* Stats Mini-Card */}
             {stats && (
               <div
                 style={{
@@ -2283,9 +2389,7 @@ export default function GoldenMonday() {
                         color: C.goldLight,
                       }}
                     >
-                      {stats.averageRating
-                        ? stats.averageRating.toFixed(1)
-                        : "—"}
+                      {safeFixed(stats.averageRating) || "—"}
                     </div>
                     <div style={{ fontSize: 10, color: "#a9b3e0" }}>
                       {t.statAvgRating || "Rating"}
@@ -2311,18 +2415,20 @@ export default function GoldenMonday() {
           zIndex: 2,
         }}
       >
-        <StatsDashboard
-          stats={stats}
-          nextPresenter={nextPresenter}
-          loading={loading}
-          t={t}
-        />
+        <SectionErrorBoundary label="Stats">
+          <StatsDashboard
+            stats={stats}
+            nextPresenter={nextPresenter}
+            loading={loading}
+            t={t}
+          />
+        </SectionErrorBoundary>
       </section>
 
-      {/* ── PRESENTER SPOTLIGHT ── */}
-      <PresenterSpotlight onRefresh={refreshData} />
+      <SectionErrorBoundary label="Presenter spotlight">
+        <PresenterSpotlight onRefresh={refreshData} />
+      </SectionErrorBoundary>
 
-      {/* ── TAB NAVIGATION ── */}
       <section
         style={{
           maxWidth: 1000,
@@ -2411,7 +2517,6 @@ export default function GoldenMonday() {
         </div>
       </section>
 
-      {/* ── TAB CONTENT ── */}
       <section
         style={{
           maxWidth: 1000,
@@ -2419,544 +2524,385 @@ export default function GoldenMonday() {
           padding: "clamp(16px, 3vw, 24px) clamp(20px, 6vw, 40px)",
         }}
       >
-        <AnimatePresence mode="wait">
-          {/* ─── OVERVIEW TAB ─── */}
-          {activeTab === "overview" && (
-            <motion.div
-              key="overview"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-            >
-              {/* PILLARS */}
-              <div
-                id="gm-pillars"
-                ref={registerRef("pillars")}
-                data-reveal="pillars"
-                style={{
-                  marginBottom: 32,
-                  ...revealStyle("pillars"),
-                }}
+        <SectionErrorBoundary label="This tab" resetKey={activeTab}>
+          <AnimatePresence mode="wait">
+            {activeTab === "overview" && (
+              <motion.div
+                key="overview"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
               >
-                <SectionHeading
-                  eyebrow={<FiCompass size={14} />}
-                  title={t.pillarsTitle || "Why a golden morning"}
-                  sub={
-                    t.pillarsSub || "Three things every session comes back to."
-                  }
-                />
                 <div
+                  id="gm-pillars"
+                  ref={registerRef("pillars")}
+                  data-reveal="pillars"
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                    gap: 20,
-                    marginTop: 28,
+                    marginBottom: 32,
+                    ...revealStyle("pillars"),
                   }}
                 >
-                  {Array.isArray(pillars) && pillars.length > 0 ? (
-                    pillars.map((pillar, i) => {
-                      const IconComponent = PILLAR_ICONS[pillar.icon] || (
-                        <FiCompass size={22} />
-                      );
-                      const translatedTitle = getTranslatedText(pillar.title);
-                      const translatedBody = getTranslatedText(pillar.body);
+                  <SectionHeading
+                    eyebrow={<FiCompass size={14} />}
+                    title={t.pillarsTitle || "Why a golden morning"}
+                    sub={
+                      t.pillarsSub ||
+                      "Three things every session comes back to."
+                    }
+                  />
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(260px, 1fr))",
+                      gap: 20,
+                      marginTop: 28,
+                    }}
+                  >
+                    {safeArray(pillars).length > 0 ? (
+                      safeArray(pillars).map((pillar, i) => {
+                        const IconComponent = PILLAR_ICONS[pillar?.icon] || (
+                          <FiCompass size={22} />
+                        );
+                        const translatedTitle = getTranslatedText(
+                          pillar?.title,
+                        );
+                        const translatedBody = getTranslatedText(pillar?.body);
 
-                      return (
-                        <motion.div
-                          key={i}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.1, duration: 0.4 }}
-                          className="gm-card"
+                        return (
+                          <motion.div
+                            key={i}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.1, duration: 0.4 }}
+                            className="gm-card"
+                            style={{
+                              background: C.white,
+                              borderRadius: 16,
+                              padding: 24,
+                              border: `1px solid ${C.border}`,
+                              transition:
+                                "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: 46,
+                                height: 46,
+                                borderRadius: 12,
+                                background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                                color: "#fff",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                marginBottom: 16,
+                              }}
+                            >
+                              {IconComponent}
+                            </div>
+                            <h3
+                              style={{
+                                margin: "0 0 8px",
+                                fontSize: 16,
+                                color: C.dark,
+                                fontFamily: F.serif,
+                              }}
+                            >
+                              {translatedTitle ||
+                                pillar?.title?.en ||
+                                "Untitled"}
+                            </h3>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: 13.5,
+                                lineHeight: 1.7,
+                                color: C.muted,
+                              }}
+                            >
+                              {translatedBody || pillar?.body?.en || ""}
+                            </p>
+                          </motion.div>
+                        );
+                      })
+                    ) : (
+                      <div
+                        style={{
+                          gridColumn: "1 / -1",
+                          textAlign: "center",
+                          color: C.muted,
+                          padding: "40px 0",
+                        }}
+                      >
+                        <FiCompass
+                          size={32}
+                          style={{ marginBottom: 12, opacity: 0.5 }}
+                        />
+                        <p>{t.loading || "Loading pillars..."}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {isGmAdmin && (
+                  <div
+                    ref={registerRef("aiStudio")}
+                    data-reveal="aiStudio"
+                    style={{
+                      marginBottom: 32,
+                      ...revealStyle("aiStudio"),
+                    }}
+                  >
+                    <div
+                      style={{
+                        ...glass,
+                        borderRadius: 20,
+                        padding: "clamp(20px, 3vw, 28px)",
+                        overflow: "hidden",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                          gap: 12,
+                          marginBottom: 16,
+                        }}
+                      >
+                        <div
                           style={{
-                            background: C.white,
-                            borderRadius: 16,
-                            padding: 24,
-                            border: `1px solid ${C.border}`,
-                            transition:
-                              "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.4s ease",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
                           }}
                         >
                           <div
                             style={{
-                              width: 46,
-                              height: 46,
+                              width: 44,
+                              height: 44,
                               borderRadius: 12,
-                              background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-                              color: "#fff",
+                              background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              marginBottom: 16,
-                            }}
-                          >
-                            {IconComponent}
-                          </div>
-                          <h3
-                            style={{
-                              margin: "0 0 8px",
-                              fontSize: 16,
                               color: C.dark,
-                              fontFamily: F.serif,
                             }}
                           >
-                            {translatedTitle || pillar.title?.en || "Untitled"}
-                          </h3>
-                          <p
-                            style={{
-                              margin: 0,
-                              fontSize: 13.5,
-                              lineHeight: 1.7,
-                              color: C.muted,
-                            }}
-                          >
-                            {translatedBody || pillar.body?.en || ""}
-                          </p>
-                        </motion.div>
-                      );
-                    })
-                  ) : (
-                    <div
-                      style={{
-                        gridColumn: "1 / -1",
-                        textAlign: "center",
-                        color: C.muted,
-                        padding: "40px 0",
-                      }}
-                    >
-                      <FiCompass
-                        size={32}
-                        style={{ marginBottom: 12, opacity: 0.5 }}
-                      />
-                      <p>{t.loading || "Loading pillars..."}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* AI SESSION STUDIO */}
-              {isGmAdmin && (
-                <div
-                  ref={registerRef("aiStudio")}
-                  data-reveal="aiStudio"
-                  style={{
-                    marginBottom: 32,
-                    ...revealStyle("aiStudio"),
-                  }}
-                >
-                  <div
-                    style={{
-                      ...glass,
-                      borderRadius: 20,
-                      padding: "clamp(20px, 3vw, 28px)",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        flexWrap: "wrap",
-                        gap: 12,
-                        marginBottom: 16,
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 12,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 44,
-                            height: 44,
-                            borderRadius: 12,
-                            background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            color: C.dark,
-                          }}
-                        >
-                          <LuSparkles size={22} />
-                        </div>
-                        <div>
-                          <h3
-                            style={{
-                              margin: 0,
-                              fontSize: 17,
-                              color: C.dark,
-                              fontFamily: F.serif,
-                            }}
-                          >
-                            {t.aiTitle || "AI Session Studio"}
-                          </h3>
-                          <p
-                            style={{ margin: 0, fontSize: 12, color: C.muted }}
-                          >
-                            {t.aiSub ||
-                              "Log notes — AI turns them into a polished recap"}
-                          </p>
-                        </div>
-                      </div>
-                      {!showComposer && (
-                        <button
-                          onClick={() => setShowComposer(true)}
-                          style={{
-                            padding: "8px 22px",
-                            borderRadius: 10,
-                            border: "none",
-                            background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
-                            color: C.dark,
-                            fontWeight: 700,
-                            fontSize: 13,
-                            cursor: "pointer",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                            transition: "all 0.3s ease",
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.transform = "scale(1.03)";
-                            e.currentTarget.style.boxShadow =
-                              "0 4px 16px rgba(245,197,24,0.3)";
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.transform = "scale(1)";
-                            e.currentTarget.style.boxShadow = "none";
-                          }}
-                        >
-                          <FiPlus size={16} /> {t.aiNewSession || "New Session"}
-                        </button>
-                      )}
-                    </div>
-
-                    <AnimatePresence>
-                      {showComposer && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.3 }}
-                          style={{ overflow: "hidden" }}
-                        >
-                          <div
-                            style={{ display: "grid", gap: 12, paddingTop: 8 }}
-                          >
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: 12,
-                              }}
-                            >
-                              <input
-                                placeholder={t.aiFormTitle || "Session title"}
-                                value={form.title}
-                                onChange={handleFormChange("title")}
-                                style={inputStyle}
-                              />
-                              <input
-                                placeholder={t.aiFormOrg || "Organization"}
-                                value={form.organization}
-                                onChange={handleFormChange("organization")}
-                                style={inputStyle}
-                              />
-                            </div>
-                            <div
-                              style={{
-                                display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
-                                gap: 12,
-                              }}
-                            >
-                              <input
-                                placeholder={t.aiFormSpeaker || "Speaker"}
-                                value={form.speaker}
-                                onChange={handleFormChange("speaker")}
-                                style={inputStyle}
-                              />
-                              <input
-                                type="date"
-                                value={form.date}
-                                onChange={handleFormChange("date")}
-                                style={inputStyle}
-                              />
-                            </div>
-                            <textarea
-                              placeholder={
-                                t.aiFormNotes ||
-                                "Raw notes — AI will clean it up"
-                              }
-                              value={form.rawNotes}
-                              onChange={handleFormChange("rawNotes")}
-                              rows={4}
-                              style={{
-                                ...inputStyle,
-                                resize: "vertical",
-                                fontFamily: F.sans,
-                              }}
-                            />
-                            <div
-                              style={{
-                                display: "flex",
-                                gap: 10,
-                                justifyContent: "flex-end",
-                              }}
-                            >
-                              <button
-                                onClick={() => setShowComposer(false)}
-                                style={{
-                                  padding: "8px 22px",
-                                  borderRadius: 10,
-                                  border: `1px solid ${C.border}`,
-                                  background: "transparent",
-                                  color: C.muted,
-                                  fontWeight: 600,
-                                  fontSize: 13,
-                                  cursor: "pointer",
-                                  transition: "all 0.2s ease",
-                                }}
-                                onMouseEnter={(e) =>
-                                  (e.currentTarget.style.background = C.bg)
-                                }
-                                onMouseLeave={(e) =>
-                                  (e.currentTarget.style.background =
-                                    "transparent")
-                                }
-                              >
-                                {t.aiCancel || "Cancel"}
-                              </button>
-                              <button
-                                onClick={handleGenerateAndSave}
-                                disabled={generating}
-                                style={{
-                                  padding: "8px 28px",
-                                  borderRadius: 10,
-                                  border: "none",
-                                  background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-                                  color: "#fff",
-                                  fontWeight: 700,
-                                  fontSize: 13,
-                                  cursor: generating
-                                    ? "not-allowed"
-                                    : "pointer",
-                                  opacity: generating ? 0.7 : 1,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 8,
-                                  transition: "all 0.3s ease",
-                                }}
-                              >
-                                {generating ? (
-                                  <FiLoader
-                                    size={16}
-                                    style={{
-                                      animation: "spin 1s linear infinite",
-                                    }}
-                                  />
-                                ) : (
-                                  <FiSend size={16} />
-                                )}
-                                {generating
-                                  ? t.aiGenerating || "Generating..."
-                                  : t.aiGenerate || "Generate & Save"}
-                              </button>
-                            </div>
+                            <LuSparkles size={22} />
                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-              )}
-
-              {/* ROTATION PANEL */}
-              <div style={{ marginBottom: 32 }}>
-                <GoldenMondayRotationPanel onRefresh={refreshData} />
-              </div>
-
-              {/* UPCOMING & PAST SESSIONS TIMELINE */}
-              <div
-                ref={registerRef("timeline")}
-                data-reveal="timeline"
-                style={revealStyle("timeline")}
-              >
-                <div
-                  style={{
-                    ...glass,
-                    borderRadius: 20,
-                    padding: "clamp(20px, 3vw, 28px)",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      marginBottom: 20,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 10,
-                        background: `${C.primary}15`,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        color: C.primary,
-                      }}
-                    >
-                      <FiCalendar size={18} />
-                    </div>
-                    <h3
-                      style={{
-                        margin: 0,
-                        fontSize: 18,
-                        color: C.dark,
-                        fontFamily: F.serif,
-                      }}
-                    >
-                      {t.timelineTitle || "Session Timeline"}
-                    </h3>
-                  </div>
-
-                  {/* Upcoming Sessions */}
-                  {upcomingSessions.length > 0 && (
-                    <>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          marginBottom: 12,
-                          marginTop: 8,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: "50%",
-                            background: C.gold,
-                            animation: "gm-pulse-ring 2s ease-in-out infinite",
-                          }}
-                        />
-                        <h4 style={{ fontSize: 14, color: C.dark, margin: 0 }}>
-                          {t.upcomingSessionsHeader || "Upcoming Sessions"}
-                        </h4>
-                      </div>
-                      <div style={{ display: "grid", gap: 10 }}>
-                        {upcomingSessions.map((session) => (
-                          <SessionCard
-                            key={session._id}
-                            session={session}
-                            language={language}
-                            isAdmin={isGmAdmin}
-                            user={user}
-                            onRefresh={refreshData}
-                            t={t}
-                          />
-                        ))}
-                      </div>
-                    </>
-                  )}
-
-                  {/* Past Sessions */}
-                  {pastSessions.length > 0 && (
-                    <>
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                          marginTop: upcomingSessions.length > 0 ? 28 : 0,
-                          marginBottom: 12,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 6,
-                            height: 6,
-                            borderRadius: "50%",
-                            background: C.muted,
-                          }}
-                        />
-                        <h4 style={{ fontSize: 14, color: C.muted, margin: 0 }}>
-                          {t.pastSessionsHeader || "Past Sessions"}
-                        </h4>
-                      </div>
-                      <div style={{ display: "grid", gap: 10 }}>
-                        {pastSessions.slice(0, 10).map((session) => (
-                          <SessionCard
-                            key={session._id}
-                            session={session}
-                            language={language}
-                            isAdmin={isGmAdmin}
-                            user={user}
-                            onRefresh={refreshData}
-                            t={t}
-                          />
-                        ))}
-                        {pastSessions.length > 10 && (
-                          <p
+                          <div>
+                            <h3
+                              style={{
+                                margin: 0,
+                                fontSize: 17,
+                                color: C.dark,
+                                fontFamily: F.serif,
+                              }}
+                            >
+                              {t.aiTitle || "AI Session Studio"}
+                            </h3>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: 12,
+                                color: C.muted,
+                              }}
+                            >
+                              {t.aiSub ||
+                                "Log notes — AI turns them into a polished recap"}
+                            </p>
+                          </div>
+                        </div>
+                        {!showComposer && (
+                          <button
+                            onClick={() => setShowComposer(true)}
                             style={{
-                              textAlign: "center",
-                              fontSize: 12,
-                              color: C.muted,
-                              marginTop: 4,
+                              padding: "8px 22px",
+                              borderRadius: 10,
+                              border: "none",
+                              background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
+                              color: C.dark,
+                              fontWeight: 700,
+                              fontSize: 13,
+                              cursor: "pointer",
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 6,
+                              transition: "all 0.3s ease",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.transform = "scale(1.03)";
+                              e.currentTarget.style.boxShadow =
+                                "0 4px 16px rgba(245,197,24,0.3)";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.transform = "scale(1)";
+                              e.currentTarget.style.boxShadow = "none";
                             }}
                           >
-                            +{pastSessions.length - 10} more sessions
-                          </p>
+                            <FiPlus size={16} />{" "}
+                            {t.aiNewSession || "New Session"}
+                          </button>
                         )}
                       </div>
-                    </>
-                  )}
 
-                  {upcomingSessions.length === 0 &&
-                    pastSessions.length === 0 && (
-                      <div
-                        style={{
-                          textAlign: "center",
-                          padding: "40px 0",
-                          color: C.muted,
-                        }}
-                      >
-                        <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
-                        <p
-                          style={{
-                            fontSize: 15,
-                            fontWeight: 600,
-                            color: C.dark,
-                          }}
-                        >
-                          {t.noSessionsYet || "No sessions recorded yet"}
-                        </p>
-                        <p style={{ fontSize: 13 }}>
-                          {t.noSessionsSub ||
-                            "Start by logging a session with AI!"}
-                        </p>
-                      </div>
-                    )}
+                      <AnimatePresence>
+                        {showComposer && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.3 }}
+                            style={{ overflow: "hidden" }}
+                          >
+                            <div
+                              style={{
+                                display: "grid",
+                                gap: 12,
+                                paddingTop: 8,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr 1fr",
+                                  gap: 12,
+                                }}
+                              >
+                                <input
+                                  placeholder={t.aiFormTitle || "Session title"}
+                                  value={form.title}
+                                  onChange={handleFormChange("title")}
+                                  style={inputStyle}
+                                />
+                                <input
+                                  placeholder={t.aiFormOrg || "Organization"}
+                                  value={form.organization}
+                                  onChange={handleFormChange("organization")}
+                                  style={inputStyle}
+                                />
+                              </div>
+                              <div
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr 1fr",
+                                  gap: 12,
+                                }}
+                              >
+                                <input
+                                  placeholder={t.aiFormSpeaker || "Speaker"}
+                                  value={form.speaker}
+                                  onChange={handleFormChange("speaker")}
+                                  style={inputStyle}
+                                />
+                                <input
+                                  type="date"
+                                  value={form.date}
+                                  onChange={handleFormChange("date")}
+                                  style={inputStyle}
+                                />
+                              </div>
+                              <textarea
+                                placeholder={
+                                  t.aiFormNotes ||
+                                  "Raw notes — AI will clean it up"
+                                }
+                                value={form.rawNotes}
+                                onChange={handleFormChange("rawNotes")}
+                                rows={4}
+                                style={{
+                                  ...inputStyle,
+                                  resize: "vertical",
+                                  fontFamily: F.sans,
+                                }}
+                              />
+                              <div
+                                style={{
+                                  display: "flex",
+                                  gap: 10,
+                                  justifyContent: "flex-end",
+                                }}
+                              >
+                                <button
+                                  onClick={() => setShowComposer(false)}
+                                  style={{
+                                    padding: "8px 22px",
+                                    borderRadius: 10,
+                                    border: `1px solid ${C.border}`,
+                                    background: "transparent",
+                                    color: C.muted,
+                                    fontWeight: 600,
+                                    fontSize: 13,
+                                    cursor: "pointer",
+                                    transition: "all 0.2s ease",
+                                  }}
+                                  onMouseEnter={(e) =>
+                                    (e.currentTarget.style.background = C.bg)
+                                  }
+                                  onMouseLeave={(e) =>
+                                    (e.currentTarget.style.background =
+                                      "transparent")
+                                  }
+                                >
+                                  {t.aiCancel || "Cancel"}
+                                </button>
+                                <button
+                                  onClick={handleGenerateAndSave}
+                                  disabled={generating}
+                                  style={{
+                                    padding: "8px 28px",
+                                    borderRadius: 10,
+                                    border: "none",
+                                    background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                                    color: "#fff",
+                                    fontWeight: 700,
+                                    fontSize: 13,
+                                    cursor: generating
+                                      ? "not-allowed"
+                                      : "pointer",
+                                    opacity: generating ? 0.7 : 1,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    transition: "all 0.3s ease",
+                                  }}
+                                >
+                                  {generating ? (
+                                    <FiLoader
+                                      size={16}
+                                      style={{
+                                        animation: "spin 1s linear infinite",
+                                      }}
+                                    />
+                                  ) : (
+                                    <FiSend size={16} />
+                                  )}
+                                  {generating
+                                    ? t.aiGenerating || "Generating..."
+                                    : t.aiGenerate || "Generate & Save"}
+                                </button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ marginBottom: 32 }}>
+                  <SectionErrorBoundary label="Rotation panel">
+                    <GoldenMondayRotationPanel onRefresh={refreshData} />
+                  </SectionErrorBoundary>
                 </div>
-              </div>
 
-              {/* ADMIN PANEL */}
-              {isGmAdmin && (
                 <div
-                  ref={registerRef("admin")}
-                  data-reveal="admin"
-                  style={{
-                    marginTop: 40,
-                    ...revealStyle("admin"),
-                  }}
+                  ref={registerRef("timeline")}
+                  data-reveal="timeline"
+                  style={revealStyle("timeline")}
                 >
                   <div
                     style={{
@@ -2969,393 +2915,591 @@ export default function GoldenMonday() {
                       style={{
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "space-between",
-                        flexWrap: "wrap",
-                        gap: 12,
+                        gap: 10,
                         marginBottom: 20,
                       }}
                     >
                       <div
                         style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 10,
+                          background: `${C.primary}15`,
                           display: "flex",
                           alignItems: "center",
-                          gap: 10,
+                          justifyContent: "center",
+                          color: C.primary,
+                        }}
+                      >
+                        <FiCalendar size={18} />
+                      </div>
+                      <h3
+                        style={{
+                          margin: 0,
+                          fontSize: 18,
+                          color: C.dark,
+                          fontFamily: F.serif,
+                        }}
+                      >
+                        {t.timelineTitle || "Session Timeline"}
+                      </h3>
+                    </div>
+
+                    {safeArray(upcomingSessions).length > 0 && (
+                      <>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            marginBottom: 12,
+                            marginTop: 8,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              background: C.gold,
+                              animation:
+                                "gm-pulse-ring 2s ease-in-out infinite",
+                            }}
+                          />
+                          <h4
+                            style={{ fontSize: 14, color: C.dark, margin: 0 }}
+                          >
+                            {t.upcomingSessionsHeader || "Upcoming Sessions"}
+                          </h4>
+                        </div>
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {safeArray(upcomingSessions).map((session, i) => (
+                            <SessionCard
+                              key={session?._id || `upcoming-${i}`}
+                              session={session}
+                              language={language}
+                              isAdmin={isGmAdmin}
+                              user={user}
+                              onRefresh={refreshData}
+                              t={t}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
+
+                    {safeArray(pastSessions).length > 0 && (
+                      <>
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            marginTop:
+                              safeArray(upcomingSessions).length > 0 ? 28 : 0,
+                            marginBottom: 12,
+                          }}
+                        >
+                          <div
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              background: C.muted,
+                            }}
+                          />
+                          <h4
+                            style={{ fontSize: 14, color: C.muted, margin: 0 }}
+                          >
+                            {t.pastSessionsHeader || "Past Sessions"}
+                          </h4>
+                        </div>
+                        <div style={{ display: "grid", gap: 10 }}>
+                          {safeArray(pastSessions)
+                            .slice(0, 10)
+                            .map((session, i) => (
+                              <SessionCard
+                                key={session?._id || `past-${i}`}
+                                session={session}
+                                language={language}
+                                isAdmin={isGmAdmin}
+                                user={user}
+                                onRefresh={refreshData}
+                                t={t}
+                              />
+                            ))}
+                          {safeArray(pastSessions).length > 10 && (
+                            <p
+                              style={{
+                                textAlign: "center",
+                                fontSize: 12,
+                                color: C.muted,
+                                marginTop: 4,
+                              }}
+                            >
+                              +{safeArray(pastSessions).length - 10} more
+                              sessions
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {safeArray(upcomingSessions).length === 0 &&
+                      safeArray(pastSessions).length === 0 && (
+                        <div
+                          style={{
+                            textAlign: "center",
+                            padding: "40px 0",
+                            color: C.muted,
+                          }}
+                        >
+                          <div style={{ fontSize: 48, marginBottom: 12 }}>
+                            📅
+                          </div>
+                          <p
+                            style={{
+                              fontSize: 15,
+                              fontWeight: 600,
+                              color: C.dark,
+                            }}
+                          >
+                            {t.noSessionsYet || "No sessions recorded yet"}
+                          </p>
+                          <p style={{ fontSize: 13 }}>
+                            {t.noSessionsSub ||
+                              "Start by logging a session with AI!"}
+                          </p>
+                        </div>
+                      )}
+                  </div>
+                </div>
+
+                {isGmAdmin && (
+                  <div
+                    ref={registerRef("admin")}
+                    data-reveal="admin"
+                    style={{
+                      marginTop: 40,
+                      ...revealStyle("admin"),
+                    }}
+                  >
+                    <div
+                      style={{
+                        ...glass,
+                        borderRadius: 20,
+                        padding: "clamp(20px, 3vw, 28px)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          flexWrap: "wrap",
+                          gap: 12,
+                          marginBottom: 20,
                         }}
                       >
                         <div
                           style={{
-                            width: 36,
-                            height: 36,
-                            borderRadius: 10,
-                            background: `${C.primary}15`,
                             display: "flex",
                             alignItems: "center",
-                            justifyContent: "center",
-                            color: C.primary,
+                            gap: 10,
                           }}
                         >
-                          <FiUsers size={18} />
-                        </div>
-                        <div>
-                          <h3
+                          <div
                             style={{
-                              margin: 0,
-                              fontSize: 17,
-                              color: C.dark,
-                              fontFamily: F.serif,
+                              width: 36,
+                              height: 36,
+                              borderRadius: 10,
+                              background: `${C.primary}15`,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: C.primary,
                             }}
                           >
-                            {t.adminPanelTitle || "Employee Management"}
-                          </h3>
-                          <p
-                            style={{ margin: 0, fontSize: 12, color: C.muted }}
-                          >
-                            {t.adminPanelSub ||
-                              "Register and manage employees for Golden Monday rotation"}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setShowEmployeeModal(true)}
-                        style={btnStyle(C.primary)}
-                      >
-                        <FiUserPlus size={14} />{" "}
-                        {t.registerEmployeeBtn || "Register Employee"}
-                      </button>
-                    </div>
-
-                    <div style={{ display: "grid", gap: 8 }}>
-                      {employees.length === 0 ? (
-                        <div
-                          style={{
-                            textAlign: "center",
-                            padding: "30px 0",
-                            color: C.muted,
-                            border: `1.5px dashed ${C.border}`,
-                            borderRadius: 12,
-                          }}
-                        >
-                          <p style={{ fontSize: 13 }}>
-                            {t.noEmployeesYet ||
-                              'No employees registered yet. Click "Register Employee" to add.'}
-                          </p>
-                        </div>
-                      ) : (
-                        employees.map((emp) => {
-                          const empId = emp.user?._id || emp._id;
-                          return (
-                            <div
-                              key={empId}
+                            <FiUsers size={18} />
+                          </div>
+                          <div>
+                            <h3
                               style={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "space-between",
-                                padding: "10px 16px",
-                                borderRadius: 10,
-                                background: emp.isEligible ? C.bg : "#fef2f2",
-                                border: `1px solid ${emp.isEligible ? C.border : "#fecaca"}`,
-                                flexWrap: "wrap",
-                                gap: 8,
-                                transition: "all 0.2s ease",
+                                margin: 0,
+                                fontSize: 17,
+                                color: C.dark,
+                                fontFamily: F.serif,
                               }}
                             >
+                              {t.adminPanelTitle || "Employee Management"}
+                            </h3>
+                            <p
+                              style={{
+                                margin: 0,
+                                fontSize: 12,
+                                color: C.muted,
+                              }}
+                            >
+                              {t.adminPanelSub ||
+                                "Register and manage employees for Golden Monday rotation"}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setShowEmployeeModal(true)}
+                          style={btnStyle(C.primary)}
+                        >
+                          <FiUserPlus size={14} />{" "}
+                          {t.registerEmployeeBtn || "Register Employee"}
+                        </button>
+                      </div>
+
+                      <div style={{ display: "grid", gap: 8 }}>
+                        {safeArray(employees).length === 0 ? (
+                          <div
+                            style={{
+                              textAlign: "center",
+                              padding: "30px 0",
+                              color: C.muted,
+                              border: `1.5px dashed ${C.border}`,
+                              borderRadius: 12,
+                            }}
+                          >
+                            <p style={{ fontSize: 13 }}>
+                              {t.noEmployeesYet ||
+                                'No employees registered yet. Click "Register Employee" to add.'}
+                            </p>
+                          </div>
+                        ) : (
+                          safeArray(employees).map((emp, idx) => {
+                            const empId =
+                              emp?.user?._id || emp?._id || `emp-${idx}`;
+                            return (
                               <div
+                                key={empId}
                                 style={{
                                   display: "flex",
                                   alignItems: "center",
-                                  gap: 12,
+                                  justifyContent: "space-between",
+                                  padding: "10px 16px",
+                                  borderRadius: 10,
+                                  background: emp?.isEligible
+                                    ? C.bg
+                                    : "#fef2f2",
+                                  border: `1px solid ${
+                                    emp?.isEligible ? C.border : "#fecaca"
+                                  }`,
+                                  flexWrap: "wrap",
+                                  gap: 8,
+                                  transition: "all 0.2s ease",
                                 }}
                               >
-                                {emp.profilePhotoUrl ? (
-                                  <img
-                                    src={emp.profilePhotoUrl}
-                                    alt={emp.name}
-                                    style={{
-                                      width: 36,
-                                      height: 36,
-                                      borderRadius: "50%",
-                                      objectFit: "cover",
-                                      border: `2px solid ${emp.isEligible ? C.primary : "#ef4444"}`,
-                                    }}
-                                  />
-                                ) : (
-                                  <div
-                                    style={{
-                                      width: 36,
-                                      height: 36,
-                                      borderRadius: "50%",
-                                      background: emp.isEligible
-                                        ? C.primary
-                                        : "#ef4444",
-                                      color: "#fff",
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      fontSize: 14,
-                                      fontWeight: 700,
-                                    }}
-                                  >
-                                    {emp.name?.charAt(0) || "?"}
-                                  </div>
-                                )}
-                                <div>
-                                  <div
-                                    style={{
-                                      fontWeight: 600,
-                                      color: C.dark,
-                                      fontSize: 14,
-                                    }}
-                                  >
-                                    {emp.name}
-                                  </div>
-                                  <div style={{ fontSize: 12, color: C.muted }}>
-                                    {emp.department ||
-                                      t.noDepartment ||
-                                      "No department"}{" "}
-                                    ·{" "}
-                                    {emp.position ||
-                                      t.noPosition ||
-                                      "No position"}
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 12,
+                                  }}
+                                >
+                                  {emp?.profilePhotoUrl ? (
+                                    <img
+                                      src={emp.profilePhotoUrl}
+                                      alt={emp?.name}
+                                      style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: "50%",
+                                        objectFit: "cover",
+                                        border: `2px solid ${
+                                          emp?.isEligible
+                                            ? C.primary
+                                            : "#ef4444"
+                                        }`,
+                                      }}
+                                    />
+                                  ) : (
+                                    <div
+                                      style={{
+                                        width: 36,
+                                        height: 36,
+                                        borderRadius: "50%",
+                                        background: emp?.isEligible
+                                          ? C.primary
+                                          : "#ef4444",
+                                        color: "#fff",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        fontSize: 14,
+                                        fontWeight: 700,
+                                      }}
+                                    >
+                                      {emp?.name?.charAt(0) || "?"}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontWeight: 600,
+                                        color: C.dark,
+                                        fontSize: 14,
+                                      }}
+                                    >
+                                      {emp?.name}
+                                    </div>
+                                    <div
+                                      style={{ fontSize: 12, color: C.muted }}
+                                    >
+                                      {emp?.department ||
+                                        t.noDepartment ||
+                                        "No department"}{" "}
+                                      ·{" "}
+                                      {emp?.position ||
+                                        t.noPosition ||
+                                        "No position"}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
 
-                              <div
-                                style={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 8,
-                                  flexWrap: "wrap",
-                                }}
-                              >
-                                <span
+                                <div
                                   style={{
-                                    fontSize: 10,
-                                    fontWeight: 700,
-                                    padding: "2px 12px",
-                                    borderRadius: 999,
-                                    background: emp.isEligible
-                                      ? "#d1fae5"
-                                      : "#fef2f2",
-                                    color: emp.isEligible
-                                      ? "#065f46"
-                                      : "#991b1b",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 8,
+                                    flexWrap: "wrap",
                                   }}
                                 >
-                                  {emp.isEligible
-                                    ? t.activeLabel || "Active"
-                                    : t.inactiveLabel || "Inactive"}
-                                </span>
-                                <span style={{ fontSize: 11, color: C.muted }}>
-                                  {t.presentedLabel || "Presented"}:{" "}
-                                  {emp.timesPresented || 0}x
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    handleToggleEligibility(
-                                      empId,
-                                      emp.isEligible,
-                                    )
-                                  }
-                                  style={{
-                                    ...btnStyle(
-                                      emp.isEligible ? "#f59e0b" : "#10b981",
-                                      "#fff",
-                                    ),
-                                    fontSize: 11,
-                                    padding: "4px 12px",
-                                  }}
-                                >
-                                  {emp.isEligible ? (
-                                    <FiUserX size={12} />
-                                  ) : (
-                                    <FiUserCheck size={12} />
-                                  )}
-                                  {emp.isEligible
-                                    ? t.deactivateBtn || "Deactivate"
-                                    : t.activateBtn || "Activate"}
-                                </button>
-                                {isSuperAdmin && (
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      padding: "2px 12px",
+                                      borderRadius: 999,
+                                      background: emp?.isEligible
+                                        ? "#d1fae5"
+                                        : "#fef2f2",
+                                      color: emp?.isEligible
+                                        ? "#065f46"
+                                        : "#991b1b",
+                                    }}
+                                  >
+                                    {emp?.isEligible
+                                      ? t.activeLabel || "Active"
+                                      : t.inactiveLabel || "Inactive"}
+                                  </span>
+                                  <span
+                                    style={{ fontSize: 11, color: C.muted }}
+                                  >
+                                    {t.presentedLabel || "Presented"}:{" "}
+                                    {emp?.timesPresented || 0}x
+                                  </span>
                                   <button
                                     onClick={() =>
-                                      handleRemoveEmployee(empId, emp.name)
+                                      handleToggleEligibility(
+                                        empId,
+                                        emp?.isEligible,
+                                      )
                                     }
                                     style={{
-                                      ...btnStyle("#ef4444", "#fff"),
+                                      ...btnStyle(
+                                        emp?.isEligible ? "#f59e0b" : "#10b981",
+                                        "#fff",
+                                      ),
                                       fontSize: 11,
                                       padding: "4px 12px",
                                     }}
                                   >
-                                    <FiTrash2 size={12} />{" "}
-                                    {t.removeBtn || "Remove"}
+                                    {emp?.isEligible ? (
+                                      <FiUserX size={12} />
+                                    ) : (
+                                      <FiUserCheck size={12} />
+                                    )}
+                                    {emp?.isEligible
+                                      ? t.deactivateBtn || "Deactivate"
+                                      : t.activateBtn || "Activate"}
                                   </button>
-                                )}
+                                  {isSuperAdmin && (
+                                    <button
+                                      onClick={() =>
+                                        handleRemoveEmployee(empId, emp?.name)
+                                      }
+                                      style={{
+                                        ...btnStyle("#ef4444", "#fff"),
+                                        fontSize: 11,
+                                        padding: "4px 12px",
+                                      }}
+                                    >
+                                      <FiTrash2 size={12} />{" "}
+                                      {t.removeBtn || "Remove"}
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })
-                      )}
+                            );
+                          })
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </motion.div>
-          )}
+                )}
+              </motion.div>
+            )}
 
-          {/* ─── EXPERIENCE & RESULT TAB ─── */}
-          {activeTab === "experience-result" && (
-            <motion.div
-              key="experience-result"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-            >
-              <ExperiencesAndResults sessionId={selectedSessionId} />
-            </motion.div>
-          )}
+            {activeTab === "experience-result" && (
+              <motion.div
+                key="experience-result"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+              >
+                <ExperiencesAndResults sessionId={selectedSessionId} />
+              </motion.div>
+            )}
 
-          {/* ─── ATTENDANCE TAB ─── */}
-          {activeTab === "attendance" && (
-            <motion.div
-              key="attendance"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-            >
-              {sessionOptions.length > 0 && (
-                <div
-                  style={{
-                    ...glass,
-                    borderRadius: 16,
-                    padding: "16px 20px",
-                    marginBottom: 16,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <label
+            {activeTab === "attendance" && (
+              <motion.div
+                key="attendance"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+              >
+                {sessionOptions.length > 0 && (
+                  <div
                     style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: C.dark,
+                      ...glass,
+                      borderRadius: 16,
+                      padding: "16px 20px",
+                      marginBottom: 16,
                       display: "flex",
                       alignItems: "center",
-                      gap: 6,
+                      gap: 12,
+                      flexWrap: "wrap",
                     }}
                   >
-                    <FiCalendar size={16} />{" "}
-                    {t.selectSession || "Select Session:"}
-                  </label>
-                  <select
-                    value={selectedSessionId || ""}
-                    onChange={(e) => setSelectedSessionId(e.target.value)}
-                    style={{
-                      padding: "8px 14px",
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 10,
-                      fontSize: 13,
-                      background: C.white,
-                      outline: "none",
-                      flex: 1,
-                      minWidth: 180,
-                    }}
-                  >
-                    {sessionOptions.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              {selectedSessionId && (
-                <>
-                  <div style={{ marginBottom: 16 }}>
-                    <QRCheckIn
-                      sessionId={selectedSessionId}
-                      onCheckIn={refreshData}
-                    />
+                    <label
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: C.dark,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                      }}
+                    >
+                      <FiCalendar size={16} />{" "}
+                      {t.selectSession || "Select Session:"}
+                    </label>
+                    <select
+                      value={selectedSessionId || ""}
+                      onChange={(e) => setSelectedSessionId(e.target.value)}
+                      style={{
+                        padding: "8px 14px",
+                        border: `1px solid ${C.border}`,
+                        borderRadius: 10,
+                        fontSize: 13,
+                        background: C.white,
+                        outline: "none",
+                        flex: 1,
+                        minWidth: 180,
+                      }}
+                    >
+                      {sessionOptions.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <AttendancePanel
-                    sessionId={selectedSessionId}
-                    onRefresh={refreshData}
-                  />
-                </>
-              )}
+                )}
 
-              {!selectedSessionId && (
-                <div
-                  style={{
-                    ...glass,
-                    borderRadius: 20,
-                    padding: "60px 20px",
-                    textAlign: "center",
-                    color: C.muted,
-                  }}
-                >
-                  <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-                  <p style={{ fontSize: 16, marginBottom: 4 }}>
-                    {t.noSessionsAvailable || "No sessions available"}
-                  </p>
-                  <p style={{ fontSize: 13, color: "#999" }}>
-                    {t.createSessionFirst ||
-                      "Create a session first to record attendance"}
-                  </p>
-                </div>
-              )}
-            </motion.div>
-          )}
+                {selectedSessionId && (
+                  <>
+                    <div style={{ marginBottom: 16 }}>
+                      <QRCheckIn
+                        sessionId={selectedSessionId}
+                        onCheckIn={refreshData}
+                      />
+                    </div>
+                    <SectionErrorBoundary
+                      label="Attendance"
+                      resetKey={selectedSessionId}
+                    >
+                      <AttendancePanel
+                        sessionId={selectedSessionId}
+                        onRefresh={refreshData}
+                      />
+                    </SectionErrorBoundary>
+                  </>
+                )}
 
-          {/* ─── RESOURCES TAB ─── */}
-          {activeTab === "resources" && (
-            <motion.div
-              key="resources"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-            >
-              <ResourceLibrary
-                sessionId={selectedSessionId}
-                onRefresh={refreshData}
-              />
-            </motion.div>
-          )}
+                {!selectedSessionId && (
+                  <div
+                    style={{
+                      ...glass,
+                      borderRadius: 20,
+                      padding: "60px 20px",
+                      textAlign: "center",
+                      color: C.muted,
+                    }}
+                  >
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
+                    <p style={{ fontSize: 16, marginBottom: 4 }}>
+                      {t.noSessionsAvailable || "No sessions available"}
+                    </p>
+                    <p style={{ fontSize: 13, color: "#999" }}>
+                      {t.createSessionFirst ||
+                        "Create a session first to record attendance"}
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            )}
 
-          {/* ─── GALLERY TAB ─── */}
-          {activeTab === "gallery" && (
-            <motion.div
-              key="gallery"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-            >
-              <GalleryGrid
-                sessionId={selectedSessionId}
-                onRefresh={refreshData}
-              />
-            </motion.div>
-          )}
+            {activeTab === "resources" && (
+              <motion.div
+                key="resources"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+              >
+                <ResourceLibrary
+                  sessionId={selectedSessionId}
+                  onRefresh={refreshData}
+                />
+              </motion.div>
+            )}
 
-          {/* ─── REPORTS TAB ─── */}
-          {activeTab === "reports" && (
-            <motion.div
-              key="reports"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.4 }}
-            >
-              <ReportExport sessionId={selectedSessionId} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+            {activeTab === "gallery" && (
+              <motion.div
+                key="gallery"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+              >
+                <GalleryGrid
+                  sessionId={selectedSessionId}
+                  onRefresh={refreshData}
+                />
+              </motion.div>
+            )}
+
+            {activeTab === "reports" && (
+              <motion.div
+                key="reports"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.4 }}
+              >
+                <ReportExport sessionId={selectedSessionId} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </SectionErrorBoundary>
       </section>
 
       {/* ── MESOB PLATFORM ── */}
@@ -3506,7 +3650,7 @@ export default function GoldenMonday() {
               margin: "0 0 8px",
             }}
           >
-            {t.closingTitle || "Start your week here"}
+            {t?.closingTitle || "Start your week here"}
           </h3>
           <p
             style={{
@@ -3516,7 +3660,7 @@ export default function GoldenMonday() {
               margin: "0 auto",
             }}
           >
-            {t.closingBody ||
+            {t?.closingBody ||
               "Golden Monday is a standing fixture — check back weekly for the next session's write-up."}
           </p>
         </motion.div>
