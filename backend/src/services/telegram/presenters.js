@@ -1,12 +1,22 @@
 // backend/src/services/telegram/presenters.js
 const GoldenMondaySession = require("../../models/GoldenMondaySession");
 const { formatDate, sendMessage, callTelegramApi } = require("./utils");
+const {
+  LABELS,
+  formatDateForLang,
+  buildPresenterHashtag,
+  translateDynamicStrings,
+} = require("./trilingual");
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID;
 const TELEGRAM_ADMIN_GROUP_ID = process.env.TELEGRAM_ADMIN_GROUP_ID;
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://akmesob.vercel.app";
 const TELEGRAM_API = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}`;
+
+// Telegram caps message bodies at 4096 characters. Leave a small
+// headroom because `sendPhoto` uses part of the limit for the caption.
+const TELEGRAM_MAX_BODY = 4000;
 
 // ─── PENDING CONFIRMATIONS ──────────────────────────────────────
 const pendingPresenterConfirmations = new Map();
@@ -27,6 +37,88 @@ async function generateAnnouncementImage(presenter, session) {
   }
 }
 
+// ─── BUILD TRILINGUAL MESSAGE BODY ──────────────────────────────
+// Assembles the three language sections in the order:
+//   Amharic → English → Afaan Oromoo
+// Fixed labels come from the LABELS map; dynamic strings (title,
+// description, suggested topics) are translated via the AI service
+// with per-string fallback to the original on any failure.
+async function buildTrilingualAnnouncement(session) {
+  const presenter = session.presenter;
+
+  const title = session.presentationTitle || "";
+  const description = session.presentationDescription || "";
+  const topics = Array.isArray(session.suggestedTopics)
+    ? session.suggestedTopics
+    : [];
+
+  // Kick off all translation calls in parallel.
+  const [[titleAm], [titleOm], [descAm], [descOm], topicsAm, topicsOm] =
+    await Promise.all([
+      translateDynamicStrings([title], "am"),
+      translateDynamicStrings([title], "om"),
+      translateDynamicStrings([description], "am"),
+      translateDynamicStrings([description], "om"),
+      translateDynamicStrings(topics, "am"),
+      translateDynamicStrings(topics, "om"),
+    ]);
+
+  const buildSection = (lang, dynamic) => {
+    const L = LABELS[lang];
+    const dateStr = formatDateForLang(session.date, lang);
+    const presenterName = presenter?.name || "TBD";
+    const presenterHashtag = buildPresenterHashtag(presenterName);
+
+    const lines = [];
+    lines.push(`🎯 *${L.header} — ${dateStr}*`);
+    lines.push("");
+    lines.push(`👤 *${L.presenter}:* ${presenterName}`);
+    if (presenter?.department) {
+      lines.push(`🏛️ *${L.department}:* ${presenter.department}`);
+    }
+    if (dynamic.title) {
+      lines.push(`📖 *${L.topic}:* "${dynamic.title}"`);
+    }
+    if (dynamic.description) {
+      lines.push(`📝 *${L.description}:* ${dynamic.description}`);
+    }
+    lines.push("");
+    lines.push(`🕒 *${L.time}:* ${L.timeValue}`);
+    lines.push(`📍 *${L.location}:* ${L.locationValue}`);
+    if (dynamic.topics.length > 0) {
+      lines.push("");
+      lines.push(`💡 *${L.aiTopics}:*`);
+      dynamic.topics.forEach((topic, i) => {
+        lines.push(`   ${i + 1}. ${topic}`);
+      });
+    }
+    lines.push("");
+    lines.push(`${L.hashtags.join(" ")} ${presenterHashtag}`);
+    return lines.join("\n");
+  };
+
+  const sectionAm = buildSection("am", {
+    title: titleAm || title,
+    description: descAm || description,
+    topics: topicsAm.length ? topicsAm : topics,
+  });
+
+  const sectionEn = buildSection("en", {
+    title,
+    description,
+    topics,
+  });
+
+  const sectionOm = buildSection("om", {
+    title: titleOm || title,
+    description: descOm || description,
+    topics: topicsOm.length ? topicsOm : topics,
+  });
+
+  const divider = "\n\n━━━━━━━━━━━━━━━━━━\n\n";
+  return sectionAm + divider + sectionEn + divider + sectionOm;
+}
+
 // ─── POST TO CHANNEL ─────────────────────────────────────────────
 async function postPresenterAnnouncementToChannel(session) {
   if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHANNEL_ID) {
@@ -36,33 +128,23 @@ async function postPresenterAnnouncementToChannel(session) {
 
   try {
     const presenter = session.presenter;
-    const dateFormatted = formatDate(session.date);
-
     const imageUrl = await generateAnnouncementImage(presenter, session);
 
-    let message = `🎯 Golden Monday - ${dateFormatted}\n\n`;
-    message += `👤 Presenter: ${presenter?.name || "TBD"}\n`;
-    if (presenter?.department) {
-      message += `🏛️ Department: ${presenter.department}\n`;
-    }
-    if (session.presentationTitle) {
-      message += `📖 Topic: "${session.presentationTitle}"\n`;
-    }
-    if (session.presentationDescription) {
-      message += `📝 Description: ${session.presentationDescription}\n`;
-    }
-    message += `\n🕒 Time: 2:00 - 2:50 PM\n`;
-    message += `📍 Location: Addis MESOB Conference Hall\n\n`;
+    // Build the trilingual body. Falls back to per-string originals
+    // on any translation failure — never throws.
+    let message = await buildTrilingualAnnouncement(session);
 
-    if (session.suggestedTopics && session.suggestedTopics.length > 0) {
-      message += `💡 AI Suggested Topics:\n`;
-      session.suggestedTopics.forEach((topic, i) => {
-        message += `   ${i + 1}. ${topic}\n`;
-      });
+    // Safety trim: Telegram rejects bodies over 4096 characters. The
+    // announcement can approach that with a long description + many
+    // topics in three languages.
+    if (message.length > TELEGRAM_MAX_BODY) {
+      console.warn(
+        `[presenters] trilingual message is ${message.length} chars, trimming to ${TELEGRAM_MAX_BODY}`,
+      );
+      message =
+        message.slice(0, TELEGRAM_MAX_BODY - 40).trimEnd() +
+        "\n\n_… (truncated)_";
     }
-
-    const presenterName = (presenter?.name || "GM").replace(/\s/g, "");
-    message += `\n#GoldenMonday #AddisMESOB #${presenterName}`;
 
     let response;
     if (imageUrl) {
@@ -123,7 +205,7 @@ async function postPresenterAnnouncementToChannel(session) {
 }
 
 // ─── REQUEST PRESENTER AVAILABILITY ─────────────────────────────
-// ✅ NEW: accepts `{ force }`. Also hydrates a bare ObjectId presenter.
+// Accepts `{ force }`. Also hydrates a bare ObjectId presenter.
 async function requestPresenterAvailability(session, { force = false } = {}) {
   // Hydrate presenter if it's just an ObjectId
   let presenter = session.presenter;
@@ -143,7 +225,7 @@ async function requestPresenterAvailability(session, { force = false } = {}) {
 
   const sessionId = session._id.toString();
 
-  // ✅ NEW: on force, drop any stale entry so the deadline resets
+  // On force, drop any stale entry so the deadline resets
   if (force) {
     pendingPresenterConfirmations.delete(sessionId);
   }
@@ -513,7 +595,7 @@ async function handlePresenterUnavailableReason(msg) {
 }
 
 // ════════════════════════════════════════════════════════════════
-// ✅ NEW FUNCTIONS — force actions
+// FORCE ACTIONS
 // ════════════════════════════════════════════════════════════════
 
 // ─── FORCE RE-POST ANNOUNCEMENT TO CHANNEL ──────────────────────
