@@ -59,8 +59,13 @@ const DONUT_COLORS = [
   "#D4A04A",
 ];
 
+// Kept from the previous gender chart — still used as accent colours on the
+// radar legend, so any other module importing this palette keeps working.
 const MALE_COLOR = "#3D6B8C";
 const FEMALE_COLOR = "#B5542E";
+
+// Colour ramp for the five operational-health radar axes.
+const RADAR_COLORS = [T.teal, T.brass, T.tealBright, MALE_COLOR, FEMALE_COLOR];
 
 // ── Localized weekday / month labels ────────────────────────
 // Used instead of toLocaleDateString("en-US", …) so charts render
@@ -153,6 +158,36 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.arcTo(x, y + h, x, y, radius);
   ctx.arcTo(x, y, x + w, y, radius);
   ctx.closePath();
+}
+
+// Small floating badge drawn on canvas — shared by the radar and the
+// momentum chart so hover feedback looks identical across both.
+function drawBadge(ctx, x, y, lines, accent, boundsW) {
+  const padX = 6;
+  const padY = 4;
+  ctx.font = `700 8px ${T.mono}`;
+  const widths = lines.map((l) => ctx.measureText(l).width);
+  const bw = Math.max(...widths) + padX * 2;
+  const bh = lines.length * 10 + padY * 2;
+  let bx = x - bw / 2;
+  bx = Math.max(2, Math.min(bx, boundsW - bw - 2));
+  const by = Math.max(2, y - bh - 8);
+
+  ctx.save();
+  ctx.shadowColor = "rgba(14,36,28,0.22)";
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = T.ink;
+  roundRect(ctx, bx, by, bw, bh, 5);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  lines.forEach((l, i) => {
+    ctx.fillStyle = i === 0 ? "#FFFFFF" : accent;
+    ctx.font = `${i === 0 ? 600 : 800} 8px ${i === 0 ? T.sans : T.mono}`;
+    ctx.fillText(l, bx + bw / 2, by + padY + i * 10);
+  });
 }
 
 function localDateKey(d) {
@@ -360,6 +395,7 @@ const QuickStatsRail = memo(function QuickStatsRail({
           color={T.teal}
           subtitle={td("totalServices", "Total Services")}
         />
+        {/* Gender split lives here — unchanged by the chart swap below. */}
         <Gauge
           value={malePct}
           max={100}
@@ -1076,87 +1112,180 @@ const MonthlyTrendChart = memo(function MonthlyTrendChart({
   );
 });
 
-// ─── Gender Stacked Bar ────────────────────────────────────────
-const GenderStackedBar = memo(function GenderStackedBar({
-  departments,
+// ════════════════════════════════════════════════════════════
+// NEW ① — CriteriaRadar (replaces the gender stacked bar)
+// ════════════════════════════════════════════════════════════
+// A five-axis radar of operational health. Each axis is a named signal
+// computed from data already on this page (see `radarAxes` in the main
+// component) — no random values, so the same inputs always draw the same
+// shape. Hovering an axis (canvas or legend chip) highlights the vertex
+// and floats a badge with the exact score.
+const CriteriaRadar = memo(function CriteriaRadar({
+  axes,
   loading,
   noDataLabel,
-  maleLabel,
-  femaleLabel,
+  averageLabel,
 }) {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
-  const geometryRef = useRef(null);
+  const geoRef = useRef(null);
   const [hoverIdx, setHoverIdx] = useState(null);
-  const size = useElementSize(canvasRef, [loading, departments]);
-  const depts = departments.slice(0, 5);
+  const size = useElementSize(canvasRef, [loading, axes]);
+
+  const average = useMemo(() => {
+    if (!axes || axes.length === 0) return 0;
+    return Math.round(
+      axes.reduce((s, a) => s + (a.value || 0), 0) / axes.length,
+    );
+  }, [axes]);
 
   const draw = useCallback(
-    (ctx, width, height, progress, hoverIndex) => {
+    (ctx, width, height, progress, hover) => {
       ctx.clearRect(0, 0, width, height);
-      if (depts.length === 0) {
+      if (!axes || axes.length < 3) {
         drawNoData(ctx, width, height, noDataLabel);
-        geometryRef.current = null;
+        geoRef.current = null;
         return;
       }
-      const maxVal = Math.max(
-        ...depts.map((d) => (d.male || 0) + (d.female || 0)),
-        1,
-      );
-      const pad = { top: 14, bottom: 20, left: 4, right: 4 };
-      const chartH = height - pad.top - pad.bottom;
-      const gap = 8;
-      const barW = Math.max(
-        (width - pad.left - pad.right - gap * (depts.length - 1)) /
-          depts.length,
-        8,
-      );
-      geometryRef.current = { pad, barW, gap, count: depts.length };
 
-      depts.forEach((d, i) => {
-        const x = pad.left + i * (barW + gap);
-        const m = d.male || 0;
-        const f = d.female || 0;
-        const t = m + f || 1;
-        const totalH = (t / maxVal) * chartH * progress;
-        const mH = (m / t) * totalH;
-        const fH = totalH - mH;
-        const baseY = pad.top + chartH;
-        const isHover = hoverIndex === i;
+      const n = axes.length;
+      const cx = width / 2;
+      const cy = height / 2 + 2;
+      const R = Math.max(Math.min(width, height) / 2 - 24, 18);
+      const angleAt = (i) => -Math.PI / 2 + (2 * Math.PI * i) / n;
 
-        ctx.globalAlpha = isHover || hoverIndex == null ? 1 : 0.4;
-        ctx.fillStyle = FEMALE_COLOR;
-        roundRect(ctx, x, baseY - fH, barW, fH, 3);
+      // ── concentric rings (polygonal, alternating tint) ──
+      for (let ring = 4; ring >= 1; ring--) {
+        const rr = (R * ring) / 4;
+        ctx.beginPath();
+        for (let i = 0; i < n; i++) {
+          const a = angleAt(i);
+          const x = cx + rr * Math.cos(a);
+          const y = cy + rr * Math.sin(a);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = ring % 2 === 0 ? "rgba(20,97,73,0.035)" : "transparent";
         ctx.fill();
-        ctx.fillStyle = MALE_COLOR;
-        roundRect(ctx, x, baseY - totalH, barW, mH, 3);
-        ctx.fill();
-        ctx.globalAlpha = 1;
+        ctx.strokeStyle = "rgba(14,36,28,0.08)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      // ── spokes ──
+      ctx.strokeStyle = "rgba(14,36,28,0.07)";
+      for (let i = 0; i < n; i++) {
+        const a = angleAt(i);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + R * Math.cos(a), cy + R * Math.sin(a));
+        ctx.stroke();
+      }
+
+      // ── value polygon ──
+      const pts = axes.map((ax, i) => {
+        const raw = Math.max(0, Math.min(100, ax.value || 0)) / 100;
+        const v = raw * progress;
+        const a = angleAt(i);
+        return {
+          x: cx + R * v * Math.cos(a),
+          y: cy + R * v * Math.sin(a),
+          a,
+          raw,
+        };
+      });
+      geoRef.current = { cx, cy, R, pts, n, angleAt };
+
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, R);
+      grad.addColorStop(0, "rgba(30,138,99,0.32)");
+      grad.addColorStop(1, "rgba(20,97,73,0.10)");
+
+      ctx.beginPath();
+      pts.forEach((p, i) =>
+        i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y),
+      );
+      ctx.closePath();
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.save();
+      ctx.shadowColor = "rgba(20,97,73,0.35)";
+      ctx.shadowBlur = 8;
+      ctx.strokeStyle = T.teal;
+      ctx.lineWidth = 2.2;
+      ctx.lineJoin = "round";
+      ctx.stroke();
+      ctx.restore();
+
+      // ── vertices + outer labels ──
+      pts.forEach((p, i) => {
+        const isHover = hover === i;
+        const color = axes[i].color || T.teal;
 
         if (isHover) {
-          ctx.fillStyle = T.ink;
-          ctx.font = `700 8px ${T.mono}`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "bottom";
-          ctx.fillText(t, x + barW / 2, baseY - totalH - 4);
+          const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 12);
+          glow.addColorStop(0, `${color}55`);
+          glow.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 12, 0, 2 * Math.PI);
+          ctx.fill();
         }
 
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, isHover ? 5 : 3.2, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.strokeStyle = T.white;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        const a = angleAt(i);
+        const lx = cx + (R + 13) * Math.cos(a);
+        const ly = cy + (R + 13) * Math.sin(a);
+        const cos = Math.cos(a);
         ctx.fillStyle = isHover ? T.ink : T.inkSoft;
-        ctx.font = `${isHover ? 700 : 600} 8px ${T.sans}`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "top";
-        const label = d.name.length > 9 ? d.name.slice(0, 9) + "…" : d.name;
-        ctx.fillText(label, x + barW / 2, baseY + 4);
+        ctx.font = `${isHover ? 800 : 600} 8px ${T.sans}`;
+        ctx.textAlign = cos > 0.3 ? "left" : cos < -0.3 ? "right" : "center";
+        ctx.textBaseline = "middle";
+        const short =
+          axes[i].short.length > 11
+            ? axes[i].short.slice(0, 11) + "…"
+            : axes[i].short;
+        ctx.fillText(short, lx, ly);
       });
+
+      // ── centre score (hidden while a vertex is hovered) ──
+      if (hover == null) {
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = T.ink;
+        ctx.font = `800 17px ${T.mono}`;
+        ctx.fillText(`${Math.round(average * progress)}`, cx, cy - 4);
+        ctx.fillStyle = T.inkLight;
+        ctx.font = `600 6.5px ${T.sans}`;
+        ctx.fillText(averageLabel, cx, cy + 9);
+      } else {
+        const p = pts[hover];
+        drawBadge(
+          ctx,
+          p.x,
+          p.y,
+          [axes[hover].short, `${axes[hover].value}%`],
+          axes[hover].color || T.brassLight,
+          width,
+        );
+      }
     },
-    [depts, noDataLabel],
+    [axes, noDataLabel, average, averageLabel],
   );
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || loading || !size.width || !size.height) return;
     let start = null;
-    const duration = 700;
+    const duration = 900;
     cancelAnimationFrame(rafRef.current);
     const frame = (ts) => {
       if (!start) start = ts;
@@ -1168,121 +1297,343 @@ const GenderStackedBar = memo(function GenderStackedBar({
     };
     rafRef.current = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [depts, loading, draw, size.width, size.height]);
+  }, [axes, loading, draw, size.width, size.height]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || loading || !geometryRef.current || !size.width) return;
+    if (!canvas || loading || !geoRef.current || !size.width) return;
     const ctx = prepCanvas(canvas, size.width, size.height);
     draw(ctx, size.width, size.height, 1, hoverIdx);
   }, [hoverIdx, draw, loading, size.width, size.height]);
 
   return (
-    <div className="op-stacked-wrap">
+    <div className="op-radar-wrap">
       <div
         className="op-canvas-box op-canvas-box-interactive"
         onMouseMove={(e) => {
-          const geo = geometryRef.current;
+          const geo = geoRef.current;
           if (!geo) return;
           const rect = canvasRef.current.getBoundingClientRect();
           const x = e.clientX - rect.left;
-          const idx = Math.floor((x - geo.pad.left) / (geo.barW + geo.gap));
-          setHoverIdx(idx >= 0 && idx < geo.count ? idx : null);
+          const y = e.clientY - rect.top;
+          // Pick the axis whose direction the pointer sits closest to,
+          // measured from the centre — works anywhere in the wedge.
+          const dx = x - geo.cx;
+          const dy = y - geo.cy;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 8 || dist > geo.R + 20) {
+            setHoverIdx(null);
+            return;
+          }
+          const ang = Math.atan2(dy, dx);
+          let best = 0;
+          let bestDiff = Infinity;
+          for (let i = 0; i < geo.n; i++) {
+            let diff = Math.abs(ang - geo.angleAt(i));
+            diff = Math.min(diff, 2 * Math.PI - diff);
+            if (diff < bestDiff) {
+              bestDiff = diff;
+              best = i;
+            }
+          }
+          setHoverIdx(bestDiff < Math.PI / geo.n ? best : null);
         }}
         onMouseLeave={() => setHoverIdx(null)}
       >
         <canvas ref={canvasRef} />
       </div>
-      <div className="op-stacked-legend">
-        <span>
-          <i style={{ background: MALE_COLOR }} />
-          {maleLabel}
-        </span>
-        <span>
-          <i style={{ background: FEMALE_COLOR }} />
-          {femaleLabel}
-        </span>
+      <div className="op-radar-legend">
+        {axes.map((a, i) => (
+          <div
+            key={a.key}
+            className={`op-radar-chip${hoverIdx === i ? " op-radar-chip-active" : ""}`}
+            onMouseEnter={() => setHoverIdx(i)}
+            onMouseLeave={() => setHoverIdx(null)}
+          >
+            <span className="op-radar-dot" style={{ background: a.color }} />
+            <span className="op-radar-name">{a.label}</span>
+            <span className="op-radar-val" style={{ color: a.color }}>
+              {a.value}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
 });
 
-// ─── Activity Heatmap (day-of-week x weeks grid) ─────────────
-const ActivityHeatmap = memo(function ActivityHeatmap({
-  weeklyTrend,
-  dayLabels,
+// ════════════════════════════════════════════════════════════
+// NEW ② — MomentumChart (replaces the activity heatmap)
+// ════════════════════════════════════════════════════════════
+// Cumulative services across the week, drawn against a dashed "ideal pace"
+// line. Running above the dashed line means the week is ahead of an even
+// daily split; below means it's behind. Hover any day for that day's own
+// volume plus the running total. Three mini-stats sit underneath.
+const MomentumChart = memo(function MomentumChart({
+  data,
+  loading,
   noDataLabel,
+  labels,
 }) {
-  const weeks = useMemo(() => {
-    if (!weeklyTrend || weeklyTrend.length === 0) return [];
-    const cols = 4;
-    return Array.from({ length: cols }, (_, w) =>
-      weeklyTrend.map((d, i) => {
-        const jitter = w === cols - 1 ? 1 : 0.55 + ((i * 7 + w * 13) % 10) / 20;
-        return Math.round(d.value * jitter);
-      }),
-    );
-  }, [weeklyTrend]);
+  const canvasRef = useRef(null);
+  const rafRef = useRef(null);
+  const geoRef = useRef(null);
+  const [hoverIdx, setHoverIdx] = useState(null);
+  const size = useElementSize(canvasRef, [loading, data]);
 
-  const max = useMemo(() => Math.max(1, ...weeks.flat()), [weeks]);
+  const summary = useMemo(() => {
+    const values = (data || []).map((d) => d.value || 0);
+    if (values.length === 0) {
+      return { total: 0, best: null, avg: 0, delta: 0 };
+    }
+    const total = values.reduce((a, b) => a + b, 0);
+    let bestIdx = 0;
+    values.forEach((v, i) => {
+      if (v > values[bestIdx]) bestIdx = i;
+    });
+    const half = Math.max(1, Math.floor(values.length / 2));
+    const first = values.slice(0, half).reduce((a, b) => a + b, 0);
+    const last = values.slice(-half).reduce((a, b) => a + b, 0);
+    const delta = first > 0 ? Math.round(((last - first) / first) * 100) : 0;
+    return {
+      total,
+      best: { label: data[bestIdx].label, value: values[bestIdx] },
+      avg: Math.round(total / values.length),
+      delta,
+    };
+  }, [data]);
 
-  if (!weeklyTrend || weeklyTrend.length === 0) {
-    return <div className="op-heatmap-empty">{noDataLabel}</div>;
-  }
+  const draw = useCallback(
+    (ctx, width, height, progress, hover) => {
+      ctx.clearRect(0, 0, width, height);
+      if (!data || data.length === 0 || data.every((d) => !d.value)) {
+        drawNoData(ctx, width, height, noDataLabel);
+        geoRef.current = null;
+        return;
+      }
 
-  const stops = [T.canvasDeep, T.tealLight, T.tealBright, T.teal, T.tealDeep];
-  const cellColor = (v) => {
-    const pct = v / max;
-    if (pct <= 0) return T.canvasDeep;
-    const idx = Math.min(stops.length - 1, Math.ceil(pct * (stops.length - 1)));
-    return stops[idx];
-  };
+      const pad = { top: 14, bottom: 18, left: 6, right: 6 };
+      const chartW = width - pad.left - pad.right;
+      const chartH = height - pad.top - pad.bottom;
+
+      let run = 0;
+      const cum = data.map((d) => (run += d.value || 0));
+      const total = run || 1;
+      const step = data.length > 1 ? chartW / (data.length - 1) : 0;
+      const baseY = pad.top + chartH;
+
+      const pts = cum.map((v, i) => ({
+        x: pad.left + i * step,
+        y: baseY - (v / total) * chartH,
+      }));
+      geoRef.current = { pts, pad, step, cum, count: data.length };
+
+      // horizontal grid
+      ctx.strokeStyle = "rgba(14,36,28,0.05)";
+      ctx.lineWidth = 1;
+      for (let g = 0; g <= 3; g++) {
+        const gy = pad.top + (chartH / 3) * g;
+        ctx.beginPath();
+        ctx.moveTo(pad.left, gy);
+        ctx.lineTo(width - pad.right, gy);
+        ctx.stroke();
+      }
+
+      // ideal-pace reference line (even split across the period)
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = "rgba(200,155,60,0.7)";
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(pad.left, baseY);
+      ctx.lineTo(pts[pts.length - 1].x, pad.top);
+      ctx.stroke();
+      ctx.restore();
+
+      // reveal clip
+      const revealX = pad.left + chartW * progress;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(0, 0, revealX, height);
+      ctx.clip();
+
+      const curve = () => {
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const p0 = pts[i - 1] || pts[i];
+          const p1 = pts[i];
+          const p2 = pts[i + 1];
+          const p3 = pts[i + 2] || p2;
+          ctx.bezierCurveTo(
+            p1.x + (p2.x - p0.x) / 6,
+            p1.y + (p2.y - p0.y) / 6,
+            p2.x - (p3.x - p1.x) / 6,
+            p2.y - (p3.y - p1.y) / 6,
+            p2.x,
+            p2.y,
+          );
+        }
+      };
+
+      const areaGrad = ctx.createLinearGradient(0, pad.top, 0, baseY);
+      areaGrad.addColorStop(0, "rgba(30,138,99,0.34)");
+      areaGrad.addColorStop(0.55, "rgba(20,97,73,0.12)");
+      areaGrad.addColorStop(1, "rgba(20,97,73,0)");
+
+      curve();
+      ctx.lineTo(pts[pts.length - 1].x, baseY);
+      ctx.lineTo(pts[0].x, baseY);
+      ctx.closePath();
+      ctx.fillStyle = areaGrad;
+      ctx.fill();
+
+      curve();
+      const lineGrad = ctx.createLinearGradient(pad.left, 0, width, 0);
+      lineGrad.addColorStop(0, T.tealBright);
+      lineGrad.addColorStop(1, T.brass);
+      ctx.strokeStyle = lineGrad;
+      ctx.lineWidth = 2.6;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.shadowColor = "rgba(20,97,73,0.3)";
+      ctx.shadowBlur = 7;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+      ctx.restore();
+
+      // markers + day labels
+      pts.forEach((p, i) => {
+        if (p.x > revealX + 0.5) return;
+        const isLast = i === pts.length - 1;
+        const isHover = hover === i;
+        const radius = isHover ? 5.5 : isLast ? 4.5 : 2.8;
+
+        if (isLast || isHover) {
+          const glow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 11);
+          glow.addColorStop(
+            0,
+            isHover ? "rgba(20,97,73,0.26)" : "rgba(200,155,60,0.22)",
+          );
+          glow.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 11, 0, 2 * Math.PI);
+          ctx.fill();
+        }
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = isHover ? T.tealDeep : isLast ? T.brass : T.teal;
+        ctx.fill();
+        ctx.strokeStyle = T.white;
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+
+        ctx.fillStyle = isHover ? T.ink : T.inkSoft;
+        ctx.font = `${isHover ? 700 : 500} 7px ${T.mono}`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "top";
+        ctx.fillText(data[i].label, p.x, baseY + 5);
+      });
+
+      if (hover != null && pts[hover] && pts[hover].x <= revealX + 0.5) {
+        drawBadge(
+          ctx,
+          pts[hover].x,
+          pts[hover].y,
+          [`${data[hover].label} · +${data[hover].value}`, `Σ ${cum[hover]}`],
+          T.brassLight,
+          width,
+        );
+      }
+    },
+    [data, noDataLabel],
+  );
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || loading || !size.width || !size.height) return;
+    let start = null;
+    const duration = 900;
+    cancelAnimationFrame(rafRef.current);
+    const frame = (ts) => {
+      if (!start) start = ts;
+      const progress = Math.min((ts - start) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const ctx = prepCanvas(canvas, size.width, size.height);
+      draw(ctx, size.width, size.height, eased, null);
+      if (progress < 1) rafRef.current = requestAnimationFrame(frame);
+    };
+    rafRef.current = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [data, loading, draw, size.width, size.height]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || loading || !geoRef.current || !size.width) return;
+    const ctx = prepCanvas(canvas, size.width, size.height);
+    draw(ctx, size.width, size.height, 1, hoverIdx);
+  }, [hoverIdx, draw, loading, size.width, size.height]);
+
+  const up = summary.delta >= 0;
 
   return (
-    <div className="op-heatmap">
-      {/* Week header row */}
-      <div className="op-heatmap-weekrow">
-        <span className="op-heatmap-daylabel" />
-        <div className="op-heatmap-cells">
-          {weeks.map((_, w) => (
-            <span key={w} className="op-heatmap-weeklabel">
-              W{w + 1}
-            </span>
-          ))}
+    <div className="op-momentum-wrap">
+      <div
+        className="op-canvas-box op-canvas-box-interactive"
+        onMouseMove={(e) => {
+          const geo = geoRef.current;
+          if (!geo) return;
+          const rect = canvasRef.current.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          let nearest = 0;
+          let minDist = Infinity;
+          geo.pts.forEach((p, i) => {
+            const d = Math.abs(p.x - x);
+            if (d < minDist) {
+              minDist = d;
+              nearest = i;
+            }
+          });
+          setHoverIdx(minDist < 25 ? nearest : null);
+        }}
+        onMouseLeave={() => setHoverIdx(null)}
+      >
+        <canvas ref={canvasRef} />
+      </div>
+      <div className="op-momentum-stats">
+        <div className="op-momentum-stat">
+          <span className="op-momentum-stat-val">{summary.total}</span>
+          <span className="op-momentum-stat-label">{labels.cumulative}</span>
         </div>
-      </div>
-
-      <div className="op-heatmap-rows">
-        {dayLabels.map((label, r) => (
-          <div className="op-heatmap-row" key={label}>
-            <span className="op-heatmap-daylabel">{label}</span>
-            <div className="op-heatmap-cells">
-              {weeks.map((week, w) => (
-                <div
-                  key={w}
-                  className="op-heatmap-cell"
-                  style={{ background: cellColor(week[r] || 0) }}
-                  title={`${label} · W${w + 1}: ${week[r] || 0}`}
-                >
-                  <span className="op-heatmap-cell-val">{week[r] || 0}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div className="op-heatmap-legend">
-        <span className="op-heatmap-legend-label">Low</span>
-        {stops.map((c, i) => (
+        <div className="op-momentum-stat">
+          <span className="op-momentum-stat-val">
+            {summary.best ? summary.best.value : 0}
+          </span>
+          <span className="op-momentum-stat-label">
+            {labels.bestDay}
+            {summary.best ? ` · ${summary.best.label}` : ""}
+          </span>
+        </div>
+        <div className="op-momentum-stat">
           <span
-            key={i}
-            className="op-heatmap-legend-swatch"
-            style={{ background: c }}
-          />
-        ))}
-        <span className="op-heatmap-legend-label">High</span>
+            className="op-momentum-stat-val"
+            style={{ color: up ? T.tealBright : T.clay }}
+          >
+            <FiTrendingUp
+              size={11}
+              style={{
+                marginRight: 3,
+                verticalAlign: -1,
+                transform: up ? "none" : "scaleY(-1)",
+              }}
+            />
+            {up ? "+" : ""}
+            {summary.delta}%
+          </span>
+          <span className="op-momentum-stat-label">{labels.vsStart}</span>
+        </div>
       </div>
     </div>
   );
@@ -1498,6 +1849,9 @@ export default function Dashboard({ t: tProp }) {
           });
         });
 
+        // male/female are kept on every department object even though no
+        // chart splits by gender right now — the rail gauge uses the totals
+        // and a future per-department gender view needs these intact.
         let departments = Object.entries(deptMap)
           .map(([name, value]) => ({
             name,
@@ -1691,12 +2045,82 @@ export default function Dashboard({ t: tProp }) {
   );
 
   const agendas = t?.("agendas") || [];
-  const dayLabels = useMemo(
-    () =>
-      localizedWeeklyTrend.length
-        ? localizedWeeklyTrend.map((d) => d.label)
-        : WEEKDAY_LABELS[language] || WEEKDAY_LABELS.en,
-    [localizedWeeklyTrend, language],
+
+  // ── Operational-health radar axes ────────────────────────
+  // Every axis is a deterministic function of data already on this page —
+  // no random values, so two people looking at the same week see the same
+  // shape. Axis meanings:
+  //   quality     — Golden Monday average session rating, scaled to 100
+  //   throughput  — average daily volume as a share of the week's best day
+  //   breadth     — how many departments are reporting (8 = full coverage)
+  //   equity      — gender balance of people served (50/50 scores 100)
+  //   consistency — inverse coefficient of variation across the 7 days
+  const radarAxes = useMemo(() => {
+    const values = stats.weeklyTrend.map((d) => d.value || 0);
+    const maxDay = Math.max(1, ...values);
+    const avgDay = values.length
+      ? values.reduce((a, b) => a + b, 0) / values.length
+      : 0;
+    const mean = avgDay || 1;
+    const variance = values.length
+      ? values.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / values.length
+      : 0;
+    const cv = Math.sqrt(variance) / mean;
+
+    const clamp = (v) => Math.max(0, Math.min(100, Math.round(v)));
+
+    const defs = [
+      {
+        key: "quality",
+        label: td("signalQuality", "Service quality"),
+        short: td("signalQualityShort", "Quality"),
+        value: clamp(((goldenMondayStats.avgRating || 0) / 5) * 100),
+      },
+      {
+        key: "throughput",
+        label: td("signalThroughput", "Daily throughput"),
+        short: td("signalThroughputShort", "Volume"),
+        value: clamp((avgDay / maxDay) * 100),
+      },
+      {
+        key: "breadth",
+        label: td("signalBreadth", "Department coverage"),
+        short: td("signalBreadthShort", "Coverage"),
+        value: clamp(Math.min(localizedDepartments.length / 8, 1) * 100),
+      },
+      {
+        key: "equity",
+        label: td("signalEquity", "Gender balance"),
+        short: td("signalEquityShort", "Balance"),
+        value: clamp(100 - Math.abs(50 - malePct) * 2),
+      },
+      {
+        key: "consistency",
+        label: td("signalConsistency", "Day-to-day consistency"),
+        short: td("signalConsistencyShort", "Steady"),
+        value: clamp((1 - cv) * 100),
+      },
+    ];
+
+    return defs.map((d, i) => ({
+      ...d,
+      color: RADAR_COLORS[i % RADAR_COLORS.length],
+    }));
+  }, [
+    stats.weeklyTrend,
+    goldenMondayStats.avgRating,
+    localizedDepartments.length,
+    malePct,
+    td,
+  ]);
+
+  const momentumLabels = useMemo(
+    () => ({
+      cumulative: td("cumulative", "Cumulative"),
+      bestDay: td("bestDay", "Best day"),
+      vsStart: td("vsStart", "vs. week start"),
+    }),
+    [td],
   );
 
   if (loading) {
@@ -1804,41 +2228,40 @@ export default function Dashboard({ t: tProp }) {
             </section>
           </div>
 
-          {/* Extra row — the two attention-grabbing new charts */}
+          {/* Extra row — radar + momentum (replaces gender bar + heatmap) */}
           <div className="op-extra-row">
-            <section className="op-panel op-panel-gender">
+            <section className="op-panel op-panel-radar">
               <div className="op-panel-head">
                 <span>
-                  <FiUsers size={13} />{" "}
-                  {td("genderBreakdown", "Gender Breakdown")}
+                  <FiTarget size={13} />{" "}
+                  {td("healthRadar", "Operational Health")}
                 </span>
                 <span className="op-panel-sub">
-                  {td("byDept", "By department")}
+                  {td("fiveSignals", "Five live signals")}
                 </span>
               </div>
-              <GenderStackedBar
-                departments={localizedDepartments}
+              <CriteriaRadar
+                axes={radarAxes}
                 loading={loading}
                 noDataLabel={noDataLabel}
-                maleLabel={td("male", "Male")}
-                femaleLabel={td("female", "Female")}
+                averageLabel={td("indexLabel", "INDEX")}
               />
             </section>
 
-            <section className="op-panel op-panel-heatmap">
+            <section className="op-panel op-panel-momentum">
               <div className="op-panel-head">
                 <span>
-                  <FiGrid size={13} />{" "}
-                  {td("activityHeatmap", "Activity Heatmap")}
+                  <FiZap size={13} /> {td("growthMomentum", "Weekly Momentum")}
                 </span>
                 <span className="op-panel-sub">
-                  {td("byDayOfWeek", "By day of week")}
+                  {td("vsIdealPace", "vs. ideal pace")}
                 </span>
               </div>
-              <ActivityHeatmap
-                weeklyTrend={localizedWeeklyTrend}
-                dayLabels={dayLabels}
+              <MomentumChart
+                data={localizedWeeklyTrend}
+                loading={loading}
                 noDataLabel={noDataLabel}
+                labels={momentumLabels}
               />
             </section>
           </div>
@@ -2088,30 +2511,48 @@ const shellStyles = `
   .op-legend-pct { font-family: ${T.mono}; font-weight: 600; color: ${T.inkSoft}; font-size: 8.5px; }
   .op-legend-empty { grid-column: 1 / -1; font-size: 9px; color: ${T.inkSoft}; text-align: center; padding: 2px 0; }
 
-  /* STACKED BAR */
-  .op-stacked-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .op-stacked-legend { display: flex; gap: 10px; justify-content: center; margin-top: 3px; flex-shrink: 0; }
-  .op-stacked-legend span { display: flex; align-items: center; gap: 4px; font-size: 9px; color: ${T.inkSoft}; font-weight: 600; }
-  .op-stacked-legend i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
-
- /* HEATMAP */
-  .op-heatmap { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 3px; min-height: 0; overflow: hidden; }
-  .op-heatmap-weekrow { display: flex; align-items: center; gap: 5px; }
-  .op-heatmap-weeklabel { flex: 1; text-align: center; font-size: 7px; color: ${T.inkLight}; font-weight: 600; }
-  .op-heatmap-rows { display: flex; flex-direction: column; gap: 3px; }
-  .op-heatmap-row { display: flex; align-items: center; gap: 5px; }
-  .op-heatmap-daylabel { width: 26px; font-size: 8px; color: ${T.inkSoft}; font-weight: 700; flex-shrink: 0; }
-  .op-heatmap-cells { display: flex; gap: 3px; flex: 1; }
-  .op-heatmap-cell {
-    flex: 1; aspect-ratio: 1.4; border-radius: 4px; transition: transform 0.15s ease;
-    display: flex; align-items: center; justify-content: center;
+  /* ── OPERATIONAL HEALTH RADAR (replaces the gender stacked bar) ── */
+  .op-radar-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .op-radar-legend {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2px 6px;
+    margin-top: 4px;
+    flex-shrink: 0;
+    max-height: 46px;
+    overflow-y: auto;
   }
-  .op-heatmap-cell:hover { transform: scale(1.15); }
-  .op-heatmap-cell-val { font-size: 7px; font-weight: 700; color: rgba(255,255,255,0.9); font-family: ${T.mono}; }
-  .op-heatmap-empty { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 10px; color: ${T.inkSoft}; }
-  .op-heatmap-legend { display: flex; align-items: center; gap: 3px; justify-content: center; margin-top: 2px; flex-shrink: 0; }
-  .op-heatmap-legend-swatch { width: 10px; height: 8px; border-radius: 2px; }
-  .op-heatmap-legend-label { font-size: 6.5px; color: ${T.inkLight}; font-weight: 600; margin: 0 2px; }
+  .op-radar-legend::-webkit-scrollbar { width: 2px; }
+  .op-radar-legend::-webkit-scrollbar-thumb { background: ${T.mist}; border-radius: 2px; }
+  .op-radar-chip {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 9px; padding: 2px 4px; border-radius: 4px;
+    cursor: default; transition: background 0.15s ease;
+  }
+  .op-radar-chip:hover, .op-radar-chip-active { background: rgba(20,97,73,0.07); }
+  .op-radar-dot { width: 6px; height: 6px; border-radius: 2px; flex-shrink: 0; }
+  .op-radar-name {
+    flex: 1; min-width: 0; color: ${T.inkSoft}; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .op-radar-val { font-family: ${T.mono}; font-weight: 800; font-size: 10px; flex-shrink: 0; }
+
+  /* ── WEEKLY MOMENTUM (replaces the activity heatmap) ── */
+  .op-momentum-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .op-momentum-stats { display: flex; gap: 5px; margin-top: 4px; flex-shrink: 0; }
+  .op-momentum-stat {
+    flex: 1; min-width: 0;
+    background: ${T.canvas}; border-radius: 7px; padding: 4px 6px;
+    display: flex; flex-direction: column; gap: 1px;
+  }
+  .op-momentum-stat-val {
+    font-family: ${T.mono}; font-weight: 800; font-size: 12.5px; color: ${T.ink};
+    line-height: 1.1; white-space: nowrap;
+  }
+  .op-momentum-stat-label {
+    font-size: 8px; color: ${T.inkSoft}; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
 
   /* RADIAL GAUGE */
   .op-radial-gauge { display: flex; flex-direction: column; align-items: center; gap: 1px; flex-shrink: 0; }
@@ -2173,6 +2614,9 @@ const shellStyles = `
     .op-charts-grid { grid-template-columns: 1fr; grid-template-rows: none; gap: 6px; }
     .op-extra-row { grid-template-columns: 1fr; gap: 6px; }
     .op-panel { min-height: 160px; padding: 6px 8px 4px; }
+    /* The radar needs more vertical room than a bar chart to stay legible. */
+    .op-panel-radar { min-height: 230px; }
+    .op-panel-momentum { min-height: 200px; }
 
     .op-rail-right { flex-direction: column; }
     .op-rail-right > * { flex: none; }
@@ -2184,6 +2628,7 @@ const shellStyles = `
     .op-greeting { font-size: 12px; }
     .op-ai-banner { max-height: none; }
     .op-legend { grid-template-columns: 1fr 1fr; max-height: 44px; }
+    .op-radar-legend { grid-template-columns: 1fr 1fr; max-height: none; }
   }
 
   @media (max-width: 480px) {
@@ -2199,9 +2644,14 @@ const shellStyles = `
     .op-criteria-pct { font-size: 11px; }
     .op-criteria-name { font-size: 8.5px; }
     .op-panel { padding: 4px 6px 3px; min-height: 140px; }
+    .op-panel-radar { min-height: 215px; }
+    .op-panel-momentum { min-height: 190px; }
     .op-panel-head { font-size: 10px; }
     .op-legend { grid-template-columns: 1fr; max-height: 56px; }
     .op-legend-item { font-size: 8px; }
     .op-legend-val { font-size: 9px; }
+    .op-radar-legend { grid-template-columns: 1fr; }
+    .op-momentum-stat-val { font-size: 11px; }
+    .op-momentum-stat-label { font-size: 7.5px; }
   }
 `;
