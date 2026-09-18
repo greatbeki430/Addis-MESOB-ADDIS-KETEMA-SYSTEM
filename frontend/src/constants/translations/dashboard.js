@@ -39,7 +39,7 @@ export const dashboardTranslations = {
       totalPresented: "Presentations",
       avgRating: "Avg Rating",
 
-      // ── Added: Right panel / performance ──
+      // ── Right panel / performance ──
       performance: "Performance",
       overallScore: "Overall Score",
       basedOnRatings: "Based on session ratings",
@@ -50,17 +50,43 @@ export const dashboardTranslations = {
       recentActivity: "Recent Activity",
       logged: "logged",
 
-      // ── Added: Extra charts row ──
+      // ── Extra charts row ──
       monthlyTrend: "Monthly Trend",
       last12Months: "Last 12 months",
+
+      // Kept for backward compatibility — the gender stacked bar and the
+      // activity heatmap were replaced by the radar and momentum charts,
+      // but these keys stay so nothing referencing them breaks.
       genderBreakdown: "Gender Breakdown",
       activityHeatmap: "Activity Heatmap",
       byDayOfWeek: "By day of week",
 
-      // ── Added: Left rail agendas empty state ──
+      // ── Operational Health radar ──
+      healthRadar: "Operational Health",
+      fiveSignals: "Five live signals",
+      indexLabel: "INDEX",
+      signalQuality: "Service quality",
+      signalQualityShort: "Quality",
+      signalThroughput: "Daily throughput",
+      signalThroughputShort: "Volume",
+      signalBreadth: "Department coverage",
+      signalBreadthShort: "Coverage",
+      signalEquity: "Gender balance",
+      signalEquityShort: "Balance",
+      signalConsistency: "Day-to-day consistency",
+      signalConsistencyShort: "Steady",
+
+      // ── Weekly Momentum chart ──
+      growthMomentum: "Weekly Momentum",
+      vsIdealPace: "vs. ideal pace",
+      cumulative: "Cumulative",
+      bestDay: "Best day",
+      vsStart: "vs. week start",
+
+      // ── Left rail agendas empty state ──
       noAgendas: "No agendas yet",
 
-      // ── Added: Fallback demo department names (used only when no real data yet) ──
+      // ── Fallback demo department names (used only when no real data yet) ──
       deptCustomerService: "Customer Service",
       deptAdministration: "Administration",
       deptFinance: "Finance",
@@ -105,7 +131,7 @@ export const dashboardTranslations = {
       totalPresented: "የቀረቡ አቀራረቦች",
       avgRating: "አማካይ ደረጃ",
 
-      // ── Added: Right panel / performance ──
+      // ── Right panel / performance ──
       performance: "አፈጻጸም",
       overallScore: "አጠቃላይ ውጤት",
       basedOnRatings: "በክፍለ ጊዜ ደረጃዎች ላይ የተመሠረተ",
@@ -116,17 +142,41 @@ export const dashboardTranslations = {
       recentActivity: "የቅርብ ጊዜ እንቅስቃሴ",
       logged: "ተመዝግቧል",
 
-      // ── Added: Extra charts row ──
+      // ── Extra charts row ──
       monthlyTrend: "ወርሃዊ አዝማሚያ",
       last12Months: "የመጨረሻ 12 ወራት",
+
+      // የተተኩ ግራፎች — ቁልፎቹ ለተኳኋኝነት ተጠብቀዋል
       genderBreakdown: "በፆታ ስርጭት",
       activityHeatmap: "የእንቅስቃሴ ካርታ",
       byDayOfWeek: "በቀን",
 
-      // ── Added: Left rail agendas empty state ──
+      // ── የአሰራር ጤና ራዳር ──
+      healthRadar: "የአሰራር ጤና",
+      fiveSignals: "አምስት ቀጥታ አመልካቾች",
+      indexLabel: "ጠቋሚ",
+      signalQuality: "የአገልግሎት ጥራት",
+      signalQualityShort: "ጥራት",
+      signalThroughput: "ዕለታዊ መጠን",
+      signalThroughputShort: "መጠን",
+      signalBreadth: "የዘርፍ ሽፋን",
+      signalBreadthShort: "ሽፋን",
+      signalEquity: "የፆታ ሚዛን",
+      signalEquityShort: "ሚዛን",
+      signalConsistency: "የቀን ወጥነት",
+      signalConsistencyShort: "ወጥነት",
+
+      // ── ሳምንታዊ ሞመንተም ──
+      growthMomentum: "ሳምንታዊ ሞመንተም",
+      vsIdealPace: "ከተጠበቀው ፍጥነት ጋር",
+      cumulative: "ድምር",
+      bestDay: "ከፍተኛ ቀን",
+      vsStart: "ከሳምንቱ መጀመሪያ",
+
+      // ── Left rail agendas empty state ──
       noAgendas: "እስካሁን ምንም አጀንዳ የለም",
 
-      // ── Added: Fallback demo department names (used only when no real data yet) ──
+      // ── Fallback demo department names (used only when no real data yet) ──
       deptCustomerService: "የደንበኞች አገልግሎት",
       deptAdministration: "አስተዳደር",
       deptFinance: "ፋይናንስ",
@@ -171,7 +221,7 @@ export const dashboardTranslations = {
       totalPresented: "Dhiheessaa",
       avgRating: "Sadarkaa Giddugaleessaa",
 
-      // ── Added: Right panel / performance ──
+      // ── Right panel / performance ──
       performance: "Raawwii",
       overallScore: "Qabxii Waliigalaa",
       basedOnRatings: "Sadarkaa walga'ii irratti hundaa'e",
@@ -182,17 +232,41 @@ export const dashboardTranslations = {
       recentActivity: "Sochii Dhiyoo",
       logged: "galmeeffame",
 
-      // ── Added: Extra charts row ──
+      // ── Extra charts row ──
       monthlyTrend: "Haalli Ji'aa",
       last12Months: "Ji'oota 12 darban",
+
+      // Chaartiiwwan bakka bu'an — furtuuwwan walsimuuf turan
       genderBreakdown: "Qooddama Saalaa",
       activityHeatmap: "Kaartaa Sochii",
       byDayOfWeek: "Guyyaan",
 
-      // ── Added: Left rail agendas empty state ──
+      // ── Raadaara Fayyaa Hojii ──
+      healthRadar: "Fayyaa Hojii",
+      fiveSignals: "Mallattoo shan kallattii",
+      indexLabel: "INDEKSII",
+      signalQuality: "Qulqullina tajaajilaa",
+      signalQualityShort: "Qulqullina",
+      signalThroughput: "Baay'ina guyyaa",
+      signalThroughputShort: "Baay'ina",
+      signalBreadth: "Haguuggii kutaa",
+      signalBreadthShort: "Haguuggii",
+      signalEquity: "Madaallii saalaa",
+      signalEquityShort: "Madaallii",
+      signalConsistency: "Wal-simannaa guyyaa",
+      signalConsistencyShort: "Wal-sima",
+
+      // ── Momentum Torbanii ──
+      growthMomentum: "Momentum Torbanii",
+      vsIdealPace: "saffisa eegamaa waliin",
+      cumulative: "Ida'ama",
+      bestDay: "Guyyaa olaanaa",
+      vsStart: "jalqaba torbanii irraa",
+
+      // ── Left rail agendas empty state ──
       noAgendas: "Ajandaan hin jiru",
 
-      // ── Added: Fallback demo department names (used only when no real data yet) ──
+      // ── Fallback demo department names (used only when no real data yet) ──
       deptCustomerService: "Tajaajila Maamiltootaa",
       deptAdministration: "Bulchiinsa",
       deptFinance: "Faayinaansii",

@@ -59,8 +59,11 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
   //
   // Optional fields (sessionNumber, subtitle, department,
   // description, weekOf, qrDataUrl) are declared here with empty
-  // defaults so the Studio template always gets a full shape and
-  // the input elements below stay controlled.
+  // defaults so every template always gets a full shape and the
+  // input elements below stay controlled. All three templates
+  // (Classic Blue, Modern Minimal, Studio) now read these when
+  // present, so the inputs for them are NOT gated to Studio — see
+  // the "Optional content" section below.
   const [form, setForm] = useState({
     presenterName: "",
     title: "",
@@ -117,8 +120,8 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
 
   // ── Initialise form from session ────────────────────────────
   // Pre-populates any optional field the session carries. Missing
-  // fields stay as their empty default — the template treats empty
-  // strings as "don't draw this".
+  // fields stay as their empty default — every template treats
+  // empty strings as "don't draw this".
   useEffect(() => {
     if (!isOpen || !session) return;
 
@@ -255,6 +258,30 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
     const reader = new FileReader();
     reader.onload = () => setPhotoSrc(reader.result);
     reader.readAsDataURL(file);
+  }, []);
+
+  // ── QR code upload ──────────────────────────────────────────
+  // Same pattern as the photo upload: reads a small image file to a
+  // data URL and stores it directly in form.qrDataUrl. No QR
+  // generation happens here — the coordinator brings a
+  // pre-generated QR image (e.g. exported from a QR tool pointed at
+  // the registration link) and this just attaches it to the poster.
+  // All three templates render it in the footer when present, or
+  // fall back to their own ornamental footer mark when absent.
+  const handleQrUpload = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file for the QR code.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setForm((f) => ({ ...f, qrDataUrl: reader.result }));
+    reader.readAsDataURL(file);
+  }, []);
+
+  const clearQrCode = useCallback(() => {
+    setForm((f) => ({ ...f, qrDataUrl: "" }));
   }, []);
 
   // ── Submit ──────────────────────────────────────────────────
@@ -611,7 +638,10 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
               </div>
             </Field>
 
-            {/* Studio-only controls: theme + reset */}
+            {/* Studio-only controls: theme + reset. Everything below
+                this (optional content, dates, etc.) applies to all
+                three templates — only the drag layout and colour
+                theme are Studio-specific. */}
             {isStudio && (
               <>
                 <Field label="Colour theme">
@@ -777,61 +807,134 @@ export default function PosterStudio({ isOpen, onClose, session, onPosted }) {
               )}
             </Field>
 
-            {/* ─── Optional fields, read by the Studio template only ─── */}
-            {/* These are new. Other templates ignore them. */}
-            {isStudio && (
-              <>
-                <Field label="Session number">
-                  <input
-                    type="number"
-                    value={form.sessionNumber}
-                    onChange={(e) =>
-                      setForm({ ...form, sessionNumber: e.target.value })
-                    }
-                    placeholder="e.g. 42"
-                    style={inputStyle}
-                  />
-                </Field>
+            {/* ─── Optional content ───────────────────────────────
+                Read by all three templates (Classic Blue, Modern
+                Minimal, Studio) — each one falls back gracefully
+                when a field is empty, so these are safe to show
+                regardless of which template is selected. Previously
+                gated to `isStudio`; that gate is removed because it
+                silently prevented setting these fields for the
+                other two templates even though they now render
+                them. */}
+            <Field label="Session number">
+              <input
+                type="number"
+                value={form.sessionNumber}
+                onChange={(e) =>
+                  setForm({ ...form, sessionNumber: e.target.value })
+                }
+                placeholder="e.g. 42"
+                style={inputStyle}
+              />
+            </Field>
 
-                <Field label="Subtitle (under presenter name)">
-                  <input
-                    value={form.subtitle}
-                    onChange={(e) =>
-                      setForm({ ...form, subtitle: e.target.value })
-                    }
-                    placeholder="Optional — e.g. Distinguished Lecturer"
-                    style={inputStyle}
-                  />
-                </Field>
+            <Field label="Subtitle (under presenter name)">
+              <input
+                value={form.subtitle}
+                onChange={(e) => setForm({ ...form, subtitle: e.target.value })}
+                placeholder="Optional — e.g. Distinguished Lecturer"
+                style={inputStyle}
+              />
+            </Field>
 
-                <Field label="Department">
-                  <input
-                    value={form.department}
-                    onChange={(e) =>
-                      setForm({ ...form, department: e.target.value })
-                    }
-                    placeholder="Optional — e.g. Urban Planning"
-                    style={inputStyle}
-                  />
-                </Field>
+            <Field label="Department">
+              <input
+                value={form.department}
+                onChange={(e) =>
+                  setForm({ ...form, department: e.target.value })
+                }
+                placeholder="Optional — e.g. Urban Planning"
+                style={inputStyle}
+              />
+            </Field>
 
-                <Field label="Description (short)">
-                  <textarea
-                    value={form.description}
-                    onChange={(e) =>
-                      setForm({ ...form, description: e.target.value })
-                    }
-                    placeholder="Optional — one line under the topic"
-                    rows={2}
-                    style={{
-                      ...inputStyle,
-                      resize: "vertical",
-                      fontFamily: "inherit",
-                    }}
+            <Field label="Description (short)">
+              <textarea
+                value={form.description}
+                onChange={(e) =>
+                  setForm({ ...form, description: e.target.value })
+                }
+                placeholder="Optional — one line under the topic"
+                rows={2}
+                style={{
+                  ...inputStyle,
+                  resize: "vertical",
+                  fontFamily: "inherit",
+                }}
+              />
+            </Field>
+
+            <Field label="Week of">
+              <input
+                type="date"
+                value={form.weekOf}
+                onChange={(e) => setForm({ ...form, weekOf: e.target.value })}
+                style={inputStyle}
+              />
+              <p style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                Optional — shown as a small "Week of …" line on the poster.
+                Independent of the session date above.
+              </p>
+            </Field>
+
+            <Field label="QR code (optional)">
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <label
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "8px 14px",
+                    borderRadius: 8,
+                    border: `1.5px solid ${C.border}`,
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontSize: 13,
+                  }}
+                >
+                  <FiUpload size={14} />
+                  Upload QR image
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleQrUpload}
+                    style={{ display: "none" }}
                   />
-                </Field>
-              </>
-            )}
+                </label>
+                {form.qrDataUrl && (
+                  <>
+                    <img
+                      src={form.qrDataUrl}
+                      alt="QR preview"
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 4,
+                        border: `1px solid ${C.border}`,
+                        objectFit: "cover",
+                      }}
+                    />
+                    <button
+                      onClick={clearQrCode}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: C.muted,
+                        cursor: "pointer",
+                        fontSize: 12,
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </>
+                )}
+              </div>
+              <p style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
+                Bring a pre-generated QR image (e.g. pointing to the
+                registration link). Shown in the poster footer when present;
+                otherwise the footer uses its own decorative mark.
+              </p>
+            </Field>
 
             <Field label="Audience line (Amharic)">
               <input
