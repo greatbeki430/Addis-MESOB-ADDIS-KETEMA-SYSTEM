@@ -822,15 +822,19 @@ function UndoCheckInModal({
       if (!userId) return;
       setBusyId(userId);
       try {
-        await goldenMondayAPI.undoQRCheckIn(sessionId, userId);
-        showToast(`↩️ ${name}'s check-in removed`, "success");
+        const res = await goldenMondayAPI.undoQRCheckIn(sessionId, userId);
+        if (res?.data?.removed) {
+          showToast(`↩️ ${name}'s check-in removed`, "success");
+        } else {
+          showToast(
+            `No check-in found for ${name} — nothing to remove`,
+            "warning",
+          );
+        }
         if (onUndone) {
           try {
             await onUndone();
           } catch (refreshErr) {
-            // A parent refresh failure must never bubble out of a click
-            // handler — an unhandled rejection here would surface as an
-            // unexplained failure on mobile.
             console.error("[UndoCheckIn] onUndone threw:", refreshErr);
           }
         }
