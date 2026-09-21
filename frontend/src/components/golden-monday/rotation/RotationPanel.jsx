@@ -366,7 +366,7 @@ export default function RotationPanel({ onRefresh }) {
           }
         }
 
-        @media (max-width: 380px) {
+                @media (max-width: 380px) {
           .gm-panel-action-btn {
             min-width: 36px !important;
             min-height: 36px !important;
@@ -378,8 +378,41 @@ export default function RotationPanel({ onRefresh }) {
             width: 14px !important;
             height: 14px !important;
           }
-          .gm-panel-action-btn > span:first-child {
-            font-size: 12px !important;
+        }
+
+        /* Rotation tab strip: allow horizontal scroll on narrow
+           viewports so the third tab never clips. The strip hides
+           its scrollbar (Firefox + WebKit) for a cleaner look. */
+        .gm-rotation-tab-strip {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .gm-rotation-tab-strip::-webkit-scrollbar {
+          display: none;
+        }
+        .gm-rotation-tab-btn {
+          white-space: nowrap;
+        }
+
+        @media (max-width: 640px) {
+          .gm-rotation-tab-strip {
+            overflow-x: auto;
+            flex-wrap: nowrap !important;
+            -webkit-overflow-scrolling: touch;
+          }
+          .gm-rotation-tab-btn {
+            flex: 0 0 auto !important;
+            min-width: 60px !important;
+            padding: 10px 12px !important;
+          }
+        }
+
+        @media (max-width: 460px) {
+          .gm-rotation-tab-btn {
+            padding: 10px 10px !important;
+          }
+          .gm-rotation-tab-btn .gm-rotation-tab-label {
+            display: none !important;
           }
         }
       `}</style>
@@ -583,6 +616,7 @@ export default function RotationPanel({ onRefresh }) {
 
         {/* Tabs */}
         <div
+          className="gm-rotation-tab-strip"
           style={{
             display: "flex",
             gap: 4,
@@ -598,8 +632,12 @@ export default function RotationPanel({ onRefresh }) {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
+              title={tab.label}
+              aria-label={tab.label}
+              className="gm-rotation-tab-btn"
               style={{
                 flex: 1,
+                minWidth: 0,
                 padding: "10px 16px",
                 borderRadius: 10,
                 border: "none",
@@ -618,7 +656,7 @@ export default function RotationPanel({ onRefresh }) {
               }}
             >
               {tab.icon}
-              {tab.label}
+              <span className="gm-rotation-tab-label">{tab.label}</span>
             </button>
           ))}
         </div>
