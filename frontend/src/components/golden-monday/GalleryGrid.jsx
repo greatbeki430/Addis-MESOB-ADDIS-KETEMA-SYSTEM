@@ -482,10 +482,10 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
 
   // ─── Process Upload Queue ──
   const processUploadQueue = useCallback(
-    async (folderId, topic) => {
-      if (uploading || uploadQueue.length === 0) return;
+    async (folderId, topic, itemsOverride) => {
+      const sourceItems = itemsOverride || uploadQueue;
+      if (uploading || sourceItems.length === 0) return;
 
-      // ✅ Validate folderId
       if (!folderId) {
         showToast("Folder ID is required for upload", "error");
         return;
@@ -494,7 +494,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       setUploading(true);
 
       const CONCURRENCY_LIMIT = 3;
-      const queue = [...uploadQueue];
+      const queue = [...sourceItems];
       let processed = 0;
       let failed = 0;
 
@@ -628,6 +628,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       }
 
       if (processed > 0) {
+        // ← this is already here
         const message = `✅ Successfully uploaded ${processed} file(s) to "${topic}"`;
         if (failed > 0) {
           showToast(`${message} (${failed} failed)`, "warning");
