@@ -2098,6 +2098,10 @@ export default function GoldenMonday() {
 
         /* Mobile responsive button labels */
         @media (max-width: 768px) {
+        .gm-hero-stats-card {
+            width: 100% !important;
+            min-width: 0 !important;
+          }
           .btn-label {
             display: none !important;
           }
