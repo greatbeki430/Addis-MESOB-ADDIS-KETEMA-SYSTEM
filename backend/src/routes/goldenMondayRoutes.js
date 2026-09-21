@@ -255,28 +255,50 @@ router.delete(
 // ════════════════════════════════════════════════════════════════
 
 router.get("/rotation/preview", protect, anyRole, previewRotation);
+// GET /api/golden-monday/rotation/next?weekOf=<iso>
+// Canonical "who presents next" for the target week. Used by the
+// mini card and the Spotlight so they agree with the rotation
+// panel's ranking[0]. If ?weekOf is omitted, resolves the week
+// using the same rule the panel uses (see resolveTargetWeek).
 router.get("/rotation/next", protect, anyRole, async (req, res) => {
   try {
-    const next = await rotationService.getNextPresenter();
+    const weekOfParam = req.query.weekOf || null;
+    const next = await rotationService.getNextPresenterForWeek(
+      weekOfParam ? new Date(weekOfParam) : null,
+    );
+
     if (!next) {
-      return res.json({ name: "No presenter assigned", department: "" });
+      return res.json({
+        name: "No presenter assigned",
+        department: "",
+        weekOf: null,
+        sessionId: null,
+      });
     }
 
-    // ✅ FIX: Check if the user still exists
-    if (next.user) {
-      const userExists = await User.findById(next.user);
+    // Stale-user sweep — same guard the old handler had. If the
+    // chosen user no longer exists, remove them from the roster
+    // and retry once. Any subsequent failure returns an empty
+    // result rather than a 500.
+    if (next._id) {
+      const userExists = await User.findById(next._id);
       if (!userExists) {
         console.warn(
-          `⚠️ User ${next.user} no longer exists, removing from roster`,
+          `⚠️ User ${next._id} no longer exists, removing from roster`,
         );
-        // Remove stale entry
-        await GoldenMondayPresenter.findOneAndDelete({ user: next.user });
-        // Get next presenter
-        const newNext = await rotationService.getNextPresenter();
-        if (newNext) {
-          return res.json(newNext);
+        await GoldenMondayPresenter.findOneAndDelete({ user: next._id });
+        const retry = await rotationService.getNextPresenterForWeek(
+          weekOfParam ? new Date(weekOfParam) : null,
+        );
+        if (!retry) {
+          return res.json({
+            name: "No presenter assigned",
+            department: "",
+            weekOf: null,
+            sessionId: null,
+          });
         }
-        return res.json({ name: "No presenter assigned", department: "" });
+        return res.json(retry);
       }
     }
 
