@@ -438,14 +438,22 @@ router.get("/:sessionId/attendance", protect, anyRole, async (req, res) => {
     const report = allEmployees.map((emp) => {
       const record = attendance.find(
         (a) =>
-          a.user &&
-          emp.user &&
-          a.user._id.toString() === emp.user._id.toString(),
+          a.user && emp.user && a.user._id.toString() === emp.user.toString(),
       );
 
       return {
         user: emp.user,
-        userId: emp.user?._id || emp._id,
+        // emp.user is a raw ObjectId here (the select() above doesn't
+        // populate it) — it has no ._id property, so the previous
+        // `emp.user?._id || emp._id` fallback ALWAYS hit emp._id, the
+        // GoldenMondayPresenter roster document's own id, not the
+        // actual User id that GoldenMondayAttendance.user references.
+        // That silently broke "Manage check-ins → Un-sign", since the
+        // DELETE /qr-checkin/:sessionId/:userId lookup could never
+        // match a real attendance record. Use emp.user directly; it's
+        // already the correct id, and only fall back to emp._id in
+        // the unlikely case a roster entry has no linked user at all.
+        userId: emp.user || emp._id,
         name: emp.name,
         email: emp.email,
         department: emp.department || "",
@@ -631,7 +639,50 @@ router.post(
 // GET /api/golden-monday/gallery/folders
 router.get("/gallery/folders", protect, anyRole, async (req, res) => {
   try {
-    const { category, limit = 20, page = 1 } = req.query;
+    const { category, limit = 20, page = 1, parentFolder } = req.query;
+
+    // ── Child (fileType) folders of a given week folder ─────────
+    // This branch is what GalleryGrid.jsx calls after the user opens
+    // a week folder, to discover the fileType subfolders that
+    // actually hold photo documents (a photo's `folder` field always
+    // points at a fileType folder, never at the week folder itself —
+    // see the upload route). Previously this param was silently
+    // ignored and the route fell through to the week-folder listing
+    // below, which meant the "inside a folder" view always queried
+    // the wrong folder IDs and came back empty even though the week
+    // folder's own coverPhoto/count (aggregated separately) showed
+    // content existed.
+    if (parentFolder) {
+      const childFolders = await GoldenMondayFolder.find({
+        parentFolder,
+        folderType: "fileType",
+      })
+        .sort({ fileType: 1 })
+        .lean();
+
+      const shapedChildren = childFolders.map((child) => ({
+        _id: child._id,
+        folderType: "fileType",
+        fileType: child.fileType,
+        title: getFileTypeLabel(child.fileType),
+        parentFolder: child.parentFolder,
+        count: child.count || 0,
+        coverPhoto: child.coverPhoto || null,
+        createdAt: child.createdAt,
+      }));
+
+      return res.json({
+        folders: shapedChildren,
+        pagination: {
+          total: shapedChildren.length,
+          page: 1,
+          limit: shapedChildren.length,
+          pages: 1,
+        },
+      });
+    }
+
+    // ── Top-level week folders (existing behavior, unchanged) ───
     const filter = { folderType: "week" };
     if (category && category !== "all") filter["topics"] = { $in: [category] };
 
