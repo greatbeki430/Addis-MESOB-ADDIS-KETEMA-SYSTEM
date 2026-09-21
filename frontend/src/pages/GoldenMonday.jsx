@@ -454,22 +454,76 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
       ))}
 
       {nextPresenter && nextPresenter.name && (
-        <div
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.4 }}
           style={{
-            textAlign: "center",
-            borderLeft: `1px solid ${C.border}`,
-            paddingLeft: 16,
+            gridColumn: "1 / -1",
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: 16,
+            padding: "18px 20px",
+            background: `linear-gradient(135deg, ${C.primary}10, ${C.gold}10)`,
+            border: `1.5px solid ${C.gold}44`,
           }}
         >
-          <div style={{ fontSize: 12, color: C.muted, marginBottom: 4 }}>
-            {t.statNextPresenter || "Next Presenter"}
-          </div>
+          {/* Accent bar on the left */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: 5,
+              background: `linear-gradient(180deg, ${C.gold}, ${C.primary})`,
+            }}
+          />
+
+          {/* Header row */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              gap: 10,
+              gap: 8,
+              marginBottom: 12,
+              marginLeft: 6,
+            }}
+          >
+            <div
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 8,
+                background: C.gold,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: C.dark,
+              }}
+            >
+              <FiStar size={14} />
+            </div>
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: 1,
+                textTransform: "uppercase",
+                color: C.primary,
+              }}
+            >
+              {t.statNextPresenter || "Next Presenter"}
+            </span>
+          </div>
+
+          {/* Presenter row */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 14,
+              marginLeft: 6,
             }}
           >
             {nextPresenter.profilePhotoUrl ? (
@@ -477,41 +531,71 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
                 src={nextPresenter.profilePhotoUrl}
                 alt={nextPresenter.name}
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: 56,
+                  height: 56,
                   borderRadius: "50%",
                   objectFit: "cover",
-                  border: `2px solid ${C.gold}`,
+                  border: `3px solid ${C.gold}`,
+                  boxShadow: `0 4px 16px ${C.gold}44`,
+                  flexShrink: 0,
                 }}
               />
             ) : (
               <div
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: 56,
+                  height: 56,
                   borderRadius: "50%",
-                  background: C.primary,
+                  background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
                   color: "#fff",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: 14,
-                  fontWeight: 700,
+                  fontSize: 22,
+                  fontWeight: 800,
+                  border: `3px solid ${C.gold}`,
+                  boxShadow: `0 4px 16px ${C.gold}44`,
+                  flexShrink: 0,
                 }}
               >
                 {nextPresenter.name?.charAt(0) || "?"}
               </div>
             )}
-            <div style={{ textAlign: "left" }}>
-              <div style={{ fontWeight: 600, color: C.dark, fontSize: 13 }}>
+
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div
+                style={{
+                  fontWeight: 800,
+                  color: C.dark,
+                  fontSize: 17,
+                  lineHeight: 1.2,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  wordBreak: "break-word",
+                }}
+              >
                 {nextPresenter.name}
               </div>
-              <div style={{ fontSize: 11, color: C.muted }}>
-                {nextPresenter.department || ""}
-              </div>
+              {nextPresenter.department && (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: C.muted,
+                    marginTop: 4,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {nextPresenter.department}
+                </div>
+              )}
             </div>
           </div>
-        </div>
+        </motion.div>
       )}
     </div>
   );
