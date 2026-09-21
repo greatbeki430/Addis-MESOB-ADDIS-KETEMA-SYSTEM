@@ -44,6 +44,47 @@ export default function PresenterTab({
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.3 }}
     >
+      <style>{`
+        /* ─── Presenter card responsive rules ─────────────────────
+           On narrow screens the desktop row (avatar | name block)
+           and the title row (input | save button) both squeeze and
+           wrap mid-element, which reads as broken. Force them onto
+           their own lines, center the avatar, and let the input
+           take the full width. Only applies below 640px. */
+        @media (max-width: 640px) {
+          .gm-presenter-header {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 14px !important;
+          }
+          .gm-presenter-meta {
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            gap: 4px !important;
+          }
+          .gm-presenter-meta-divider {
+            display: none !important;
+          }
+          .gm-presenter-title-row {
+            flex-direction: column !important;
+            align-items: stretch !important;
+          }
+          .gm-presenter-title-input,
+          .gm-presenter-title-btn {
+            width: 100% !important;
+            min-width: 0 !important;
+            justify-content: center !important;
+          }
+          .gm-presenter-card {
+            padding: 16px !important;
+          }
+          .gm-presenter-avatar {
+            width: 60px !important;
+            height: 60px !important;
+          }
+        }
+      `}</style>
+
       {isPrivileged && (
         <SessionActionsBar
           session={currentSession}
@@ -82,6 +123,7 @@ function CurrentPresenterCard({
 }) {
   return (
     <div
+      className="gm-presenter-card"
       style={{
         background:
           "linear-gradient(135deg, rgba(245,197,24,0.08), rgba(13,26,94,0.04))",
@@ -107,6 +149,7 @@ function CurrentPresenterCard({
       />
 
       <div
+        className="gm-presenter-header"
         style={{
           display: "flex",
           alignItems: "center",
@@ -116,6 +159,7 @@ function CurrentPresenterCard({
         }}
       >
         <div
+          className="gm-presenter-avatar"
           style={{
             width: 72,
             height: 72,
@@ -159,7 +203,7 @@ function CurrentPresenterCard({
           )}
         </div>
 
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
           <div
             style={{
               display: "flex",
@@ -186,19 +230,30 @@ function CurrentPresenterCard({
               </span>
             )}
           </div>
+
+          {/* Department + date. Uses a wrapper class so the mobile
+              media query can stack them and hide the `|` divider,
+              which otherwise reads as a stray character. */}
           <div
+            className="gm-presenter-meta"
             style={{
               fontSize: 14,
               color: C.muted,
               display: "flex",
               alignItems: "center",
               gap: 8,
+              marginTop: 4,
             }}
           >
             <span>
               {session.presenterDepartment || t.noDepartment || "No department"}
             </span>
-            <span style={{ fontSize: 12, color: C.border }}>|</span>
+            <span
+              className="gm-presenter-meta-divider"
+              style={{ fontSize: 12, color: C.border }}
+            >
+              |
+            </span>
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
               <FiCalendar size={12} />
               {new Date(session.date).toLocaleDateString(undefined, {
@@ -208,11 +263,13 @@ function CurrentPresenterCard({
               })}
             </span>
           </div>
+
           <div
+            className="gm-presenter-meta"
             style={{
               fontSize: 13,
               color: C.muted,
-              marginTop: 4,
+              marginTop: 6,
               display: "flex",
               alignItems: "center",
               gap: 8,
@@ -227,6 +284,7 @@ function CurrentPresenterCard({
                   display: "flex",
                   alignItems: "center",
                   gap: 6,
+                  wordBreak: "break-word",
                 }}
               >
                 "{session.presentationTitle}"
@@ -238,6 +296,7 @@ function CurrentPresenterCard({
                     color: copySuccess ? "#10b981" : C.muted,
                     cursor: "pointer",
                     padding: "2px 4px",
+                    flexShrink: 0,
                   }}
                   title={t.copyTitle || "Copy title"}
                 >
@@ -272,8 +331,12 @@ function CurrentPresenterCard({
               ? t.chooseTitle || "Choose your presentation title"
               : t.setTitleOnBehalf || "Set title on behalf"}
           </label>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div
+            className="gm-presenter-title-row"
+            style={{ display: "flex", gap: 10, flexWrap: "wrap" }}
+          >
             <input
+              className="gm-presenter-title-input"
               value={titleDraft}
               onChange={(e) => setTitleDraft(e.target.value)}
               placeholder={
@@ -290,9 +353,11 @@ function CurrentPresenterCard({
                 fontSize: 14,
                 outline: "none",
                 background: C.white,
+                boxSizing: "border-box",
               }}
             />
             <button
+              className="gm-presenter-title-btn"
               onClick={onSaveTitle}
               disabled={savingTitle || !titleDraft.trim()}
               style={{
@@ -312,6 +377,7 @@ function CurrentPresenterCard({
                 display: "flex",
                 alignItems: "center",
                 gap: 8,
+                whiteSpace: "nowrap",
               }}
             >
               {savingTitle ? (
