@@ -2092,6 +2092,38 @@ export default function GoldenMonday() {
     font-size: 10px !important;
   }
 }
+
+/* Mobile: collapse the "New Session" and "Register Employee"
+   buttons to icon-only circular pills, matching the rotation
+   panel's treatment. Only the label span hides — the button
+   keeps its click handler and title/aria-label. */
+@media (max-width: 640px) {
+  .gm-panel-action-btn .gm-action-label {
+    display: none !important;
+  }
+  .gm-panel-action-btn {
+    padding: 8px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 50% !important;
+  }
+}
+
+@media (max-width: 380px) {
+  .gm-panel-action-btn {
+    min-width: 36px !important;
+    min-height: 36px !important;
+    width: 36px !important;
+    height: 36px !important;
+    padding: 6px !important;
+  }
+  .gm-panel-action-btn svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+}
       `}</style>
 
       {/* ── HERO SECTION ── */}
@@ -2719,6 +2751,9 @@ export default function GoldenMonday() {
                         {!showComposer && (
                           <button
                             onClick={() => setShowComposer(true)}
+                            title={t.aiNewSession || "New Session"}
+                            aria-label={t.aiNewSession || "New Session"}
+                            className="gm-panel-action-btn"
                             style={{
                               padding: "8px 22px",
                               borderRadius: 10,
@@ -2730,6 +2765,7 @@ export default function GoldenMonday() {
                               cursor: "pointer",
                               display: "flex",
                               alignItems: "center",
+                              justifyContent: "center",
                               gap: 6,
                               transition: "all 0.3s ease",
                             }}
@@ -2743,8 +2779,10 @@ export default function GoldenMonday() {
                               e.currentTarget.style.boxShadow = "none";
                             }}
                           >
-                            <FiPlus size={16} />{" "}
-                            {t.aiNewSession || "New Session"}
+                            <FiPlus size={16} />
+                            <span className="gm-action-label">
+                              {t.aiNewSession || "New Session"}
+                            </span>
                           </button>
                         )}
                       </div>
@@ -3147,10 +3185,20 @@ export default function GoldenMonday() {
                         </div>
                         <button
                           onClick={() => setShowEmployeeModal(true)}
-                          style={btnStyle(C.primary)}
+                          title={t.registerEmployeeBtn || "Register Employee"}
+                          aria-label={
+                            t.registerEmployeeBtn || "Register Employee"
+                          }
+                          className="gm-panel-action-btn"
+                          style={{
+                            ...btnStyle(C.primary),
+                            justifyContent: "center",
+                          }}
                         >
-                          <FiUserPlus size={14} />{" "}
-                          {t.registerEmployeeBtn || "Register Employee"}
+                          <FiUserPlus size={14} />
+                          <span className="gm-action-label">
+                            {t.registerEmployeeBtn || "Register Employee"}
+                          </span>
                         </button>
                       </div>
 
