@@ -521,6 +521,14 @@ export const goldenMondayTranslations = {
     // ─── Employee Management ──────────────────────────────────────
     noPosition: "No position",
     locale: "en-US",
+
+    // ─── Week Selector (rotation panel) ─────────────────────────
+    weekAuto: "Auto",
+    weekAutoHint: "Follow the current session",
+    weekThis: "This week",
+    weekNext: "Next week",
+    weekPickDate: "Pick any week",
+    posterStudio: "Poster Studio",
   },
 
   am: {
@@ -1029,6 +1037,13 @@ export const goldenMondayTranslations = {
     // ─── Employee Management ──────────────────────────────────────
     noPosition: "ሹመት የለም",
     locale: "am-ET",
+
+    weekAuto: "ራስ-ሰር",
+    weekAutoHint: "የአሁኑን ክፍለ-ጊዜ ይከተሉ",
+    weekThis: "ይህ ሳምንት",
+    weekNext: "ቀጣይ ሳምንት",
+    weekPickDate: "ማንኛውንም ሳምንት ይምረጡ",
+    posterStudio: "የፖስተር ስቱዲዮ",
   },
 
   om: {
@@ -1556,5 +1571,12 @@ export const goldenMondayTranslations = {
     // ─── Employee Management ──────────────────────────────────────
     noPosition: "Aangoon hin jiru",
     locale: "om-ET",
+
+    weekAuto: "Ofumaan",
+    weekAutoHint: "Yeroo ammaa hordofi",
+    weekThis: "Torban kana",
+    weekNext: "Torban itti aanu",
+    weekPickDate: "Torban kamiyyuu filadhu",
+    posterStudio: "Istuudiyoo Poostarii",
   },
 };
