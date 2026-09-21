@@ -1,5 +1,5 @@
 // src/components/golden-monday/rotation/RotationPanel.jsx
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   FiAward,
@@ -9,6 +9,7 @@ import {
   FiVideo,
   FiArrowRight,
   FiLoader,
+  FiCalendar,
 } from "react-icons/fi";
 import { C, F } from "../../../styles/theme";
 import { useAuth } from "../../../hooks/useAuth";
@@ -17,7 +18,17 @@ import { goldenMondayAPI } from "../../../services/api";
 import { goldenMondayTranslations } from "../../../constants/goldenMondayTranslations";
 import { isGoldenMondayAdminOrAbove } from "../../../utils/roles";
 import AutoAnnounceButton from "../AutoAnnounceButton";
-import { glass, useRotationData, notify, fileToBase64 } from "./helpers";
+import {
+  glass,
+  useRotationData,
+  notify,
+  fileToBase64,
+  // ✅ NEW: week helpers, exported by the rewritten helpers.js
+  thisMondayISO,
+  nextMondayISO,
+  isSameWeek,
+  formatWeekLabel,
+} from "./helpers";
 import PresenterTab from "./PresenterTab";
 import RankingTab from "./RankingTab";
 import RecordingsTab from "./RecordingsTab";
@@ -25,21 +36,17 @@ import AlreadyAssignedDialog from "./AlreadyAssignedDialog";
 import ManualPresenterPicker from "./ManualPresenterPicker";
 import PosterStudio from "../PosterStudio";
 
-// Base64 encoding inflates the payload by ~33%. Express's default
-// JSON body limit is 50MB. Keeping the raw file under ~35MB leaves
-// headroom for the encoded string plus session title and metadata.
 const MAX_RECORDING_BYTES = 35 * 1024 * 1024;
 
-// Compute the upcoming Monday in UTC — same rule the backend uses
-// in `mondayOf()`. Used as a last-resort fallback if `currentSession`
-// has no `weekOf` field for any reason. Without this, `openManualPicker`
-// could hand the picker a null week, which used to silently no-op the
-// assignment.
+// Fallback used only when currentSession has no weekOf for some
+// reason AND the admin hasn't picked a week. Matches backend
+// `nextMondayFrom()` — the same week assignRotation() would
+// default to if we sent nothing, so at least the two agree.
 const upcomingMondayISO = () => {
   const d = new Date();
   const day = d.getUTCDay();
   const diff = (day === 0 ? -6 : 1) - day;
-  d.setUTCDate(d.getUTCDate() + diff + 7); // next Monday, not today's
+  d.setUTCDate(d.getUTCDate() + diff + 7);
   d.setUTCHours(0, 0, 0, 0);
   return d.toISOString();
 };
@@ -49,9 +56,6 @@ export default function RotationPanel({ onRefresh }) {
   const { language } = useLanguage();
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
-  // ✅ Single source of truth for GM gating. Coordinators flagged with
-  // isGoldenMondayAdmin === true get the same UI as leaders/admins —
-  // but only inside Golden Monday. No system-admin capabilities leak.
   const isPrivileged = isGoldenMondayAdminOrAbove(user);
 
   const [activeTab, setActiveTab] = useState("presenter");
@@ -67,54 +71,46 @@ export default function RotationPanel({ onRefresh }) {
   const [showAllRecordings, setShowAllRecordings] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
 
-  // ─── Dialog state ────────────────────────────────────────────
-  // Instead of storing { isOpen, session } and syncing isOpen in an
-  // effect, we store only the CAPTURED session and derive isOpen on
-  // render by comparing against live data. If the session it was
-  // opened for is no longer the current session, or the user is no
-  // longer privileged, the dialog is treated as closed — no state
-  // mutation, no cascading renders.
   const [alreadyAssignedFor, setAlreadyAssignedFor] = useState(null);
   const [manualPickerFor, setManualPickerFor] = useState(null);
   const [posterStudioOpen, setPosterStudioOpen] = useState(false);
 
+  // ─── Week selector state ────────────────────────────────────
+  // null  = "Auto" — let useRotationData pick the target week
+  //         from currentSession (existing behavior)
+  // ISO   = explicit override — every action (assign, ranking,
+  //         manual picker, already-assigned check) targets THIS
+  //         week, and only this week.
+  const [weekOverride, setWeekOverride] = useState(null);
+
   const { ranking, currentSession, recordings, loading, loadAll } =
-    useRotationData({ onRefresh });
+    useRotationData({ onRefresh, weekOverride });
 
   const sessionId = currentSession?._id || null;
 
   // ─── The week every action in this panel targets ─────────────
-  // Derived once, reused everywhere: the manual picker's target,
-  // the ranking tab's label, the title-save call's scope. Falls
-  // back to the upcoming Monday if the session lacks a weekOf field
-  // (older documents created before weekOf was added, or edge cases
-  // where the API returned a session without it).
+  // When the admin has picked a week, that IS the target — even if
+  // no session exists for it yet. Otherwise, derive from the
+  // current session, falling back to next Monday.
   const targetWeekOf =
-    currentSession?.weekOf || currentSession?.date || upcomingMondayISO();
+    weekOverride ||
+    currentSession?.weekOf ||
+    currentSession?.date ||
+    upcomingMondayISO();
 
-  // ─── Derived: is the already-assigned dialog open? ───────────
-  // It's open only if a session was captured AND that session is
-  // still the one being shown. A stale capture (session changed
-  // behind our back) closes itself on the next render.
+  // ─── Quick-pick button highlight state ──────────────────────
+  const isThisWeek = isSameWeek(weekOverride, thisMondayISO());
+  const isNextWeek = isSameWeek(weekOverride, nextMondayISO());
+  const isAuto = !weekOverride;
+
   const alreadyAssignedOpen =
     !!alreadyAssignedFor?._id && alreadyAssignedFor._id === sessionId;
 
-  // ─── Derived: is the manual picker open? ─────────────────────
-  // Only privileged users can open it; if privileges are revoked
-  // mid-flight, this drops to false automatically.
   const manualPickerOpen = isPrivileged && !!manualPickerFor;
 
-  // ─── Derived: is the poster studio open? ─────────────────────
-  // Same pattern — only privileged users, and only when a session
-  // exists to fill the form from.
   const posterStudioVisible =
     isPrivileged && posterStudioOpen && !!currentSession;
 
-  // ─── Title draft: dirty flag + session scoping ───────────────
-  // The draft is only "yours" if it was typed for the session
-  // currently on screen. If the session changes, we fall back to
-  // the fresh server value. No reset effect needed — the fallback
-  // is derived on every render.
   const titleDraftValue =
     titleDraft.sessionId === sessionId && titleDraft.value
       ? titleDraft.value
@@ -125,10 +121,6 @@ export default function RotationPanel({ onRefresh }) {
     [sessionId],
   );
 
-  // ─── Clear copy-success timeout on unmount ──────────────────
-  // No setState in the effect body — only a cleanup that mutates a
-  // ref-held timer and the mount state is already false by the time
-  // the timeout fires (we cancel it).
   const copyTimerRef = useRef(null);
   useEffect(() => {
     return () => {
@@ -136,7 +128,7 @@ export default function RotationPanel({ onRefresh }) {
     };
   }, []);
 
-  // ─── Keyboard shortcut: Ctrl/Cmd + R refreshes the panel ────
+  // ─── Refresh ────────────────────────────────────────────────
   const handleRefresh = useCallback(async () => {
     await loadAll();
     notify(t.refresh || "Data refreshed", "success");
@@ -156,13 +148,15 @@ export default function RotationPanel({ onRefresh }) {
   }, [handleRefresh, loading]);
 
   // ─── Assign Next Presenter ──────────────────────────────────
+  // ✅ THE FIX: pass targetWeekOf explicitly. Previously this
+  // called assignRotation() with no args, so the backend fell back
+  // to nextMondayFrom() computed at request time — which could
+  // silently differ from the week the admin was looking at.
   const handleAssignNext = useCallback(async () => {
     setAssigning(true);
     try {
-      const res = await goldenMondayAPI.assignRotation();
+      const res = await goldenMondayAPI.assignRotation(targetWeekOf);
       if (res.data.alreadyAssigned && res.data.session) {
-        // Capture the session. The dialog open state is derived
-        // from whether this capture still matches `sessionId`.
         setAlreadyAssignedFor(res.data.session);
       } else {
         const name =
@@ -185,7 +179,7 @@ export default function RotationPanel({ onRefresh }) {
     } finally {
       setAssigning(false);
     }
-  }, [t, loadAll]);
+  }, [t, loadAll, targetWeekOf]);
 
   // ─── Already-assigned dialog actions ────────────────────────
   const handleKeepAsIs = useCallback(() => {
@@ -209,10 +203,6 @@ export default function RotationPanel({ onRefresh }) {
     }
   }, [alreadyAssignedFor, t, loadAll]);
 
-  // Preserve the week the admin was looking at when they chose
-  // "Reassign" so the manual picker targets that same week. Falls
-  // back to the panel's current target week if the dialog's session
-  // has no weekOf.
   const handleReassignFromDialog = useCallback(() => {
     const dialogWeek =
       alreadyAssignedFor?.weekOf || alreadyAssignedFor?.date || targetWeekOf;
@@ -220,10 +210,7 @@ export default function RotationPanel({ onRefresh }) {
     setManualPickerFor({ targetWeekOf: dialogWeek });
   }, [alreadyAssignedFor, targetWeekOf]);
 
-  // ─── Open/close manual picker ───────────────────────────────
-  // Always passes a non-null targetWeekOf. If the current session
-  // lacks a weekOf field, we fall back to the upcoming Monday — this
-  // is what used to be null and made the picker silently no-op.
+  // ─── Manual picker ──────────────────────────────────────────
   const openManualPicker = useCallback(() => {
     setManualPickerFor({ targetWeekOf });
   }, [targetWeekOf]);
@@ -232,20 +219,14 @@ export default function RotationPanel({ onRefresh }) {
     setManualPickerFor(null);
   }, []);
 
-  // ─── Manual presenter picked ────────────────────────────────
   const handleManualAssigned = useCallback(async () => {
     setManualPickerFor(null);
     await loadAll();
   }, [loadAll]);
 
-  // ─── Open/close Poster Studio ───────────────────────────────
-  const openPosterStudio = useCallback(() => {
-    setPosterStudioOpen(true);
-  }, []);
-
-  const closePosterStudio = useCallback(() => {
-    setPosterStudioOpen(false);
-  }, []);
+  // ─── Poster Studio ──────────────────────────────────────────
+  const openPosterStudio = useCallback(() => setPosterStudioOpen(true), []);
+  const closePosterStudio = useCallback(() => setPosterStudioOpen(false), []);
 
   const handlePosterPosted = useCallback(async () => {
     setPosterStudioOpen(false);
@@ -271,8 +252,6 @@ export default function RotationPanel({ onRefresh }) {
     try {
       await goldenMondayAPI.setPresentationTitle(currentSession._id, trimmed);
       notify(t.titleSaved || "Presentation title saved", "success");
-      // Clear the local draft; the server value will be shown after
-      // loadAll() returns fresh data.
       setTitleDraftState({ sessionId: null, value: "" });
       await loadAll();
     } catch (err) {
@@ -341,92 +320,72 @@ export default function RotationPanel({ onRefresh }) {
     user?._id &&
     String(currentSession.presenter) === String(user._id);
 
-  const tabs = [
-    {
-      id: "presenter",
-      label: t.tabPresenter || "Presenter",
-      icon: <FiUser size={14} />,
-    },
-    {
-      id: "ranking",
-      label: t.tabRanking || "Ranking",
-      icon: <FiBarChart2 size={14} />,
-    },
-    {
-      id: "recordings",
-      label: t.tabRecordings || "Recordings",
-      icon: <FiVideo size={14} />,
-    },
-  ];
+  const tabs = useMemo(
+    () => [
+      {
+        id: "presenter",
+        label: t.tabPresenter || "Presenter",
+        icon: <FiUser size={14} />,
+      },
+      {
+        id: "ranking",
+        label: t.tabRanking || "Ranking",
+        icon: <FiBarChart2 size={14} />,
+      },
+      {
+        id: "recordings",
+        label: t.tabRecordings || "Recordings",
+        icon: <FiVideo size={14} />,
+      },
+    ],
+    [t],
+  );
+
+  // ─── Week selector handlers ─────────────────────────────────
+  const handlePickAuto = useCallback(() => setWeekOverride(null), []);
+  const handlePickThisWeek = useCallback(
+    () => setWeekOverride(thisMondayISO()),
+    [],
+  );
+  const handlePickNextWeek = useCallback(
+    () => setWeekOverride(nextMondayISO()),
+    [],
+  );
 
   // ─── Render ─────────────────────────────────────────────────
   return (
-    <div style={{ fontFamily: F.sans }}>
+    <div style={{ fontFamily: F.sans, maxWidth: 1100, margin: "0 auto" }}>
       <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-        @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
-        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @keyframes pulse-glow {
-          0% { box-shadow: 0 0 20px rgba(245, 197, 24, 0.2); }
-          50% { box-shadow: 0 0 40px rgba(245, 197, 24, 0.4); }
-          100% { box-shadow: 0 0 20px rgba(245, 197, 24, 0.2); }
+          0%, 100% { box-shadow: 0 0 20px rgba(245, 197, 24, 0.2); }
+          50%      { box-shadow: 0 0 40px rgba(245, 197, 24, 0.4); }
         }
 
-        /* Mobile: collapse action buttons to icon-only circular pills.
-           The label span is hidden, the button shrinks to a fixed square,
-           and the icon (or emoji) stays centered. Tooltip via title=
-           attribute keeps the action discoverable on long-press. */
         @media (max-width: 640px) {
-          .gm-panel-action-btn .gm-action-label {
-            display: none !important;
-          }
+          .gm-panel-action-btn .gm-action-label { display: none !important; }
           .gm-panel-action-btn {
             padding: 8px !important;
-            min-width: 40px !important;
-            min-height: 40px !important;
-            width: 40px !important;
-            height: 40px !important;
+            min-width: 40px !important; min-height: 40px !important;
+            width: 40px !important; height: 40px !important;
             border-radius: 50% !important;
           }
         }
-
         @media (max-width: 380px) {
           .gm-panel-action-btn {
-            min-width: 36px !important;
-            min-height: 36px !important;
-            width: 36px !important;
-            height: 36px !important;
+            min-width: 36px !important; min-height: 36px !important;
+            width: 36px !important; height: 36px !important;
             padding: 6px !important;
           }
-          .gm-panel-action-btn svg {
-            width: 14px !important;
-            height: 14px !important;
-          }
+          .gm-panel-action-btn svg { width: 14px !important; height: 14px !important; }
         }
 
-        /* Rotation tab strip: allow horizontal scroll on narrow
-           viewports so the third tab never clips. The strip hides
-           its scrollbar (Firefox + WebKit) for a cleaner look. */
-        .gm-rotation-tab-strip {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-        .gm-rotation-tab-strip::-webkit-scrollbar {
-          display: none;
-        }
-        .gm-rotation-tab-btn {
-          white-space: nowrap;
-        }
-
+        .gm-rotation-tab-strip { scrollbar-width: none; -ms-overflow-style: none; }
+        .gm-rotation-tab-strip::-webkit-scrollbar { display: none; }
+        .gm-rotation-tab-btn { white-space: nowrap; }
         @media (max-width: 640px) {
           .gm-rotation-tab-strip {
-            overflow-x: auto;
-            flex-wrap: nowrap !important;
+            overflow-x: auto; flex-wrap: nowrap !important;
             -webkit-overflow-scrolling: touch;
           }
           .gm-rotation-tab-btn {
@@ -435,14 +394,22 @@ export default function RotationPanel({ onRefresh }) {
             padding: 10px 12px !important;
           }
         }
-
         @media (max-width: 460px) {
-          .gm-rotation-tab-btn {
-            padding: 10px 10px !important;
+          .gm-rotation-tab-btn { padding: 10px 10px !important; }
+          .gm-rotation-tab-btn .gm-rotation-tab-label { display: none !important; }
+        }
+
+        /* Week selector chips — scroll horizontally on narrow screens */
+        .gm-week-chip-row {
+          display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+        }
+        @media (max-width: 520px) {
+          .gm-week-chip-row {
+            flex-wrap: nowrap; overflow-x: auto; width: 100%;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
           }
-          .gm-rotation-tab-btn .gm-rotation-tab-label {
-            display: none !important;
-          }
+          .gm-week-chip-row::-webkit-scrollbar { display: none; }
         }
       `}</style>
 
@@ -489,7 +456,7 @@ export default function RotationPanel({ onRefresh }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: 24,
+            marginBottom: 16,
             position: "relative",
             zIndex: 1,
             flexWrap: "wrap",
@@ -534,7 +501,6 @@ export default function RotationPanel({ onRefresh }) {
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <AutoAnnounceButton onDone={loadAll} t={t} />
 
-            {/* ✅ Poster Studio trigger — only when a session exists */}
             {isPrivileged && currentSession && (
               <button
                 onClick={openPosterStudio}
@@ -640,6 +606,112 @@ export default function RotationPanel({ onRefresh }) {
                 }}
               />
             </button>
+          </div>
+        </div>
+
+        {/* ─── WEEK SELECTOR ──────────────────────────────────────
+            Every action below (Assign Next, Pick manually, the
+            ranking list) targets exactly this week. "Auto" preserves
+            the old behavior of following the current session. */}
+        <div
+          style={{
+            position: "relative",
+            zIndex: 1,
+            marginBottom: 20,
+            padding: "12px 16px",
+            borderRadius: 14,
+            background: C.bg,
+            border: `1px solid ${C.border}`,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            <FiCalendar size={14} color={C.primary} />
+            <span
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: 0.5,
+                textTransform: "uppercase",
+                color: C.primary,
+              }}
+            >
+              {t.targetWeekLabel || "Target week"}
+            </span>
+            <span style={{ fontSize: 12, color: C.muted }}>
+              ·{" "}
+              <strong style={{ color: C.dark }}>
+                {formatWeekLabel(targetWeekOf) || "—"}
+              </strong>
+            </span>
+            {isAuto && currentSession && (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  padding: "2px 8px",
+                  borderRadius: 999,
+                  background: `${C.primary}15`,
+                  color: C.primary,
+                }}
+              >
+                {t.autoWeek || "Auto"}
+              </span>
+            )}
+          </div>
+
+          <div className="gm-week-chip-row">
+            <WeekChip
+              active={isAuto}
+              onClick={handlePickAuto}
+              label={t.weekAuto || "Auto"}
+              hint={t.weekAutoHint || "Follow the current session"}
+            />
+            <WeekChip
+              active={isThisWeek}
+              onClick={handlePickThisWeek}
+              label={t.weekThis || "This week"}
+            />
+            <WeekChip
+              active={isNextWeek}
+              onClick={handlePickNextWeek}
+              label={t.weekNext || "Next week"}
+            />
+            <input
+              type="date"
+              value={weekOverride ? weekOverride.slice(0, 10) : ""}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (!v) return setWeekOverride(null);
+                // Normalize typed date to its Monday so it matches
+                // the same rule the backend keys sessions on.
+                const d = new Date(v + "T00:00:00Z");
+                const day = d.getUTCDay();
+                const diff = (day === 0 ? -6 : 1) - day;
+                d.setUTCDate(d.getUTCDate() + diff);
+                d.setUTCHours(0, 0, 0, 0);
+                setWeekOverride(d.toISOString());
+              }}
+              style={{
+                padding: "6px 10px",
+                borderRadius: 8,
+                border: `1.5px solid ${C.border}`,
+                fontSize: 12,
+                fontFamily: F.sans,
+                color: C.dark,
+                background: C.white,
+                outline: "none",
+                cursor: "pointer",
+              }}
+              title={t.weekPickDate || "Pick any week"}
+            />
           </div>
         </div>
 
@@ -760,7 +832,6 @@ export default function RotationPanel({ onRefresh }) {
         </AnimatePresence>
       </div>
 
-      {/* Already-assigned dialog — derived open state */}
       <AlreadyAssignedDialog
         isOpen={alreadyAssignedOpen}
         onClose={() => setAlreadyAssignedFor(null)}
@@ -771,7 +842,6 @@ export default function RotationPanel({ onRefresh }) {
         t={t}
       />
 
-      {/* Manual presenter picker — derived open state */}
       <ManualPresenterPicker
         isOpen={manualPickerOpen}
         onClose={closeManualPicker}
@@ -781,7 +851,6 @@ export default function RotationPanel({ onRefresh }) {
         t={t}
       />
 
-      {/* ✅ Poster Studio — coordinator tool */}
       <PosterStudio
         isOpen={posterStudioVisible}
         onClose={closePosterStudio}
@@ -789,5 +858,31 @@ export default function RotationPanel({ onRefresh }) {
         onPosterPosted={handlePosterPosted}
       />
     </div>
+  );
+}
+
+// ─── Small local presentational helper for the week chips ────
+function WeekChip({ active, onClick, label, hint }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={hint || label}
+      style={{
+        padding: "6px 14px",
+        borderRadius: 999,
+        border: `1.5px solid ${active ? C.primary : C.border}`,
+        background: active ? `${C.primary}10` : C.white,
+        color: active ? C.primary : C.muted,
+        fontWeight: active ? 700 : 600,
+        fontSize: 12,
+        cursor: "pointer",
+        fontFamily: F.sans,
+        whiteSpace: "nowrap",
+        transition: "all 0.15s ease",
+      }}
+    >
+      {label}
+    </button>
   );
 }
