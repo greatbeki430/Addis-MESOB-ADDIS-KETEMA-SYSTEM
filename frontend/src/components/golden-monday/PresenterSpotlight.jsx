@@ -61,6 +61,30 @@ export default function PresenterSpotlight({ onRefresh }) {
   const timerRef = useRef(null);
   const isMounted = useRef(true);
   const isInitialLoad = useRef(true);
+  const sessionDateRef = useRef(null);
+
+  // Calculate time until next Monday
+  const calculateTimeRemaining = useCallback((sessionDate) => {
+    if (!sessionDate) {
+      setTimeRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
+    const now = new Date();
+    const target = new Date(sessionDate);
+    // Presenter day is Monday at 14:00 local time.
+    target.setHours(14, 0, 0, 0);
+
+    const diff = target - now;
+    if (diff <= 0) {
+      setTimeRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+    setTimeRemaining({ days, hours, minutes, seconds });
+  }, []);
 
   // Load presenter data
   const loadPresenter = useCallback(async () => {
@@ -70,32 +94,26 @@ export default function PresenterSpotlight({ onRefresh }) {
       const response = await goldenMondayAPI.getNextPresenter();
       if (!isMounted.current) return;
 
-      // ✅ Check if we have valid presenter data
       if (response.data && response.data.name) {
         setPresenter(response.data);
 
-        // ✅ Only fetch user details if we have a valid _id
+        // ✅ NEW: capture the session date the backend returned so the
+        // countdown ticks against the SAME week the panel is targeting,
+        // instead of recomputing "next Monday" from the client clock.
+        sessionDateRef.current =
+          response.data.sessionDate || response.data.weekOf || null;
+        calculateTimeRemaining(sessionDateRef.current);
+
         if (response.data._id) {
           try {
             const detailRes = await goldenMondayAPI.getUserDetails(
               response.data._id,
             );
             if (!isMounted.current) return;
-
-            // ✅ Only update if we got valid data back
             if (detailRes.data && detailRes.data._id) {
-              setPresenter((prev) => ({
-                ...prev,
-                ...detailRes.data,
-              }));
-            } else {
-              // User not found - use the presenter data we already have
-              console.warn(
-                `⚠️ User ${response.data._id} not found - using base presenter data`,
-              );
+              setPresenter((prev) => ({ ...prev, ...detailRes.data }));
             }
           } catch (detailErr) {
-            // Silently handle 404 - keep the presenter data
             if (detailErr.response?.status === 404) {
               console.warn(
                 `⚠️ User ${response.data._id} not found - using base presenter data`,
@@ -109,40 +127,21 @@ export default function PresenterSpotlight({ onRefresh }) {
           }
         }
       } else {
-        // No presenter data - clear the presenter
         setPresenter(null);
+        sessionDateRef.current = null;
+        calculateTimeRemaining(null);
       }
     } catch (error) {
       console.error("Failed to load presenter:", error);
       setPresenter(null);
+      sessionDateRef.current = null;
+      calculateTimeRemaining(null);
     } finally {
       if (isMounted.current) {
         setLoading(false);
       }
     }
-  }, []);
-
-  // Calculate time until next Monday
-  const calculateTimeRemaining = useCallback(() => {
-    const now = new Date();
-    const nextMonday = new Date(now);
-    const daysUntilMonday = (7 - now.getDay() + 1) % 7 || 7;
-    nextMonday.setDate(now.getDate() + daysUntilMonday);
-    nextMonday.setHours(14, 0, 0, 0);
-
-    const diff = nextMonday - now;
-    if (diff <= 0) {
-      setTimeRemaining({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-      return;
-    }
-
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-    setTimeRemaining({ days, hours, minutes, seconds });
-  }, []);
+  }, [calculateTimeRemaining]);
 
   // Glow animation loop
   useEffect(() => {
@@ -162,9 +161,13 @@ export default function PresenterSpotlight({ onRefresh }) {
     if (isInitialLoad.current) {
       isInitialLoad.current = false;
       loadPresenter();
-      calculateTimeRemaining();
 
-      timerRef.current = setInterval(calculateTimeRemaining, 1000);
+      // ✅ NEW: tick against the ref — loadPresenter() will fill it in
+      // once the fetch resolves. Until then the ref is null and the
+      // countdown safely shows zeros.
+      timerRef.current = setInterval(() => {
+        calculateTimeRemaining(sessionDateRef.current);
+      }, 1000);
 
       const particleTimer = setTimeout(() => {
         if (isMounted.current) setShowParticles(true);

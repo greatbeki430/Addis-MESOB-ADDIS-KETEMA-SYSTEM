@@ -76,6 +76,58 @@ const nextMondayFrom = (d = new Date()) => {
   return next;
 };
 
+// ─────────────────────────────────────────────────────────────
+// Resolve the session the dashboard cares about — the SAME rule
+// the rotation panel uses on the client, so the mini card, the
+// Spotlight, and the panel can never disagree about who's next.
+//
+// Priority:
+//   1. Soonest session with date >= now, not cancelled
+//   2. Otherwise, most recent non-cancelled past session
+//   3. Otherwise, fall back to the week of `nextMondayFrom()`
+//
+// Returns { weekOf, session } — session may be null if the roster
+// has sessions but none match (unlikely, but handled).
+// ─────────────────────────────────────────────────────────────
+const resolveTargetWeek = async () => {
+  const now = new Date();
+
+  // Prefer the soonest upcoming session
+  const upcoming = await GoldenMondaySession.findOne({
+    status: { $ne: "cancelled" },
+    date: { $gte: now },
+  })
+    .sort({ date: 1 })
+    .lean();
+
+  if (upcoming?.weekOf || upcoming?.date) {
+    return {
+      weekOf: mondayOf(upcoming.weekOf || upcoming.date),
+      session: upcoming,
+    };
+  }
+
+  // Fall back to the most recent past session
+  const past = await GoldenMondaySession.findOne({
+    status: { $ne: "cancelled" },
+    date: { $lt: now },
+  })
+    .sort({ date: -1 })
+    .lean();
+
+  if (past?.weekOf || past?.date) {
+    return {
+      weekOf: mondayOf(past.weekOf || past.date),
+      session: past,
+    };
+  }
+
+  // No sessions at all — default to the week the algorithm would
+  // have used anyway, so the endpoint still returns a sensible
+  // ranking for a fresh install.
+  return { weekOf: nextMondayFrom(), session: null };
+};
+
 // Deterministic 0..1 pseudo-random value from a string — used only to
 // break exact score ties in a stable, auditable way (no real randomness).
 const stableHashUnit = (str) => {
@@ -169,6 +221,60 @@ const computeRanking = async (weekOf = nextMondayFrom()) => {
   } catch (error) {
     console.error("Error in computeRanking:", error);
     return { ranking: [], weekOf, rosterAvgPresented: 0 };
+  }
+};
+
+// ─────────────────────────────────────────────────────────────
+// getNextPresenterForWeek(weekOf?)
+//
+// THE canonical "who is next" query. Used by the mini card, the
+// Spotlight, and any other consumer. Mirrors what
+// previewRotation(weekOf).ranking[0] produces, so the panel and
+// this endpoint can never disagree.
+//
+// If `weekOf` is not passed, resolveTargetWeek() picks it using
+// the same rule the panel uses. If it is passed, that week wins.
+//
+// Returns a presenter DTO (or null):
+//   {
+//     _id, name, department, position, profilePhotoUrl,
+//     isEligible, timesPresented, daysSinceLastPresented,
+//     score, timesSkipped,
+//     weekOf, sessionId, sessionDate, assignmentMethod,
+//   }
+// ─────────────────────────────────────────────────────────────
+const getNextPresenterForWeek = async (weekOf = null) => {
+  try {
+    const resolved = weekOf
+      ? { weekOf: mondayOf(weekOf), session: null }
+      : await resolveTargetWeek();
+
+    const { ranking } = await computeRanking(resolved.weekOf);
+    if (!ranking || ranking.length === 0) return null;
+
+    const top = ranking[0];
+    const presenter = top.presenter;
+
+    return {
+      _id: presenter.user,
+      name: presenter.name,
+      department: presenter.department || "",
+      position: presenter.position || "",
+      profilePhotoUrl: presenter.profilePhotoUrl || "",
+      isEligible: presenter.isEligible !== false,
+      timesPresented: presenter.timesPresented || 0,
+      timesSkipped: presenter.timesSkipped || 0,
+      daysSinceLastPresented:
+        top.daysSinceLast >= 100000 ? "never presented" : top.daysSinceLast,
+      score: Math.round(top.score * 100) / 100,
+      weekOf: resolved.weekOf,
+      sessionId: resolved.session?._id || null,
+      sessionDate: resolved.session?.date || resolved.weekOf,
+      assignmentMethod: resolved.session?.assignmentMethod || null,
+    };
+  } catch (error) {
+    console.error("[getNextPresenterForWeek] failed:", error);
+    return null;
   }
 };
 
@@ -371,7 +477,9 @@ module.exports = {
   getEligibleRoster,
   computeRanking,
   getNextPresenter,
+  getNextPresenterForWeek,
   assignNextPresenter,
   confirmPresentationTitle,
   reassignPresenter,
+  resolveTargetWeek,
 };
