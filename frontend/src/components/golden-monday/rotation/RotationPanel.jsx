@@ -347,6 +347,41 @@ export default function RotationPanel({ onRefresh }) {
           50% { box-shadow: 0 0 40px rgba(245, 197, 24, 0.4); }
           100% { box-shadow: 0 0 20px rgba(245, 197, 24, 0.2); }
         }
+
+        /* Mobile: collapse action buttons to icon-only circular pills.
+           The label span is hidden, the button shrinks to a fixed square,
+           and the icon (or emoji) stays centered. Tooltip via title=
+           attribute keeps the action discoverable on long-press. */
+        @media (max-width: 640px) {
+          .gm-panel-action-btn .gm-action-label {
+            display: none !important;
+          }
+          .gm-panel-action-btn {
+            padding: 8px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+            width: 40px !important;
+            height: 40px !important;
+            border-radius: 50% !important;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .gm-panel-action-btn {
+            min-width: 36px !important;
+            min-height: 36px !important;
+            width: 36px !important;
+            height: 36px !important;
+            padding: 6px !important;
+          }
+          .gm-panel-action-btn svg {
+            width: 14px !important;
+            height: 14px !important;
+          }
+          .gm-panel-action-btn > span:first-child {
+            font-size: 12px !important;
+          }
+        }
       `}</style>
 
       <div
@@ -441,10 +476,13 @@ export default function RotationPanel({ onRefresh }) {
             {isPrivileged && currentSession && (
               <button
                 onClick={openPosterStudio}
-                title="Open Poster Studio"
+                title={t.posterStudio || "Poster Studio"}
+                aria-label={t.posterStudio || "Poster Studio"}
+                className="gm-panel-action-btn"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
+                  justifyContent: "center",
                   gap: 6,
                   padding: "8px 18px",
                   borderRadius: 10,
@@ -458,7 +496,10 @@ export default function RotationPanel({ onRefresh }) {
                   boxShadow: "0 4px 16px rgba(59,130,246,0.3)",
                 }}
               >
-                🎨 {t.posterStudio || "Poster Studio"}
+                <span style={{ fontSize: 14, lineHeight: 1 }}>🎨</span>
+                <span className="gm-action-label">
+                  {t.posterStudio || "Poster Studio"}
+                </span>
               </button>
             )}
 
@@ -466,9 +507,21 @@ export default function RotationPanel({ onRefresh }) {
               <button
                 onClick={handleAssignNext}
                 disabled={assigning}
+                title={
+                  assigning
+                    ? t.assigning || "Assigning..."
+                    : t.assignNext || "Assign Next"
+                }
+                aria-label={
+                  assigning
+                    ? t.assigning || "Assigning..."
+                    : t.assignNext || "Assign Next"
+                }
+                className="gm-panel-action-btn"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
+                  justifyContent: "center",
                   gap: 6,
                   padding: "8px 18px",
                   borderRadius: 10,
@@ -492,9 +545,11 @@ export default function RotationPanel({ onRefresh }) {
                 ) : (
                   <FiArrowRight size={14} />
                 )}
-                {assigning
-                  ? t.assigning || "Assigning..."
-                  : t.assignNext || "Assign Next"}
+                <span className="gm-action-label">
+                  {assigning
+                    ? t.assigning || "Assigning..."
+                    : t.assignNext || "Assign Next"}
+                </span>
               </button>
             )}
 
