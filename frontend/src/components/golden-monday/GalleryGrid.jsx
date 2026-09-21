@@ -480,99 +480,6 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
     }
   }, [folderModal, loadGallery, onRefresh, handleCloseModal]);
 
-  // ─── Handle File Selection ──
-  const handleFileSelect = useCallback(
-    (e) => {
-      const files = Array.from(e.target.files);
-      if (files.length === 0) return;
-
-      const allowedTypes = {
-        image: { mimes: ["image/"], maxSize: 10 * 1024 * 1024 },
-        pdf: { mimes: ["application/pdf"], maxSize: 10 * 1024 * 1024 },
-        presentation: {
-          mimes: [
-            "application/vnd.ms-powerpoint",
-            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-          ],
-          maxSize: 10 * 1024 * 1024,
-        },
-        document: {
-          mimes: [
-            "application/msword",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-          ],
-          maxSize: 10 * 1024 * 1024,
-        },
-        video: { mimes: ["video/"], maxSize: 100 * 1024 * 1024 },
-      };
-
-      const validFiles = [];
-      const rejectedFiles = [];
-
-      for (const file of files) {
-        let matchedType = null;
-        for (const [typeKey, typeConfig] of Object.entries(allowedTypes)) {
-          if (
-            typeConfig.mimes.some(
-              (mime) =>
-                file.type.startsWith(mime.replace("*", "")) ||
-                file.type === mime,
-            )
-          ) {
-            matchedType = typeKey;
-            break;
-          }
-        }
-        if (!matchedType) {
-          rejectedFiles.push({
-            name: file.name,
-            reason: `Unsupported file type: ${file.type || "unknown"}`,
-          });
-          continue;
-        }
-        const typeConfig = allowedTypes[matchedType];
-        if (file.size > typeConfig.maxSize) {
-          rejectedFiles.push({
-            name: file.name,
-            reason: `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB, max ${(typeConfig.maxSize / 1024 / 1024).toFixed(0)}MB)`,
-          });
-          continue;
-        }
-        validFiles.push(file);
-      }
-
-      if (rejectedFiles.length > 0) {
-        const messages = rejectedFiles.map((f) => `❌ ${f.name}: ${f.reason}`);
-        showToast(
-          `${rejectedFiles.length} file(s) rejected:\n${messages.join("\n")}`,
-          "warning",
-          { duration: 5000 },
-        );
-      }
-
-      if (validFiles.length === 0) {
-        if (rejectedFiles.length === 0) {
-          showToast("No valid files selected", "warning");
-        }
-        e.target.value = "";
-        return;
-      }
-
-      setUploadQueue(
-        validFiles.map((file) => ({
-          file,
-          id: Date.now() + Math.random(),
-          status: "pending",
-          progress: 0,
-          category: category !== "all" ? category : null,
-        })),
-      );
-      setIsUploadModalOpen(true);
-      e.target.value = "";
-    },
-    [category],
-  );
-
   // ─── Process Upload Queue ──
   const processUploadQueue = useCallback(
     async (folderId, topic) => {
@@ -743,6 +650,117 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
       loadGallery,
       onRefresh,
     ],
+  );
+
+  // ─── Handle File Selection ──
+  // ─── Handle File Selection ──────────────────────────────────
+  const handleFileSelect = useCallback(
+    (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+
+      const allowedTypes = {
+        image: { mimes: ["image/"], maxSize: 10 * 1024 * 1024 },
+        pdf: { mimes: ["application/pdf"], maxSize: 10 * 1024 * 1024 },
+        presentation: {
+          mimes: [
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+          ],
+          maxSize: 10 * 1024 * 1024,
+        },
+        document: {
+          mimes: [
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          ],
+          maxSize: 10 * 1024 * 1024,
+        },
+        video: { mimes: ["video/"], maxSize: 100 * 1024 * 1024 },
+      };
+
+      const validFiles = [];
+      const rejectedFiles = [];
+
+      for (const file of files) {
+        let matchedType = null;
+        for (const [typeKey, typeConfig] of Object.entries(allowedTypes)) {
+          if (
+            typeConfig.mimes.some(
+              (mime) =>
+                file.type.startsWith(mime.replace("*", "")) ||
+                file.type === mime,
+            )
+          ) {
+            matchedType = typeKey;
+            break;
+          }
+        }
+        if (!matchedType) {
+          rejectedFiles.push({
+            name: file.name,
+            reason: `Unsupported file type: ${file.type || "unknown"}`,
+          });
+          continue;
+        }
+        const typeConfig = allowedTypes[matchedType];
+        if (file.size > typeConfig.maxSize) {
+          rejectedFiles.push({
+            name: file.name,
+            reason: `File too large (${(file.size / 1024 / 1024).toFixed(1)}MB, max ${(typeConfig.maxSize / 1024 / 1024).toFixed(0)}MB)`,
+          });
+          continue;
+        }
+        validFiles.push(file);
+      }
+
+      if (rejectedFiles.length > 0) {
+        const messages = rejectedFiles.map((f) => `❌ ${f.name}: ${f.reason}`);
+        showToast(
+          `${rejectedFiles.length} file(s) rejected:\n${messages.join("\n")}`,
+          "warning",
+          { duration: 5000 },
+        );
+      }
+
+      if (validFiles.length === 0) {
+        if (rejectedFiles.length === 0)
+          showToast("No valid files selected", "warning");
+        e.target.value = "";
+        return;
+      }
+
+      const queueItems = validFiles.map((file) => ({
+        file,
+        id: Date.now() + Math.random(),
+        status: "pending",
+        progress: 0,
+        category: category !== "all" ? category : null,
+      }));
+
+      setUploadQueue(queueItems);
+
+      if (currentFolder) {
+        // Already viewing an existing folder — attach these uploads
+        // directly to it instead of opening the "create folder" modal.
+        // That modal always resolves a folder by topic + today's date
+        // (getOrCreateWeekFolder), which can silently land new photos in
+        // a DIFFERENT folder than the one on screen. currentFolder is
+        // always a "week" folder here (see loadGallery's Case 1), which
+        // is exactly the shape POST /gallery's folderId expects — the
+        // backend finds/creates the right fileType subfolder itself.
+        processUploadQueue(
+          currentFolder._id,
+          currentFolder.title || "",
+          queueItems,
+        );
+      } else {
+        setIsUploadModalOpen(true);
+      }
+
+      e.target.value = "";
+    },
+    [category, currentFolder, processUploadQueue],
   );
 
   const removeFromQueue = useCallback((id) => {
@@ -1213,7 +1231,8 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                   </>
                 ) : (
                   <>
-                    <FiUpload size={14} /> {t.upload || "Upload Media"}
+                    <FiUpload size={14} />{" "}
+                    {currentFolder ? "Add Photos" : t.upload || "Upload Media"}
                   </>
                 )}
                 <input
@@ -1739,7 +1758,7 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 : "Upload media to create a new Golden Monday folder"
               : t.checkBackLater || "Check back later"}
           </p>
-          {isAdmin && !currentFolder && (
+          {isAdmin && (
             <label
               style={{
                 display: "inline-flex",
@@ -1763,10 +1782,13 @@ export default function GalleryGrid({ sessionId = null, onRefresh }) {
                 (e.currentTarget.style.background = `${C.primary}11`)
               }
             >
-              <FiUpload size={16} /> Create First Folder
+              <FiUpload size={16} />
+              {currentFolder
+                ? "Add Photos to This Folder"
+                : "Create First Folder"}
               <input
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,video/*"
                 multiple
                 onChange={handleFileSelect}
                 style={{ display: "none" }}
