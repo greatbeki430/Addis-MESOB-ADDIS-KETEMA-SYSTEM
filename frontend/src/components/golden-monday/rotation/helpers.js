@@ -20,14 +20,50 @@ export const fileToBase64 = (file) =>
     reader.readAsDataURL(file);
   });
 
-// ─── Small helper: extract the current unannounced session ──
-export const pickCurrentSession = (sessions = []) =>
-  sessions.find((s) => s.presenter && s.status !== "cancelled") || null;
+// ─── Small helper: pick the session the rotation panel is *about* ─
+//
+// The panel is always about the NEXT upcoming session — the one whose
+// presenter needs managing. Not the most recent session (which is
+// already in the past), and not "any session with a presenter".
+//
+// Priority:
+//   1. Soonest session whose date >= today, not cancelled
+//   2. If none upcoming, the most recent past session (so the panel
+//      still shows something sensible on the Monday after a session)
+//
+// This matters because every action in the panel — Set Title,
+// Manual Assign, Re-announce — needs to target a specific week, and
+// the only correct target is the one the user is actually looking at.
+export const pickCurrentSession = (sessions = []) => {
+  if (!Array.isArray(sessions) || sessions.length === 0) return null;
+
+  const now = new Date();
+  const notCancelled = sessions.filter((s) => s && s.status !== "cancelled");
+
+  // Upcoming first — soonest date wins.
+  const upcoming = notCancelled
+    .filter((s) => s.date && new Date(s.date) >= now)
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  if (upcoming.length > 0) return upcoming[0];
+
+  // Fallback: most recent past session.
+  const past = notCancelled
+    .filter((s) => s.date && new Date(s.date) < now)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  return past[0] || null;
+};
 
 // ─── Data hook ──────────────────────────────────────────────
-// Loads rotation preview + all sessions + live recordings in
-// parallel. Exposes a refresh function so any child can trigger
-// a reload after an action.
+// Loads sessions + live recordings first, then computes the target
+// week from the sessions, then loads the rotation preview for THAT
+// week. This ordering matters: the ranking must be computed for the
+// same week the panel is targeting, not for whatever "next Monday
+// from now" happens to be. When those two diverge — e.g. on a
+// Tuesday after a Monday session, or when a future week has been
+// manually assigned — the panel would otherwise display a ranking
+// for week A while the assignment buttons write to week B.
 export function useRotationData({ onRefresh, autoLoad = true } = {}) {
   const isMounted = useRef(true);
   const [ranking, setRanking] = useState([]);
@@ -39,24 +75,43 @@ export function useRotationData({ onRefresh, autoLoad = true } = {}) {
   const loadAll = useCallback(async () => {
     if (!isMounted.current) return;
     setLoading(true);
+
     try {
-      const [rotationRes, sessionsRes, recordingsRes] = await Promise.all([
-        goldenMondayAPI
-          .previewRotation()
-          .catch(() => ({ data: { ranking: [] } })),
+      // 1. Fetch sessions + recordings in parallel. Sessions drive
+      //    everything else in this hook, so they must resolve first.
+      const [sessionsRes, recordingsRes] = await Promise.all([
         goldenMondayAPI.getAll().catch(() => ({ data: [] })),
         goldenMondayAPI.getLiveRecordings().catch(() => ({ data: [] })),
       ]);
 
-      const rankingData = rotationRes?.data?.ranking;
-      const sessions = sessionsRes?.data || [];
+      if (!isMounted.current) return;
+
+      const sessions = Array.isArray(sessionsRes?.data) ? sessionsRes.data : [];
+      const target = pickCurrentSession(sessions);
+      const targetWeekOf = target?.weekOf || target?.date || null;
+
+      // 2. Fetch the rotation preview FOR THE TARGET WEEK. If we have
+      //    no target (empty roster, no sessions), pass nothing and let
+      //    the backend default to next Monday — at least the panel
+      //    shows something.
+      const rotationRes = await goldenMondayAPI
+        .previewRotation(targetWeekOf || undefined)
+        .catch(() => ({ data: { ranking: [] } }));
 
       if (!isMounted.current) return;
 
+      const rankingData = rotationRes?.data?.ranking;
+
+      // 3. Commit all state at once. currentSession is derived from
+      //    the SAME sessions array we computed the target week from,
+      //    so the panel's "target week" and the ranking's week can
+      //    never disagree.
       setRanking(Array.isArray(rankingData) ? rankingData : []);
       setAllSessions(sessions);
-      setCurrentSession(pickCurrentSession(sessions));
-      setRecordings(recordingsRes?.data || []);
+      setCurrentSession(target);
+      setRecordings(
+        Array.isArray(recordingsRes?.data) ? recordingsRes.data : [],
+      );
 
       if (onRefresh) onRefresh();
     } catch (err) {

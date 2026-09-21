@@ -8,6 +8,14 @@
 //
 // The algorithm's choice is highlighted at the top with a "recommended"
 // badge so admins know who they're overriding.
+//
+// The week banner at the top is critical: this modal writes to a
+// SPECIFIC week, and without a visible indicator of which week, an
+// admin can easily assign to the wrong one (which is exactly the bug
+// this revision fixes — the parent used to pass a past week when
+// currentSession resolved to the most recent past session, and the
+// modal silently submitted the write to a session that already had a
+// presenter, so nothing changed).
 
 import { useState, useMemo } from "react";
 import { createPortal } from "react-dom";
@@ -19,10 +27,30 @@ import {
   FiStar,
   FiLoader,
   FiAlertTriangle,
+  FiCalendar,
 } from "react-icons/fi";
 import { C, F } from "../../../styles/theme";
 import { goldenMondayAPI } from "../../../services/api";
 import { notify } from "./helpers";
+
+// Format a week (ISO string, Date, or null) for the banner. Falls
+// back to the raw value if parsing fails, so a bad input is at least
+// visible rather than silently blank.
+const formatWeekLabel = (iso) => {
+  if (!iso) return null;
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    return d.toLocaleDateString(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  } catch {
+    return String(iso);
+  }
+};
 
 export default function ManualPresenterPicker({
   isOpen,
@@ -58,8 +86,25 @@ export default function ManualPresenterPicker({
     );
   }, [ranking, search]);
 
+  const weekLabel = formatWeekLabel(targetWeekOf);
+  const hasTargetWeek = Boolean(targetWeekOf && weekLabel);
+
   const handleConfirm = async () => {
     if (!selectedId) return;
+
+    // Guard: refuse to submit without a valid target week. Previously
+    // this silently did nothing if the parent hadn't supplied one, and
+    // the user saw "Presenter assigned" for an operation that was
+    // never performed.
+    if (!hasTargetWeek) {
+      notify(
+        t.noTargetWeek ||
+          "No target week set — close this dialog and try again from the rotation panel.",
+        "error",
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       await goldenMondayAPI.assignPresenter(selectedId, targetWeekOf);
@@ -157,6 +202,52 @@ export default function ManualPresenterPicker({
           >
             <FiX size={20} />
           </button>
+        </div>
+
+        {/* Target week banner — shows exactly which week this assignment
+            will write to. Red when there's no target so the user never
+            sees a "success" for a no-op. */}
+        <div
+          style={{
+            margin: "12px 24px 0",
+            padding: "10px 14px",
+            borderRadius: 10,
+            background: hasTargetWeek ? `${C.primary}0d` : "#FEF2F2",
+            border: `1px solid ${hasTargetWeek ? `${C.primary}33` : "#FECACA"}`,
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+          }}
+        >
+          {hasTargetWeek ? (
+            <FiCalendar size={16} color={C.primary} style={{ flexShrink: 0 }} />
+          ) : (
+            <FiAlertTriangle
+              size={16}
+              color="#DC2626"
+              style={{ flexShrink: 0 }}
+            />
+          )}
+          <div
+            style={{
+              fontSize: 12,
+              color: hasTargetWeek ? C.dark : "#7F1D1D",
+            }}
+          >
+            {hasTargetWeek ? (
+              <>
+                <strong>{t.assigningToWeek || "Assigning to week:"}</strong>{" "}
+                <span style={{ color: C.primary, fontWeight: 700 }}>
+                  {weekLabel}
+                </span>
+              </>
+            ) : (
+              <span style={{ fontWeight: 700 }}>
+                {t.noTargetWeek ||
+                  "No target week set — this dialog can't submit an assignment. Close it and reopen from the rotation panel."}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Warning banner */}
@@ -387,16 +478,28 @@ export default function ManualPresenterPicker({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={!selectedId || submitting}
+            disabled={!selectedId || submitting || !hasTargetWeek}
+            title={
+              !hasTargetWeek
+                ? t.noTargetWeek || "No target week set"
+                : undefined
+            }
             style={{
               padding: "10px 24px",
               borderRadius: 10,
               border: "none",
-              background: !selectedId || submitting ? C.border : C.primary,
-              color: !selectedId || submitting ? C.muted : "#fff",
+              background:
+                !selectedId || submitting || !hasTargetWeek
+                  ? C.border
+                  : C.primary,
+              color:
+                !selectedId || submitting || !hasTargetWeek ? C.muted : "#fff",
               fontWeight: 700,
               fontSize: 13,
-              cursor: !selectedId || submitting ? "not-allowed" : "pointer",
+              cursor:
+                !selectedId || submitting || !hasTargetWeek
+                  ? "not-allowed"
+                  : "pointer",
               display: "inline-flex",
               alignItems: "center",
               gap: 6,

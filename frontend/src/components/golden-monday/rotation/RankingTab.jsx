@@ -11,6 +11,7 @@ import {
   FiMinimize2,
   FiUserPlus,
   FiSearch,
+  FiCalendar,
 } from "react-icons/fi";
 import { C, F } from "../../../styles/theme";
 import { RankingSkeleton } from "./Skeleton";
@@ -24,6 +25,7 @@ export default function RankingTab({
   expandedRanking,
   setExpandedRanking,
   onOpenManualPicker,
+  targetWeekOf,
   t,
 }) {
   const [search, setSearch] = useState("");
@@ -195,15 +197,37 @@ export default function RankingTab({
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-start",
           marginBottom: 12,
           flexWrap: "wrap",
           gap: 8,
         }}
       >
-        <span style={{ fontSize: 12, color: C.muted }}>
-          {t.rotationOrder || "Rotation order (longest-waiting first)"}
-        </span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+          <span style={{ fontSize: 12, color: C.muted }}>
+            {t.rotationOrder || "Rotation order (longest-waiting first)"}
+          </span>
+          {targetWeekOf && (
+            <span
+              style={{
+                fontSize: 11,
+                color: C.primary,
+                fontWeight: 700,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <FiCalendar size={11} />
+              {t.targetWeekLabel || "Target week:"}{" "}
+              {new Date(targetWeekOf).toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+              })}
+            </span>
+          )}
+        </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           {isPrivileged && (
             <>

@@ -30,6 +30,20 @@ import PosterStudio from "../PosterStudio";
 // headroom for the encoded string plus session title and metadata.
 const MAX_RECORDING_BYTES = 35 * 1024 * 1024;
 
+// Compute the upcoming Monday in UTC — same rule the backend uses
+// in `mondayOf()`. Used as a last-resort fallback if `currentSession`
+// has no `weekOf` field for any reason. Without this, `openManualPicker`
+// could hand the picker a null week, which used to silently no-op the
+// assignment.
+const upcomingMondayISO = () => {
+  const d = new Date();
+  const day = d.getUTCDay();
+  const diff = (day === 0 ? -6 : 1) - day;
+  d.setUTCDate(d.getUTCDate() + diff + 7); // next Monday, not today's
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
+};
+
 export default function RotationPanel({ onRefresh }) {
   const { user } = useAuth();
   const { language } = useLanguage();
@@ -68,6 +82,15 @@ export default function RotationPanel({ onRefresh }) {
     useRotationData({ onRefresh });
 
   const sessionId = currentSession?._id || null;
+
+  // ─── The week every action in this panel targets ─────────────
+  // Derived once, reused everywhere: the manual picker's target,
+  // the ranking tab's label, the title-save call's scope. Falls
+  // back to the upcoming Monday if the session lacks a weekOf field
+  // (older documents created before weekOf was added, or edge cases
+  // where the API returned a session without it).
+  const targetWeekOf =
+    currentSession?.weekOf || currentSession?.date || upcomingMondayISO();
 
   // ─── Derived: is the already-assigned dialog open? ───────────
   // It's open only if a session was captured AND that session is
@@ -187,17 +210,23 @@ export default function RotationPanel({ onRefresh }) {
   }, [alreadyAssignedFor, t, loadAll]);
 
   // Preserve the week the admin was looking at when they chose
-  // "Reassign" so the manual picker targets that same week.
+  // "Reassign" so the manual picker targets that same week. Falls
+  // back to the panel's current target week if the dialog's session
+  // has no weekOf.
   const handleReassignFromDialog = useCallback(() => {
-    const targetWeekOf = alreadyAssignedFor?.weekOf || null;
+    const dialogWeek =
+      alreadyAssignedFor?.weekOf || alreadyAssignedFor?.date || targetWeekOf;
     setAlreadyAssignedFor(null);
-    setManualPickerFor({ targetWeekOf });
-  }, [alreadyAssignedFor]);
+    setManualPickerFor({ targetWeekOf: dialogWeek });
+  }, [alreadyAssignedFor, targetWeekOf]);
 
   // ─── Open/close manual picker ───────────────────────────────
+  // Always passes a non-null targetWeekOf. If the current session
+  // lacks a weekOf field, we fall back to the upcoming Monday — this
+  // is what used to be null and made the picker silently no-op.
   const openManualPicker = useCallback(() => {
-    setManualPickerFor({ targetWeekOf: currentSession?.weekOf || null });
-  }, [currentSession]);
+    setManualPickerFor({ targetWeekOf });
+  }, [targetWeekOf]);
 
   const closeManualPicker = useCallback(() => {
     setManualPickerFor(null);
@@ -366,7 +395,7 @@ export default function RotationPanel({ onRefresh }) {
           }
         }
 
-                @media (max-width: 380px) {
+        @media (max-width: 380px) {
           .gm-panel-action-btn {
             min-width: 36px !important;
             min-height: 36px !important;
@@ -699,6 +728,7 @@ export default function RotationPanel({ onRefresh }) {
                 expandedRanking={expandedRanking}
                 setExpandedRanking={setExpandedRanking}
                 onOpenManualPicker={openManualPicker}
+                targetWeekOf={targetWeekOf}
                 t={t}
               />
             </motion.div>
@@ -756,7 +786,7 @@ export default function RotationPanel({ onRefresh }) {
         isOpen={posterStudioVisible}
         onClose={closePosterStudio}
         session={currentSession}
-        onPosted={handlePosterPosted}
+        onPosterPosted={handlePosterPosted}
       />
     </div>
   );
