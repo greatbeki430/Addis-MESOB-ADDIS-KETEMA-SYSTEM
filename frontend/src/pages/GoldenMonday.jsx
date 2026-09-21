@@ -412,7 +412,7 @@ function StatsDashboard({ stats, nextPresenter, loading, t }) {
         borderRadius: 20,
         padding: "clamp(20px, 3vw, 32px)",
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+        gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))",
         gap: 16,
       }}
       className="stats-grid"
@@ -2715,6 +2715,8 @@ export default function GoldenMonday() {
                             style={{
                               width: 44,
                               height: 44,
+                              minWidth: 44,
+                              flexShrink: 0,
                               borderRadius: 12,
                               background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
                               display: "flex",
@@ -2757,6 +2759,7 @@ export default function GoldenMonday() {
                             style={{
                               padding: "8px 22px",
                               borderRadius: 10,
+                              marginLeft: "auto",
                               border: "none",
                               background: `linear-gradient(135deg, ${C.gold}, ${C.goldLight})`,
                               color: C.dark,
