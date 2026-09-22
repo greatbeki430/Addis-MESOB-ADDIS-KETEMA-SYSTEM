@@ -2452,8 +2452,14 @@ router.get("/qr-checkin/my-history", protect, anyRole, getMyQRHistory);
 
 // ─── 1. ADMIN GENERATES SESSION QR (GET) ─────────────────────
 // GET /api/golden-monday/qr-checkin/:sessionId
-// Returns a QR code image. When an EMPLOYEE scans it, their own
-// JWT identifies them — the QR only carries the sessionId.
+// Returns a QR code image encoding a SHORT-LIVED, ROTATING token —
+// not just the sessionId. This is what prevents someone from
+// screenshotting the QR and sending it to another person to scan
+// from anywhere: the token embedded in the image expires ~30s after
+// it's generated, and the frontend re-calls this endpoint on a timer
+// while the "Show Session QR" modal is open, so the on-screen code
+// keeps changing. A screenshot is only good for the brief window it
+// was taken in.
 router.get(
   "/qr-checkin/:sessionId",
   protect,
@@ -2462,18 +2468,50 @@ router.get(
     try {
       const { sessionId } = req.params;
       const QRCode = require("qrcode");
+      const crypto = require("crypto");
 
-      const session = await GoldenMondaySession.findById(sessionId);
+      const session = await GoldenMondaySession.findById(sessionId).select(
+        "+qrToken +qrTokenExpiresAt +qrPrevToken +qrPrevTokenExpiresAt",
+      );
       if (!session) {
         return res.status(404).json({ error: "Session not found" });
       }
 
+      // const now = Date.now();
+      // const TOKEN_TTL_MS = 30 * 1000; // how long a freshly-shown QR stays scannable
+      // const PREV_GRACE_MS = 10 * 1000; // covers a scan in-flight during refresh
+      const now = Date.now();
+      const TOKEN_TTL_MS = 30 * 1000;
+      const PREV_GRACE_MS = 10 * 1000;
+      // Schedule the frontend's next silent refresh comfortably BEFORE
+      // this token's own TTL elapses — not exactly at it. Without this
+      // buffer, refreshInMs === TOKEN_TTL_MS means the client's refresh
+      // timer fires right as (or, with any latency, just after) the
+      // currently-displayed token expires, leaving a brief window where
+      // a legitimate scan can be rejected as "expired" even though nothing
+      // looks wrong on the admin's screen.
+      const REFRESH_BUFFER_MS = 8 * 1000;
+
+      // Rotate: whatever was the active token becomes the "previous"
+      // token with a short grace window (covers an employee who
+      // decoded the image a split second before the admin's screen
+      // refreshes to a new one), and a brand-new token becomes the
+      // one actually shown.
+      if (session.qrToken) {
+        session.qrPrevToken = session.qrToken;
+        session.qrPrevTokenExpiresAt = new Date(now + PREV_GRACE_MS);
+      }
+      session.qrToken = crypto.randomBytes(16).toString("hex");
+      session.qrTokenExpiresAt = new Date(now + TOKEN_TTL_MS);
+      await session.save();
+
       const qrPayload = JSON.stringify({
         type: "gm-session-checkin",
         sessionId: session._id.toString(),
+        token: session.qrToken,
         title: session.title || "Golden Monday Session",
         date: session.date,
-        generatedAt: Date.now(),
+        generatedAt: now,
       });
 
       const qrCode = await QRCode.toDataURL(qrPayload, {
@@ -2483,9 +2521,23 @@ router.get(
         color: { dark: "#0d1a5e", light: "#ffffff" },
       });
 
+      // res.json({
+      //   success: true,
+      //   qrCode,
+      //   expiresAt: session.qrTokenExpiresAt,
+      //   refreshInMs: TOKEN_TTL_MS,
+      //   session: {
+      //     id: session._id,
+      //     title: session.title,
+      //     date: session.date,
+      //   },
+      // });
+
       res.json({
         success: true,
         qrCode,
+        expiresAt: session.qrTokenExpiresAt,
+        refreshInMs: Math.max(TOKEN_TTL_MS - REFRESH_BUFFER_MS, 5000),
         session: {
           id: session._id,
           title: session.title,
@@ -2511,11 +2563,48 @@ router.get(
 router.post("/qr-checkin/:sessionId", protect, anyRole, async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const { location } = req.body || {};
+    const { location, token } = req.body || {};
 
-    const session = await GoldenMondaySession.findById(sessionId);
+    const session = await GoldenMondaySession.findById(sessionId).select(
+      "+qrToken +qrTokenExpiresAt +qrPrevToken +qrPrevTokenExpiresAt",
+    );
     if (!session) {
       return res.status(404).json({ error: "Session not found" });
+    }
+
+    // ── Rotating-token validation ──────────────────────────────
+    // The QR on the coordinator's screen rotates every ~20s (see the
+    // GET handler above). A missing or expired token is rejected
+    // here — this is the actual anti-screenshot enforcement, not
+    // just cosmetic QR swapping. The "previous token" check only
+    // covers the brief overlap between a display refresh and an
+    // in-flight scan; it does not make an old screenshot reusable
+    // once both windows have passed.
+    if (!token) {
+      return res.status(400).json({
+        error:
+          "This QR code is out of date. Ask the coordinator to show it again.",
+        code: "QR_TOKEN_MISSING",
+      });
+    }
+    const now = Date.now();
+    const matchesCurrent =
+      session.qrToken &&
+      token === session.qrToken &&
+      session.qrTokenExpiresAt &&
+      session.qrTokenExpiresAt.getTime() > now;
+    const matchesPrev =
+      session.qrPrevToken &&
+      token === session.qrPrevToken &&
+      session.qrPrevTokenExpiresAt &&
+      session.qrPrevTokenExpiresAt.getTime() > now;
+
+    if (!matchesCurrent && !matchesPrev) {
+      return res.status(410).json({
+        error:
+          "This QR code has expired. Ask the coordinator to show it again.",
+        code: "QR_TOKEN_EXPIRED",
+      });
     }
 
     const existing = await GoldenMondayAttendance.findOne({

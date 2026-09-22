@@ -1114,22 +1114,59 @@ function QRCheckInCard({ sessionId, onCheckIn }) {
   }, [sessionId]);
 
   // ─── Load session QR (admin) ───
-  const loadSessionQR = useCallback(async () => {
-    if (!sessionId) return;
-    try {
-      setLoadingSessionQR(true);
-      const res = await goldenMondayAPI.generateQRCheckIn(sessionId);
-      if (res?.data?.qrCode) setSessionQR(res.data.qrCode);
-    } catch (err) {
-      console.error("Failed to load session QR:", err);
-      showToast(
-        err.response?.data?.error || "Failed to load session QR",
-        "error",
-      );
-    } finally {
-      setLoadingSessionQR(false);
-    }
-  }, [sessionId]);
+  // Guards against overlapping fetches (a slow network response
+  // arriving after a newer one has already landed).
+  const qrFetchInFlightRef = useRef(false);
+  const qrRefreshTimeoutRef = useRef(null);
+  const loadSessionQRRef = useRef(null);
+
+  const loadSessionQR = useCallback(
+    async ({ silent = false } = {}) => {
+      if (!sessionId || qrFetchInFlightRef.current) return;
+      qrFetchInFlightRef.current = true;
+      try {
+        // "silent" refreshes (the background auto-rotation) never
+        // toggle the loading spinner — that spinner is only for the
+        // first open, so it doesn't overlay the still-valid QR image
+        // that's already on screen and about to be swapped anyway.
+        if (!silent) setLoadingSessionQR(true);
+        const res = await goldenMondayAPI.generateQRCheckIn(sessionId);
+        if (res?.data?.qrCode) setSessionQR(res.data.qrCode);
+
+        // Self-scheduling refresh: use the server's own refreshInMs
+        // (comfortably inside its token TTL) rather than a fixed
+        // client-side guess, so the next fetch is always timed
+        // correctly even if this request itself was slow.
+        if (qrRefreshTimeoutRef.current) {
+          clearTimeout(qrRefreshTimeoutRef.current);
+          qrRefreshTimeoutRef.current = null;
+        }
+        const refreshInMs = res?.data?.refreshInMs || 20000;
+        qrRefreshTimeoutRef.current = setTimeout(() => {
+          setShowSessionQR((isOpen) => {
+            if (isOpen) loadSessionQRRef.current?.({ silent: true });
+            return isOpen;
+          });
+        }, refreshInMs);
+      } catch (err) {
+        console.error("Failed to load session QR:", err);
+        if (!silent) {
+          showToast(
+            err.response?.data?.error || "Failed to load session QR",
+            "error",
+          );
+        }
+      } finally {
+        qrFetchInFlightRef.current = false;
+        setLoadingSessionQR(false);
+      }
+    },
+    [sessionId],
+  );
+
+  useEffect(() => {
+    loadSessionQRRef.current = loadSessionQR;
+  }, [loadSessionQR]);
 
   // ─── Load MY personal QR (all users) ───
   const loadMyQR = useCallback(async () => {
@@ -1152,6 +1189,31 @@ function QRCheckInCard({ sessionId, onCheckIn }) {
     }, 0);
     return () => clearTimeout(timer);
   }, [isAdmin, sessionId, loadSessionQR]);
+
+  // Keep the displayed session QR alive while the modal is open: pull
+  // a fresh, differently-tokened QR from the server every 20s, well
+  // inside the token's 30s server-side TTL. This is what makes a
+  // photo of the screen stop working shortly after it's taken —
+  // rotation only protects security if it's actually re-fetched on a
+  // schedule, not just re-generated once on open.
+  // Cleans up the self-scheduled refresh timer when the modal closes
+  // or the component unmounts — loadSessionQR schedules its own next
+  // call now (see above), so this effect just needs to cancel that
+  // chain rather than drive it with setInterval.
+  useEffect(() => {
+    if (!showSessionQR) {
+      if (qrRefreshTimeoutRef.current) {
+        clearTimeout(qrRefreshTimeoutRef.current);
+        qrRefreshTimeoutRef.current = null;
+      }
+    }
+    return () => {
+      if (qrRefreshTimeoutRef.current) {
+        clearTimeout(qrRefreshTimeoutRef.current);
+        qrRefreshTimeoutRef.current = null;
+      }
+    };
+  }, [showSessionQR]);
 
   // Shared: notify the parent without ever letting its failure escape.
   // refreshData() is an async function; an unhandled rejection from it inside
@@ -1193,6 +1255,7 @@ function QRCheckInCard({ sessionId, onCheckIn }) {
 
         const res = await goldenMondayAPI.recordQRCheckIn(payload.sessionId, {
           location: "qr-scan",
+          token: payload.token, // rotating token decoded from the QR image
         });
         const data = res?.data || {};
 
@@ -1219,9 +1282,15 @@ function QRCheckInCard({ sessionId, onCheckIn }) {
         await notifyParent();
       } catch (err) {
         console.error("Employee check-in failed:", err);
+        const code = err.response?.data?.code;
         const msg =
           err.response?.data?.error || t.checkInError || "Check-in failed";
-        if (err.response?.data?.alreadyCheckedIn) {
+
+        if (code === "QR_TOKEN_EXPIRED" || code === "QR_TOKEN_MISSING") {
+          // Screenshot / stale QR — distinct, actionable message instead
+          // of a generic failure toast.
+          showToast(msg, "warning");
+        } else if (err.response?.data?.alreadyCheckedIn) {
           showToast(
             t.qrAlreadyCheckedInShort ||
               "You've already checked in to this session",
@@ -1376,7 +1445,10 @@ function QRCheckInCard({ sessionId, onCheckIn }) {
         {isAdmin && (
           <button
             onClick={() => {
-              if (!sessionQR && !loadingSessionQR) loadSessionQR();
+              // Always fetch a fresh token when opening — a stale
+              // cached QR from earlier in the session must never be
+              // reused as-is.
+              loadSessionQR();
               setShowSessionQR(true);
             }}
             disabled={loadingSessionQR || submitting}
@@ -1683,7 +1755,7 @@ function QRCheckInCard({ sessionId, onCheckIn }) {
         }
         hint={
           t.qrSessionModalHint ||
-          '📱 Ask the person to open Golden Monday → "Scan QR" on their phone'
+          '📱 Ask the person to open Golden Monday → "Scan QR" on their phone. This code refreshes automatically every few seconds for security — always scan the one currently on screen.'
         }
       />
 

@@ -148,6 +148,19 @@ const goldenMondaySessionSchema = new mongoose.Schema(
       default: [],
     },
 
+    // ─── QR Check-In Rotation ─────────────────────────────────
+    // select: false is deliberate: GET /api/golden-monday (anyRole)
+    // returns full session docs via s.toObject() to every logged-in
+    // employee. Without select: false, the live token would leak to
+    // everyone on every session-list fetch — defeating the entire
+    // point of rotating it. Every route that needs to read/write
+    // these must explicitly .select("+qrToken +qrTokenExpiresAt
+    // +qrPrevToken +qrPrevTokenExpiresAt").
+    qrToken: { type: String, default: null, select: false },
+    qrTokenExpiresAt: { type: Date, default: null, select: false },
+    qrPrevToken: { type: String, default: null, select: false },
+    qrPrevTokenExpiresAt: { type: Date, default: null, select: false },
+
     // Raw notes and recap
     rawNotes: { type: String, default: "", trim: true },
     recapEn: { type: String, default: "", trim: true },
