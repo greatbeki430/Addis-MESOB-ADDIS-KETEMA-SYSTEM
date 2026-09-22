@@ -37,6 +37,7 @@ import TimeExpiredModal from "../components/forum-report/TimeExpiredModal";
 import AutoSaveIndicator from "../components/forum-report/AutoSaveIndicator";
 import { forumReportService } from "../services/forumReportService";
 import SignatureModal from "../components/forum-report/SignatureModal";
+import { useTimerBeep } from "../hooks/useTimerBeep";
 
 // ✅ React Icons
 import {
@@ -1025,6 +1026,12 @@ export default function ForumReport({
       );
     },
   });
+  // Play a beep when the timer crosses 5 min / 1 min / 10 s remaining.
+  // The mute toggle is passed down to MeetingTimer for the UI control.
+  const { isMuted, toggleMute } = useTimerBeep({
+    isActive: timerActive,
+    timeRemaining,
+  });
 
   // ─── Auto-save handler ───────────────────────────────────────
   const handleAutoSave = useCallback(async () => {
@@ -1934,6 +1941,8 @@ ${"=".repeat(50)}
           onExtend={() => setShowExpiredModal(true)}
           isAdmin={isAdmin}
           onResume={handleResumeReport}
+          isMuted={isMuted}
+          onToggleMute={toggleMute}
         />
       </div>
 
