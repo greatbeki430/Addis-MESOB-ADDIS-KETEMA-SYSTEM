@@ -225,6 +225,13 @@ const isPlainObject = (v) =>
 // Detect a base64 image data-URL
 const isImageDataUrl = (v) =>
   typeof v === "string" && /^data:image\/[a-z]+;base64,/i.test(v);
+// Detect an http(s) URL that points to an image
+const isImageUrl = (v) =>
+  typeof v === "string" &&
+  /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|avif)(\?.*)?$/i.test(v);
+
+// True for either a data: URL or an http(s) image URL
+const isImageLike = (v) => isImageDataUrl(v) || isImageUrl(v);
 
 const isDateLike = (v) =>
   typeof v === "string" &&
@@ -1561,28 +1568,54 @@ function renderModalValue(value, isMobile = false) {
     }
   }
 
-  // Base64 image data URL → render as an actual <img>
-  if (isImageDataUrl(value)) {
+  // Image URL or base64 data URL → render as an actual <img>
+  if (isImageLike(value)) {
+    const isDataUrl = isImageDataUrl(value);
     return (
-      <img
-        src={value}
-        alt="Signature"
-        style={{
-          maxWidth: "100%",
-          maxHeight: isMobile ? 90 : 140,
-          borderRadius: 8,
-          border: `1px solid ${C.border}`,
-          background: "#fff",
-          padding: 6,
-          display: "block",
-        }}
-      />
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <img
+          src={value}
+          alt={isDataUrl ? "Signature" : "Image"}
+          style={{
+            maxWidth: "100%",
+            maxHeight: isMobile ? 140 : 200,
+            borderRadius: 10,
+            border: `1px solid ${C.border}`,
+            background: "#fff",
+            padding: isDataUrl ? 6 : 0,
+            display: "block",
+            objectFit: "cover",
+          }}
+          onError={(e) => {
+            // If the image fails to load, replace with the raw URL text
+            const parent = e.currentTarget.parentNode;
+            if (parent) {
+              parent.innerHTML = `<span style="color:${C.muted};font-size:12px;word-break:break-all">${value}</span>`;
+            }
+          }}
+        />
+        {!isDataUrl && (
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontSize: 11,
+              color: C.primary,
+              textDecoration: "none",
+              fontWeight: 600,
+            }}
+          >
+            Open in new tab ↗
+          </a>
+        )}
+      </div>
     );
   }
 
   if (Array.isArray(value)) {
-    // Array of base64 image strings → grid of signatures
-    if (value.every((v) => isImageDataUrl(v))) {
+    // Array of image strings (base64 or http) → grid of images
+    if (value.every((v) => isImageLike(v))) {
       return (
         <div
           style={{
