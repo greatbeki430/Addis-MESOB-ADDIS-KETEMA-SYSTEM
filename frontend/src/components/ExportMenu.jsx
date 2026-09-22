@@ -22,16 +22,27 @@ const ExportMenu = ({
   data,
   t,
   teamName,
+  // The following props are reserved for the certificate / biweekly
+  // branches, which are currently commented out inside handleExport.
+  // They are intentionally NOT listed in the useCallback deps array —
+  // ESLint's react-hooks/exhaustive-deps rule only wants deps that the
+  // callback body actually reads. When those branches are re-enabled,
+  // add them back to the dep array alongside the code that reads them.
+  //
+  // eslint-disable-next-line no-unused-vars
   meetingNumber,
   reportDate,
-  // certificate / biweekly only — unused while those branches are
-  // commented out, kept in the signature so call sites don't need to
-  // change when the branches are re-enabled.
+  // eslint-disable-next-line no-unused-vars
   employeeName,
+  // eslint-disable-next-line no-unused-vars
   month,
+  // eslint-disable-next-line no-unused-vars
   score,
+  // eslint-disable-next-line no-unused-vars
   weeklyData,
+  // eslint-disable-next-line no-unused-vars
   startDate,
+  // eslint-disable-next-line no-unused-vars
   endDate,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -96,7 +107,9 @@ const ExportMenu = ({
         // evaluation page should call exportEvaluationReportToPDF()
         // directly with its full argument list.
 
-        // Uncomment once the certificate branch is wired up:
+        // Uncomment once the certificate branch is wired up. Remember
+        // to also add employeeName, month, teamName, and score to the
+        // deps array below when you do.
         // case "certificate":
         //   exportRecognitionCertificateToPDF(
         //     employeeName,
@@ -106,7 +119,9 @@ const ExportMenu = ({
         //   );
         //   break;
 
-        // Uncomment once the biweekly branch is wired up:
+        // Uncomment once the biweekly branch is wired up. Remember to
+        // also add weeklyData, startDate, endDate, and teamName to the
+        // deps array below when you do.
         // case "biweekly":
         //   exportBiWeeklyAggregateReportToPDF(
         //     weeklyData,
@@ -124,22 +139,7 @@ const ExportMenu = ({
     } finally {
       setIsOpen(false);
     }
-  }, [
-    type,
-    data,
-    t,
-    teamName,
-    meetingNumber,
-    reportDate,
-    // Only used when the certificate / biweekly branches are re-enabled.
-    // Listed here so the hook doesn't go stale if those branches return.
-    employeeName,
-    month,
-    score,
-    weeklyData,
-    startDate,
-    endDate,
-  ]);
+  }, [type, data, t, teamName, reportDate]);
 
   return (
     <div
