@@ -23,20 +23,17 @@ import {
   FiGrid,
   FiCheckCircle,
   FiXCircle,
+  FiInfo,
+  FiUsers,
+  FiPenTool,
+  FiAlignLeft,
+  FiActivity,
 } from "react-icons/fi";
-import {} from // FaCheck,
-// FaTimes,
-// FaTrash,
-// FaEye,
-// FaDownload,
-// FaSearch,
-// FaCalendarAlt,
-"react-icons/fa";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 
-// Column configurations with React Icons
+// ─── Column configurations (unchanged) ──────────────────────────
 const COLUMN_CONFIGS = {
   evaluations: {
     label: "Evaluations",
@@ -135,6 +132,134 @@ const COLUMN_CONFIGS = {
   },
 };
 
+// ─── Sensitive fields that must never render ────────────────────
+const BLOCKED_FIELDS = new Set([
+  "password",
+  "__v",
+  "_id",
+  "id",
+  "profilePhotoPublicId",
+]);
+
+// ─── Human-friendly key labels ──────────────────────────────────
+const KEY_LABELS = {
+  topic: "Topic",
+  author_name: "Author",
+  team_name: "Team",
+  createdAt: "Created",
+  updatedAt: "Last Updated",
+  date: "Date",
+  timeStart: "Start Time",
+  timeEnd: "End Time",
+  present: "Present Members",
+  absent: "Absent Members",
+  prevResults: "Previous Results",
+  topics: "Discussion Topics",
+  explanation: "Explanation",
+  gaps: "Identified Gaps",
+  agreements: "Agreed Points",
+  signatures: "Signatures",
+  teamName: "Team Name",
+  createdBy: "Created By",
+  team: "Team",
+  status: "Status",
+  isAutoSave: "Auto-Saved",
+  lastAutoSave: "Last Auto-Save",
+  autoSaveCount: "Auto-Save Count",
+  meetingDuration: "Meeting Duration (min)",
+  timeExpired: "Time Expired",
+  timeExpiredAt: "Expired At",
+  extensionApproved: "Extension Approved",
+  extensionExpiresAt: "Extension Expires",
+  isResumed: "Resumed",
+  resumedAt: "Resumed At",
+  isLocked: "Locked",
+  lockedAt: "Locked At",
+  lockedReason: "Lock Reason",
+  adminNotes: "Admin Notes",
+  reviewedBy: "Reviewed By",
+  reviewedAt: "Reviewed At",
+  finalizedAt: "Finalized At",
+  aiGeneratedContent: "AI Generated Content",
+  employee_name: "Employee",
+  submittedBy: "Submitted By",
+  evaluatedBy: "Evaluated By",
+  evaluatedAt: "Evaluated At",
+  bestPerformer: "Best Performer",
+  averageScore: "Average Score",
+  highestScore: "Highest Score",
+  lowestScore: "Lowest Score",
+  totalMembers: "Total Members",
+  members: "Members",
+  scores: "Scores",
+  comments: "Comments",
+  totalScores: "Total Scores",
+  grandTotal: "Grand Total",
+  entries: "Entries",
+  summary: "Summary",
+  reactions: "Reactions",
+  replies: "Replies",
+  name: "Name",
+  email: "Email",
+  role: "Role",
+  position: "Position",
+  branch: "Branch",
+  department: "Department",
+  phone: "Phone",
+  leader: "Leader",
+};
+
+// ─── Helpers ────────────────────────────────────────────────────
+const formatLabel = (key) =>
+  KEY_LABELS[key] ||
+  key
+    .replace(/_/g, " ")
+    .replace(/([A-Z])/g, " $1")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+const isPlainObject = (v) =>
+  v !== null && typeof v === "object" && !Array.isArray(v);
+
+const isDateLike = (v) =>
+  typeof v === "string" &&
+  /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?Z?)?$/.test(v);
+
+const formatValue = (value) => {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return value.toLocaleString();
+
+  if (isDateLike(value)) {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) {
+      // Show date + time nicely
+      const hasTime = value.includes("T");
+      return d.toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        ...(hasTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+      });
+    }
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "—";
+    return value
+      .map((v) =>
+        typeof v === "object"
+          ? v.name || v.text || v.title || JSON.stringify(v)
+          : String(v),
+      )
+      .join(", ");
+  }
+
+  return String(value);
+};
+
+// ─── Component ──────────────────────────────────────────────────
 const AdminDataManagement = ({ dataType }) => {
   const { user } = useAuth();
   const [data, setData] = useState([]);
@@ -163,7 +288,6 @@ const AdminDataManagement = ({ dataType }) => {
 
   const config = COLUMN_CONFIGS[dataType];
 
-  // Cleanup on unmount
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -174,14 +298,12 @@ const AdminDataManagement = ({ dataType }) => {
     };
   }, []);
 
-  // Fetch data with filters
   const fetchData = useCallback(async () => {
     if (!user?._id || !isMountedRef.current) return;
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-
     abortControllerRef.current = new AbortController();
 
     setLoading(true);
@@ -227,7 +349,6 @@ const AdminDataManagement = ({ dataType }) => {
     }
   }, [user, dataType, filters, pagination.page, pagination.limit]);
 
-  // Load initial data
   useEffect(() => {
     if (user?._id && !hasLoadedRef.current) {
       hasLoadedRef.current = true;
@@ -235,13 +356,11 @@ const AdminDataManagement = ({ dataType }) => {
     }
   }, [user?._id, fetchData]);
 
-  // Handle filter changes
   const handleFilterChange = useCallback((key, value) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPagination((prev) => ({ ...prev, page: 1 }));
   }, []);
 
-  // Handle sorting
   const handleSort = useCallback(
     (key) => {
       const newOrder =
@@ -252,23 +371,18 @@ const AdminDataManagement = ({ dataType }) => {
     [filters.sortBy, filters.sortOrder, handleFilterChange],
   );
 
-  // Handle search with debounce
   useEffect(() => {
     if (hasLoadedRef.current) {
       const timer = setTimeout(() => {
-        if (filters.search !== "") {
-          fetchData();
-        }
+        if (filters.search !== "") fetchData();
       }, 500);
       return () => clearTimeout(timer);
     }
   }, [filters.search, fetchData]);
 
-  // Handle bulk actions
   const handleBulkAction = useCallback(
     async (action) => {
       if (!selectedItems.length) return;
-
       try {
         await axios.post(
           `${API_BASE_URL}/admin/data/${dataType}/bulk-action`,
@@ -288,7 +402,6 @@ const AdminDataManagement = ({ dataType }) => {
     [dataType, selectedItems, fetchData],
   );
 
-  // Handle export
   const handleExport = useCallback(async () => {
     try {
       const response = await axios.post(
@@ -299,7 +412,6 @@ const AdminDataManagement = ({ dataType }) => {
           responseType: "blob",
         },
       );
-
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement("a");
       link.href = url;
@@ -315,13 +427,11 @@ const AdminDataManagement = ({ dataType }) => {
     }
   }, [dataType, filters]);
 
-  // View item details
   const viewItem = useCallback((item) => {
     setSelectedItem(item);
     setShowModal(true);
   }, []);
 
-  // Delete item
   const deleteItem = useCallback(
     async (id) => {
       if (window.confirm("Are you sure you want to delete this item?")) {
@@ -340,10 +450,8 @@ const AdminDataManagement = ({ dataType }) => {
     [dataType, fetchData],
   );
 
-  // Render cell value based on type
   const renderCellValue = useCallback((item, col) => {
     const value = item[col.key];
-
     if (value === null || value === undefined) return "—";
 
     const statusColors = {
@@ -356,6 +464,9 @@ const AdminDataManagement = ({ dataType }) => {
       verified: "#10B981",
       resolved: "#3B82F6",
       dismissed: "#6B7280",
+      in_progress: "#8B5CF6",
+      auto_saved: "#F59E0B",
+      draft: "#6B7280",
     };
 
     const priorityColors = {
@@ -378,7 +489,8 @@ const AdminDataManagement = ({ dataType }) => {
           <span
             className="status-badge"
             style={{
-              backgroundColor: statusColors[value.toLowerCase()] || "#6B7280",
+              backgroundColor:
+                statusColors[String(value).toLowerCase()] || "#6B7280",
               color: "#fff",
               padding: "4px 12px",
               borderRadius: "12px",
@@ -399,8 +511,7 @@ const AdminDataManagement = ({ dataType }) => {
         return (
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
             <span style={{ fontWeight: 600 }}>{value}</span>
-            {value >= 80 && <FiStar size={14} color="#f59e0b" />}
-            {value >= 60 && value < 80 && <FiStar size={14} color="#f59e0b" />}
+            {value >= 60 && <FiStar size={14} color="#f59e0b" />}
           </div>
         );
 
@@ -409,7 +520,8 @@ const AdminDataManagement = ({ dataType }) => {
           <span
             className="priority-badge"
             style={{
-              backgroundColor: priorityColors[value.toLowerCase()] || "#6B7280",
+              backgroundColor:
+                priorityColors[String(value).toLowerCase()] || "#6B7280",
               color: "#fff",
               padding: "4px 12px",
               borderRadius: "12px",
@@ -429,7 +541,8 @@ const AdminDataManagement = ({ dataType }) => {
           <span
             className="severity-badge"
             style={{
-              backgroundColor: severityColors[value.toLowerCase()] || "#6B7280",
+              backgroundColor:
+                severityColors[String(value).toLowerCase()] || "#6B7280",
               color: "#fff",
               padding: "4px 12px",
               borderRadius: "12px",
@@ -463,7 +576,6 @@ const AdminDataManagement = ({ dataType }) => {
     }
   }, []);
 
-  // Pagination controls
   const renderPagination = useCallback(() => {
     const { page, totalPages } = pagination;
     if (totalPages <= 1) return null;
@@ -527,8 +639,156 @@ const AdminDataManagement = ({ dataType }) => {
     );
   }
 
+  // ─── Section grouping for the modal ────────────────────────────
+  const SECTION_MAP = {
+    "forum-reports": [
+      {
+        title: "Report Summary",
+        icon: <FiFileText size={16} />,
+        keys: ["topic", "team_name", "author_name", "createdAt", "status"],
+      },
+      {
+        title: "Meeting Details",
+        icon: <FiCalendar size={16} />,
+        keys: ["date", "timeStart", "timeEnd", "teamName"],
+      },
+      {
+        title: "Attendees",
+        icon: <FiUsers size={16} />,
+        keys: ["present", "absent"],
+      },
+      {
+        title: "Discussion",
+        icon: <FiMessageSquare size={16} />,
+        keys: ["topics", "prevResults", "explanation", "gaps", "agreements"],
+      },
+      {
+        title: "Signatures",
+        icon: <FiPenTool size={16} />,
+        keys: ["signatures"],
+      },
+      {
+        title: "Activity",
+        icon: <FiActivity size={16} />,
+        keys: [
+          "isAutoSave",
+          "lastAutoSave",
+          "autoSaveCount",
+          "finalizedAt",
+          "adminNotes",
+        ],
+      },
+    ],
+    "daily-reports": [
+      {
+        title: "Report Summary",
+        icon: <FiFileText size={16} />,
+        keys: ["employee_name", "team_name", "submittedBy", "date", "status"],
+      },
+      {
+        title: "Totals",
+        icon: <FiBarChart2 size={16} />,
+        keys: ["grandTotal"],
+      },
+      {
+        title: "Entries",
+        icon: <FiAlignLeft size={16} />,
+        keys: ["entries"],
+      },
+      {
+        title: "Summary",
+        icon: <FiAlignLeft size={16} />,
+        keys: ["summary"],
+      },
+    ],
+    evaluations: [
+      {
+        title: "Evaluation Summary",
+        icon: <FiStar size={16} />,
+        keys: [
+          "employee_name",
+          "team_name",
+          "score",
+          "averageScore",
+          "highestScore",
+          "lowestScore",
+          "bestPerformer",
+          "totalMembers",
+          "status",
+          "createdAt",
+        ],
+      },
+      {
+        title: "Members",
+        icon: <FiUsers size={16} />,
+        keys: ["members"],
+      },
+      {
+        title: "Scores",
+        icon: <FiBarChart2 size={16} />,
+        keys: ["totalScores"],
+      },
+      {
+        title: "Comments",
+        icon: <FiMessageSquare size={16} />,
+        keys: ["comments"],
+      },
+      {
+        title: "Audit",
+        icon: <FiActivity size={16} />,
+        keys: ["evaluatedBy", "evaluatedAt"],
+      },
+    ],
+  };
+
+  const buildSections = (item, dtype) => {
+    const map = SECTION_MAP[dtype] || [];
+    const usedKeys = new Set();
+    const sections = [];
+
+    map.forEach((section) => {
+      const rows = section.keys
+        .filter((k) => k in item && !BLOCKED_FIELDS.has(k))
+        .map((k) => {
+          usedKeys.add(k);
+          return { key: k, value: item[k] };
+        })
+        .filter(({ value }) => {
+          // Hide empty arrays and null/undefined values
+          if (value === null || value === undefined) return false;
+          if (Array.isArray(value) && value.length === 0) return false;
+          return true;
+        });
+      if (rows.length > 0) {
+        sections.push({ ...section, rows });
+      }
+    });
+
+    // Remaining keys not covered by any section → "More Details"
+    const leftovers = Object.keys(item)
+      .filter((k) => !usedKeys.has(k) && !BLOCKED_FIELDS.has(k))
+      .filter((k) => {
+        const v = item[k];
+        if (v === null || v === undefined) return false;
+        if (Array.isArray(v) && v.length === 0) return false;
+        return true;
+      })
+      .map((k) => ({ key: k, value: item[k] }));
+
+    if (leftovers.length > 0) {
+      sections.push({
+        title: "More Details",
+        icon: <FiInfo size={16} />,
+        rows: leftovers,
+      });
+    }
+
+    return sections;
+  };
+
   return (
     <div style={{ padding: "20px" }}>
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -615,6 +875,9 @@ const AdminDataManagement = ({ dataType }) => {
           <option value="approved">Approved</option>
           <option value="rejected">Rejected</option>
           <option value="completed">Completed</option>
+          <option value="in_progress">In Progress</option>
+          <option value="auto_saved">Auto Saved</option>
+          <option value="draft">Draft</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
           <option value="verified">Verified</option>
@@ -685,13 +948,7 @@ const AdminDataManagement = ({ dataType }) => {
         }}
       >
         {loading ? (
-          <div
-            style={{
-              padding: "60px",
-              textAlign: "center",
-              color: C.muted,
-            }}
-          >
+          <div style={{ padding: "60px", textAlign: "center", color: C.muted }}>
             <FiClock size={32} style={{ marginBottom: 12 }} />
             <div>Loading...</div>
           </div>
@@ -801,10 +1058,7 @@ const AdminDataManagement = ({ dataType }) => {
                           </td>
                         ))}
                         <td
-                          style={{
-                            padding: "12px 16px",
-                            textAlign: "center",
-                          }}
+                          style={{ padding: "12px 16px", textAlign: "center" }}
                         >
                           <div
                             style={{
@@ -960,13 +1214,14 @@ const AdminDataManagement = ({ dataType }) => {
         </div>
       )}
 
-      {/* View Modal */}
+      {/* ─── View Modal (rebuilt) ─────────────────────────────────── */}
       {showModal && selectedItem && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(0,0,0,0.5)",
+            background: "rgba(15, 23, 42, 0.55)",
+            backdropFilter: "blur(4px)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -979,80 +1234,359 @@ const AdminDataManagement = ({ dataType }) => {
             style={{
               background: C.white,
               borderRadius: 16,
-              padding: 24,
-              maxWidth: 600,
+              maxWidth: 720,
               width: "100%",
-              maxHeight: "80vh",
-              overflow: "auto",
+              maxHeight: "88vh",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Modal header */}
             <div
               style={{
+                padding: "18px 24px",
+                borderBottom: `1px solid ${C.border}`,
                 display: "flex",
-                justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 16,
+                justifyContent: "space-between",
+                gap: 12,
+                background: `linear-gradient(135deg, ${C.primary}10, ${C.primary}05)`,
               }}
             >
-              <h2
-                style={{
-                  margin: 0,
-                  color: C.dark,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <FiEye size={24} color={C.primary} />
-                Details
-              </h2>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    background: C.primary,
+                    color: "#fff",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexShrink: 0,
+                  }}
+                >
+                  {config.icon}
+                </div>
+                <div>
+                  <h2
+                    style={{
+                      margin: 0,
+                      fontSize: 18,
+                      color: C.dark,
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {config.label} Details
+                  </h2>
+                  <p
+                    style={{
+                      margin: "2px 0 0",
+                      fontSize: 12,
+                      color: C.muted,
+                    }}
+                  >
+                    Full record view — sensitive fields hidden
+                  </p>
+                </div>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
                 style={{
-                  background: "none",
+                  background: "rgba(0,0,0,0.05)",
                   border: "none",
-                  fontSize: 24,
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
                   cursor: "pointer",
                   color: C.muted,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(0,0,0,0.1)";
+                  e.currentTarget.style.color = C.dark;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(0,0,0,0.05)";
+                  e.currentTarget.style.color = C.muted;
                 }}
               >
-                <FiX size={24} />
+                <FiX size={18} />
               </button>
             </div>
-            {Object.entries(selectedItem).map(([key, value]) => (
-              <div
-                key={key}
-                style={{
-                  display: "flex",
-                  padding: "8px 0",
-                  borderBottom: `1px solid ${C.border}44`,
-                }}
-              >
+
+            {/* Modal body — sections */}
+            <div
+              style={{
+                padding: "20px 24px",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: 20,
+              }}
+            >
+              {buildSections(selectedItem, dataType).map((section, sIdx) => (
+                <div key={sIdx}>
+                  {/* Section header */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginBottom: 10,
+                      paddingBottom: 8,
+                      borderBottom: `2px solid ${C.primary}22`,
+                    }}
+                  >
+                    <span style={{ color: C.primary }}>{section.icon}</span>
+                    <span
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: C.primary,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      {section.title}
+                    </span>
+                  </div>
+
+                  {/* Section rows */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                    }}
+                  >
+                    {section.rows.map((row, rIdx) => (
+                      <div
+                        key={rIdx}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "160px 1fr",
+                          gap: 12,
+                          padding: "8px 12px",
+                          background:
+                            rIdx % 2 === 0 ? "#FAFBFC" : "transparent",
+                          borderRadius: 6,
+                          alignItems: "flex-start",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: C.muted,
+                            textTransform: "uppercase",
+                            letterSpacing: "0.03em",
+                            paddingTop: 2,
+                          }}
+                        >
+                          {formatLabel(row.key)}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 13,
+                            color: C.dark,
+                            wordBreak: "break-word",
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {renderModalValue(row.value)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {buildSections(selectedItem, dataType).length === 0 && (
                 <div
                   style={{
-                    width: 140,
-                    fontWeight: 600,
+                    textAlign: "center",
+                    padding: "40px 20px",
                     color: C.muted,
-                    fontSize: 13,
                   }}
                 >
-                  {key.replace(/_/g, " ").toUpperCase()}
+                  <FiInfo size={32} style={{ marginBottom: 8 }} />
+                  <p>No displayable fields in this record.</p>
                 </div>
-                <div style={{ flex: 1, fontSize: 13, color: C.dark }}>
-                  {value !== null && value !== undefined
-                    ? typeof value === "object"
-                      ? JSON.stringify(value)
-                      : String(value)
-                    : "—"}
-                </div>
-              </div>
-            ))}
+              )}
+            </div>
+
+            {/* Modal footer */}
+            <div
+              style={{
+                padding: "12px 24px",
+                borderTop: `1px solid ${C.border}`,
+                background: "#FAFBFC",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+              }}
+            >
+              <button
+                onClick={() => setShowModal(false)}
+                style={{
+                  padding: "8px 20px",
+                  background: C.primary,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                  fontSize: 13,
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 };
+
+// ─── Modal value renderer (handles all value types) ─────────────
+function renderModalValue(value) {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return value.toLocaleString();
+
+  if (isDateLike(value)) {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) {
+      const hasTime = value.includes("T");
+      return d.toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        ...(hasTime ? { hour: "2-digit", minute: "2-digit" } : {}),
+      });
+    }
+  }
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return "—";
+
+    // Array of strings → pill list
+    if (value.every((v) => typeof v === "string" || typeof v === "number")) {
+      return (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {value.map((v, i) => (
+            <span
+              key={i}
+              style={{
+                background: `${C.primary}15`,
+                color: C.primary,
+                padding: "2px 10px",
+                borderRadius: 12,
+                fontSize: 12,
+                fontWeight: 500,
+              }}
+            >
+              {v}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    // Array of objects → mini cards
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {value.map((v, i) => (
+          <div
+            key={i}
+            style={{
+              background: "#fff",
+              border: `1px solid ${C.border}`,
+              borderRadius: 6,
+              padding: "6px 10px",
+              fontSize: 12,
+            }}
+          >
+            {isPlainObject(v)
+              ? Object.entries(v)
+                  .filter(([k]) => !BLOCKED_FIELDS.has(k))
+                  .map(([k, vv]) => (
+                    <div
+                      key={k}
+                      style={{
+                        display: "flex",
+                        gap: 6,
+                        marginBottom: 2,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontWeight: 600,
+                          color: C.muted,
+                          minWidth: 70,
+                        }}
+                      >
+                        {formatLabel(k)}:
+                      </span>
+                      <span style={{ color: C.dark }}>{formatValue(vv)}</span>
+                    </div>
+                  ))
+              : formatValue(v)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Nested object → sub rows
+  if (isPlainObject(value)) {
+    const entries = Object.entries(value).filter(
+      ([k]) => !BLOCKED_FIELDS.has(k),
+    );
+    if (entries.length === 0) return "—";
+
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          background: "#fff",
+          border: `1px solid ${C.border}`,
+          borderRadius: 6,
+          padding: "8px 12px",
+        }}
+      >
+        {entries.map(([k, vv]) => (
+          <div
+            key={k}
+            style={{
+              display: "grid",
+              gridTemplateColumns: "120px 1fr",
+              gap: 8,
+              fontSize: 12,
+            }}
+          >
+            <span style={{ fontWeight: 600, color: C.muted }}>
+              {formatLabel(k)}
+            </span>
+            <span style={{ color: C.dark }}>{formatValue(vv)}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return String(value);
+}
 
 export default AdminDataManagement;
