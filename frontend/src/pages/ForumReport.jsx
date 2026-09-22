@@ -1006,7 +1006,7 @@ export default function ForumReport({
     initialTimeRemaining: getInitialTimeRemaining(),
     onTimeExpired: () => {
       setIsReportLocked(true);
-      handleAutoSave();
+      handleFinalizeOnExpiry(); // ← changed from handleAutoSave
       setShowExpiredModal(true);
       localStorage.removeItem(STORAGE_KEY);
     },
@@ -1048,7 +1048,7 @@ export default function ForumReport({
         gaps: form.gaps.filter((g) => g.trim() !== ""),
         agreements: form.agreements.filter((a) => a.trim() !== ""),
         signatures: form.signatures.filter((s) => s.trim() !== ""),
-        teamId: selectedTeam?.id || selectedTeam?._id,
+        team: selectedTeam?.id || selectedTeam?._id,
         teamName: selectedTeam?.name || "Unknown Team",
         isAutoSave: true,
         status: "in_progress",
@@ -1064,6 +1064,58 @@ export default function ForumReport({
       throw error;
     }
   }, [form, selectedTeam, tf, showToast]);
+
+  // ─── Finalize on timer expiry ────────────────────────────────
+  // Called when the meeting timer hits zero. Unlike handleAutoSave,
+  // this marks the report as status: "completed" and isAutoSave: false,
+  // so the admin sees it as a finished report instead of an in-progress
+  // draft. Falls back to the draft auto-save if the finalize call fails,
+  // so no data is lost.
+  const handleFinalizeOnExpiry = useCallback(async () => {
+    try {
+      const reportData = {
+        date: form.date,
+        timeStart: form.timeStart,
+        timeEnd: form.timeEnd,
+        present: form.present.filter((p) => p.trim() !== ""),
+        absent: form.absent.filter((a) => a.name.trim() !== ""),
+        prevResults: form.prevResults.filter((p) => p.trim() !== ""),
+        topics: form.topics.filter((t) => t.trim() !== ""),
+        explanation: form.explanation || "",
+        gaps: form.gaps.filter((g) => g.trim() !== ""),
+        agreements: form.agreements.filter((a) => a.trim() !== ""),
+        signatures: form.signatures.filter((s) => s.trim() !== ""),
+        team: selectedTeam?.id || selectedTeam?._id,
+        teamName: selectedTeam?.name || "Unknown Team",
+        aiGeneratedContent: aiGeneratedContent,
+        isAutoSave: false,
+        status: "completed",
+        finalizedAt: new Date().toISOString(),
+      };
+
+      if (editingId) {
+        await meetingAPI.update(editingId, reportData);
+      } else {
+        await meetingAPI.create(reportData);
+      }
+
+      // Nudge the History tab so a completed report appears immediately
+      // when the user switches to it.
+      setHistoryRefreshKey((k) => k + 1);
+      console.log("✅ Report finalized on timer expiry");
+    } catch (error) {
+      console.error(
+        "Finalize on expiry failed, falling back to draft save:",
+        error,
+      );
+      // Don't lose data — save as a draft if the finalized save fails.
+      try {
+        await handleAutoSave();
+      } catch (fallbackError) {
+        console.error("Fallback auto-save also failed:", fallbackError);
+      }
+    }
+  }, [form, selectedTeam, editingId, aiGeneratedContent, handleAutoSave]);
 
   // ─── Extension request handler ──────────────────────────────
   const handleRequestExtension = async (reason) => {
@@ -1501,7 +1553,7 @@ ${"=".repeat(50)}
         gaps: form.gaps.filter((g) => g.trim() !== ""),
         agreements: form.agreements.filter((a) => a.trim() !== ""),
         signatures: form.signatures.filter((s) => s.trim() !== ""),
-        teamId: selectedTeam?.id || selectedTeam?._id,
+        team: selectedTeam?.id || selectedTeam?._id,
         teamName: selectedTeam?.name || "Unknown Team",
         aiGeneratedContent: aiGeneratedContent,
       };
