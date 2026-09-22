@@ -1572,19 +1572,29 @@ function renderModalValue(value, isMobile = false) {
   if (isImageLike(value)) {
     const isDataUrl = isImageDataUrl(value);
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+          alignItems: "flex-start",
+        }}
+      >
+        {" "}
         <img
           src={value}
           alt={isDataUrl ? "Signature" : "Image"}
           style={{
-            maxWidth: "100%",
-            maxHeight: isMobile ? 140 : 200,
+            width: "auto",
+            height: "auto",
+            maxWidth: isMobile ? "100%" : 280,
+            maxHeight: isMobile ? 160 : 220,
             borderRadius: 10,
             border: `1px solid ${C.border}`,
             background: "#fff",
             padding: isDataUrl ? 6 : 0,
             display: "block",
-            objectFit: "cover",
+            objectFit: "contain",
           }}
           onError={(e) => {
             // If the image fails to load, replace with the raw URL text
@@ -1641,6 +1651,8 @@ function renderModalValue(value, isMobile = false) {
                 src={v}
                 alt={`Signature ${i + 1}`}
                 style={{
+                  width: "auto",
+                  height: "auto",
                   maxWidth: "100%",
                   maxHeight: isMobile ? 70 : 100,
                   objectFit: "contain",
