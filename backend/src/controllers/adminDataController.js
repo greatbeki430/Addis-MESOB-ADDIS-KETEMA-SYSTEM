@@ -14,6 +14,10 @@ const mongoose = require("mongoose");
 // Every row MUST have a string `id` (frontend uses it for React keys,
 // checkboxes, delete URLs, and the view modal) and MUST expose the
 // specific keys each column config reads — see the SHAPING block below.
+//
+// NOTE: the Meeting model names its team reference `team` (not `teamId`),
+// per backend/src/models/Meeting.js. All populate + shaping paths for
+// forum-reports therefore use `team`.
 // ─────────────────────────────────────────────────────────────
 exports.getData = async (req, res) => {
   try {
@@ -96,9 +100,14 @@ exports.getData = async (req, res) => {
     const sort = { [sortBy]: sortDir };
 
     // ── Populate ─────────────────────────────────────────────
+    // Field names MUST match the schema:
+    //   Meeting.team    → ref "Team"
+    //   Meeting.createdBy → ref "User"
+    //   DailyReport.team  → ref "Team"
+    //   Evaluation.team   → ref "Team"
     let populateFields = [];
     if (dataType === "forum-reports") {
-      populateFields = ["createdBy", "teamId"];
+      populateFields = ["createdBy", "team"];
     } else if (dataType === "daily-reports") {
       populateFields = ["createdBy", "team"];
     } else if (dataType === "evaluations") {
@@ -127,7 +136,7 @@ exports.getData = async (req, res) => {
           (m.explanation || "").slice(0, 60) ||
           "(no topic)",
         author_name: m.createdBy?.name || "Unknown",
-        team_name: m.teamId?.name || m.teamName || "Unknown",
+        team_name: m.team?.name || m.teamName || "Unknown",
         replies: 0,
         createdAt: m.createdAt,
         status: m.status || "pending",
@@ -146,7 +155,7 @@ exports.getData = async (req, res) => {
         signatures: m.signatures || [],
         teamName: m.teamName,
         createdBy: m.createdBy,
-        teamId: m.teamId,
+        team: m.team,
       }));
     } else if (dataType === "daily-reports") {
       data = rawData.map((d) => ({
@@ -242,6 +251,15 @@ exports.bulkAction = async (req, res) => {
       return res.status(400).json({ success: false, error: "No IDs provided" });
     }
 
+    // Guard against non-ObjectId strings — otherwise $in silently
+    // matches nothing (delete/update "succeeds" with 0 modified).
+    const validIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    if (validIds.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, error: "No valid IDs provided" });
+    }
+
     let model;
     switch (dataType) {
       case "daily-reports":
@@ -262,23 +280,23 @@ exports.bulkAction = async (req, res) => {
     let result;
     switch (action) {
       case "delete":
-        result = await model.deleteMany({ _id: { $in: ids } });
+        result = await model.deleteMany({ _id: { $in: validIds } });
         break;
       case "archive":
         result = await model.updateMany(
-          { _id: { $in: ids } },
+          { _id: { $in: validIds } },
           { status: "archived" },
         );
         break;
       case "approve":
         result = await model.updateMany(
-          { _id: { $in: ids } },
+          { _id: { $in: validIds } },
           { status: "approved" },
         );
         break;
       case "reject":
         result = await model.updateMany(
-          { _id: { $in: ids } },
+          { _id: { $in: validIds } },
           { status: "rejected" },
         );
         break;
@@ -312,7 +330,15 @@ exports.exportData = async (req, res) => {
 
     let model;
     let data;
-    const query = ids ? { _id: { $in: ids.split(",") } } : {};
+
+    // Only include ObjectId-valid ids in the $in filter.
+    let query = {};
+    if (ids) {
+      const validIds = ids
+        .split(",")
+        .filter((id) => mongoose.Types.ObjectId.isValid(id));
+      query = { _id: { $in: validIds } };
+    }
 
     switch (dataType) {
       case "daily-reports":
@@ -328,7 +354,7 @@ exports.exportData = async (req, res) => {
             (item.createdBy
               ? `${item.createdBy.firstName || ""} ${item.createdBy.lastName || ""}`.trim()
               : "N/A"),
-          Team: item.team?.name || "N/A",
+          Team: item.team?.name || item.teamName || "N/A",
           Entries: item.entries?.length || 0,
           GrandTotal: item.grandTotal || 0,
           Summary: item.summary || "N/A",
@@ -360,9 +386,9 @@ exports.exportData = async (req, res) => {
         data = await model
           .find(query)
           .populate("createdBy", "name email")
-          .populate("teamId", "name");
+          .populate("team", "name");
         data = data.map((item) => ({
-          Team: item.teamId?.name || item.teamName || "N/A",
+          Team: item.team?.name || item.teamName || "N/A",
           Date: item.date?.toLocaleDateString() || "N/A",
           Attendees: item.present?.length || 0,
           Absent: item.absent?.length || 0,
@@ -396,6 +422,10 @@ exports.exportData = async (req, res) => {
 exports.deleteItem = async (req, res) => {
   try {
     const { dataType, id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ success: false, error: "Invalid item id" });
+    }
 
     let model;
     switch (dataType) {
