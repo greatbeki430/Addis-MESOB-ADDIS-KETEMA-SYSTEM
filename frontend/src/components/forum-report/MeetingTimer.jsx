@@ -1,8 +1,14 @@
 // frontend/src/components/forum-report/MeetingTimer.jsx
-// Meeting timer display with visual progress and warnings
+// Meeting timer display with visual progress, warnings, and audio toggle.
 
 import { C, radius, shadows } from "../../styles/theme";
-import { FiClock, FiAlertTriangle, FiCheckCircle } from "react-icons/fi";
+import {
+  FiClock,
+  FiAlertTriangle,
+  FiCheckCircle,
+  FiVolume2,
+  FiVolumeX,
+} from "react-icons/fi";
 
 const MeetingTimer = ({
   timeRemaining,
@@ -13,6 +19,10 @@ const MeetingTimer = ({
   progressSaved,
   warningMessage,
   onExtend,
+  // Audio warning controls — optional so the component still works
+  // if a caller doesn't pass them (e.g. admin progress views).
+  isMuted = false,
+  onToggleMute = null,
 }) => {
   const getStatusColor = () => {
     switch (status) {
@@ -160,6 +170,41 @@ const MeetingTimer = ({
               <FiCheckCircle size={12} />
               Auto-saved
             </div>
+          )}
+
+          {/* Audio toggle — only shown when a handler is supplied. */}
+          {onToggleMute && (
+            <button
+              type="button"
+              onClick={onToggleMute}
+              aria-pressed={isMuted}
+              aria-label={
+                isMuted ? "Unmute timer warnings" : "Mute timer warnings"
+              }
+              title={isMuted ? "Unmute timer warnings" : "Mute timer warnings"}
+              style={{
+                background: isMuted ? "#fee2e2" : "#eff6ff",
+                color: isMuted ? "#b91c1c" : C.primary,
+                border: "none",
+                borderRadius: radius.pill,
+                width: 28,
+                height: 28,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                transition: "all 0.2s ease",
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "scale(1.08)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "scale(1)";
+              }}
+            >
+              {isMuted ? <FiVolumeX size={14} /> : <FiVolume2 size={14} />}
+            </button>
           )}
 
           {isExpired && (
