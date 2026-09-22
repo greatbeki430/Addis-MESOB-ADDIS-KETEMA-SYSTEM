@@ -11,6 +11,11 @@ import * as ModernMinimal from "./ModernMinimal";
 import * as ElegantGold from "./ElegantGold";
 import * as Geometric from "./Geometric";
 import * as CeremonialRed from "./CeremonialRed";
+import * as EmeraldBotanical from "./EmeraldBotanical";
+import * as SunsetFestival from "./SunsetFestival";
+import * as MonochromeEditorial from "./MonochromeEditorial";
+import * as RoyalPurple from "./RoyalPurple";
+import * as TealWave from "./TealWave";
 import * as StudioTemplate from "./StudioTemplate";
 
 export const TEMPLATES = {
@@ -19,18 +24,29 @@ export const TEMPLATES = {
   [ElegantGold.meta.id]: ElegantGold,
   [Geometric.meta.id]: Geometric,
   [CeremonialRed.meta.id]: CeremonialRed,
+  [EmeraldBotanical.meta.id]: EmeraldBotanical,
+  [SunsetFestival.meta.id]: SunsetFestival,
+  [MonochromeEditorial.meta.id]: MonochromeEditorial,
+  [RoyalPurple.meta.id]: RoyalPurple,
+  [TealWave.meta.id]: TealWave,
   [StudioTemplate.meta.id]: StudioTemplate,
 };
 
 // Ordered list for the picker UI. Order here = display order.
 //
-//   · ClassicBlue   — the original committee look
-//   · ModernMinimal — clean editorial
-//   · ElegantGold   — formal navy + gold
-//   · CeremonialRed — deep burgundy, ceremonial
-//   · Geometric     — bold flat-color blocks
-//   · Studio        — drag-and-drop with colour themes (last, it's
-//                     the most interactive and worth discovering)
+//   · ClassicBlue          — the original committee look
+//   · ModernMinimal        — clean editorial
+//   · ElegantGold          — formal navy + gold
+//   · CeremonialRed        — deep burgundy, ceremonial
+//   · Geometric            — bold flat-color blocks
+//   · EmeraldBotanical     — green with a gold wreath
+//   · SunsetFestival       — warm gradient, sunburst medallion
+//   · MonochromeEditorial  — black & white brutalist
+//   · RoyalPurple          — regal violet & gold, jeweled frame
+//   · TealWave             — modern teal gradient, wave shapes
+//   · Studio               — drag-and-drop with colour themes (last,
+//                            it's the most interactive and worth
+//                            discovering)
 //
 export const TEMPLATE_ORDER = [
   ClassicBlue.meta.id,
@@ -38,6 +54,11 @@ export const TEMPLATE_ORDER = [
   ElegantGold.meta.id,
   CeremonialRed.meta.id,
   Geometric.meta.id,
+  EmeraldBotanical.meta.id,
+  SunsetFestival.meta.id,
+  MonochromeEditorial.meta.id,
+  RoyalPurple.meta.id,
+  TealWave.meta.id,
   StudioTemplate.meta.id,
 ];
 
