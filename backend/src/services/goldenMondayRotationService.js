@@ -128,6 +128,35 @@ const resolveTargetWeek = async () => {
   return { weekOf: nextMondayFrom(), session: null };
 };
 
+// ─────────────────────────────────────────────────────────────
+// resolveSessionForWeek(weekOf?)
+//
+// Used by GET /rotation/preview. When an explicit weekOf is given
+// (the admin picked a week via the RotationPanel selector), look up
+// that EXACT week's session directly — never fall back to "soonest
+// upcoming" logic, which would silently substitute a different week
+// than the one requested.
+//
+// When no weekOf is given, defer entirely to resolveTargetWeek() —
+// the same function getNextPresenterForWeek() uses. This is what
+// keeps /rotation/preview and /rotation/next resolving to the same
+// week (and therefore the same session/presenter) in "Auto" mode.
+// Previously /rotation/preview fell back to nextMondayFrom() here —
+// a plain "next Monday from now" with no awareness of which session
+// is actually upcoming — which is one half of why the panel could
+// disagree with the mini card and Spotlight.
+// ─────────────────────────────────────────────────────────────
+const resolveSessionForWeek = async (weekOf = null) => {
+  if (weekOf) {
+    const normalized = mondayOf(weekOf);
+    const session = await GoldenMondaySession.findOne({
+      weekOf: normalized,
+    }).lean();
+    return { weekOf: normalized, session: session || null };
+  }
+  return resolveTargetWeek();
+};
+
 // Deterministic 0..1 pseudo-random value from a string — used only to
 // break exact score ties in a stable, auditable way (no real randomness).
 const stableHashUnit = (str) => {
@@ -482,4 +511,5 @@ module.exports = {
   confirmPresentationTitle,
   reassignPresenter,
   resolveTargetWeek,
+  resolveSessionForWeek,
 };

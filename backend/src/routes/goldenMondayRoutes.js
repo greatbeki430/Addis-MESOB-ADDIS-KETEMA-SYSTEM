@@ -266,6 +266,13 @@ router.get("/rotation/next", protect, anyRole, async (req, res) => {
     const next = await rotationService.getNextPresenterForWeek(
       weekOfParam ? new Date(weekOfParam) : null,
     );
+    // Debug aid — compare this against previewRotation's log line to
+    // confirm both endpoints resolved the same weekOf/session.
+    console.log(
+      `[/rotation/next] resolved weekOf=${next?.weekOf || "none"} name=${
+        next?.name || "none"
+      } sessionId=${next?.sessionId || "none"}`,
+    );
 
     if (!next) {
       return res.json({
