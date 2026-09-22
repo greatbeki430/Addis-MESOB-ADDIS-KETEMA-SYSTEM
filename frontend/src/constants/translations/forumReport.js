@@ -134,6 +134,7 @@ export const forumReportTranslations = {
 
       // ─── Misc ──────────────────────────────────────────────────
       notAssigned: "Not assigned",
+      time: "Time",
     },
   },
   am: {
@@ -265,6 +266,7 @@ export const forumReportTranslations = {
 
       // ─── Misc ──────────────────────────────────────────────────
       notAssigned: "አልተመደበም",
+      time: "ሰዓት",
     },
   },
   om: {
@@ -400,6 +402,7 @@ export const forumReportTranslations = {
 
       // ─── Misc ──────────────────────────────────────────────────
       notAssigned: "Hin ramadamne",
+      time: "Yeroo",
     },
   },
 };

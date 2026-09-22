@@ -1461,7 +1461,7 @@ ${"=".repeat(50)}
   // ─── Handle Export ──────────────────────────────────────────
   const handleExport = () => {
     try {
-      exportForumReportToPDF(form, t, lang, selectedTeam?.name);
+      exportForumReportToPDF(form, t, lang || "am", selectedTeam?.name);
       showToast(
         tf("exportSuccess", "✅ Report exported successfully!"),
         "success",

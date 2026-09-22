@@ -1,9 +1,29 @@
 // frontend/src/utils/pdfExport.js
+// ─────────────────────────────────────────────────────────────────────────────
+// Canonical PDF export entry points.
+//   • exportForumReportToPDF              — mixed-script safe, Amharic-first
+//   • exportDailyReportToPDF              — delegates to ./pdf/reports/dailyReport.js
+//   • exportEvaluationReportToPDF         — mixed-script safe, Amharic-first
+//   • exportRecognitionCertificateToPDF   — mixed-script safe, Amharic-first
+//   • exportBiWeeklyAggregateReportToPDF  — mixed-script safe, Amharic-first
+//
+// RULE OF THUMB (see dailyReport.js / goldenMondayReport.js for the same
+// pattern): every visible string goes through drawMixedScriptText(), every
+// document calls loadFonts() once after creation, and table cells switch
+// fonts per-cell in didParseCell.
+//
+// drawMixedScriptText is imported from ./pdf/pdfHelpers — the shared
+// implementation used by dailyReport.js, goldenMondayReport.js and
+// reportExport.js. Do NOT define a second copy here.
+// ─────────────────────────────────────────────────────────────────────────────
+
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { showErrorToast, showSuccessToast } from "./toastHelper";
 import { loadFonts, FONT_NAMES } from "./pdf/fontLoader";
-import { isAmharic } from "./pdf/language";
+import { isAmharic, detectLanguage } from "./pdf/language";
+import { drawMixedScriptText } from "./pdf/pdfHelpers";
+import { generateDailyReportPDF } from "./pdf/reports/dailyReport";
 
 // ─── ETHIOPIAN CALENDAR HELPERS ─────────────────────────────
 const ETHIOPIAN_MONTHS_AM = [
@@ -57,171 +77,258 @@ function toEthiopianDate(date = new Date()) {
   return { year, month, day };
 }
 
-// ✅ Get Ethiopian date with proper month name
 const getEthiopianDate = (date = new Date()) => {
   const { year, month, day } = toEthiopianDate(date);
   const monthName = ETHIOPIAN_MONTHS_AM[month - 1];
   return `${monthName} ${day} ቀን ${year} ዓ.ም`;
 };
 
-// Helper: Format time
-const formatTime = (timeStr) => {
-  if (!timeStr) return "___";
-  return timeStr;
-};
-
-// ✅ Helper: Ensure text is properly encoded for PDF (Unicode/UTF-8 support)
+// Helper: Ensure text is properly encoded for PDF
 const encodeText = (text) => {
   if (!text) return "";
   return String(text);
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ✅ MIXED-SCRIPT TEXT RENDERING (ported from dailyReport.js / ReportExport.jsx)
-//
-// jsPDF can only apply ONE font per doc.text() call. If a string mixes
-// Amharic characters with Latin letters, digits, or punctuation (e.g. dates,
-// names, "|" separators, page numbers like "ገጽ 1/1"), picking a single font
-// for the whole string means whichever script that font doesn't cover
-// renders as nothing — which is why dates/names were "disappearing" even
-// though the label text was showing. This splits the string into per-script
-// runs and switches font per run, and computes alignment manually since
-// jsPDF can't align mixed-font text on its own.
-// ─────────────────────────────────────────────────────────────────────────────
-const AMHARIC_CHAR_RE = /[\u1200-\u137F]/;
-const SCRIPT_RUN_RE = /[\u1200-\u137F]+|[^\u1200-\u137F]+/g;
+// ─── FORUM REPORT LABELS (language-aware) ─────────────────────
+// Amharic is the primary language. English and Afan Oromo are honored
+// when `lang` says so. Falls back to `t.forum.*` translations first,
+// then to hardcoded strings.
+function getForumLabels(lang, t) {
+  const tf = (key, fallback) => t?.forum?.[key] || fallback;
 
-function splitIntoScriptRuns(text) {
-  const str = String(text ?? "");
-  const runs = str.match(SCRIPT_RUN_RE) || [str];
-  return runs.map((run) => ({
-    text: run,
-    isAmharic: AMHARIC_CHAR_RE.test(run),
-  }));
+  const isAm = lang === "am";
+  const isOm = lang === "om";
+
+  return {
+    title: tf(
+      "title",
+      isAm ? "የአቻ ፎረም ሪፖርት" : isOm ? "Gabaasa Fooraamii" : "Peer Forum Report",
+    ),
+    subtitle: tf(
+      "subtitle",
+      isAm
+        ? "በአዲስ አበባ ከተማ አስተዳደር አዲስ መሶብ · አዲስ ከተማ ማዕከል"
+        : isOm
+          ? "Bulchiinsa Magaalaa Finfinnee · Addis MESOB · Addis Ketema"
+          : "Addis Ababa City Admin · Addis MESOB · Addis Ketema Center",
+    ),
+    date: tf("date", isAm ? "ቀን" : isOm ? "Guyyaa" : "Date"),
+    time: isAm ? "ሰዓት" : isOm ? "Yeroo" : "Time",
+    presentMembers: tf(
+      "presentMembers",
+      isAm ? "የተገኙ አባላት" : isOm ? "Miseensota Argaman" : "Present Members",
+    ),
+    absentMembers: tf(
+      "absentMembers",
+      isAm ? "ያልተገኙ አባላት" : isOm ? "Miseensota Hin Argamne" : "Absent Members",
+    ),
+    prevResults: tf(
+      "prevResults",
+      isAm
+        ? "ያለፈው ስብሰባ ውጤቶች"
+        : isOm
+          ? "Bu'aa Walgahii Darbee"
+          : "Previous Results",
+    ),
+    topics: tf(
+      "todayTopics",
+      isAm ? "የእለቱ ርዕሶች" : isOm ? "Mata-duree Marii" : "Discussion Topics",
+    ),
+    explanation: tf(
+      "explanation",
+      isAm ? "ማብራሪያ" : isOm ? "Ibsa" : "Explanation",
+    ),
+    gaps: tf(
+      "gaps",
+      isAm ? "የታዩ ክፍተቶች" : isOm ? "Hanqinaalee" : "Identified Gaps",
+    ),
+    agreements: tf(
+      "agreements",
+      isAm ? "የተስማሙባቸው ነጥቦች" : isOm ? "Qabxii Walii Galame" : "Agreed Points",
+    ),
+    signatures: tf(
+      "signatures",
+      isAm ? "ፊርማዎች" : isOm ? "Mallattoo" : "Signatures",
+    ),
+    signatureN: tf(
+      "signatureN",
+      isAm ? "ኛ ፊርማ" : isOm ? " Mallattoo" : "th Signature",
+    ),
+    footer: isAm
+      ? "በአዲስ መሶብ የአንድ ማዕከል አገልግሎት የተዘጋጀ"
+      : isOm
+        ? "A-MESOB Wiirtuu Tajaajila Iddoo Tokkoo"
+        : "Generated by Addis MESOB One-Stop Service Center",
+    page: isAm ? "ገጽ" : isOm ? "Fuula" : "Page",
+    of: isAm ? "ከ" : isOm ? "keessaa" : "of",
+  };
 }
 
-function setFontForRun(doc, isAmharicRun, bold) {
-  const style = bold ? "bold" : "normal";
+// ─── EXPORT RECOGNITION CERTIFICATE ────────────────────────
+export const exportRecognitionCertificateToPDF = (
+  employeeName,
+  month,
+  teamName,
+  score,
+  lang = "am",
+) => {
   try {
-    if (isAmharicRun) {
-      doc.setFont(
-        doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica",
-        style,
-      );
-    } else {
-      doc.setFont(doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica", style);
-    }
-  } catch (error) {
-    console.warn("Font fallback while drawing mixed text:", error.message);
-    doc.setFont("helvetica", style);
-  }
-}
-
-function drawMixedScriptText(doc, text, x, y, opts = {}) {
-  const { align = "left", bold = false, maxWidth = null } = opts;
-  const runs = splitIntoScriptRuns(text);
-
-  const widths = runs.map((run) => {
-    setFontForRun(doc, run.isAmharic, bold);
-    return doc.getTextWidth(run.text);
-  });
-
-  const totalWidth = widths.reduce((sum, w) => sum + w, 0);
-
-  // If justify is requested, we need to handle it differently
-  if (align === "justify" && maxWidth) {
-    // Split text into words and draw with spacing
-    const words = text.split(/\s+/);
-    const wordRuns = words.map((word) => ({
-      text: word,
-      runs: splitIntoScriptRuns(word),
-    }));
-
-    let currentLine = [];
-    let currentLineWidth = 0;
-    const lines = [];
-    const spaceWidth = doc.getTextWidth(" ");
-
-    for (const word of wordRuns) {
-      const wordWidth = word.runs.reduce((sum, run) => {
-        setFontForRun(doc, run.isAmharic, bold);
-        return sum + doc.getTextWidth(run.text);
-      }, 0);
-
-      if (currentLineWidth + wordWidth > maxWidth && currentLine.length > 0) {
-        lines.push(currentLine);
-        currentLine = [];
-        currentLineWidth = 0;
-      }
-      currentLine.push(word);
-      currentLineWidth += wordWidth + spaceWidth;
-    }
-    if (currentLine.length > 0) {
-      lines.push(currentLine);
-    }
-
-    // Draw justified lines
-    lines.forEach((line, lineIdx) => {
-      const lineY = y + lineIdx * 5;
-      const totalWordsWidth = line.reduce((sum, word) => {
-        const w = word.runs.reduce((s, run) => {
-          setFontForRun(doc, run.isAmharic, bold);
-          return s + doc.getTextWidth(run.text);
-        }, 0);
-        return sum + w;
-      }, 0);
-
-      const spaceCount = line.length - 1;
-      let extraSpace = 0;
-      if (spaceCount > 0) {
-        extraSpace = (maxWidth - totalWordsWidth) / spaceCount;
-      }
-
-      let cursorX = x;
-      line.forEach((word, idx) => {
-        word.runs.forEach((run) => {
-          setFontForRun(doc, run.isAmharic, bold);
-          doc.text(run.text, cursorX, lineY, { align: "left" });
-          cursorX += doc.getTextWidth(run.text);
-        });
-        if (idx < line.length - 1) {
-          cursorX += extraSpace + doc.getTextWidth(" ");
-        }
-      });
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4",
     });
 
-    return lines.length * 5;
-  }
+    loadFonts(doc);
 
-  // Original behavior for left/center/right
-  let startX = x;
-  if (align === "center") startX = x - totalWidth / 2;
-  else if (align === "right") startX = x - totalWidth;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
 
-  let cursorX = startX;
-  runs.forEach((run, i) => {
-    setFontForRun(doc, run.isAmharic, bold);
-    doc.text(run.text, cursorX, y, { align: "left" });
-    cursorX += widths[i];
-  });
+    const isAm = lang === "am";
+    const isOm = lang === "om";
 
-  return totalWidth;
-}
+    const L = {
+      title: isAm
+        ? "የእውቅና ሰርተፍኬት"
+        : isOm
+          ? "Waraqaa Ragaa"
+          : "Certificate of Recognition",
+      presentedTo: isAm
+        ? "ይህ ሰርተፍኬት ለ"
+        : isOm
+          ? "Waraqaan kun kennameef"
+          : "This certificate is presented to",
+      forMonth: isAm
+        ? "ለሚከተለው ወር ጥሩ አፈጻጸም ስላሳዩ"
+        : isOm
+          ? "Ji'a kanaaf afeerraa gaarii waan qabaaniif"
+          : "for outstanding performance during",
+      withScore: isAm ? "በውጤት" : isOm ? "Qabxii" : "with a score of",
+      team: isAm ? "ቡድን" : isOm ? "Garee" : "Team",
+      date: isAm ? "ቀን" : isOm ? "Guyyaa" : "Date",
+      signature: isAm ? "ፊርማ" : isOm ? "Mallattoo" : "Signature",
+    };
 
-// ─── EXPORT FORUM REPORT ─────────────────────────────────────
-export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
-  try {
-    console.log("📄 Generating Forum Report PDF...");
+    // ─── Border frame ──────────────────────────────────────
+    doc.setDrawColor(26, 107, 74);
+    doc.setLineWidth(1.5);
+    doc.rect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2);
 
-    const hasData =
-      formData?.present?.some((m) => m && m.trim() !== "") ||
-      formData?.absent?.some((item) => item?.name && item.name.trim() !== "") ||
-      formData?.topics?.some((topic) => topic && topic.trim() !== "");
+    doc.setLineWidth(0.5);
+    doc.rect(
+      margin + 3,
+      margin + 3,
+      pageWidth - margin * 2 - 6,
+      pageHeight - margin * 2 - 6,
+    );
 
-    if (!hasData) {
-      showErrorToast(
-        "No data to export. Please fill in some information first.",
+    // ─── Title ─────────────────────────────────────────────
+    doc.setFontSize(28);
+    doc.setTextColor(26, 107, 74);
+    drawMixedScriptText(doc, L.title, pageWidth / 2, margin + 30, {
+      align: "center",
+      bold: true,
+    });
+
+    doc.setDrawColor(194, 90, 0);
+    doc.setLineWidth(1);
+    doc.line(pageWidth / 2 - 40, margin + 38, pageWidth / 2 + 40, margin + 38);
+
+    // ─── Presented to ──────────────────────────────────────
+    doc.setFontSize(12);
+    doc.setTextColor(80, 80, 80);
+    drawMixedScriptText(doc, L.presentedTo, pageWidth / 2, margin + 58, {
+      align: "center",
+    });
+
+    // ─── Name ──────────────────────────────────────────────
+    doc.setFontSize(24);
+    doc.setTextColor(30, 30, 30);
+    drawMixedScriptText(doc, employeeName || "—", pageWidth / 2, margin + 78, {
+      align: "center",
+      bold: true,
+    });
+
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(pageWidth / 2 - 60, margin + 82, pageWidth / 2 + 60, margin + 82);
+
+    // ─── Reason ────────────────────────────────────────────
+    doc.setFontSize(11);
+    doc.setTextColor(80, 80, 80);
+    const reasonLine = `${L.forMonth} ${month || "—"} ${L.withScore}: ${score ?? "—"}`;
+    drawMixedScriptText(doc, reasonLine, pageWidth / 2, margin + 98, {
+      align: "center",
+    });
+
+    // ─── Team ──────────────────────────────────────────────
+    if (teamName) {
+      doc.setFontSize(12);
+      doc.setTextColor(26, 107, 74);
+      drawMixedScriptText(
+        doc,
+        `${L.team}: ${teamName}`,
+        pageWidth / 2,
+        margin + 112,
+        { align: "center", bold: true },
       );
+    }
+
+    // ─── Date + Signature lines ────────────────────────────
+    const lineY = pageHeight - margin - 35;
+    const leftX = margin + 40;
+    const rightX = pageWidth - margin - 40;
+
+    doc.setDrawColor(100, 100, 100);
+    doc.setLineWidth(0.4);
+    doc.line(leftX - 40, lineY, leftX + 40, lineY);
+    doc.line(rightX - 40, lineY, rightX + 40, lineY);
+
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    drawMixedScriptText(doc, L.date, leftX, lineY + 5, { align: "center" });
+    drawMixedScriptText(doc, L.signature, rightX, lineY + 5, {
+      align: "center",
+    });
+
+    const gregDate = new Date().toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    doc.setFontSize(8);
+    drawMixedScriptText(doc, gregDate, leftX, lineY - 3, {
+      align: "center",
+    });
+
+    // ─── Save ──────────────────────────────────────────────
+    const safeName = String(employeeName || "certificate").replace(
+      /[^a-z0-9]/gi,
+      "_",
+    );
+    doc.save(`certificate_${safeName}.pdf`);
+
+    showSuccessToast("📄 Certificate PDF generated successfully!");
+    return true;
+  } catch (error) {
+    console.error("❌ Certificate PDF Error:", error);
+    showErrorToast(`❌ Failed to generate PDF: ${error.message}`);
+    return false;
+  }
+};
+
+// ─── EXPORT BI-WEEKLY AGGREGATE REPORT ─────────────────────
+export const exportBiWeeklyAggregateReportToPDF = (
+  weeklyData,
+  startDate,
+  endDate,
+  teamName,
+  lang = "am",
+) => {
+  try {
+    if (!weeklyData || weeklyData.length === 0) {
+      showErrorToast("No data to export.");
       return false;
     }
 
@@ -231,24 +338,71 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
       format: "a4",
     });
 
+    loadFonts(doc);
+
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
     let yPos = margin;
 
-    // Header
+    const isAm = lang === "am";
+    const isOm = lang === "om";
+
+    const L = {
+      title: isAm
+        ? "የሁለት ሳምንት ሪፖርት"
+        : isOm
+          ? "Gabaasa Torban Lama"
+          : "Bi-Weekly Report",
+      subtitle: isAm
+        ? "የአዲስ መሶብ የአንድ ማዕከል አገልግሎት"
+        : isOm
+          ? "A-MESOB Wiirtuu Tajaajila Iddoo Tokkoo"
+          : "A-MESOB One-Stop Service Center",
+      team: isAm ? "ቡድን" : isOm ? "Garee" : "Team",
+      period: isAm ? "የሪፖርት ጊዜ" : isOm ? "Yeroo" : "Period",
+      week: isAm ? "ሳምንት" : isOm ? "Torban" : "Week",
+      total: isAm ? "ጠቅላላ" : isOm ? "Waliigala" : "Total",
+      details: isAm ? "ዝርዝር" : isOm ? "Bal'ina" : "Details",
+      footer: isAm
+        ? "በአዲስ መሶብ የተዘጋጀ"
+        : isOm
+          ? "A-MESOB tiin qophaa'e"
+          : "Generated by A-MESOB",
+      page: isAm ? "ገጽ" : isOm ? "Fuula" : "Page",
+      of: isAm ? "ከ" : isOm ? "keessaa" : "of",
+    };
+
+    // ─── Title ─────────────────────────────────────────────
     doc.setFontSize(18);
-    doc.setFont("helvetica", "bold");
-    doc.text(
-      encodeText(t.forum?.title || "Peer Forum Report"),
-      pageWidth / 2,
-      yPos,
-      { align: "center" },
-    );
+    doc.setTextColor(26, 107, 74);
+    drawMixedScriptText(doc, L.title, pageWidth / 2, yPos, {
+      align: "center",
+      bold: true,
+    });
+    doc.setTextColor(0, 0, 0);
     yPos += 8;
 
     doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(encodeText(t.forum?.subtitle || ""), pageWidth / 2, yPos, {
+    doc.setTextColor(100, 100, 100);
+    drawMixedScriptText(doc, L.subtitle, pageWidth / 2, yPos, {
+      align: "center",
+    });
+    doc.setTextColor(0, 0, 0);
+    yPos += 8;
+
+    if (teamName) {
+      doc.setFontSize(11);
+      drawMixedScriptText(doc, `${L.team}: ${teamName}`, pageWidth / 2, yPos, {
+        align: "center",
+        bold: true,
+      });
+      yPos += 7;
+    }
+
+    const periodText = `${L.period}: ${startDate || "—"} — ${endDate || "—"}`;
+    doc.setFontSize(10);
+    drawMixedScriptText(doc, periodText, pageWidth / 2, yPos, {
       align: "center",
     });
     yPos += 10;
@@ -258,374 +412,355 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 8;
 
-    // Meeting info
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text(`Meeting #${meetingNumber || 1}`, margin, yPos);
-    const displayDate = formData?.date || getEthiopianDate();
-    doc.text(`Date: ${displayDate}`, pageWidth - margin - 50, yPos, {
-      align: "right",
+    // ─── Table ─────────────────────────────────────────────
+    const headers = [L.week, L.total, L.details];
+    const rows = weeklyData.map((w, i) => [
+      `${i + 1}`,
+      String(w.total ?? 0),
+      w.summary || w.details || "—",
+    ]);
+
+    autoTable(doc, {
+      startY: yPos,
+      head: [headers],
+      body: rows,
+      margin: { left: margin, right: margin },
+      theme: "striped",
+      headStyles: {
+        fillColor: [26, 107, 74],
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        halign: "center",
+      },
+      bodyStyles: { fontSize: 9 },
+      didParseCell: (cellData) => {
+        const raw = String(cellData.cell.raw ?? "");
+        cellData.cell.styles.font = isAmharic(raw)
+          ? FONT_NAMES.ethiopic
+          : FONT_NAMES.latin;
+      },
     });
-    yPos += 10;
 
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    doc.text(
-      `⏰ Time: ${formatTime(formData?.timeStart)} - ${formatTime(formData?.timeEnd)}`,
-      margin,
-      yPos,
-    );
-    yPos += 12;
+    yPos = doc.lastAutoTable?.finalY + 10 || yPos + 40;
 
-    // Present Members
-    doc.setFillColor(26, 107, 74);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(
-      encodeText(t.forum?.presentMembers || "Present Members"),
-      margin + 2,
-      yPos,
-    );
-    doc.setTextColor(0, 0, 0);
-    yPos += 8;
-
-    const presentMembers =
-      formData?.present?.filter((m) => m && m.trim() !== "") || [];
-    if (presentMembers.length > 0) {
-      autoTable(doc, {
-        startY: yPos,
-        head: [
-          [
-            encodeText(t.forum?.memberN || "No."),
-            encodeText(t.forum?.name || "Name"),
-          ],
-        ],
-        body: presentMembers.map((name, idx) => [
-          `${idx + 1}`,
-          encodeText(name),
-        ]),
-        margin: { left: margin, right: margin },
-        theme: "striped",
-        headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
-        bodyStyles: { fontSize: 9 },
-      });
-      yPos = doc.lastAutoTable?.finalY + 8 || yPos + 20;
-    } else {
-      doc.setFontSize(10);
-      doc.text("—", margin, yPos);
-      yPos += 8;
-    }
-
-    // Absent Members
-    if (yPos > 250) {
-      doc.addPage();
-      yPos = margin;
-    }
-
-    doc.setFillColor(139, 26, 26);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(
-      encodeText(t.forum?.absentMembers || "Absent Members"),
-      margin + 2,
-      yPos,
-    );
-    doc.setTextColor(0, 0, 0);
-    yPos += 8;
-
-    const absentMembers =
-      formData?.absent?.filter(
-        (item) => item?.name && item.name.trim() !== "",
-      ) || [];
-    if (absentMembers.length > 0) {
-      autoTable(doc, {
-        startY: yPos,
-        head: [
-          [
-            encodeText(t.forum?.memberN || "No."),
-            encodeText(t.forum?.name || "Name"),
-            encodeText(t.forum?.reason || "Reason"),
-          ],
-        ],
-        body: absentMembers.map((item, idx) => [
-          `${idx + 1}`,
-          encodeText(item.name),
-          encodeText(item.reason || "—"),
-        ]),
-        margin: { left: margin, right: margin },
-        theme: "striped",
-        headStyles: { fillColor: [139, 26, 26], textColor: [255, 255, 255] },
-        bodyStyles: { fontSize: 9 },
-      });
-      yPos = doc.lastAutoTable?.finalY + 8 || yPos + 20;
-    } else {
-      doc.setFontSize(10);
-      doc.text("All members present", margin, yPos);
-      yPos += 8;
-    }
-
-    // Previous Results
-    if (yPos > 250) {
-      doc.addPage();
-      yPos = margin;
-    }
-
-    doc.setFillColor(60, 60, 60);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(
-      encodeText(t.forum?.prevResults || "Previous Results"),
-      margin + 2,
-      yPos,
-    );
-    doc.setTextColor(0, 0, 0);
-    yPos += 8;
-
-    const prevResults =
-      formData?.prevResults?.filter((r) => r && r.trim() !== "") || [];
-    if (prevResults.length > 0) {
-      autoTable(doc, {
-        startY: yPos,
-        head: [["#", encodeText("Result")]],
-        body: prevResults.map((result, idx) => [
-          `${idx + 1}`,
-          encodeText(result),
-        ]),
-        margin: { left: margin, right: margin },
-        theme: "plain",
-        bodyStyles: { fontSize: 9 },
-      });
-      yPos = doc.lastAutoTable?.finalY + 8 || yPos + 20;
-    } else {
-      doc.setFontSize(10);
-      doc.text("—", margin, yPos);
-      yPos += 8;
-    }
-
-    // Discussion Topics
-    if (yPos > 250) {
-      doc.addPage();
-      yPos = margin;
-    }
-
-    doc.setFillColor(46, 125, 50);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(
-      encodeText(t.forum?.todayTopics || "Discussion Topics"),
-      margin + 2,
-      yPos,
-    );
-    doc.setTextColor(0, 0, 0);
-    yPos += 8;
-
-    const topics =
-      formData?.topics?.filter((topic) => topic && topic.trim() !== "") || [];
-    if (topics.length > 0) {
-      autoTable(doc, {
-        startY: yPos,
-        head: [["#", encodeText(t.forum?.topic || "Topic")]],
-        body: topics.map((topic, idx) => [`${idx + 1}`, encodeText(topic)]),
-        margin: { left: margin, right: margin },
-        theme: "striped",
-        bodyStyles: { fontSize: 9 },
-      });
-      yPos = doc.lastAutoTable?.finalY + 6 || yPos + 20;
-    }
-
-    // Standing Agendas
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "normal");
-    doc.text(
-      encodeText(t.forum?.standingAgendas || "Standing Agendas:"),
-      margin,
-      yPos,
-    );
-    yPos += 5;
-
-    const standingAgendas = t?.agendas || [];
-    const agendasPerRow = 2;
-    const agendaWidth = (pageWidth - margin * 2) / agendasPerRow;
-    let agendaX = margin;
-
-    standingAgendas.slice(0, 4).forEach((agenda, idx) => {
-      if (idx % agendasPerRow === 0 && idx > 0) {
-        agendaX = margin;
-        yPos += 6;
-      }
-      doc.text(`☐ ${encodeText(agenda)}`, agendaX, yPos);
-      agendaX += agendaWidth;
-    });
-    yPos += 12;
-
-    // Explanation
-    if (yPos > 250) {
-      doc.addPage();
-      yPos = margin;
-    }
-
-    doc.setFillColor(60, 60, 60);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(
-      encodeText(t.forum?.explanation || "Explanation"),
-      margin + 2,
-      yPos,
-    );
-    doc.setTextColor(0, 0, 0);
-    yPos += 8;
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    const explanationText = formData?.explanation || "—";
-    const splitExplanation = doc.splitTextToSize(
-      encodeText(explanationText),
-      pageWidth - margin * 2,
-    );
-    doc.text(splitExplanation, margin, yPos);
-    yPos += splitExplanation.length * 5 + 8;
-
-    // Gaps
-    if (yPos > 250) {
-      doc.addPage();
-      yPos = margin;
-    }
-
-    doc.setFillColor(194, 90, 0);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(encodeText(t.forum?.gaps || "Identified Gaps"), margin + 2, yPos);
-    doc.setTextColor(0, 0, 0);
-    yPos += 8;
-
-    const gaps = formData?.gaps?.filter((g) => g && g.trim() !== "") || [];
-    if (gaps.length > 0) {
-      autoTable(doc, {
-        startY: yPos,
-        head: [["#", encodeText("Gap Identified")]],
-        body: gaps.map((gap, idx) => [`${idx + 1}`, encodeText(gap)]),
-        margin: { left: margin, right: margin },
-        theme: "striped",
-        headStyles: { fillColor: [194, 90, 0], textColor: [255, 255, 255] },
-        bodyStyles: { fontSize: 9 },
-      });
-      yPos = doc.lastAutoTable?.finalY + 8 || yPos + 20;
-    } else {
-      doc.setFontSize(10);
-      doc.text("—", margin, yPos);
-      yPos += 8;
-    }
-
-    // Agreements
-    if (yPos > 250) {
-      doc.addPage();
-      yPos = margin;
-    }
-
-    doc.setFillColor(26, 107, 74);
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.setTextColor(255, 255, 255);
-    doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-    doc.text(
-      encodeText(t.forum?.agreements || "Agreed Points"),
-      margin + 2,
-      yPos,
-    );
-    doc.setTextColor(0, 0, 0);
-    yPos += 8;
-
-    const agreements =
-      formData?.agreements?.filter((a) => a && a.trim() !== "") || [];
-    if (agreements.length > 0) {
-      autoTable(doc, {
-        startY: yPos,
-        head: [["#", encodeText("Agreed Point")]],
-        body: agreements.map((agreement, idx) => [
-          `${idx + 1}`,
-          encodeText(agreement),
-        ]),
-        margin: { left: margin, right: margin },
-        theme: "striped",
-        headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
-        bodyStyles: { fontSize: 9 },
-      });
-      yPos = doc.lastAutoTable?.finalY + 8 || yPos + 20;
-    } else {
-      doc.setFontSize(10);
-      doc.text("—", margin, yPos);
-      yPos += 8;
-    }
-
-    // Signatures
-    if (yPos > 230) {
-      doc.addPage();
-      yPos = margin;
-    }
-
-    doc.setFontSize(11);
-    doc.setFont("helvetica", "bold");
-    doc.text(encodeText(t.forum?.signatures || "Signatures"), margin, yPos);
-    yPos += 10;
-
-    const signatureCount = 7;
-    const sigsPerRow = 3;
-    const sigWidth = (pageWidth - margin * 2) / sigsPerRow;
-    let sigX = margin;
-
-    for (let i = 0; i < signatureCount; i++) {
-      if (i % sigsPerRow === 0 && i > 0) {
-        sigX = margin;
-        yPos += 20;
-      }
-      doc.setDrawColor(100, 100, 100);
-      doc.line(sigX, yPos, sigX + sigWidth - 10, yPos);
-      doc.setFontSize(8);
-      doc.setFont("helvetica", "normal");
-      doc.text(
-        encodeText(`${i + 1}${t.forum?.signatureN || "th Signature"}`),
-        sigX,
-        yPos - 3,
-      );
-      sigX += sigWidth;
-    }
-
-    // Footer with page numbers
+    // ─── Footer ────────────────────────────────────────────
     const pageCount = doc.internal.getNumberOfPages();
+    const footerY = pageHeight - 10;
+
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+
       doc.setFontSize(8);
-      doc.setFont("helvetica", "italic");
       doc.setTextColor(150, 150, 150);
-      doc.text(
-        `Generated by Addis MESOB One-Stop Service Center · ${getEthiopianDate()}`,
-        pageWidth / 2,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: "center" },
-      );
-      doc.text(
-        `Page ${i} of ${pageCount}`,
+      drawMixedScriptText(doc, L.footer, pageWidth / 2, footerY, {
+        align: "center",
+      });
+      drawMixedScriptText(
+        doc,
+        `${L.page} ${i} ${L.of} ${pageCount}`,
         pageWidth - margin,
-        doc.internal.pageSize.getHeight() - 10,
+        footerY,
         { align: "right" },
       );
+      doc.setTextColor(0, 0, 0);
     }
 
-    doc.save(`forum_report_${displayDate.replace(/\//g, "-")}.pdf`);
-    console.log("✅ Forum Report PDF generated successfully!");
+    const safeStart = String(startDate || "start").replace(/\//g, "-");
+    doc.save(`biweekly_report_${safeStart}.pdf`);
 
+    showSuccessToast("📄 Bi-Weekly Report PDF generated successfully!");
+    return true;
+  } catch (error) {
+    console.error("❌ Bi-Weekly PDF Error:", error);
+    showErrorToast(`❌ Failed to generate PDF: ${error.message}`);
+    return false;
+  }
+};
+
+// ─── EXPORT FORUM REPORT (language-aware, mixed-script safe) ───
+export const exportForumReportToPDF = (
+  formData,
+  t,
+  lang = "am",
+  teamName = "",
+  options = {},
+) => {
+  try {
+    console.log("📄 Generating Forum Report PDF...");
+
+    const hasData =
+      formData?.present?.some((m) => m && m.trim() !== "") ||
+      formData?.absent?.some((i) => i?.name && i.name.trim() !== "") ||
+      formData?.topics?.some((tp) => tp && tp.trim() !== "");
+
+    if (!hasData) {
+      showErrorToast(
+        "No data to export. Please fill in some information first.",
+      );
+      return false;
+    }
+
+    // ─── Language resolution ────────────────────────────────
+    // Priority: explicit lang (am|en|om) → detect from content → Amharic
+    let reportLang = lang;
+    if (!["am", "en", "om"].includes(reportLang)) {
+      const sample =
+        (formData?.present || []).join(" ") +
+        " " +
+        (formData?.topics || []).join(" ");
+      const detected = detectLanguage(sample);
+      reportLang = detected === "english" ? "en" : "am";
+    }
+
+    const L = getForumLabels(reportLang, t);
+
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    doc.setProperties({
+      title: options?.title || L.title,
+      author: options?.author || teamName || "A-MESOB",
+      subject: options?.subject || L.subtitle,
+      keywords: options?.keywords || "forum, report, meeting",
+    });
+
+    // ✅ CRITICAL: embed the fonts on THIS document instance
+    loadFonts(doc);
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPos = margin;
+
+    // ─── Header ────────────────────────────────────────────
+    doc.setFontSize(18);
+    doc.setTextColor(26, 107, 74);
+    drawMixedScriptText(doc, L.title, pageWidth / 2, yPos, {
+      align: "center",
+      bold: true,
+    });
+    doc.setTextColor(0, 0, 0);
+    yPos += 8;
+
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    drawMixedScriptText(doc, L.subtitle, pageWidth / 2, yPos, {
+      align: "center",
+    });
+    doc.setTextColor(0, 0, 0);
+    yPos += 8;
+
+    if (teamName) {
+      doc.setFontSize(11);
+      drawMixedScriptText(doc, `— ${teamName}`, pageWidth / 2, yPos, {
+        align: "center",
+        bold: true,
+      });
+      yPos += 7;
+    }
+
+    doc.setDrawColor(26, 107, 74);
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 8;
+
+    // ─── Meta line (date + time) ────────────────────────────
+    const dateText = formData?.date || new Date().toISOString().split("T")[0];
+    const timeText =
+      formData?.timeStart || formData?.timeEnd
+        ? `${formData.timeStart || "—"} - ${formData.timeEnd || "—"}`
+        : "—";
+    const metaLine = `${L.date}: ${dateText}    |    ${L.time}: ${timeText}`;
+
+    doc.setFontSize(10);
+    drawMixedScriptText(doc, metaLine, margin, yPos);
+    yPos += 10;
+
+    // ─── Section renderer ────────────────────────────────────
+    // Every section gets the same treatment:
+    //   • colored header bar (mixed-script safe title)
+    //   • wrapped body via drawMixedScriptText
+    //   • pagination
+    const renderSection = (title, bodyLines, opts = {}) => {
+      const { fillColor = [26, 107, 74], minSpace = 30 } = opts;
+
+      if (yPos > pageHeight - minSpace) {
+        doc.addPage();
+        yPos = margin;
+      }
+
+      // Header bar
+      doc.setFillColor(...fillColor);
+      doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      drawMixedScriptText(doc, title, margin + 2, yPos, { bold: true });
+      doc.setTextColor(0, 0, 0);
+      yPos += 8;
+
+      if (!bodyLines || bodyLines.length === 0) {
+        doc.setFontSize(9);
+        doc.setTextColor(120, 120, 120);
+        drawMixedScriptText(doc, "—", margin + 2, yPos);
+        doc.setTextColor(0, 0, 0);
+        yPos += 8;
+        return;
+      }
+
+      doc.setFontSize(9);
+      bodyLines.forEach((line) => {
+        const encoded = encodeText(line);
+        const wrapped = doc.splitTextToSize(
+          encoded,
+          pageWidth - margin * 2 - 4,
+        );
+        wrapped.forEach((w) => {
+          if (yPos > pageHeight - 20) {
+            doc.addPage();
+            yPos = margin;
+          }
+          drawMixedScriptText(doc, w, margin + 2, yPos);
+          yPos += 5;
+        });
+      });
+      yPos += 4;
+    };
+
+    // ─── Present Members ────────────────────────────────────
+    const present = (formData?.present || []).filter((m) => m && m.trim());
+    renderSection(
+      L.presentMembers,
+      present.map((name, i) => `${i + 1}. ${name}`),
+      { fillColor: [26, 107, 74] },
+    );
+
+    // ─── Absent Members ─────────────────────────────────────
+    const absent = (formData?.absent || []).filter(
+      (i) => i?.name && i.name.trim(),
+    );
+    renderSection(
+      L.absentMembers,
+      absent.map((i, idx) => `${idx + 1}. ${i.name} — ${i.reason || "—"}`),
+      { fillColor: [139, 26, 26] },
+    );
+
+    // ─── Previous Results ───────────────────────────────────
+    const prev = (formData?.prevResults || []).filter((r) => r && r.trim());
+    renderSection(
+      L.prevResults,
+      prev.map((r, i) => `${i + 1}. ${r}`),
+      { fillColor: [60, 60, 60] },
+    );
+
+    // ─── Topics ─────────────────────────────────────────────
+    const topics = (formData?.topics || []).filter((tp) => tp && tp.trim());
+    renderSection(
+      L.topics,
+      topics.map((tp, i) => `${i + 1}. ${tp}`),
+      { fillColor: [46, 125, 50] },
+    );
+
+    // ─── Explanation ────────────────────────────────────────
+    // Note: the form.explanation field is a single textarea that may
+    // contain multiple newline-separated paragraphs (including the
+    // AI-generated summary block, which itself uses `\n`). We split
+    // on newlines and render each as its own wrapped line.
+    const explanation = formData?.explanation || "";
+    renderSection(
+      L.explanation,
+      explanation.split("\n").filter((l) => l.trim() !== ""),
+      { fillColor: [60, 60, 60], minSpace: 40 },
+    );
+
+    // ─── Gaps ───────────────────────────────────────────────
+    const gaps = (formData?.gaps || []).filter((g) => g && g.trim());
+    renderSection(
+      L.gaps,
+      gaps.map((g, i) => `${i + 1}. ${g}`),
+      { fillColor: [194, 90, 0] },
+    );
+
+    // ─── Agreements ─────────────────────────────────────────
+    const agreements = (formData?.agreements || []).filter(
+      (a) => a && a.trim(),
+    );
+    renderSection(
+      L.agreements,
+      agreements.map((a, i) => `${i + 1}. ${a}`),
+      { fillColor: [26, 107, 74] },
+    );
+
+    // ─── Signatures ─────────────────────────────────────────
+    if (yPos > pageHeight - 60) {
+      doc.addPage();
+      yPos = margin;
+    }
+    doc.setFontSize(11);
+    drawMixedScriptText(doc, L.signatures, margin, yPos, { bold: true });
+    yPos += 12;
+
+    const sigsPerRow = 3;
+    const sigWidth = (pageWidth - margin * 2) / sigsPerRow;
+
+    for (let i = 0; i < 7; i++) {
+      const col = i % sigsPerRow;
+
+      // New row → advance y, reset x
+      if (col === 0 && i > 0) {
+        yPos += 20;
+      }
+      if (yPos > pageHeight - 20) {
+        doc.addPage();
+        yPos = margin;
+      }
+
+      const sigX = margin + col * sigWidth;
+
+      doc.setDrawColor(100, 100, 100);
+      doc.setLineWidth(0.3);
+      doc.line(sigX, yPos, sigX + sigWidth - 12, yPos);
+
+      doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
+      drawMixedScriptText(doc, `${i + 1}${L.signatureN}`, sigX, yPos - 3);
+      doc.setTextColor(0, 0, 0);
+    }
+
+    // ─── Footer with page numbers ───────────────────────────
+    const pageCount = doc.internal.getNumberOfPages();
+    const footerY = pageHeight - 10;
+
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(0.3);
+      doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      drawMixedScriptText(doc, L.footer, pageWidth / 2, footerY, {
+        align: "center",
+      });
+      drawMixedScriptText(
+        doc,
+        `${L.page} ${i} ${L.of} ${pageCount}`,
+        pageWidth - margin,
+        footerY,
+        { align: "right" },
+      );
+      doc.setTextColor(0, 0, 0);
+    }
+
+    const safeDate = String(dateText).replace(/\//g, "-");
+    doc.save(`forum_report_${safeDate}.pdf`);
+
+    console.log("✅ Forum Report PDF generated successfully!");
     showSuccessToast("📄 Forum Report PDF generated successfully!");
     return true;
   } catch (error) {
@@ -636,90 +771,24 @@ export const exportForumReportToPDF = (formData, t, meetingNumber = 1) => {
 };
 
 // ─── EXPORT DAILY REPORT ─────────────────────────────────────
-export const exportDailyReportToPDF = (rows, date, t) => {
+// Delegates to the canonical, mixed-script safe implementation in
+// ./pdf/reports/dailyReport.js. This shim exists so older call sites
+// (which import `exportDailyReportToPDF` from this file) keep working.
+// The dailyReport generator is Amharic-first, uses drawMixedScriptText
+// everywhere, and supports all three languages via options.language.
+export const exportDailyReportToPDF = async (rows, date, t, options = {}) => {
   try {
-    console.log("📄 Generating Daily Report PDF...");
+    console.log("📄 Generating Daily Report PDF (delegating)...");
 
     if (!rows || rows.length === 0) {
       showErrorToast("No data to export. Please add some data first.");
       return false;
     }
 
-    const doc = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: "a4",
-    });
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
-    let yPos = margin;
-
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "bold");
-    doc.text(
-      encodeText(t.dailyReport?.title || "Daily Report"),
-      pageWidth / 2,
-      yPos,
-      { align: "center" },
-    );
-    yPos += 8;
-
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "normal");
-    const reportDate = date || getEthiopianDate();
-    doc.text(`Report Date: ${reportDate}`, pageWidth / 2, yPos, {
-      align: "center",
-    });
-    yPos += 12;
-
-    const grandTotal = rows.reduce((sum, row) => sum + (row.total || 0), 0);
-    const grandMale = rows.reduce((sum, row) => sum + (row.male || 0), 0);
-    const grandFemale = rows.reduce((sum, row) => sum + (row.female || 0), 0);
-
-    autoTable(doc, {
-      startY: yPos,
-      head: [
-        [
-          encodeText(t.dailyReport?.colNo || "#"),
-          encodeText(t.dailyReport?.colDept || "Department"),
-          encodeText(t.dailyReport?.colService || "Service"),
-          encodeText(t.dailyReport?.colMale || "Male"),
-          encodeText(t.dailyReport?.colFemale || "Female"),
-          encodeText(t.dailyReport?.colTotal || "Total"),
-        ],
-      ],
-      body: rows.map((row, idx) => [
-        idx + 1,
-        encodeText(row.dept || "—"),
-        encodeText(row.service || "—"),
-        row.male || 0,
-        row.female || 0,
-        row.total || 0,
-      ]),
-      foot: [
-        [
-          "",
-          "",
-          encodeText(t.dailyReport?.grandTotal || "Grand Total"),
-          grandMale,
-          grandFemale,
-          grandTotal,
-        ],
-      ],
-      margin: { left: margin, right: margin },
-      theme: "striped",
-      headStyles: { fillColor: [26, 107, 74], textColor: [255, 255, 255] },
-      footStyles: {
-        fillColor: [240, 247, 244],
-        textColor: [26, 107, 74],
-        fontStyle: "bold",
-      },
-      bodyStyles: { fontSize: 9 },
-    });
-
-    doc.save(`daily_report_${reportDate.replace(/\//g, "-")}.pdf`);
-    console.log("✅ Daily Report PDF generated successfully!");
+    // Pass `t` through as-is; dailyReport.js reads labels from its own
+    // internal LABELS table (already Amharic-first) and uses `options.language`
+    // to pick the language. We forward whatever the caller gave us.
+    await generateDailyReportPDF(rows, date, t, options);
 
     showSuccessToast("📄 Daily Report PDF generated successfully!");
     return true;
@@ -837,7 +906,6 @@ export const exportEvaluationReportToPDF = (
     }));
     const sortedMembers = [...memberTotals].sort((a, b) => b.total - a.total);
 
-    // ✅ Added "አስተያየት" column with adjusted widths
     const tableHeaders = ["#", "የአባል ስም", "ውጤት", "ደረጃ", "ፊርማ", "ሁኔታ", "አስተያየት"];
     const tableBody = sortedMembers.map((m, idx) => {
       const rank =
@@ -851,7 +919,6 @@ export const exportEvaluationReportToPDF = (
       const signatureData = signatures?.[m.name] || null;
       const hasSignature =
         signatureData && signatureData.startsWith("data:image");
-      // ✅ FIX: use m.name as key, not index
       const comment = comments?.[m.name] || "";
       let statusText = hasSignature
         ? "✅ ተፈርሟል"
@@ -886,13 +953,13 @@ export const exportEvaluationReportToPDF = (
       },
       bodyStyles: { fontSize: 8, halign: "center" },
       columnStyles: {
-        0: { cellWidth: 10, halign: "center" }, // # - fixed
-        1: { cellWidth: "auto", halign: "left" }, // Name - expands
-        2: { cellWidth: 18, halign: "center" }, // Score - fixed
-        3: { cellWidth: 22, halign: "center" }, // Rank - fixed
-        4: { cellWidth: 30, halign: "center", minCellHeight: 14 }, // Signature - fixed
-        5: { cellWidth: 22, halign: "center" }, // Status - fixed
-        6: { cellWidth: "auto", halign: "left", fontSize: 7 }, // Feedback - expands
+        0: { cellWidth: 10, halign: "center" },
+        1: { cellWidth: "auto", halign: "left" },
+        2: { cellWidth: 18, halign: "center" },
+        3: { cellWidth: 22, halign: "center" },
+        4: { cellWidth: 30, halign: "center", minCellHeight: 14 },
+        5: { cellWidth: 22, halign: "center" },
+        6: { cellWidth: "auto", halign: "left", fontSize: 7 },
       },
       rowHeight: 16,
       styles: { font: FONT_NAMES.ethiopic, overflow: "linebreak" },
@@ -1076,7 +1143,6 @@ export const exportEvaluationReportToPDF = (
       doc.line(margin, yPos, pageWidth - margin, yPos);
       yPos += 8;
 
-      // ✅ Pagination with LEFT alignment (no justify)
       let linesPerPage = Math.floor((pageHeight - yPos - 30) / 5);
       let lineIndex = 0;
 
@@ -1097,16 +1163,16 @@ export const exportEvaluationReportToPDF = (
           linesPerPage = Math.floor((pageHeight - yPos - 30) / 5);
         }
 
-        // ✅ Use drawMixedScriptText with left alignment
         chunk.forEach((line, idx) => {
           drawMixedScriptText(doc, line, margin, yPos + idx * 5, {
-            align: "left", // ✅ Changed from "justify" to "left"
+            align: "left",
           });
         });
         yPos += chunkHeight + 6;
         lineIndex += chunkSize;
       }
     }
+
     // ─── FOOTER ───────────────────────────────────────────────
     const pageCount = doc.internal.getNumberOfPages();
     const footerY = pageHeight - 14;
