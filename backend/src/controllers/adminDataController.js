@@ -8,18 +8,12 @@ const mongoose = require("mongoose");
 // ─────────────────────────────────────────────────────────────
 // GET /admin/data/:dataType
 //
-// Backs the admin "Manage ..." pages. Response shape MUST match
-// what frontend/src/pages/admin/AdminDataManagement.jsx reads:
+// Response shape MUST match what AdminDataManagement.jsx reads:
+//   { success: true, data: [...], pagination: { total, totalPages, page, limit } }
 //
-//   {
-//     success: true,
-//     data: [ { id, ...columns the page reads }, ... ],
-//     pagination: { total, totalPages, page, limit }
-//   }
-//
-// Every row MUST have a string `id` — the page uses it as the React
-// key, the checkbox selection identifier, the delete URL segment,
-// and the view-modal subject. Mongo docs have `_id`, so we map it.
+// Every row MUST have a string `id` (frontend uses it for React keys,
+// checkboxes, delete URLs, and the view modal) and MUST expose the
+// specific keys each column config reads — see the SHAPING block below.
 // ─────────────────────────────────────────────────────────────
 exports.getData = async (req, res) => {
   try {
@@ -62,23 +56,16 @@ exports.getData = async (req, res) => {
     // ── Query construction ───────────────────────────────────
     const query = {};
 
-    // Status: only apply if explicitly requested. Never hide drafts
-    // or in-progress records by default — admins should see them.
     if (status && status !== "all") {
       query.status = status;
     }
 
-    // Team: forum reports carry a `teamId` ObjectId + `teamName`
-    // string. Accept either an ObjectId or a name fragment.
-    if (team && team !== "all" && dataType === "forum-reports") {
+    if (team && team !== "all") {
       if (mongoose.Types.ObjectId.isValid(team)) {
-        query.teamId = team;
-      } else {
-        query.teamName = { $regex: team, $options: "i" };
+        query.team = team;
       }
     }
 
-    // Date range: use createdAt so it works uniformly across models.
     if (startDate || endDate) {
       query.createdAt = {};
       if (startDate) query.createdAt.$gte = new Date(startDate);
@@ -89,9 +76,6 @@ exports.getData = async (req, res) => {
       }
     }
 
-    // Search: type-aware so we hit fields that actually exist on
-    // each model, instead of the old blanket `summary`/`description`
-    // which most models don't have.
     if (search && search.trim()) {
       const re = { $regex: search.trim(), $options: "i" };
       if (dataType === "forum-reports") {
@@ -100,14 +84,14 @@ exports.getData = async (req, res) => {
           { topics: re },
           { explanation: re },
           { "present.name": re },
-          { "absent.name": re },
         ];
-      } else {
-        query.$or = [{ summary: re }, { description: re }, { title: re }];
+      } else if (dataType === "evaluations") {
+        query.$or = [{ teamName: re }, { evaluatedBy: re }, { members: re }];
+      } else if (dataType === "daily-reports") {
+        query.$or = [{ summary: re }, { "entries.service": re }];
       }
     }
 
-    // ── Sort ─────────────────────────────────────────────────
     const sortDir = String(sortOrder).toUpperCase() === "ASC" ? 1 : -1;
     const sort = { [sortBy]: sortDir };
 
@@ -118,10 +102,9 @@ exports.getData = async (req, res) => {
     } else if (dataType === "daily-reports") {
       populateFields = ["createdBy", "team"];
     } else if (dataType === "evaluations") {
-      populateFields = ["employeeId", "evaluatorId"];
+      populateFields = ["createdBy", "team"];
     }
 
-    // ── Execute ──────────────────────────────────────────────
     const [total, rawData] = await Promise.all([
       model.countDocuments(query),
       model
@@ -133,62 +116,101 @@ exports.getData = async (req, res) => {
         .lean(),
     ]);
 
-    // ── Shape rows for the frontend ─────────────────────────
+    // ── SHAPING: match each admin page's column config ──────
     let data;
 
     if (dataType === "forum-reports") {
-      data = rawData.map((m) => {
-        // Display topic: first topic, or a snippet of the
-        // explanation if topics are empty.
-        const firstTopic =
-          Array.isArray(m.topics) && m.topics[0]
-            ? m.topics[0]
-            : (m.explanation || "").slice(0, 60) || "(no topic)";
+      data = rawData.map((m) => ({
+        id: m._id.toString(),
+        topic:
+          (Array.isArray(m.topics) && m.topics[0]) ||
+          (m.explanation || "").slice(0, 60) ||
+          "(no topic)",
+        author_name: m.createdBy?.name || "Unknown",
+        team_name: m.teamId?.name || m.teamName || "Unknown",
+        replies: 0,
+        createdAt: m.createdAt,
+        status: m.status || "pending",
+        // Full data for view modal
+        _id: m._id,
+        date: m.date,
+        timeStart: m.timeStart,
+        timeEnd: m.timeEnd,
+        present: m.present || [],
+        absent: m.absent || [],
+        topics: m.topics || [],
+        prevResults: m.prevResults || [],
+        explanation: m.explanation || "",
+        gaps: m.gaps || [],
+        agreements: m.agreements || [],
+        signatures: m.signatures || [],
+        teamName: m.teamName,
+        createdBy: m.createdBy,
+        teamId: m.teamId,
+      }));
+    } else if (dataType === "daily-reports") {
+      data = rawData.map((d) => ({
+        id: d._id.toString(),
+        employee_name:
+          d.createdBy?.name || d.createdBy?.email || "Unknown Employee",
+        team_name: d.team?.name || d.teamName || "—",
+        date: d.date || d.createdAt,
+        status: d.status || "draft",
+        submittedBy: d.createdBy?.name || d.createdBy?.email || "—",
+        // Full data for view modal
+        _id: d._id,
+        entries: d.entries || [],
+        grandTotal: d.grandTotal || 0,
+        summary: d.summary || "",
+        comments: d.comments || [],
+        reactions: d.reactions || [],
+        createdAt: d.createdAt,
+        createdBy: d.createdBy,
+        team: d.team,
+      }));
+    } else if (dataType === "evaluations") {
+      data = rawData.map((e) => {
+        // Pick the top-scoring member as the "employee" shown in the
+        // list; if the evaluation has one member (common case) this is
+        // just that member.
+        const topMember =
+          Array.isArray(e.totalScores) && e.totalScores.length > 0
+            ? [...e.totalScores].sort(
+                (a, b) => (b.total || 0) - (a.total || 0),
+              )[0]
+            : null;
 
         return {
-          // Required by the frontend for keys, checkboxes, delete,
-          // and the view modal.
-          id: m._id.toString(),
-
-          // Columns the frontend's `forum-reports` config reads:
-          topic: firstTopic,
-          author_name: m.createdBy?.name || "Unknown",
-          team_name: m.teamId?.name || m.teamName || "Unknown",
-          replies: 0, // wire up if you add a replies model later
-          createdAt: m.createdAt,
-          status: m.status || "pending",
-
-          // Extra fields kept so the "View Details" modal shows
-          // the full report, not just the columns.
-          _id: m._id,
-          date: m.date,
-          timeStart: m.timeStart,
-          timeEnd: m.timeEnd,
-          teamName: m.teamName,
-          present: m.present || [],
-          absent: m.absent || [],
-          prevResults: m.prevResults || [],
-          topics: m.topics || [],
-          explanation: m.explanation || "",
-          gaps: m.gaps || [],
-          agreements: m.agreements || [],
-          signatures: m.signatures || [],
-          aiGeneratedContent: m.aiGeneratedContent || "",
-          isAutoSave: m.isAutoSave || false,
-          createdBy: m.createdBy,
-          teamId: m.teamId,
+          id: e._id.toString(),
+          employee_name:
+            topMember?.name ||
+            (Array.isArray(e.members) && e.members[0]) ||
+            "—",
+          team_name: e.teamName || e.team?.name || "—",
+          score: e.averageScore ?? e.highestScore ?? 0,
+          status: e.status || "draft",
+          createdAt: e.createdAt,
+          // Full data for view modal
+          _id: e._id,
+          members: e.members || [],
+          scores: e.scores || {},
+          comments: e.comments || {},
+          signatures: e.signatures || {},
+          totalScores: e.totalScores || [],
+          evaluatedBy: e.evaluatedBy,
+          evaluatedAt: e.evaluatedAt,
+          bestPerformer: e.bestPerformer,
+          averageScore: e.averageScore,
+          highestScore: e.highestScore,
+          lowestScore: e.lowestScore,
+          totalMembers: e.totalMembers,
+          teamName: e.teamName,
+          createdBy: e.createdBy,
+          team: e.team,
         };
       });
-    } else {
-      // Other types: still ensure a string `id` so row keys and
-      // delete URLs work. Keep everything else untouched.
-      data = rawData.map((d) => ({
-        ...d,
-        id: (d._id || d.id || "").toString(),
-      }));
     }
 
-    // ── Response — shape must match AdminDataManagement ─────
     return res.status(200).json({
       success: true,
       data,
@@ -297,16 +319,60 @@ exports.exportData = async (req, res) => {
         model = DailyReport;
         data = await model
           .find(query)
-          .populate("createdBy", "firstName lastName email");
+          .populate("createdBy", "firstName lastName name email")
+          .populate("team", "name");
         data = data.map((item) => ({
           Date: item.date?.toLocaleDateString() || "N/A",
-          Employee: item.createdBy
-            ? `${item.createdBy.firstName} ${item.createdBy.lastName}`
-            : "N/A",
+          Employee:
+            item.createdBy?.name ||
+            (item.createdBy
+              ? `${item.createdBy.firstName || ""} ${item.createdBy.lastName || ""}`.trim()
+              : "N/A"),
+          Team: item.team?.name || "N/A",
+          Entries: item.entries?.length || 0,
+          GrandTotal: item.grandTotal || 0,
           Summary: item.summary || "N/A",
           Status: item.status || "N/A",
         }));
         break;
+
+      case "evaluations":
+        model = Evaluation;
+        data = await model
+          .find(query)
+          .populate("createdBy", "firstName lastName name email")
+          .populate("team", "name");
+        data = data.map((item) => ({
+          Team: item.teamName || item.team?.name || "N/A",
+          Members: item.members?.length || 0,
+          BestPerformer: item.bestPerformer || "N/A",
+          AverageScore: item.averageScore ?? "N/A",
+          HighestScore: item.highestScore ?? "N/A",
+          LowestScore: item.lowestScore ?? "N/A",
+          EvaluatedBy: item.evaluatedBy || "N/A",
+          Date: item.createdAt?.toLocaleDateString() || "N/A",
+          Status: item.status || "N/A",
+        }));
+        break;
+
+      case "forum-reports":
+        model = Meeting;
+        data = await model
+          .find(query)
+          .populate("createdBy", "name email")
+          .populate("teamId", "name");
+        data = data.map((item) => ({
+          Team: item.teamId?.name || item.teamName || "N/A",
+          Date: item.date?.toLocaleDateString() || "N/A",
+          Attendees: item.present?.length || 0,
+          Absent: item.absent?.length || 0,
+          Topics: item.topics?.length || 0,
+          Agreements: item.agreements?.length || 0,
+          Gaps: item.gaps?.length || 0,
+          Status: item.status || "N/A",
+        }));
+        break;
+
       default:
         return res.status(400).json({
           success: false,
