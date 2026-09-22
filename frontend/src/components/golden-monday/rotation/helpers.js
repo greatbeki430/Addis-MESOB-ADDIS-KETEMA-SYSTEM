@@ -153,52 +153,52 @@ export function useRotationData({
     setLoading(true);
 
     try {
-      // 1. Fetch sessions + recordings in parallel. Sessions drive
-      //    everything else in this hook, so they must resolve first.
-      const [sessionsRes, recordingsRes] = await Promise.all([
+      // previewRotation(weekOverride) now resolves the target week
+      // SERVER-SIDE: with no override it calls resolveTargetWeek(),
+      // the exact same function /rotation/next uses, and returns the
+      // actual session for that week in the response body. This
+      // replaces the old client-side pickCurrentSession(sessions) step
+      // that used to run here — that step could pick a DIFFERENT
+      // session than the server whenever `sessions` (capped at 50,
+      // sorted by date desc) didn't happen to include the same
+      // upcoming session the server found by querying the DB directly
+      // with no cap. That mismatch was the actual root cause of the
+      // rotation panel disagreeing with the mini card / Spotlight.
+      //
+      // `sessions` (getAll()) is still fetched to populate
+      // `allSessions`, kept for API compatibility with any other
+      // consumer of this hook — it is no longer used to pick the
+      // current session.
+      const [rotationRes, sessionsRes, recordingsRes] = await Promise.all([
+        goldenMondayAPI
+          .previewRotation(weekOverride || undefined)
+          .catch(() => ({
+            data: { ranking: [], session: null, weekOf: null },
+          })),
         goldenMondayAPI.getAll().catch(() => ({ data: [] })),
         goldenMondayAPI.getLiveRecordings().catch(() => ({ data: [] })),
       ]);
 
       if (!isMounted.current) return;
 
-      const sessions = Array.isArray(sessionsRes?.data) ? sessionsRes.data : [];
-
-      // 2. Resolve the target session for this render.
-      let target;
-      if (weekOverride) {
-        // Explicit week chosen by the admin — find its session (if
-        // any exists yet). Do NOT fall back to pickCurrentSession()
-        // here; that would silently retarget a different week.
-        target =
-          sessions.find((s) => isSameWeek(s.weekOf || s.date, weekOverride)) ||
-          null;
-      } else {
-        target = pickCurrentSession(sessions);
-      }
-
-      const targetWeekOf =
-        weekOverride || target?.weekOf || target?.date || null;
-
-      // 3. Fetch the rotation preview FOR THE TARGET WEEK. If we have
-      //    no target at all (empty roster, no sessions, no override),
-      //    pass nothing and let the backend default to next Monday —
-      //    at least the panel shows something.
-      const rotationRes = await goldenMondayAPI
-        .previewRotation(targetWeekOf || undefined)
-        .catch(() => ({ data: { ranking: [] } }));
-
-      if (!isMounted.current) return;
-
       const rankingData = rotationRes?.data?.ranking;
+      const resolvedSession = rotationRes?.data?.session || null;
 
-      // 4. Commit all state at once. currentSession is derived from
-      //    the SAME sessions array (and the SAME targetWeekOf) we
-      //    computed the ranking for, so the panel's "target week"
-      //    and the ranking's week can never disagree.
+      // Debug aid: confirms in the console which week/session this
+      // panel actually targeted — compare against the /rotation/next
+      // network response to verify the fix without guessing.
+      console.log(
+        "[useRotationData] resolved weekOf:",
+        rotationRes?.data?.weekOf,
+        "session:",
+        resolvedSession?._id || null,
+        "presenter:",
+        resolvedSession?.presenterName || null,
+      );
+
       setRanking(Array.isArray(rankingData) ? rankingData : []);
-      setAllSessions(sessions);
-      setCurrentSession(target);
+      setAllSessions(Array.isArray(sessionsRes?.data) ? sessionsRes.data : []);
+      setCurrentSession(resolvedSession);
       setRecordings(
         Array.isArray(recordingsRes?.data) ? recordingsRes.data : [],
       );

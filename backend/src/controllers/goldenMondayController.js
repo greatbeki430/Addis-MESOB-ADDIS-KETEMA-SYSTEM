@@ -411,18 +411,31 @@ const removeFromRoster = async (req, res) => {
 // ============================================================
 
 // GET /api/golden-monday/rotation/next-preview?weekOf=YYYY-MM-DD
-// Shows the ranked candidate list WITHOUT assigning anything — lets
-// admins see who is next and why before committing.
+// Shows the ranked candidate list WITHOUT assigning anything, AND
+// the actual session for the resolved week — this `session` field
+// is what the rotation panel now uses as its "current session"
+// instead of recomputing it client-side (see helpers.js). Both this
+// endpoint and /rotation/next resolve "which week" via the same
+// resolveTargetWeek()/resolveSessionForWeek() functions, so they can
+// no longer disagree about which session is current.
 const previewRotation = async (req, res) => {
   try {
-    const weekOf = req.query.weekOf
-      ? rotation.mondayOf(new Date(req.query.weekOf))
-      : rotation.nextMondayFrom();
+    const { weekOf, session } = await rotation.resolveSessionForWeek(
+      req.query.weekOf ? new Date(req.query.weekOf) : null,
+    );
+
     const { ranking, rosterAvgPresented } =
       await rotation.computeRanking(weekOf);
 
+    console.log(
+      `[previewRotation] resolved weekOf=${weekOf.toISOString()} session=${
+        session?._id || "none"
+      } presenter=${session?.presenterName || "none"}`,
+    );
+
     res.json({
       weekOf,
+      session,
       rosterAvgPresented,
       ranking: ranking.map((r, i) => ({
         rank: i + 1,
