@@ -222,6 +222,10 @@ const formatLabel = (key) =>
 const isPlainObject = (v) =>
   v !== null && typeof v === "object" && !Array.isArray(v);
 
+// Detect a base64 image data-URL
+const isImageDataUrl = (v) =>
+  typeof v === "string" && /^data:image\/[a-z]+;base64,/i.test(v);
+
 const isDateLike = (v) =>
   typeof v === "string" &&
   /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?Z?)?$/.test(v);
@@ -1476,8 +1480,75 @@ function renderModalValue(value) {
     }
   }
 
+  // Base64 image data URL → render as an actual <img>
+  if (isImageDataUrl(value)) {
+    return (
+      <img
+        src={value}
+        alt="Signature"
+        style={{
+          maxWidth: "100%",
+          maxHeight: 120,
+          borderRadius: 6,
+          border: `1px solid ${C.border}`,
+          background: "#fff",
+          padding: 4,
+          display: "block",
+        }}
+      />
+    );
+  }
+
   if (Array.isArray(value)) {
     if (value.length === 0) return "—";
+
+    // Array of base64 image strings → grid of signatures
+    if (value.every((v) => isImageDataUrl(v))) {
+      return (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+            gap: 10,
+          }}
+        >
+          {value.map((v, i) => (
+            <div
+              key={i}
+              style={{
+                background: "#fff",
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                padding: 6,
+                textAlign: "center",
+              }}
+            >
+              <img
+                src={v}
+                alt={`Signature ${i + 1}`}
+                style={{
+                  maxWidth: "100%",
+                  maxHeight: 80,
+                  objectFit: "contain",
+                  display: "block",
+                  margin: "0 auto",
+                }}
+              />
+              <div
+                style={{
+                  fontSize: 10,
+                  color: C.muted,
+                  marginTop: 4,
+                  fontWeight: 600,
+                }}
+              >
+                Signature {i + 1}
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
 
     // Array of strings → pill list
     if (value.every((v) => typeof v === "string" || typeof v === "number")) {
