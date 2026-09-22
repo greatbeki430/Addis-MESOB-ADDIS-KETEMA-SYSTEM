@@ -286,16 +286,19 @@ const AISummary = ({
   };
 
   // Helper to handle formatting for the parent component
-  const processContent = (content) => {
-    // If a specific formatter is passed, use it. Otherwise clean it.
-    const formatted = formatResult
-      ? formatResult(content)
-      : cleanMarkdown(content);
-    if (onContentGenerated) {
-      onContentGenerated(formatted);
-    }
-    return formatted;
-  };
+  const processContent = useCallback(
+    (content) => {
+      // If a specific formatter is passed, use it. Otherwise clean it.
+      const formatted = formatResult
+        ? formatResult(content)
+        : cleanMarkdown(content);
+      if (onContentGenerated) {
+        onContentGenerated(formatted);
+      }
+      return formatted;
+    },
+    [formatResult, onContentGenerated],
+  );
 
   const handleGenerate = useCallback(async () => {
     if (!isMounted.current) return;
@@ -319,7 +322,7 @@ const AISummary = ({
         setIsLoading(false);
       }
     }
-  }, [fetchFn, args, formatResult, onContentGenerated]);
+  }, [fetchFn, args, processContent]);
 
   const handleCopy = () => {
     if (insight) {
@@ -377,14 +380,7 @@ const AISummary = ({
     return () => {
       isEffectActive = false;
     };
-  }, [
-    autoGenerate,
-    generated,
-    fetchFn,
-    args,
-    formatResult,
-    onContentGenerated,
-  ]);
+  }, [autoGenerate, generated, fetchFn, args, processContent]);
 
   const variantStyles = {
     default: {
