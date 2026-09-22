@@ -266,6 +266,13 @@ const formatValue = (value) => {
 // ─── Component ──────────────────────────────────────────────────
 const AdminDataManagement = ({ dataType }) => {
   const { user } = useAuth();
+  // ─── Responsive viewport tracking ────────────────────────────
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
@@ -1218,71 +1225,89 @@ const AdminDataManagement = ({ dataType }) => {
         </div>
       )}
 
-      {/* ─── View Modal (rebuilt) ─────────────────────────────────── */}
+      {/* ─── View Modal (responsive, roomy) ──────────────────────── */}
       {showModal && selectedItem && (
         <div
           style={{
             position: "fixed",
             inset: 0,
-            background: "rgba(15, 23, 42, 0.55)",
-            backdropFilter: "blur(4px)",
+            background: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(6px)",
             display: "flex",
-            alignItems: "center",
+            alignItems: isMobile ? "stretch" : "center",
             justifyContent: "center",
             zIndex: 200,
-            padding: 20,
+            padding: isMobile ? 0 : 24,
+            animation: "fadeIn 0.2s ease",
           }}
           onClick={() => setShowModal(false)}
         >
           <div
             style={{
               background: C.white,
-              borderRadius: 16,
-              maxWidth: 720,
+              borderRadius: isMobile ? 0 : 20,
+              maxWidth: isMobile ? "100%" : "min(1100px, 94vw)",
               width: "100%",
-              maxHeight: "88vh",
+              maxHeight: isMobile ? "100vh" : "92vh",
+              height: isMobile ? "100vh" : "auto",
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
-              boxShadow: "0 24px 60px rgba(0,0,0,0.25)",
+              boxShadow: isMobile ? "none" : "0 24px 72px rgba(0,0,0,0.28)",
+              animation: "slideUp 0.25s ease",
             }}
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal header */}
+            {/* ── Header (sticky) ── */}
             <div
               style={{
-                padding: "18px 24px",
+                padding: isMobile ? "14px 18px" : "20px 32px",
                 borderBottom: `1px solid ${C.border}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
                 gap: 12,
-                background: `linear-gradient(135deg, ${C.primary}10, ${C.primary}05)`,
+                background: `linear-gradient(135deg, ${C.primary}12, ${C.primary}04)`,
+                flexShrink: 0,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: isMobile ? 10 : 14,
+                  minWidth: 0,
+                  flex: 1,
+                }}
+              >
                 <div
                   style={{
-                    width: 40,
-                    height: 40,
-                    borderRadius: 10,
-                    background: C.primary,
+                    width: isMobile ? 36 : 48,
+                    height: isMobile ? 36 : 48,
+                    borderRadius: isMobile ? 10 : 14,
+                    background: `linear-gradient(135deg, ${C.primary}, ${C.primary}dd)`,
                     color: "#fff",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
+                    boxShadow: `0 4px 16px ${C.primary}44`,
                   }}
                 >
                   {config.icon}
                 </div>
-                <div>
+                <div style={{ minWidth: 0, flex: 1 }}>
                   <h2
                     style={{
                       margin: 0,
-                      fontSize: 18,
+                      fontSize: isMobile ? 16 : 20,
                       color: C.dark,
                       fontFamily: "inherit",
+                      fontWeight: 700,
+                      lineHeight: 1.2,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     {config.label} Details
@@ -1290,8 +1315,11 @@ const AdminDataManagement = ({ dataType }) => {
                   <p
                     style={{
                       margin: "2px 0 0",
-                      fontSize: 12,
+                      fontSize: isMobile ? 11 : 13,
                       color: C.muted,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
                     Full record view — sensitive fields hidden
@@ -1300,63 +1328,90 @@ const AdminDataManagement = ({ dataType }) => {
               </div>
               <button
                 onClick={() => setShowModal(false)}
+                aria-label="Close"
                 style={{
-                  background: "rgba(0,0,0,0.05)",
+                  background: "rgba(0,0,0,0.06)",
                   border: "none",
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
+                  width: isMobile ? 34 : 38,
+                  height: isMobile ? 34 : 38,
+                  borderRadius: 10,
                   cursor: "pointer",
                   color: C.muted,
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   transition: "all 0.2s ease",
+                  flexShrink: 0,
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(0,0,0,0.1)";
+                  e.currentTarget.style.background = "rgba(0,0,0,0.12)";
                   e.currentTarget.style.color = C.dark;
+                  e.currentTarget.style.transform = "scale(1.05)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(0,0,0,0.05)";
+                  e.currentTarget.style.background = "rgba(0,0,0,0.06)";
                   e.currentTarget.style.color = C.muted;
+                  e.currentTarget.style.transform = "scale(1)";
                 }}
               >
-                <FiX size={18} />
+                <FiX size={isMobile ? 18 : 20} />
               </button>
             </div>
 
-            {/* Modal body — sections */}
+            {/* ── Body ── */}
             <div
               style={{
-                padding: "20px 24px",
+                padding: isMobile ? "16px 16px 24px" : "28px 32px",
                 overflowY: "auto",
+                overflowX: "hidden",
                 display: "flex",
                 flexDirection: "column",
-                gap: 20,
+                gap: isMobile ? 18 : 24,
+                WebkitOverflowScrolling: "touch",
               }}
             >
               {buildSections(selectedItem, dataType).map((section, sIdx) => (
-                <div key={sIdx}>
+                <div
+                  key={sIdx}
+                  style={{
+                    background: "#FAFBFC",
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 14,
+                    padding: isMobile ? "14px 14px" : "18px 22px",
+                  }}
+                >
                   {/* Section header */}
                   <div
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 8,
-                      marginBottom: 10,
-                      paddingBottom: 8,
+                      gap: 10,
+                      marginBottom: isMobile ? 12 : 16,
+                      paddingBottom: 10,
                       borderBottom: `2px solid ${C.primary}22`,
                     }}
                   >
-                    <span style={{ color: C.primary }}>{section.icon}</span>
                     <span
                       style={{
-                        fontSize: 13,
-                        fontWeight: 700,
+                        color: C.primary,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        background: `${C.primary}15`,
+                      }}
+                    >
+                      {section.icon}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: isMobile ? 12 : 13,
+                        fontWeight: 800,
                         color: C.primary,
                         textTransform: "uppercase",
-                        letterSpacing: "0.05em",
+                        letterSpacing: "0.06em",
                       }}
                     >
                       {section.title}
@@ -1368,7 +1423,7 @@ const AdminDataManagement = ({ dataType }) => {
                     style={{
                       display: "flex",
                       flexDirection: "column",
-                      gap: 8,
+                      gap: isMobile ? 12 : 10,
                     }}
                   >
                     {section.rows.map((row, rIdx) => (
@@ -1376,36 +1431,37 @@ const AdminDataManagement = ({ dataType }) => {
                         key={rIdx}
                         style={{
                           display: "grid",
-                          gridTemplateColumns: "160px 1fr",
-                          gap: 12,
-                          padding: "8px 12px",
-                          background:
-                            rIdx % 2 === 0 ? "#FAFBFC" : "transparent",
-                          borderRadius: 6,
+                          gridTemplateColumns: isMobile ? "1fr" : "180px 1fr",
+                          gap: isMobile ? 4 : 16,
+                          padding: isMobile ? "8px 10px" : "10px 14px",
+                          background: "#fff",
+                          borderRadius: 10,
+                          border: `1px solid ${C.border}66`,
                           alignItems: "flex-start",
                         }}
                       >
                         <div
                           style={{
-                            fontSize: 12,
-                            fontWeight: 600,
+                            fontSize: isMobile ? 10 : 11,
+                            fontWeight: 700,
                             color: C.muted,
                             textTransform: "uppercase",
-                            letterSpacing: "0.03em",
-                            paddingTop: 2,
+                            letterSpacing: "0.05em",
+                            paddingTop: isMobile ? 0 : 2,
                           }}
                         >
                           {formatLabel(row.key)}
                         </div>
                         <div
                           style={{
-                            fontSize: 13,
+                            fontSize: isMobile ? 13 : 14,
                             color: C.dark,
                             wordBreak: "break-word",
-                            lineHeight: 1.5,
+                            lineHeight: 1.6,
+                            minWidth: 0,
                           }}
                         >
-                          {renderModalValue(row.value)}
+                          {renderModalValue(row.value, isMobile)}
                         </div>
                       </div>
                     ))}
@@ -1417,44 +1473,69 @@ const AdminDataManagement = ({ dataType }) => {
                 <div
                   style={{
                     textAlign: "center",
-                    padding: "40px 20px",
+                    padding: "60px 20px",
                     color: C.muted,
                   }}
                 >
-                  <FiInfo size={32} style={{ marginBottom: 8 }} />
+                  <FiInfo
+                    size={40}
+                    style={{ marginBottom: 12, opacity: 0.5 }}
+                  />
                   <p>No displayable fields in this record.</p>
                 </div>
               )}
             </div>
 
-            {/* Modal footer */}
+            {/* ── Footer (sticky) ── */}
             <div
               style={{
-                padding: "12px 24px",
+                padding: isMobile ? "12px 16px" : "16px 32px",
                 borderTop: `1px solid ${C.border}`,
                 background: "#FAFBFC",
                 display: "flex",
                 justifyContent: "flex-end",
                 gap: 8,
+                flexShrink: 0,
               }}
             >
               <button
                 onClick={() => setShowModal(false)}
                 style={{
-                  padding: "8px 20px",
+                  padding: isMobile ? "10px 20px" : "10px 24px",
                   background: C.primary,
                   color: "#fff",
                   border: "none",
-                  borderRadius: 8,
+                  borderRadius: 10,
                   cursor: "pointer",
-                  fontWeight: 600,
-                  fontSize: 13,
+                  fontWeight: 700,
+                  fontSize: isMobile ? 13 : 14,
+                  width: isMobile ? "100%" : "auto",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = `0 6px 20px ${C.primary}44`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = "none";
                 }}
               >
                 Close
               </button>
             </div>
           </div>
+
+          <style>{`
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    `}</style>
         </div>
       )}
     </div>
@@ -1462,7 +1543,7 @@ const AdminDataManagement = ({ dataType }) => {
 };
 
 // ─── Modal value renderer (handles all value types) ─────────────
-function renderModalValue(value) {
+function renderModalValue(value, isMobile = false) {
   if (value === null || value === undefined) return "—";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   if (typeof value === "number") return value.toLocaleString();
@@ -1488,11 +1569,11 @@ function renderModalValue(value) {
         alt="Signature"
         style={{
           maxWidth: "100%",
-          maxHeight: 120,
-          borderRadius: 6,
+          maxHeight: isMobile ? 90 : 140,
+          borderRadius: 8,
           border: `1px solid ${C.border}`,
           background: "#fff",
-          padding: 4,
+          padding: 6,
           display: "block",
         }}
       />
@@ -1500,16 +1581,16 @@ function renderModalValue(value) {
   }
 
   if (Array.isArray(value)) {
-    if (value.length === 0) return "—";
-
     // Array of base64 image strings → grid of signatures
     if (value.every((v) => isImageDataUrl(v))) {
       return (
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
-            gap: 10,
+            gridTemplateColumns: isMobile
+              ? "repeat(auto-fill, minmax(120px, 1fr))"
+              : "repeat(auto-fill, minmax(180px, 1fr))",
+            gap: isMobile ? 10 : 14,
           }}
         >
           {value.map((v, i) => (
@@ -1518,8 +1599,8 @@ function renderModalValue(value) {
               style={{
                 background: "#fff",
                 border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                padding: 6,
+                borderRadius: 10,
+                padding: isMobile ? 8 : 10,
                 textAlign: "center",
               }}
             >
@@ -1528,7 +1609,7 @@ function renderModalValue(value) {
                 alt={`Signature ${i + 1}`}
                 style={{
                   maxWidth: "100%",
-                  maxHeight: 80,
+                  maxHeight: isMobile ? 70 : 100,
                   objectFit: "contain",
                   display: "block",
                   margin: "0 auto",
@@ -1536,10 +1617,12 @@ function renderModalValue(value) {
               />
               <div
                 style={{
-                  fontSize: 10,
+                  fontSize: isMobile ? 10 : 11,
                   color: C.muted,
-                  marginTop: 4,
-                  fontWeight: 600,
+                  marginTop: 6,
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.04em",
                 }}
               >
                 Signature {i + 1}
