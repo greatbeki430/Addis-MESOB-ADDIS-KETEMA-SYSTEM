@@ -278,6 +278,42 @@ const getNextPresenterForWeek = async (weekOf = null) => {
       ? { weekOf: mondayOf(weekOf), session: null }
       : await resolveTargetWeek();
 
+    // ─── If a presenter is already assigned for this week, THAT is
+    // who's next — full stop. Recomputing the rotation ranking fresh
+    // ignores the assignment: scores drift over time (recency,
+    // frequency), so "who the algorithm would pick right now" can
+    // silently diverge from "who was actually assigned," which is
+    // exactly what /rotation/preview's session lookup would show
+    // instead. This branch is what makes the two endpoints agree.
+    if (resolved.session?.presenter) {
+      const presenterDoc = await GoldenMondayPresenter.findOne({
+        user: resolved.session.presenter,
+      }).lean();
+
+      return {
+        _id: resolved.session.presenter,
+        name: presenterDoc?.name || resolved.session.presenterName || "Unknown",
+        department:
+          presenterDoc?.department ||
+          resolved.session.presenterDepartment ||
+          "",
+        position: presenterDoc?.position || "",
+        profilePhotoUrl: presenterDoc?.profilePhotoUrl || "",
+        isEligible: presenterDoc?.isEligible !== false,
+        timesPresented: presenterDoc?.timesPresented || 0,
+        timesSkipped: presenterDoc?.timesSkipped || 0,
+        daysSinceLastPresented: null,
+        score: null,
+        weekOf: resolved.weekOf,
+        sessionId: resolved.session._id,
+        sessionDate: resolved.session.date || resolved.weekOf,
+        assignmentMethod: resolved.session.assignmentMethod || null,
+        presentationTitle: resolved.session.presentationTitle || "",
+      };
+    }
+
+    // No one assigned yet for this week — fall back to the live
+    // rotation ranking, exactly as before.
     const { ranking } = await computeRanking(resolved.weekOf);
     if (!ranking || ranking.length === 0) return null;
 
