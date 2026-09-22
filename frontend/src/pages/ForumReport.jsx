@@ -1201,6 +1201,24 @@ export default function ForumReport({
       setActiveForumTab("form");
       setSubmitted(false);
 
+      // Resume the meeting timer for a loaded report that isn't done
+      // yet. Without this, opening a saved draft shows a frozen clock
+      // because timerActive stays false — and the hook's
+      // isActive-watching effect only fires when the input actually
+      // changes. Explicitly stop the timer for completed/locked
+      // reports so a previously-running clock from another draft
+      // doesn't keep ticking behind the newly-loaded finished report.
+      if (
+        report.timeStart &&
+        report.status !== "completed" &&
+        report.status !== "locked" &&
+        !report.isLocked
+      ) {
+        setTimerActive(true);
+      } else {
+        setTimerActive(false);
+      }
+
       showToast(
         `Editing "${report.teamName || "Untitled"}" — save to update, or Reset to start fresh.`,
         "info",
@@ -1208,7 +1226,6 @@ export default function ForumReport({
     },
     [showToast],
   );
-
   // ─── Reset the form to a fresh, blank state ─────────────────────────
   // Called by:
   //   • the Reset button in the action bar (new, see Edit B below)

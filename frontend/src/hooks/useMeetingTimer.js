@@ -177,6 +177,33 @@ export const useMeetingTimer = ({
     return "active";
   }, [timeRemaining, isExpired]);
 
+  // ─── React to isActive changes ──────────────────────────────
+  // ✅ THE FIX: this effect is what actually starts the interval.
+  //
+  // Before this, the hook had no effect watching isActive, so flipping
+  // it to true from a caller — "user picked a start time", "loaded a
+  // saved draft with a timeStart" — did nothing. The interval stayed
+  // null and the countdown sat frozen at its initial value. The only
+  // path that ever called startTimer() was resetTimer(), which meant
+  // the timer only worked if the user happened to click Reset first.
+  //
+  // startTimer() is idempotent (early-returns when timerRef.current
+  // already exists), so calling it here on every isActive=true render
+  // is safe. pauseTimer() has the same guard from the other direction:
+  // it's a no-op when there's nothing to clear.
+  //
+  // Listed dependencies: startTimer and pauseTimer are useCallback
+  // values whose own dependency arrays are stable in this hook, so
+  // this effect re-runs only when isActive or isExpired actually
+  // change — not on every tick.
+  useEffect(() => {
+    if (isActive && !isExpired && !timerRef.current) {
+      startTimer();
+    } else if (!isActive && timerRef.current) {
+      pauseTimer();
+    }
+  }, [isActive, isExpired, startTimer, pauseTimer]);
+
   // ─── Cleanup on unmount ────────────────────────────────────
   useEffect(() => {
     return () => {
