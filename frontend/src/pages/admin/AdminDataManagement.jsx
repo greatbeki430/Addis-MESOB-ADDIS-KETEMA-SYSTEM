@@ -1734,7 +1734,7 @@ function renderModalValue(value, isMobile = false) {
     );
   }
 
-  // Nested object → sub rows
+  // Nested object → sub rows (recurse so images render as images)
   if (isPlainObject(value)) {
     const entries = Object.entries(value).filter(
       ([k]) => !BLOCKED_FIELDS.has(k),
@@ -1746,11 +1746,11 @@ function renderModalValue(value, isMobile = false) {
         style={{
           display: "flex",
           flexDirection: "column",
-          gap: 4,
+          gap: 8,
           background: "#fff",
           border: `1px solid ${C.border}`,
-          borderRadius: 6,
-          padding: "8px 12px",
+          borderRadius: 8,
+          padding: "10px 14px",
         }}
       >
         {entries.map(([k, vv]) => (
@@ -1758,15 +1758,29 @@ function renderModalValue(value, isMobile = false) {
             key={k}
             style={{
               display: "grid",
-              gridTemplateColumns: "120px 1fr",
-              gap: 8,
+              gridTemplateColumns: isMobile ? "1fr" : "140px 1fr",
+              gap: isMobile ? 4 : 10,
               fontSize: 12,
+              alignItems: "flex-start",
+              paddingBottom: 6,
+              borderBottom: `1px solid ${C.border}44`,
             }}
           >
-            <span style={{ fontWeight: 600, color: C.muted }}>
+            <span
+              style={{
+                fontWeight: 700,
+                color: C.muted,
+                textTransform: "uppercase",
+                fontSize: 10,
+                letterSpacing: "0.04em",
+                paddingTop: isMobile ? 0 : 2,
+              }}
+            >
               {formatLabel(k)}
             </span>
-            <span style={{ color: C.dark }}>{formatValue(vv)}</span>
+            <div style={{ color: C.dark, minWidth: 0 }}>
+              {renderModalValue(vv, isMobile)}
+            </div>
           </div>
         ))}
       </div>
