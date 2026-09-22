@@ -25,6 +25,7 @@ import { useToast } from "../hooks/useToast";
 import { useLanguage } from "../hooks/useLanguage";
 import { useAuth } from "../hooks/useAuth";
 import ForumReportFeed from "../components/ForumReportFeed";
+import ForumReportHistory from "../components/forum-report/ForumReportHistory";
 import { forumReportTranslations } from "../constants/translations/forumReport";
 import { commonTranslations } from "../constants/translations/common";
 import { isAdminOrAbove } from "../utils/roles";
@@ -63,6 +64,8 @@ import {
   FiChevronLeft,
   FiBriefcase,
   FiClock,
+  FiRefreshCw,
+  FiList,
 } from "react-icons/fi";
 
 // ─── FONT SIZES ──────────────────────────────────────────────
@@ -880,6 +883,18 @@ export default function ForumReport({
   const [teams, setTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [activeForumTab, setActiveForumTab] = useState("form");
+
+  // ─── History tab plumbing ───────────────────────────────────────────
+  // historyRefreshKey: bumped after every successful save, so the
+  //   History tab refetches its list without a full page reload.
+  // historyCount: count of saved reports, drives the tab badge so the
+  //   user sees the number before opening the tab.
+  // editingId: the _id of the report currently open in the form, or
+  //   null when the user is creating a new one. Without this, hitting
+  //   Save on a loaded report would silently create a duplicate.
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
+  const [historyCount, setHistoryCount] = useState(0);
+  const [editingId, setEditingId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // ─── Timer State ──────────────────────────────────────────────
@@ -1137,6 +1152,116 @@ export default function ForumReport({
     });
   };
 
+  // ─── Load a saved report from History into the form ─────────────────
+  // Called by ForumReportHistory when the user clicks "Open" on a row.
+  // Repopulates every field, records the report's _id so Save switches
+  // to an UPDATE instead of a CREATE, and jumps back to the form tab.
+  const handleLoadReport = useCallback(
+    (report) => {
+      if (!report || !report._id) return;
+
+      setForm({
+        date: report.date
+          ? new Date(report.date).toISOString().split("T")[0]
+          : new Date().toISOString().split("T")[0],
+        timeStart: report.timeStart || "",
+        timeEnd: report.timeEnd || "",
+        present:
+          Array.isArray(report.present) && report.present.length > 0
+            ? report.present
+            : [""],
+        absent:
+          Array.isArray(report.absent) && report.absent.length > 0
+            ? report.absent
+            : [{ name: "", reason: "" }],
+        prevResults:
+          Array.isArray(report.prevResults) && report.prevResults.length > 0
+            ? report.prevResults
+            : [""],
+        topics:
+          Array.isArray(report.topics) && report.topics.length > 0
+            ? report.topics
+            : [""],
+        explanation: report.explanation || "",
+        gaps:
+          Array.isArray(report.gaps) && report.gaps.length > 0
+            ? report.gaps
+            : [""],
+        agreements:
+          Array.isArray(report.agreements) && report.agreements.length > 0
+            ? report.agreements
+            : [""],
+        signatures:
+          Array.isArray(report.signatures) && report.signatures.length > 0
+            ? report.signatures
+            : [""],
+      });
+
+      setEditingId(report._id);
+      setActiveForumTab("form");
+      setSubmitted(false);
+
+      showToast(
+        `Editing "${report.teamName || "Untitled"}" — save to update, or Reset to start fresh.`,
+        "info",
+      );
+    },
+    [showToast],
+  );
+
+  // ─── Reset the form to a fresh, blank state ─────────────────────────
+  // Called by:
+  //   • the Reset button in the action bar (new, see Edit B below)
+  //   • the "New Report" button on the submitted screen
+  //
+  // Does three things that matter:
+  //   1. Clears every field in `form` back to its initial value —
+  //      otherwise the "New Report" click leaves the previous report's
+  //      content sitting in the form and the next save creates a
+  //      duplicate.
+  //   2. Clears `editingId`, so a subsequent save is a CREATE not an
+  //      UPDATE. Without this, once you'd ever opened a report from
+  //      History, every save for the rest of the session would try to
+  //      PUT to that same report id.
+  //   3. Clears the local timer state and the AI content banner so the
+  //      next report starts truly blank.
+  const resetForm = useCallback(() => {
+    setForm({
+      date: new Date().toISOString().split("T")[0],
+      timeStart: "",
+      timeEnd: "",
+      present: [""],
+      absent: [{ name: "", reason: "" }],
+      prevResults: [""],
+      topics: [""],
+      explanation: "",
+      gaps: [""],
+      agreements: [""],
+      signatures: [""],
+    });
+
+    setEditingId(null);
+    setAiGeneratedContent(null);
+    setShowAIBadge(true);
+    setTimerActive(false);
+    setIsReportLocked(false);
+    setExtensionRequested(false);
+    setSavedProgressId(null);
+    setLastAutoSaveTime(null);
+    setWarningMessage(null);
+
+    // Clear the persisted timer for this team so a fresh report starts
+    // a fresh clock instead of inheriting the previous one's remaining
+    // seconds.
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* private mode / storage disabled — not fatal */
+    }
+
+    resetTimer();
+  }, [STORAGE_KEY, resetTimer]);
+
   // ─── Enhanced AI Apply Handler ─────────────────────────────
   const handleApplySuggestion = (text) => {
     if (!text || text.trim() === "") {
@@ -1323,17 +1448,35 @@ ${"=".repeat(50)}
         aiGeneratedContent: aiGeneratedContent,
       };
 
-      await meetingAPI.create(reportData);
+      // Branch: updating an existing report vs. creating a new one.
+      // `editingId` is set by handleLoadReport when History opens a
+      // saved report; it's cleared by resetForm and by the submitted-
+      // state "New Report" button.
+      if (editingId) {
+        await meetingAPI.update(editingId, reportData);
+        showToast(
+          tf("updateSuccess", "Report updated successfully!"),
+          "success",
+        );
+      } else {
+        await meetingAPI.create(reportData);
+        showToast(tf("saveSuccess", "Report saved successfully!"), "success");
+      }
 
       if (onReportSaved) {
         onReportSaved(selectedTeam.id, form);
       }
+
+      // Bump the History refresh key so the list reflects the save
+      // immediately when the user switches tabs.
+      setHistoryRefreshKey((k) => k + 1);
+
       setSubmitted(true);
-      showToast(tf("saveSuccess", "✅ Report saved successfully!"), "success");
     } catch (error) {
       console.error("Failed to save report:", error);
       showToast(
         error.response?.data?.message ||
+          error.response?.data?.error ||
           tf("saveError", "Failed to save report. Please try again."),
         "error",
       );
@@ -1485,7 +1628,16 @@ ${"=".repeat(50)}
                 padding: "12px 28px",
                 gap: "8px",
               }}
-              onClick={() => setSubmitted(false)}
+              onClick={() => {
+                // resetForm clears every field AND clears editingId.
+                // setSubmitted(false) brings the user back to the tab
+                // view. Both are needed: resetting alone leaves the
+                // user on the success screen, and unsubmitting alone
+                // leaves the previous report's data sitting in the
+                // form.
+                resetForm();
+                setSubmitted(false);
+              }}
             >
               <FiPlus size={18} />
               {tf("newReport", "New Report")}
@@ -1808,6 +1960,7 @@ ${"=".repeat(50)}
           border: `1px solid ${C.border}50`,
         }}
       >
+        {/* Tab 1: New Report (the form) */}
         <button
           onClick={() => setActiveForumTab("form")}
           style={{
@@ -1842,6 +1995,63 @@ ${"=".repeat(50)}
           <FiEdit3 size={isMobile ? 14 : 16} />
           {tf("newReport", "New Report")}
         </button>
+
+        {/* Tab 2: History — saved reports, open/delete. Badge shows
+            the number of saved reports so it's visible before the
+            tab is opened. */}
+        <button
+          onClick={() => setActiveForumTab("history")}
+          style={{
+            flex: 1,
+            padding: isMobile ? "8px 14px" : "10px 20px",
+            borderRadius: "10px",
+            border: "none",
+            background: activeForumTab === "history" ? "#fff" : "transparent",
+            color: activeForumTab === "history" ? "#0F172A" : "#64748B",
+            fontWeight: 600,
+            fontSize: isMobile ? "12px" : "14px",
+            cursor: "pointer",
+            transition: "all 0.3s ease",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "8px",
+            boxShadow:
+              activeForumTab === "history"
+                ? `0 2px 8px rgba(0,0,0,0.08)`
+                : "none",
+          }}
+          onMouseEnter={(e) => {
+            if (activeForumTab !== "history") {
+              e.currentTarget.style.color = "#0F172A";
+            }
+          }}
+          onMouseLeave={(e) => {
+            if (activeForumTab !== "history") {
+              e.currentTarget.style.color = "#64748B";
+            }
+          }}
+        >
+          <FiList size={isMobile ? 14 : 16} />
+          {tf("historyTab", "History")}
+          {historyCount > 0 && (
+            <span
+              style={{
+                background: C.primary,
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "1px 7px",
+                borderRadius: 999,
+                lineHeight: 1.6,
+              }}
+            >
+              {historyCount}
+            </span>
+          )}
+        </button>
+
+        {/* Tab 3: Feed — the existing social surface. */}
         <button
           onClick={() => setActiveForumTab("feed")}
           style={{
@@ -2598,7 +2808,7 @@ ${"=".repeat(50)}
               borderTop: `2px solid ${C.border}`,
             }}
           >
-            {/* ✅ EXPORT BUTTON - Text on Desktop, Icon on Mobile */}
+            {/* EXPORT — text on desktop, icon-only on mobile */}
             <button
               style={{
                 ...btn.danger,
@@ -2630,6 +2840,54 @@ ${"=".repeat(50)}
               {isMobile && <span style={{ fontSize: "10px" }}>PDF</span>}
             </button>
 
+            {/* NEW: RESET — only meaningful when there's something to
+                abandon. Always rendered, because a fresh report can
+                also be reset. Confirms before clearing so a mis-click
+                doesn't lose in-progress work. */}
+            <button
+              style={{
+                ...btn.secondary,
+                flex: isMobile ? "1" : "0.5",
+                justifyContent: "center",
+                padding: isMobile
+                  ? "clamp(10px, 2vw, 14px) clamp(12px, 3vw, 20px)"
+                  : "clamp(10px, 2vw, 14px) clamp(20px, 4vw, 36px)",
+                fontSize: isMobile ? "13px" : FONT_SIZES.body,
+                minWidth: 0,
+                gap: "6px",
+                borderRadius: radius.lg,
+                transition: "all 0.3s ease",
+              }}
+              onClick={() => {
+                const hasContent =
+                  form.present.some((p) => p && p.trim()) ||
+                  form.topics.some((t) => t && t.trim()) ||
+                  form.explanation.trim() ||
+                  form.gaps.some((g) => g && g.trim()) ||
+                  form.agreements.some((a) => a && a.trim());
+                if (
+                  hasContent &&
+                  !window.confirm(
+                    editingId
+                      ? "Discard changes to this report and start fresh?"
+                      : "Clear the form and start a new report?",
+                  )
+                ) {
+                  return;
+                }
+                resetForm();
+                showToast(
+                  editingId ? "Changes discarded." : "Form cleared.",
+                  "info",
+                );
+              }}
+              title={tc("reset", "Reset")}
+            >
+              <FiRefreshCw size={isMobile ? 18 : 16} />
+              {!isMobile && <span>{tc("reset", "Reset")}</span>}
+            </button>
+
+            {/* SAVE / UPDATE */}
             <button
               style={{
                 ...btn.primary,
@@ -2667,12 +2925,29 @@ ${"=".repeat(50)}
               ) : (
                 <>
                   <FiSave size={18} />
-                  {tf("save", "Save Report")}
+                  {editingId
+                    ? tf("updateReport", "Update Report")
+                    : tf("save", "Save Report")}
                 </>
               )}
             </button>
           </div>
         </div>
+      ) : activeForumTab === "history" ? (
+        /* ─── HISTORY TAB ─────────────────────────────────────────────
+            Saved reports for this team. The panel handles its own
+            fetching, filtering, and permission checks; we just hand it
+            the team, the "open this report" callback (which populates
+            the form and switches back to the Form tab), a count
+            callback (drives the badge on the History tab button), and
+            a refresh key (so saves from the Form tab immediately
+            appear here without a page reload). */
+        <ForumReportHistory
+          teamId={selectedTeam?.id}
+          onOpenReport={handleLoadReport}
+          onCountChange={setHistoryCount}
+          refreshKey={historyRefreshKey}
+        />
       ) : (
         /* ─── FORUM FEED TAB ────────────────────────────────────────── */
         <ForumReportFeed t={t} isMobile={isMobile} teamId={selectedTeam?.id} />
