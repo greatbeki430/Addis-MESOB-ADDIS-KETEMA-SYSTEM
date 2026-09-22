@@ -167,7 +167,8 @@ export const meetingAPI = {
   create: (data) => api.post("/meetings", data),
   getAll: (params = {}) => api.get("/meetings", { params }),
   getById: (id) => api.get(`/meetings/${id}`),
-  getByTeam: (teamId) => api.get(`/meetings/team/${teamId}`),
+  getByTeam: (teamId, params = {}) =>
+    api.get(`/meetings/team/${teamId}`, { params }),
   update: (id, data) => api.put(`/meetings/${id}`, data),
   delete: (id) => api.delete(`/meetings/${id}`),
   autoSave: (data) => api.post("/meetings/auto-save", data),

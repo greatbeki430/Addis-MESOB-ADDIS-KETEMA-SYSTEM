@@ -14,6 +14,24 @@ const isAdmin = (user) => {
   return user && ["admin", "superadmin"].includes(user.role);
 };
 
+// ─── Helper: Ownership and same-team checks ─────────────────
+// Shared by updateMeeting and deleteMeeting so the permission
+// rules stay visibly identical in both places. If one is ever
+// changed, the other should be changed too, and having the check
+// in one function makes that visible at a glance.
+const ownerAndTeamCheck = (meeting, user) => {
+  const isOwner = meeting.createdBy
+    ? meeting.createdBy.toString() === user._id.toString()
+    : false;
+
+  const sameTeam =
+    meeting.team && user.team
+      ? meeting.team.toString() === user.team.toString()
+      : false;
+
+  return { isOwner, sameTeam };
+};
+
 // ─── Create Meeting ─────────────────────────────────────────
 const createMeeting = async (req, res) => {
   try {
@@ -226,35 +244,78 @@ const autoSaveMeeting = async (req, res) => {
 };
 
 // ─── Get Meetings ───────────────────────────────────────────
+//
+// Returns the list of meeting reports visible to the caller.
+//
+// Visibility rule, matching the History tab's permission model:
+//   • Admin/superadmin → everything, no clamp
+//   • Team leader      → every report on their own team, plus their
+//                        own reports from any team
+//   • Everyone else    → their own reports only
+//
+// Query params:
+//   • teamId or team   → narrow to a single team
+//   • status           → exact status, or "draft" for the umbrella
+//                        over the two not-yet-final statuses
+//   • isLocked         → "true" / "false"
+//
+// The previous version had a single clamp — `filter.createdBy =
+// req.user._id` for every non-admin — which silently hid teammates'
+// reports from team leaders opening History. That's the whole
+// reason a leader opens History: to see what their team submitted,
+// not just what they personally submitted. Fixed by giving leaders
+// an OR clause that widens the result set to include everything on
+// their team.
 const getMeetings = async (req, res) => {
   try {
     const { teamId, team, status, isLocked } = req.query;
 
-    let filter = {};
+    const filter = {};
 
-    if (teamId) {
-      filter.team = teamId;
-    } else if (team) {
-      filter.team = team;
+    // ── Team filter (narrowing) ─────────────────────────────
+    const requestedTeamId = teamId || team;
+    if (requestedTeamId) {
+      filter.team = requestedTeamId;
     }
 
-    if (status) {
-      filter.status = status;
+    // ── Status filter ───────────────────────────────────────
+    if (status && status !== "all") {
+      if (status === "draft") {
+        // "Draft" is a UI-level umbrella over the two not-yet-final
+        // statuses. The model keeps them apart because the timer
+        // promotes in_progress → auto_saved automatically.
+        filter.status = { $in: ["in_progress", "auto_saved"] };
+      } else {
+        filter.status = status;
+      }
     }
 
-    // If isLocked is provided, filter by that
+    // ── Locked filter ───────────────────────────────────────
     if (isLocked !== undefined) {
       filter.isLocked = isLocked === "true";
     }
 
-    // If user is not admin, only show their own meetings
-    if (!isAdmin(req.user)) {
-      filter.createdBy = req.user._id;
+    // ── Visibility clamp ────────────────────────────────────
+    const isAdminUser = isAdmin(req.user);
+    const isLeaderUser = req.user.role === "leader";
+    const userTeamId = req.user.team ? req.user.team.toString() : null;
+
+    if (!isAdminUser) {
+      if (isLeaderUser && userTeamId) {
+        // A leader sees everything on their own team, plus any report
+        // they personally authored on any other team (edge case —
+        // e.g. they were moved between teams after submitting).
+        // Express the rule as an OR so a single query returns both.
+        filter.$or = [{ team: req.user.team }, { createdBy: req.user._id }];
+      } else {
+        // Everyone else — members and anything else below leader.
+        filter.createdBy = req.user._id;
+      }
     }
 
     const meetings = await Meeting.find(filter)
       .populate("createdBy", "name email")
-      .sort({ date: -1, createdAt: -1 });
+      .sort({ updatedAt: -1, date: -1 });
 
     res.json(meetings);
   } catch (error) {
@@ -311,6 +372,22 @@ const getMeetingById = async (req, res) => {
 };
 
 // ─── Update Meeting ──────────────────────────────────────────
+//
+// Permission model, matching the History tab's "Open" button:
+//   • Admin/superadmin → can update any report, including locked ones
+//   • Team leader      → can update any report on their own team,
+//                        unless it's locked
+//   • Everyone else    → can update ONLY their own drafts
+//                        (in_progress or auto_saved) that aren't locked
+//
+// Without the draft-and-owner check, a member could PUT a completed
+// report that seven people have already signed and rewrite the
+// content underneath their signatures. The signature is the whole
+// point of the artifact — the rule has to make it impossible.
+//
+// A locked report is a hard stop for everyone but an admin, who has
+// to unlock it explicitly first (via /meetings/:id/unlock) so the
+// unlock shows up in the audit trail.
 const updateMeeting = async (req, res) => {
   try {
     const meeting = await Meeting.findById(req.params.id);
@@ -318,37 +395,62 @@ const updateMeeting = async (req, res) => {
       return res.status(404).json({ message: "Meeting not found" });
     }
 
-    // Check authorization
-    const isOwner = meeting.createdBy.toString() === req.user._id.toString();
     const isAdminUser = isAdmin(req.user);
+    const isLeaderUser = req.user.role === "leader";
 
-    if (!isOwner && !isAdminUser) {
-      return res
-        .status(403)
-        .json({ message: "Not authorized to update this meeting" });
-    }
+    const { isOwner, sameTeam } = ownerAndTeamCheck(meeting, req.user);
 
-    // If meeting is locked, only admin can update
-    if (meeting.isLocked && !isAdminUser) {
-      return res
-        .status(403)
-        .json({
-          message: "This meeting is locked. Only admins can update it.",
+    const isLocked = meeting.isLocked === true || meeting.status === "locked";
+
+    const isDraft =
+      meeting.status === "in_progress" || meeting.status === "auto_saved";
+
+    // ── Who is allowed to update this report? ────────────────
+    const allowed =
+      isAdminUser ||
+      (!isLocked && isLeaderUser && sameTeam) ||
+      (!isLocked && isOwner && isDraft);
+
+    if (!allowed) {
+      // Distinguish the reasons so the client can show a useful
+      // message rather than a generic 403.
+      if (isLocked && !isAdminUser) {
+        return res.status(403).json({
+          message:
+            "This report is locked. Ask an admin to unlock it before editing.",
+          code: "MEETING_LOCKED",
         });
-    }
-
-    // If meeting is expired, only admin can update
-    if (meeting.timeExpired && !isAdminUser) {
+      }
+      if (isOwner && !isDraft && !isLeaderUser && !isAdminUser) {
+        return res.status(403).json({
+          message:
+            "Completed reports can only be edited by a team leader or admin.",
+          code: "MEETING_NOT_A_DRAFT",
+        });
+      }
+      if (isLeaderUser && !sameTeam) {
+        return res.status(403).json({
+          message: "You can only edit reports on your own team.",
+          code: "WRONG_TEAM",
+        });
+      }
       return res
         .status(403)
-        .json({
-          message: "This meeting has expired. Only admins can update it.",
-        });
+        .json({ message: "Not authorized to update this report" });
     }
 
+    // ── Apply the update ─────────────────────────────────────
     const updates = { ...req.body };
 
-    // Clean arrays
+    // Never let the client move a report to a different team or
+    // change its ownership via a plain PUT — those are audit fields.
+    // If a future feature needs team reassignment, it should be a
+    // dedicated endpoint with its own permission check.
+    delete updates.team;
+    delete updates.createdBy;
+    delete updates.createdByName;
+
+    // Clean string arrays — same treatment as create.
     ["prevResults", "topics", "gaps", "agreements", "signatures"].forEach(
       (field) => {
         if (Array.isArray(updates[field])) {
@@ -357,12 +459,25 @@ const updateMeeting = async (req, res) => {
       },
     );
 
-    // Handle date conversion
+    // Absent members: normalize each entry to { name, reason } so a
+    // partial payload doesn't leave stale objects in the array.
+    if (Array.isArray(updates.absent)) {
+      updates.absent = updates.absent
+        .filter((a) => a && a.name && a.name.trim())
+        .map((a) => ({
+          name: a.name.trim(),
+          reason: (a.reason || "").trim(),
+        }));
+    }
+
+    // Date conversion for the schedule date.
     if (updates.date) {
       updates.date = new Date(updates.date);
     }
 
-    // If status is being set to "completed", set completedAt
+    // When the client marks a report complete, stamp the moment.
+    // The status transition in_progress → completed is what flips
+    // the report to read-only for regular members.
     if (updates.status === "completed") {
       updates.completedAt = new Date();
     }
@@ -458,6 +573,19 @@ const unlockMeeting = async (req, res) => {
 };
 
 // ─── Delete Meeting ──────────────────────────────────────────
+//
+// Permission model matches updateMeeting, except that the "must be
+// a draft" clause is not applied to leaders — a leader can delete
+// any of their team's reports, including completed ones. The reason
+// for the difference: correcting a mistake in a completed report
+// requires deleting and re-submitting, and forcing the leader to
+// first unlock, then delete, then re-create is friction with no
+// security benefit (the leader already had edit rights before the
+// report was completed).
+//
+// Members cannot delete a completed report they authored. To remove
+// one, they have to ask their leader — the audit trail of "who
+// deleted the signed copy" is worth keeping.
 const deleteMeeting = async (req, res) => {
   try {
     const meeting = await Meeting.findById(req.params.id);
@@ -465,14 +593,34 @@ const deleteMeeting = async (req, res) => {
       return res.status(404).json({ message: "Meeting not found" });
     }
 
-    // Only admin or owner can delete
-    const isOwner = meeting.createdBy.toString() === req.user._id.toString();
     const isAdminUser = isAdmin(req.user);
+    const isLeaderUser = req.user.role === "leader";
 
-    if (!isOwner && !isAdminUser) {
+    const { isOwner, sameTeam } = ownerAndTeamCheck(meeting, req.user);
+
+    const isDraft =
+      meeting.status === "in_progress" || meeting.status === "auto_saved";
+
+    const allowed =
+      isAdminUser || (isLeaderUser && sameTeam) || (isOwner && isDraft);
+
+    if (!allowed) {
+      if (isOwner && !isDraft && !isLeaderUser && !isAdminUser) {
+        return res.status(403).json({
+          message:
+            "Completed reports can only be deleted by a team leader or admin.",
+          code: "MEETING_NOT_A_DRAFT",
+        });
+      }
+      if (isLeaderUser && !sameTeam) {
+        return res.status(403).json({
+          message: "You can only delete reports on your own team.",
+          code: "WRONG_TEAM",
+        });
+      }
       return res
         .status(403)
-        .json({ message: "Not authorized to delete this meeting" });
+        .json({ message: "Not authorized to delete this report" });
     }
 
     await meeting.deleteOne();
@@ -499,11 +647,9 @@ const requestExtension = async (req, res) => {
 
     // Check if user owns this meeting
     if (meeting.createdBy.toString() !== req.user._id.toString()) {
-      return res
-        .status(403)
-        .json({
-          message: "Not authorized to request extension for this meeting",
-        });
+      return res.status(403).json({
+        message: "Not authorized to request extension for this meeting",
+      });
     }
 
     // Check if there's already a pending request
