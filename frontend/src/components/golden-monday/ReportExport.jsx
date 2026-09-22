@@ -1,19 +1,23 @@
 // components/golden-monday/ReportExport.jsx
 // ============================================================
 // 📊 GOLDEN MONDAY REPORT EXPORT - Premium Export System
-// Complete PDF, Excel, Word export with Amharic support
-// Enhanced with glassmorphism, animations, and preview
+// PDF generation delegates to utils/pdf/goldenMondayReport.js —
+// the single canonical generator shared by every Golden Monday
+// report type, matching the Daily Report / Forum Report pattern
+// (mixed-script rendering, Ethiopian calendar, prepared-by,
+// watermark, green branding). Excel and Word export stay local
+// to this file since Daily/Forum Report don't have equivalents
+// to delegate to for those formats.
 // ============================================================
 
 import { useState, useRef, useMemo, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { C, F } from "../../styles/theme";
 import { useLanguage } from "../../hooks/useLanguage";
+import { useAuth } from "../../hooks/useAuth";
 import { goldenMondayAPI } from "../../services/api";
 import { showToast } from "../../utils/toastHelper";
-import { createPDF } from "../../utils/pdf/pdfEngine";
-import { loadFonts, FONT_NAMES } from "../../utils/pdf/fontLoader";
-import { encodeText, isAmharic } from "../../utils/pdf/language";
+import { generateGoldenMondayReportPDF } from "../../utils/pdf/goldenMondayReport";
 import {
   FiDownload,
   FiFileText,
@@ -50,6 +54,12 @@ const glass = {
 };
 
 // ── Ethiopian calendar conversion ──
+// Still needed locally: exportAsExcel/exportAsWord below (and the
+// preview modal's footer timestamp) use this directly. PDF export no
+// longer needs it here — utils/pdf/goldenMondayReport.js has its own
+// copy (mirrors the same pattern dailyReport.js uses, keeping the
+// calendar conversion colocated with the PDF-specific formatting that
+// needs the raw {year,month,day}, e.g. for Oromo dates).
 const ETHIOPIAN_MONTHS_AM = [
   "መስከረም",
   "ጥቅምት",
@@ -392,6 +402,7 @@ const FORMAT_OPTIONS = [
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ReportExport({ sessionId }) {
   const { language } = useLanguage();
+  const { user } = useAuth();
   const [exporting, setExporting] = useState(false);
   const [reportType, setReportType] = useState("attendance");
   const [exportFormat, setExportFormat] = useState("pdf");
@@ -429,6 +440,23 @@ export default function ReportExport({ sessionId }) {
   const selectedReportType = useMemo(() => {
     return REPORT_TYPES.find((r) => r.value === reportType) || REPORT_TYPES[0];
   }, [reportType]);
+
+  // ── Prepared-by info from the logged-in user, same shape DailyReport.jsx builds ──
+  const preparedByInfo = useMemo(() => {
+    const userName =
+      user?.fullName || user?.displayName || user?.name || user?.username || "";
+    const userDepartment =
+      user?.team?.department || user?.team?.name || user?.department || "";
+    const userPosition = user?.position || "";
+    const userBranch = user?.branch || "Addis Ketema";
+    const parts = [userDepartment, userPosition, userBranch].filter(
+      (p) => p && p !== "N/A",
+    );
+    return {
+      preparedBy: userName,
+      preparedByDisplay: parts.length ? `(${parts.join(" - ")})` : "",
+    };
+  }, [user]);
 
   // ── Get report data ──
   const getReportData = useCallback(
@@ -590,25 +618,6 @@ export default function ReportExport({ sessionId }) {
     return `golden-monday-${type}${langSuffix}_${date}.${format}`;
   };
 
-  // ─── Helper: Set smart font on doc ──────────────────────────
-  const setSmartFont = (doc, text, bold = false) => {
-    try {
-      const hasAmharic = isAmharic(text);
-      const style = bold ? "bold" : "normal";
-      if (hasAmharic) {
-        doc.setFont(
-          doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica",
-          style,
-        );
-      } else {
-        doc.setFont(doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica", style);
-      }
-    } catch (_error) {
-      console.warn("Font setting failed, using default font:", _error);
-      doc.setFont("helvetica", bold ? "bold" : "normal");
-    }
-  };
-
   // ─── Preview Report ──────────────────────────────────────────
   const handlePreview = async () => {
     setPreviewLoading(true);
@@ -625,488 +634,16 @@ export default function ReportExport({ sessionId }) {
   };
 
   // ─── EXPORT AS PDF ──────────────────────────────────────────
-  const exportAsPDF = async (data, filename) => {
-    try {
-      const autoTable = (await import("jspdf-autotable")).default;
-
-      const engine = createPDF({ orientation: "landscape", theme: "report" });
-      const doc = engine.getDoc();
-      loadFonts(doc, { silent: false });
-
-      const pageWidth = doc.internal.pageSize.getWidth();
-      // ── Title ──
-      setSmartFont(doc, data.title || t("reportTitle", "Report"), true);
-      doc.setFontSize(20);
-      doc.setTextColor(26, 58, 173);
-      doc.text(
-        encodeText(data.title || t("reportTitle", "Report")),
-        pageWidth / 2,
-        20,
-        { align: "center" },
-      );
-
-      // ── Subtitle / Date ──
-      const generatedDate = new Date(data.date);
-      const ethiopianDateStr = formatEthiopianDateAmharic(generatedDate);
-      const gregorianDateStr = generatedDate.toLocaleString();
-      const dateText = `${t("generated", "Generated")}: ${ethiopianDateStr}  |  ${gregorianDateStr}`;
-
-      setSmartFont(doc, dateText, false);
-      doc.setFontSize(10);
-      doc.setTextColor(100, 100, 100);
-      doc.text(encodeText(dateText), pageWidth / 2, 28, { align: "center" });
-
-      let yPos = 35;
-
-      const createTable = (headers, rows, startY, options = {}) => {
-        const {
-          title = null,
-          titleSize = 12,
-          fontSize = 8,
-          theme = "striped",
-          columnStyles = {},
-          rowHeight = 8,
-        } = options;
-
-        let currentY = startY;
-
-        if (title) {
-          setSmartFont(doc, title, true);
-          doc.setFontSize(titleSize);
-          doc.setTextColor(0, 0, 0);
-          doc.text(encodeText(title), 14, currentY);
-          currentY += 7;
-        }
-
-        const requiredSpace = rows.length * rowHeight + 30;
-        if (currentY + requiredSpace > doc.internal.pageSize.getHeight() - 40) {
-          doc.addPage();
-          currentY = 20;
-        }
-
-        autoTable(doc, {
-          startY: currentY,
-          head: [headers],
-          body: rows,
-          theme: theme,
-          headStyles: {
-            fillColor: [26, 58, 173],
-            textColor: [255, 255, 255],
-            fontSize: 8,
-            font: doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica",
-            halign: "center",
-          },
-          styles: {
-            fontSize: fontSize,
-            font: doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica",
-            cellPadding: 3,
-          },
-          columnStyles: columnStyles,
-          rowHeight: rowHeight,
-          tableWidth: pageWidth - 28,
-          margin: { left: 14, right: 14 },
-          didParseCell: (cellData) => {
-            const raw = String(cellData.cell.raw || "");
-            const hasAmharic = /[\u1200-\u137F]/.test(raw);
-            cellData.cell.styles.font = hasAmharic
-              ? doc.__hasEthiopicFont
-                ? FONT_NAMES.ethiopic
-                : "helvetica"
-              : doc.__hasLatinFont
-                ? FONT_NAMES.latin
-                : "helvetica";
-          },
-        });
-
-        return doc.lastAutoTable.finalY + 6;
-      };
-
-      // ─── ATTENDANCE REPORT ──────────────────────────────────
-      if (data.attendance) {
-        const { total, present, absent, withSignature } = data.stats;
-        const rate = total > 0 ? Math.round((present / total) * 100) : 0;
-
-        const summaryRows = [
-          [t("total", "Total"), total],
-          [t("present", "Present"), present],
-          [t("absent", "Absent"), absent],
-          [t("attendanceRate", "Attendance Rate"), `${rate}%`],
-          ["With Signature", withSignature],
-        ];
-
-        yPos = createTable(
-          [t("metric", "Metric"), t("value", "Value")],
-          summaryRows,
-          yPos,
-          {
-            title: t("attendanceReport", "Attendance Report Summary"),
-            fontSize: 9,
-            rowHeight: 8,
-          },
-        );
-
-        // Detailed attendance
-        const headers = [
-          t("name", "Name"),
-          t("department", "Dept"),
-          t("email", "Email"),
-          t("status", "Status"),
-          t("signature", "Sig"),
-          t("checkedInAt", "Time"),
-          t("feedback", "Feedback"),
-        ];
-
-        const tableData = data.attendance.map((a) => {
-          const status = a.attended
-            ? `✅ ${t("present", "Present")}`
-            : `❌ ${t("absent", "Absent")}`;
-          const signatureVal =
-            a.attended && a.signature && a.signature.length > 100
-              ? "✓ " + t("signed", "Signed")
-              : a.attended
-                ? "✗ " + t("notSigned", "Not Signed")
-                : "—";
-          return [
-            a.name || t("unknown", "Unknown"),
-            a.department || t("na", "N/A"),
-            a.email || t("na", "N/A"),
-            status,
-            signatureVal,
-            a.checkedInAt
-              ? new Date(a.checkedInAt).toLocaleTimeString()
-              : t("na", "N/A"),
-            a.feedback || "",
-          ];
-        });
-
-        yPos = createTable(headers, tableData, yPos, {
-          title: t("detailedAttendance", "Detailed Attendance"),
-          fontSize: 7,
-          rowHeight: 7,
-          columnStyles: {
-            0: { cellWidth: 28 },
-            1: { cellWidth: 22 },
-            2: { cellWidth: 32 },
-            3: { cellWidth: 18 },
-            4: { cellWidth: 18 },
-            5: { cellWidth: 18 },
-            6: { cellWidth: "auto" },
-          },
-        });
-      }
-
-      // ─── SESSIONS REPORT ────────────────────────────────────
-      if (data.sessions) {
-        const { total, upcoming, past, avgRating } = data.stats;
-        const statsRows = [
-          [t("total", "Total"), total],
-          [t("statUpcoming", "Upcoming"), upcoming],
-          [t("statPast", "Past"), past],
-          [t("avgRating", "Avg Rating"), avgRating.toFixed(1) + " ★"],
-        ];
-
-        yPos = createTable(
-          [t("metric", "Metric"), t("value", "Value")],
-          statsRows,
-          yPos,
-          {
-            title: t("sessionsReport", "Sessions Report Summary"),
-            fontSize: 9,
-            rowHeight: 8,
-          },
-        );
-
-        const sessionData = data.sessions.map((s) => [
-          s.presentationTitle || s.title || t("untitled", "Untitled"),
-          new Date(s.date).toLocaleDateString(),
-          s.presenterName || t("na", "N/A"),
-          s.averageRating ? `${s.averageRating.toFixed(1)} ★` : t("na", "N/A"),
-          s.status || t("unknown", "Unknown"),
-          s.attendees?.length || 0,
-        ]);
-
-        yPos = createTable(
-          [
-            t("title", "Title"),
-            t("date", "Date"),
-            t("presenter", "Presenter"),
-            t("rating", "Rating"),
-            t("status", "Status"),
-            t("attendees", "Attendees"),
-          ],
-          sessionData,
-          yPos,
-          {
-            title: t("sessionsReport", "Sessions Report"),
-            fontSize: 7,
-            rowHeight: 7,
-          },
-        );
-      }
-
-      // ─── GALLERY REPORT ─────────────────────────────────────
-      if (data.photos) {
-        const categoryRows = Object.entries(data.stats.categories || {}).map(
-          ([cat, count]) => [cat, count],
-        );
-
-        yPos = createTable(
-          [t("category", "Category"), t("count", "Count")],
-          categoryRows,
-          yPos,
-          {
-            title: t("galleryReport", "Gallery by Category"),
-            fontSize: 9,
-            rowHeight: 8,
-          },
-        );
-
-        const galleryData = data.photos.map((p) => [
-          p.title || t("untitled", "Untitled"),
-          p.category || t("other", "Other"),
-          new Date(p.createdAt).toLocaleDateString(),
-          p.uploadedByName || t("unknown", "Unknown"),
-        ]);
-
-        yPos = createTable(
-          [
-            t("title", "Title"),
-            t("category", "Category"),
-            t("date", "Date"),
-            t("uploadedBy", "Uploaded By"),
-          ],
-          galleryData,
-          yPos,
-          {
-            title: t("galleryReport", "Gallery Report"),
-            fontSize: 7,
-            rowHeight: 7,
-          },
-        );
-      }
-
-      // ─── EXPERIENCES REPORT ─────────────────────────────────
-      if (data.experiences) {
-        const { total, avgRating, recommendCount } = data.stats;
-        const statsRows = [
-          [t("total", "Total"), total],
-          [t("avgRating", "Avg Rating"), avgRating.toFixed(1) + " ★"],
-          ["Would Recommend", recommendCount],
-        ];
-
-        yPos = createTable(
-          [t("metric", "Metric"), t("value", "Value")],
-          statsRows,
-          yPos,
-          {
-            title: t("experiencesReport", "Experiences Summary"),
-            fontSize: 9,
-            rowHeight: 8,
-          },
-        );
-
-        const expData = data.experiences.map((e) => [
-          e.userName || t("unknown", "Unknown"),
-          e.department || t("na", "N/A"),
-          (e.whatILearned || "").substring(0, 50) +
-            ((e.whatILearned || "").length > 50 ? "..." : ""),
-          `${e.relevanceRating || 0}/5`,
-          e.wouldRecommend ? "✅" : "❌",
-          new Date(e.createdAt).toLocaleDateString(),
-        ]);
-
-        yPos = createTable(
-          [
-            t("name", "Name"),
-            t("department", "Dept"),
-            t("whatILearned", "What I Learned"),
-            t("relevanceRating", "Rating"),
-            t("wouldRecommend", "Recommend"),
-            t("date", "Date"),
-          ],
-          expData,
-          yPos,
-          {
-            title: t("experiencesReport", "Experiences Shared"),
-            fontSize: 7,
-            rowHeight: 7,
-          },
-        );
-      }
-
-      // ─── RESULTS REPORT ─────────────────────────────────────
-      if (data.results) {
-        const categoryRows = Object.entries(data.stats.categories || {}).map(
-          ([cat, count]) => [cat, count],
-        );
-
-        yPos = createTable(
-          [t("category", "Category"), t("count", "Count")],
-          categoryRows,
-          yPos,
-          {
-            title: t("resultsReport", "Results by Category"),
-            fontSize: 9,
-            rowHeight: 8,
-          },
-        );
-
-        const resData = data.results.map((r) => [
-          r.userName || t("unknown", "Unknown"),
-          r.department || t("na", "N/A"),
-          (r.whatIApplied || "").substring(0, 40) +
-            ((r.whatIApplied || "").length > 40 ? "..." : ""),
-          (r.measurableOutcome || "").substring(0, 40) +
-            ((r.measurableOutcome || "").length > 40 ? "..." : ""),
-          r.outcomeCategory || t("other", "Other"),
-          new Date(r.createdAt).toLocaleDateString(),
-        ]);
-
-        yPos = createTable(
-          [
-            t("name", "Name"),
-            t("department", "Dept"),
-            t("whatIApplied", "What I Applied"),
-            t("measurableOutcome", "Outcome"),
-            t("outcomeCategory", "Category"),
-            t("date", "Date"),
-          ],
-          resData,
-          yPos,
-          {
-            title: t("resultsReport", "Results Gained"),
-            fontSize: 7,
-            rowHeight: 7,
-          },
-        );
-      }
-
-      // ─── EMPLOYEE PERFORMANCE REPORT ────────────────────────
-      if (data.performance) {
-        const { total, eligible, totalPresentations } = data.stats;
-        const statsRows = [
-          [t("total", "Total"), total],
-          [t("eligible", "Eligible"), eligible],
-          ["Total Presentations", totalPresentations],
-        ];
-
-        yPos = createTable(
-          [t("metric", "Metric"), t("value", "Value")],
-          statsRows,
-          yPos,
-          {
-            title: t("performanceReport", "Performance Summary"),
-            fontSize: 9,
-            rowHeight: 8,
-          },
-        );
-
-        const perfData = data.performance.map((p) => [
-          p.name || t("unknown", "Unknown"),
-          p.department || t("na", "N/A"),
-          p.position || t("na", "N/A"),
-          p.timesPresented || 0,
-          p.averageRating ? p.averageRating.toFixed(1) : t("na", "N/A"),
-          p.isEligible ? "✅" : "❌",
-        ]);
-
-        yPos = createTable(
-          [
-            t("name", "Name"),
-            t("department", "Dept"),
-            t("position", "Position"),
-            t("timesPresented", "Presented"),
-            t("avgRating", "Avg Rating"),
-            t("isEligible", "Eligible"),
-          ],
-          perfData,
-          yPos,
-          {
-            title: t("performanceReport", "Employee Performance"),
-            fontSize: 7,
-            rowHeight: 7,
-          },
-        );
-      }
-
-      // ─── DASHBOARD INSIGHTS REPORT ──────────────────────────
-      if (data.insights || data.metrics) {
-        if (data.metrics && Object.keys(data.metrics).length > 0) {
-          const metricsRows = Object.entries(data.metrics).map(([key, val]) => [
-            key,
-            String(val),
-          ]);
-
-          yPos = createTable(
-            [t("metric", "Metric"), t("value", "Value")],
-            metricsRows,
-            yPos,
-            {
-              title: t("insightsReport", "Dashboard Metrics"),
-              fontSize: 9,
-              rowHeight: 8,
-            },
-          );
-        }
-
-        if (data.insights && data.insights.length > 0) {
-          const insightRows = data.insights.map((insight) => [
-            insight.title || "",
-            (insight.description || "").substring(0, 60) +
-              ((insight.description || "").length > 60 ? "..." : ""),
-            insight.confidence
-              ? `${(insight.confidence * 100).toFixed(0)}%`
-              : t("na", "N/A"),
-          ]);
-
-          createTable(
-            [
-              t("title", "Title"),
-              t("descriptionCol", "Description"),
-              t("confidence", "Confidence"),
-            ],
-            insightRows,
-            yPos,
-            {
-              title: t("aiSuggestions", "AI Suggestions"),
-              fontSize: 7,
-              rowHeight: 7,
-            },
-          );
-        }
-      }
-
-      // ─── Footer ─────────────────────────────────────────────
-      const pageCount = doc.internal.getNumberOfPages();
-      const footerY = doc.internal.pageSize.getHeight() - 10;
-
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-
-        const pageText = `${t("page", "Page")} ${i} ${t("of", "of")} ${pageCount}`;
-        setSmartFont(doc, pageText, false);
-        doc.text(encodeText(pageText), pageWidth / 2, footerY, {
-          align: "center",
-        });
-
-        const footerText = t(
-          "footerText",
-          "Generated by Addis MESOB Golden Monday System",
-        );
-        setSmartFont(doc, footerText, false);
-        doc.text(encodeText(footerText), pageWidth / 2, footerY + 6, {
-          align: "center",
-        });
-      }
-
-      engine.save(filename);
-      return true;
-    } catch (error) {
-      console.error("PDF export error:", error);
-      throw error;
-    }
+  // Delegates to the canonical generator in utils/pdf/goldenMondayReport.js
+  // (mixed-script rendering, Ethiopian calendar labels, prepared-by,
+  // watermark, green branding — all shared with Daily/Forum Report).
+  const exportAsPDF = async (data) => {
+    return generateGoldenMondayReportPDF(data, reportType, data.date, {
+      language: reportLang,
+      showWatermark: true,
+      preparedBy: preparedByInfo.preparedBy,
+      preparedByDisplay: preparedByInfo.preparedByDisplay,
+    });
   };
 
   // ─── EXPORT AS EXCEL ────────────────────────────────────────
@@ -1413,17 +950,17 @@ export default function ReportExport({ sessionId }) {
           <style>
             body { font-family: 'Segoe UI', Arial, sans-serif; padding: 20px; background: #f5f7fa; }
             .report-container { max-width: 1100px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-            h1 { color: #1a3aad; border-bottom: 3px solid #1a3aad; padding-bottom: 12px; font-size: 24px; }
-            h2 { color: #333; margin-top: 24px; font-size: 18px; border-left: 4px solid #1a3aad; padding-left: 12px; }
+            h1 { color: #1a6b4a; border-bottom: 3px solid #1a6b4a; padding-bottom: 12px; font-size: 24px; }
+            h2 { color: #333; margin-top: 24px; font-size: 18px; border-left: 4px solid #1a6b4a; padding-left: 12px; }
             h3 { color: #555; margin-top: 16px; font-size: 15px; }
             table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 13px; }
-            th { background-color: #1a3aad; color: white; padding: 8px 12px; text-align: left; font-weight: 600; }
+            th { background-color: #1a6b4a; color: white; padding: 8px 12px; text-align: left; font-weight: 600; }
             td { padding: 6px 12px; border: 1px solid #ddd; }
             tr:nth-child(even) { background-color: #f8f9fa; }
             tr:hover { background-color: #eef2f7; }
             .header { text-align: center; margin-bottom: 20px; }
             .footer { text-align: center; font-size: 10px; color: #999; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 12px; }
-            .summary-box { background: #f0f4f8; padding: 16px 20px; border-radius: 8px; margin: 12px 0; border-left: 4px solid #1a3aad; }
+            .summary-box { background: #f0f4f8; padding: 16px 20px; border-radius: 8px; margin: 12px 0; border-left: 4px solid #1a6b4a; }
             .summary-box table { margin: 0; width: auto; }
             .summary-box td { border: none; padding: 4px 12px; }
             .badge-present { color: #16a34a; font-weight: bold; }
@@ -1431,7 +968,7 @@ export default function ReportExport({ sessionId }) {
             .signature-img { max-width: 80px; max-height: 30px; border: 1px solid #ddd; border-radius: 4px; }
             .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin: 12px 0; }
             .stat-card { background: #f8f9fa; padding: 12px; border-radius: 8px; text-align: center; border: 1px solid #e5e7eb; }
-            .stat-value { font-size: 22px; font-weight: 700; color: #1a3aad; }
+            .stat-value { font-size: 22px; font-weight: 700; color: #1a6b4a; }
             .stat-label { font-size: 11px; color: #6b7280; text-transform: uppercase; }
             @media print {
               body { background: white; }
@@ -1445,6 +982,11 @@ export default function ReportExport({ sessionId }) {
               <h1>${data.title || t("reportTitle", "Report")}</h1>
               <p><strong>${t("generated", "Generated")}:</strong> ${ethiopianDate} | ${gregorianDate}</p>
               <p style="font-size: 12px; color: #6b7280;">Session ID: ${sessionId || "N/A"} • Language: ${reportLang}</p>
+              ${
+                preparedByInfo.preparedBy
+                  ? `<p style="font-size: 12px; color: #6b7280;">Prepared By: ${preparedByInfo.preparedBy} ${preparedByInfo.preparedByDisplay}</p>`
+                  : ""
+              }
             </div>
       `;
 
@@ -1704,7 +1246,6 @@ export default function ReportExport({ sessionId }) {
       }, 500);
 
       const data = await getReportData(reportType);
-      const filename = getFilename(reportType, exportFormat);
 
       clearInterval(progressInterval);
       setProgress(95);
@@ -1712,13 +1253,16 @@ export default function ReportExport({ sessionId }) {
       let success = false;
       switch (exportFormat) {
         case "pdf":
-          success = await exportAsPDF(data, filename);
+          // Filename is built by the canonical generator itself
+          // (AMESOB_GoldenMonday_<type>_<lang>_<date>.pdf), so we
+          // don't pass one here.
+          success = await exportAsPDF(data);
           break;
         case "excel":
-          success = exportAsExcel(data, filename);
+          success = exportAsExcel(data, getFilename(reportType, "xlsx"));
           break;
         case "word":
-          success = exportAsWord(data, filename);
+          success = exportAsWord(data, getFilename(reportType, "doc"));
           break;
         default:
           throw new Error(`Unknown format: ${exportFormat}`);
