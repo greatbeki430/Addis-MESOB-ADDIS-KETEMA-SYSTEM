@@ -791,46 +791,80 @@ const AIInsightBadge = ({ type = "info", children, onClose }) => {
 };
 
 // ─── Format AI Response ──────────────────────────────────────
+// ─── Format AI Response (clean, human-readable) ──────────────
 const formatAIResponse = (text) => {
   if (!text) return "";
 
-  let formatted = text
+  let formatted = text;
+
+  // 1. Remove code fences if any
+  formatted = formatted.replace(/```[\s\S]*?```/g, (m) =>
+    m.replace(/```/g, ""),
+  );
+
+  // 2. Convert markdown tables to plain text lists
+  //    Detect a table block (header row + separator row + body rows)
+  formatted = formatted.replace(
+    /(?:^\|.+\|\s*$\n^\|[\s\-:|]+\|\s*$\n(?:^\|.+\|\s*$\n?)*)/gm,
+    (tableBlock) => {
+      const lines = tableBlock.trim().split("\n");
+      if (lines.length < 3) return tableBlock;
+
+      const parseRow = (line) =>
+        line
+          .split("|")
+          .slice(1, -1)
+          .map((c) => c.trim());
+
+      const headers = parseRow(lines[0]);
+      const rows = lines.slice(2).map(parseRow);
+
+      let out = "\n";
+      rows.forEach((row, i) => {
+        out += `  ${i + 1}. `;
+        headers.forEach((h, j) => {
+          if (row[j])
+            out += `${h}: ${row[j]}${j < headers.length - 1 ? " • " : ""}`;
+        });
+        out += "\n";
+      });
+      return out;
+    },
+  );
+
+  // 3. Remove markdown emphasis markers
+  formatted = formatted.replace(/\*\*(.+?)\*\*/g, "$1"); // **bold**
+  formatted = formatted.replace(/\*(.+?)\*/g, "$1"); // *italic*
+  formatted = formatted.replace(/__(.+?)__/g, "$1"); // __bold__
+  formatted = formatted.replace(/_(.+?)_/g, "$1"); // _italic_
+  formatted = formatted.replace(/`(.+?)`/g, "$1"); // `code`
+
+  // 4. Convert headings to clean uppercase lines
+  formatted = formatted.replace(
+    /^#{1,6}\s*(.+)$/gm,
+    (_, title) =>
+      `\n${title.trim().toUpperCase()}\n${"─".repeat(Math.min(title.trim().length, 40))}\n`,
+  );
+
+  // 5. Convert horizontal rules into a clean divider
+  formatted = formatted.replace(/^\s*-{3,}\s*$/gm, "─".repeat(40));
+
+  // 6. Convert markdown list markers to bullets
+  formatted = formatted.replace(/^\s*[-*+]\s+/gm, "• ");
+  formatted = formatted.replace(/^\s*\d+\.\s+/gm, (m) => m.trim() + " ");
+
+  // 7. Remove leftover stray markers
+  formatted = formatted
     .replace(/\*\*/g, "")
-    .replace(/\*/g, "")
-    .replace(/### /g, "")
-    .replace(/---/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]+$/gm, "")
-    .replace(/^[•·-]\s*/gm, "• ")
-    .replace(/\(\s*\)/g, "")
-    .trim();
+    .replace(/###/g, "")
+    .replace(/---/g, "");
+  formatted = formatted.replace(/^\s*\|.*\|\s*$/gm, ""); // any orphan table rows
 
-  formatted = formatted.replace(/\*/g, "");
-  formatted = formatted.replace(/\s{2,}/g, " ");
-
-  const sections = [
-    "MEETING MINUTES",
-    "Date:",
-    "Attendees:",
-    "AGENDA ITEMS & DECISIONS",
-    "ACTION ITEMS",
-    "NEXT MEETING",
-  ];
-
-  sections.forEach((section) => {
-    const regex = new RegExp(`(${section})`, "g");
-    formatted = formatted.replace(regex, "\n$1\n");
-  });
-
-  formatted = formatted.replace(/•\s*Topics:/g, "• Topics:");
-  formatted = formatted.replace(/•\s*Explanation:/g, "• Explanation:");
-  formatted = formatted.replace(/•\s*Gaps:/g, "• Gaps:");
-  formatted = formatted.replace(/•\s*Agreements:/g, "• Agreements:");
-  formatted = formatted.replace(/•\s*\(no details recorded\)/g, "");
-  formatted = formatted.replace(/•\s*No/g, "• No");
+  // 8. Collapse excess blank lines and trailing spaces
+  formatted = formatted.replace(/[ \t]+$/gm, "");
   formatted = formatted.replace(/\n{3,}/g, "\n\n");
 
-  return formatted;
+  return formatted.trim();
 };
 
 // ─── Main Component ──────────────────────────────────────────
