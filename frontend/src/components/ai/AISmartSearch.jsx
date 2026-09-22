@@ -29,6 +29,7 @@ const AISmartSearch = ({
   const [showResults, setShowResults] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [error, setError] = useState(null);
+  const [isFocused, setIsFocused] = useState(false); // ✅ NEW: focus state
   const wrapperRef = useRef(null);
 
   // Define performSearch before it's used in useEffect
@@ -123,6 +124,18 @@ const AISmartSearch = ({
     setSelectedIndex(-1);
   };
 
+  // ✅ Combined focus handler (was duplicated twice before)
+  const handleInputFocus = () => {
+    setIsFocused(true);
+    if (query.length >= 2) {
+      setShowResults(true);
+    }
+  };
+
+  const handleInputBlur = () => {
+    setIsFocused(false);
+  };
+
   return (
     <div ref={wrapperRef} className={`relative ${className}`}>
       <div
@@ -136,24 +149,21 @@ const AISmartSearch = ({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => query.length >= 2 && setShowResults(true)}
+          onFocus={handleInputFocus}
+          onBlur={handleInputBlur}
           placeholder={placeholder}
           style={{
             width: "100%",
             padding: "10px 44px 10px 40px",
-            border: `2px solid ${showResults ? C.primary : "#CBD5E1"}`,
+            border: `2px solid ${
+              isFocused || showResults ? C.primary : "#CBD5E1"
+            }`,
             borderRadius: "10px",
             fontSize: "14px",
             outline: "none",
             transition: "all 0.3s ease",
             background: "#fff",
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.borderColor = C.primary;
-            e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-          }}
-          onBlur={(e) => {
-            e.currentTarget.style.boxShadow = "none";
+            boxShadow: isFocused ? `0 0 0 3px ${C.primary}22` : "none",
           }}
         />
         <div

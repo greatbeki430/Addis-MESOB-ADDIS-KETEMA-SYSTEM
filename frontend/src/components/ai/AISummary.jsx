@@ -20,7 +20,7 @@ const AISummary = ({
   variant = "default",
   autoGenerate = false,
   formatResult = null,
-  onContentGenerated = null, // ✅ ADD THIS
+  onContentGenerated = null,
 }) => {
   const [insight, setInsight] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -28,10 +28,8 @@ const AISummary = ({
   const [generated, setGenerated] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // ✅ Use ref to track if component is mounted
   const isMounted = useRef(true);
 
-  // ✅ Cleanup on unmount
   useEffect(() => {
     isMounted.current = true;
     return () => {
@@ -40,14 +38,12 @@ const AISummary = ({
   }, []);
 
   const handleGenerate = useCallback(async () => {
-    // ✅ Don't set state if unmounted
     if (!isMounted.current) return;
 
     setIsLoading(true);
     setError("");
     try {
       const res = await fetchFn(...args);
-      // ✅ Only update state if component is still mounted
       if (isMounted.current) {
         const content =
           res.data.insight ||
@@ -58,7 +54,6 @@ const AISummary = ({
         setInsight(content);
         setGenerated(true);
 
-        // ✅ Call the callback with the formatted content
         if (onContentGenerated) {
           const formattedContent = formatResult
             ? formatResult(content)
@@ -79,7 +74,6 @@ const AISummary = ({
 
   const handleCopy = () => {
     if (insight) {
-      // ✅ Copy the formatted version if formatter exists
       const textToCopy = formatResult ? formatResult(insight) : insight;
       navigator.clipboard?.writeText(textToCopy);
       setCopied(true);
@@ -93,13 +87,11 @@ const AISummary = ({
     handleGenerate();
   };
 
-  // ✅ Get the formatted content
   const getFormattedContent = () => {
     if (!insight) return "";
     return formatResult ? formatResult(insight) : insight;
   };
 
-  // ✅ Fixed useEffect with cleanup flag
   useEffect(() => {
     let isEffectActive = true;
 
@@ -121,7 +113,6 @@ const AISummary = ({
             setInsight(content);
             setGenerated(true);
 
-            // ✅ Call the callback with the formatted content
             if (onContentGenerated) {
               const formattedContent = formatResult
                 ? formatResult(content)
@@ -178,8 +169,6 @@ const AISummary = ({
   };
 
   const styles = variantStyles[variant] || variantStyles.default;
-
-  // ✅ Get the formatted content for display
   const displayContent = getFormattedContent();
 
   if (error) {
@@ -365,7 +354,6 @@ const AISummary = ({
         </div>
       </div>
 
-      {/* ✅ Display formatted content */}
       <div
         style={{
           fontSize: "clamp(13px, 3vw, 14px)",
