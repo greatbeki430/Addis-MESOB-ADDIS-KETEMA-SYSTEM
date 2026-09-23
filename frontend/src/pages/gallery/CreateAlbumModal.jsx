@@ -1,5 +1,6 @@
 // frontend/src/pages/gallery/CreateAlbumModal.jsx
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { FiX, FiFolder } from "react-icons/fi";
 import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
@@ -64,7 +65,7 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <form
         onSubmit={handleSubmit}
@@ -190,7 +191,8 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
