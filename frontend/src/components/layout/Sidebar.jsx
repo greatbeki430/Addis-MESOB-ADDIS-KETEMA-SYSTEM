@@ -583,7 +583,8 @@ export default function Sidebar({
         {navItemsWithGoldenMonday.map((n) => {
           const isActive = location.pathname === `/${n.id}`;
           const isForum = n.id === "forum";
-          const navLabel = safeT(`nav.${n.id}`, n.id);
+          // const navLabel = safeT(`nav.${n.id}`, n.id);
+          const navLabel = safeT(`nav.${n.id}`, "") || n.label || n.id;
 
           return (
             <div key={n.id}>
