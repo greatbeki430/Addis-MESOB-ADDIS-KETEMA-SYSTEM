@@ -32,6 +32,7 @@ import {
   FiBell,
   FiClipboard,
   FiMail,
+  FiImage,
 } from "react-icons/fi";
 
 // ✅ ADD THIS IMPORT
@@ -65,6 +66,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     if (path.startsWith("/users")) return "users";
     if (path.startsWith("/teams")) return "teams";
     if (path.startsWith("/admin/services")) return "admin/services";
+    if (path.startsWith("/gallery")) return "gallery";
     if (path.startsWith("/documents")) return "documents";
     if (path.startsWith("/golden-monday")) return "golden-monday";
     if (path.startsWith("/employees")) return "employees";
@@ -105,6 +107,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     "admin-forum-reports": <FiMessageSquare size={18} />,
     "admin-requests": <FiMail size={18} />,
     documents: <FiFileText size={18} />,
+    gallery: <FiImage size={18} />,
     profile: <FiUser size={18} />,
     settings: <FiSettings size={18} />,
     "change-password": <FiLock size={18} />,
@@ -119,6 +122,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     services: "Services",
     analytics: "Analytics",
     documents: "Document Vault",
+    gallery: "Gallery",
     "golden-monday": "Golden Monday",
     users: "User Management",
     teams: "Team Management",
