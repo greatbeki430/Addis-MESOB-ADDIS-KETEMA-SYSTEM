@@ -102,6 +102,8 @@ const focusHandlers = {
   },
 };
 
+const BAR_PADDING = `${SPACING.md} ${SPACING.lg}`;
+
 const GalleryUpload = ({
   albumId = null,
   albums = [],
@@ -267,6 +269,7 @@ const GalleryUpload = ({
           display: "flex",
           flexDirection: "column",
           fontFamily: F.sans,
+          overflow: "hidden",
         }}
       >
         {/* ── Header ──────────────────────────────────── */}
@@ -275,7 +278,7 @@ const GalleryUpload = ({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: `${SPACING.md}px ${SPACING.lg}px`,
+            padding: BAR_PADDING,
             borderBottom: `2px solid ${C.primary}22`,
           }}
         >
@@ -370,7 +373,7 @@ const GalleryUpload = ({
             style={{
               border: `2px dashed ${dragOver ? C.primary : C.border}`,
               borderRadius: radius.lg,
-              padding: "32px 24px",
+              padding: `${SPACING.xl} ${SPACING.lg}`,
               textAlign: "center",
               cursor: "pointer",
               background: dragOver ? `${C.primary}0a` : C.cardBg,
@@ -610,7 +613,7 @@ const GalleryUpload = ({
                 flexDirection: "column",
                 gap: 6,
                 alignItems: "center",
-                padding: `${SPACING.sm}px 0`,
+                padding: `${SPACING.sm} 0`,
               }}
             >
               <div
@@ -655,10 +658,9 @@ const GalleryUpload = ({
             display: "flex",
             justifyContent: "flex-end",
             gap: SPACING.sm,
-            padding: `${SPACING.md}px ${SPACING.lg}px`,
+            padding: BAR_PADDING,
             borderTop: `1px solid ${C.border}`,
             background: C.cardBg,
-            borderRadius: `0 0 ${radius.xl}px ${radius.xl}px`,
           }}
         >
           <button
