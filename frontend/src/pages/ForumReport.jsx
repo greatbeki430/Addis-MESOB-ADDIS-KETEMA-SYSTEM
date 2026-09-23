@@ -583,10 +583,7 @@ const STANDING_AGENDAS_AM = [
 const StandingAgendasPanel = ({ t }) => {
   const safeT = useMemo(() => t || {}, [t]);
   const agendas = safeT.agendas || STANDING_AGENDAS_AM;
-  const tf = useCallback(
-    (key, fallback) => safeT?.forum?.[key] || fallback,
-    [safeT],
-  );
+  const tf = useCallback((key, fallback) => safeT?.[key] ?? fallback, [safeT]);
   const [collapsed, setCollapsed] = useState(false);
 
   return (
@@ -880,16 +877,50 @@ export default function ForumReport({
   const { user } = useAuth();
   const t = tProp || tHook;
 
-  const safeT = useMemo(() => t || {}, [t]);
-  const safeYear = safeT.year || "2018 E.C.";
+  // ─── Language resolution ──────────────────────────────────────
+  // The language used for this page's labels. Priority:
+  //   1. the explicit `lang` prop
+  //   2. `t.lang` if useLanguage() exposes it
+  //   3. "am" as the Amharic-first default
+  const currentLang = useMemo(() => {
+    if (lang && ["am", "en", "om"].includes(lang)) return lang;
+    if (t?.lang && ["am", "en", "om"].includes(t.lang)) return t.lang;
+    return "am";
+  }, [lang, t]);
 
-  const tf = useCallback(
-    (key, fallback) => safeT?.forum?.[key] || fallback,
-    [safeT],
+  // The correctly-nested forum translation dict for this language.
+  // ForumReport.jsx reads its own labels directly from the constants
+  // file because useLanguage() returns a flat object that doesn't
+  // expose the nested `forum` dict.
+  const forumDict = useMemo(
+    () =>
+      forumReportTranslations[currentLang]?.forum ||
+      forumReportTranslations.en.forum,
+    [currentLang],
   );
+
+  // The common translation dict for this language.
+  const commonDict = useMemo(
+    () =>
+      commonTranslations[currentLang]?.common || commonTranslations.en.common,
+    [currentLang],
+  );
+
+  const safeYear = forumDict?.year || "2018 E.C.";
+
+  // Forum label lookup. Falls back through: nested dict → flat t.forum
+  // → flat t → hardcoded fallback (for safety only).
+  const tf = useCallback(
+    (key, fallback) =>
+      forumDict?.[key] ?? t?.forum?.[key] ?? t?.[key] ?? fallback,
+    [forumDict, t],
+  );
+
+  // Common label lookup.
   const tc = useCallback(
-    (key, fallback) => safeT?.common?.[key] || fallback,
-    [safeT],
+    (key, fallback) =>
+      commonDict?.[key] ?? t?.common?.[key] ?? t?.[key] ?? fallback,
+    [commonDict, t],
   );
 
   const { showToast } = useToast();
@@ -1520,7 +1551,7 @@ ${"=".repeat(50)}
   // ─── Handle Export ──────────────────────────────────────────
   const handleExport = () => {
     try {
-      exportForumReportToPDF(form, t, lang || "am", selectedTeam?.name);
+      exportForumReportToPDF(form, t, currentLang, selectedTeam?.name);
       showToast(
         tf("exportSuccess", "✅ Report exported successfully!"),
         "success",
@@ -1798,7 +1829,7 @@ ${"=".repeat(50)}
           teams={teams}
           selectedTeam={selectedTeam}
           setSelectedTeam={setSelectedTeam}
-          lang={lang || "en"}
+          lang={currentLang}
           loading={loadingTeams}
         />
       </div>
@@ -2049,16 +2080,17 @@ ${"=".repeat(50)}
           📊 Progress: {formProgress}% {tf("complete", "complete")}
         </strong>
         <span style={{ marginLeft: "8px", fontSize: "12px" }}>
-          {formProgress < 30 && "🚀 Start filling in the report details below"}
+          {formProgress < 30 &&
+            tf("progressStart", "🚀 Start filling in the report details below")}
           {formProgress >= 30 &&
             formProgress < 70 &&
-            "💪 You're making good progress! Keep going."}
+            tf("progressMiddle", "💪 You're making good progress! Keep going.")}
           {formProgress >= 70 &&
-            "🎯 Almost there! Review and save your report."}
+            tf("progressEnd", "🎯 Almost there! Review and save your report.")}
         </span>
       </AIInsightBadge>
 
-      <StandingAgendasPanel t={safeT} />
+      <StandingAgendasPanel t={forumDict} />
 
       {/* ✅ TABS */}
       <div
@@ -2855,7 +2887,9 @@ ${"=".repeat(50)}
                         color: C.muted,
                       }}
                     >
-                      {isReportLocked ? "🔒 Locked" : "Click to sign"}
+                      {isReportLocked
+                        ? tf("signatureLocked", "🔒 Locked")
+                        : tf("signatureClickToSign", "Click to sign")}{" "}
                     </div>
                   )}
                 </div>
