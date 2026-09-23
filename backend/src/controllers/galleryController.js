@@ -697,7 +697,13 @@ const aiEditItem = async (req, res) => {
     // Cloudinary AI background removal — requires the "remove_the_background"
     // add-on to be enabled on your Cloudinary account. If it isn't, the
     // URL transform below returns the original image and this becomes a no-op.
-    const cloudinary = require("../../config/cloudinary");
+    //
+    // NOTE: the require path is "../config/cloudinary" (one level up from
+    // src/controllers/ → src/config/cloudinary.js). An earlier copy of this
+    // file used "../../config/cloudinary" which resolves to
+    // backend/config/cloudinary — a directory that doesn't exist — and
+    // crashed at runtime the first time an AI-edit button was clicked.
+    const cloudinary = require("../config/cloudinary");
 
     // Build a transformed URL. Preserve original in `originalFileUrl`.
     const transformation =
