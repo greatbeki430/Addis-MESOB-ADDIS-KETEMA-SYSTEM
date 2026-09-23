@@ -13,6 +13,68 @@ import {
 } from "react-icons/fi";
 import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
+import { C, F, SPACING, FONT_SIZES, radius } from "../../styles/theme";
+
+// ─── Shared styles for the dark overlay ────────────────────
+const topBarButtonStyle = () => ({
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 8,
+  background: "transparent",
+  border: "none",
+  borderRadius: radius.md,
+  color: "#fff",
+  cursor: "pointer",
+  transition: "background 0.15s ease",
+});
+
+const navButtonStyle = (side) => ({
+  position: "absolute",
+  [side]: 16,
+  top: "50%",
+  transform: "translateY(-50%)",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 12,
+  background: "rgba(255,255,255,0.12)",
+  color: "#fff",
+  border: "none",
+  borderRadius: "50%",
+  cursor: "pointer",
+  transition: "background 0.15s ease",
+});
+
+const editFieldStyle = () => ({
+  width: "100%",
+  padding: "9px 12px",
+  background: "rgba(255,255,255,0.1)",
+  border: "1px solid rgba(255,255,255,0.22)",
+  borderRadius: radius.md,
+  color: "#fff",
+  fontSize: FONT_SIZES.body,
+  fontFamily: F.sans,
+  outline: "none",
+  boxSizing: "border-box",
+  transition: "border-color 0.15s ease, background 0.15s ease",
+});
+
+const aiButtonStyle = (color) => ({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "7px 12px",
+  background: color,
+  color: "#fff",
+  border: "none",
+  borderRadius: radius.md,
+  fontSize: FONT_SIZES.tiny,
+  fontWeight: 600,
+  fontFamily: F.sans,
+  cursor: "pointer",
+  transition: "transform 0.15s ease, opacity 0.15s ease",
+});
 
 const GalleryLightbox = ({
   items,
@@ -32,7 +94,9 @@ const GalleryLightbox = ({
   const [previousCurrentId, setPreviousCurrentId] = useState(current?._id);
 
   // Reset the draft while rendering the new item instead of synchronously
-  // updating state from an effect.
+  // updating state from an effect. This is the React-recommended way to
+  // "reset state when a prop changes" — see
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
   if (current?._id !== previousCurrentId) {
     setPreviousCurrentId(current?._id);
     setCaption(current?.caption || "");
@@ -113,45 +177,107 @@ const GalleryLightbox = ({
   };
 
   return createPortal(
-    <div className="fixed inset-0 z-[60] bg-black/95 flex flex-col">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 text-white">
-        <div className="text-sm opacity-80">
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        background: "rgba(0,0,0,0.96)",
+        display: "flex",
+        flexDirection: "column",
+        fontFamily: F.sans,
+      }}
+    >
+      {/* ── Top bar ───────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: `${SPACING.sm}px ${SPACING.md}px`,
+          color: "#fff",
+        }}
+      >
+        <div
+          style={{
+            fontSize: FONT_SIZES.small,
+            opacity: 0.8,
+            fontFamily: F.sans,
+          }}
+        >
           {index + 1} {t("gallery.of")} {items.length}
         </div>
-        <div className="flex items-center gap-2">
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <button
             onClick={() => onDownload(current)}
-            className="p-2 rounded hover:bg-white/10"
             title={t("gallery.download")}
+            style={topBarButtonStyle()}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
           >
-            <FiDownload />
+            <FiDownload size={18} />
           </button>
           {canEdit && (
             <button
               onClick={() => setEditing((v) => !v)}
-              className="p-2 rounded hover:bg-white/10"
               title={t("gallery.edit")}
+              style={{
+                ...topBarButtonStyle(),
+                background: editing ? "rgba(255,255,255,0.18)" : "transparent",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = editing
+                  ? "rgba(255,255,255,0.18)"
+                  : "transparent";
+              }}
             >
-              <FiEdit2 />
+              <FiEdit2 size={18} />
             </button>
           )}
           <button
             onClick={onClose}
-            className="p-2 rounded hover:bg-white/10"
             title={t("gallery.close")}
+            style={topBarButtonStyle()}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+            }}
           >
-            <FiX />
+            <FiX size={18} />
           </button>
         </div>
       </div>
 
-      {/* Media area */}
-      <div className="flex-1 flex items-center justify-center relative">
+      {/* ── Media area ────────────────────────────────── */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          position: "relative",
+          minHeight: 0,
+        }}
+      >
         {hasPrev && (
           <button
             onClick={goPrev}
-            className="absolute left-4 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white"
+            style={navButtonStyle("left")}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.22)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+            }}
           >
             <FiChevronLeft size={28} />
           </button>
@@ -163,70 +289,176 @@ const GalleryLightbox = ({
             src={current.fileUrl}
             controls
             autoPlay
-            className="max-h-full max-w-full"
+            style={{
+              maxHeight: "100%",
+              maxWidth: "100%",
+              display: "block",
+            }}
           />
         ) : (
           <img
             key={current._id}
             src={current.fileUrl}
             alt={current.caption || current.fileName}
-            className="max-h-full max-w-full object-contain"
+            style={{
+              maxHeight: "100%",
+              maxWidth: "100%",
+              objectFit: "contain",
+              display: "block",
+            }}
           />
         )}
 
         {hasNext && (
           <button
             onClick={goNext}
-            className="absolute right-4 p-3 rounded-full bg-white/10 hover:bg-white/20 text-white"
+            style={navButtonStyle("right")}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.22)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "rgba(255,255,255,0.12)";
+            }}
           >
             <FiChevronRight size={28} />
           </button>
         )}
       </div>
 
-      {/* Bottom panel — caption + tags + AI editing */}
-      <div className="bg-black/70 text-white px-4 py-3 border-t border-white/10">
+      {/* ── Bottom panel — caption, tags, AI editing ──── */}
+      <div
+        style={{
+          background: "rgba(0,0,0,0.75)",
+          color: "#fff",
+          padding: `${SPACING.md}px ${SPACING.md}px`,
+          borderTop: "1px solid rgba(255,255,255,0.1)",
+        }}
+      >
         {editing ? (
-          <div className="space-y-2 max-w-3xl mx-auto">
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: SPACING.sm,
+              maxWidth: 720,
+              margin: "0 auto",
+            }}
+          >
             <input
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder={t("gallery.captionPlaceholder")}
-              className="w-full px-3 py-2 rounded bg-white/10 border border-white/20 text-white placeholder-white/50"
+              style={editFieldStyle()}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.5)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.14)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.22)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+              }}
             />
             <input
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder={t("gallery.tagsPlaceholder")}
-              className="w-full px-3 py-2 rounded bg-white/10 border border-white/20 text-white placeholder-white/50"
+              style={editFieldStyle()}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.5)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.14)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.22)";
+                e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+              }}
             />
-            <div className="flex justify-end gap-2">
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: SPACING.sm,
+              }}
+            >
               <button
                 onClick={() => setEditing(false)}
-                className="px-3 py-1.5 text-sm rounded bg-white/10 hover:bg-white/20"
+                style={{
+                  padding: "7px 14px",
+                  background: "rgba(255,255,255,0.1)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: radius.md,
+                  fontSize: FONT_SIZES.small,
+                  fontFamily: F.sans,
+                  cursor: "pointer",
+                  transition: "background 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.2)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                }}
               >
                 {t("gallery.cancel")}
               </button>
               <button
                 onClick={handleSave}
                 disabled={busy}
-                className="px-3 py-1.5 text-sm rounded bg-blue-600 hover:bg-blue-700 flex items-center gap-1"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "7px 14px",
+                  background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: radius.md,
+                  fontSize: FONT_SIZES.small,
+                  fontWeight: 700,
+                  fontFamily: F.sans,
+                  cursor: busy ? "not-allowed" : "pointer",
+                  opacity: busy ? 0.6 : 1,
+                }}
               >
-                <FiSave /> {busy ? t("gallery.uploading") : t("gallery.save")}
+                <FiSave size={14} />{" "}
+                {busy ? t("gallery.uploading") : t("gallery.save")}
               </button>
             </div>
           </div>
         ) : (
-          <div className="max-w-3xl mx-auto">
+          <div style={{ maxWidth: 720, margin: "0 auto" }}>
             {current.caption && (
-              <p className="text-sm mb-1">{current.caption}</p>
+              <p
+                style={{
+                  fontSize: FONT_SIZES.body,
+                  margin: "0 0 6px",
+                  color: "#fff",
+                  fontFamily: F.sans,
+                }}
+              >
+                {current.caption}
+              </p>
             )}
             {current.tags?.length > 0 && (
-              <div className="flex flex-wrap gap-1 mb-2">
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: 4,
+                  marginBottom: SPACING.sm,
+                }}
+              >
                 {current.tags.map((tag, i) => (
                   <span
                     key={i}
-                    className="text-[10px] px-2 py-0.5 rounded-full bg-white/10"
+                    style={{
+                      fontSize: 10,
+                      padding: "2px 8px",
+                      borderRadius: radius.pill,
+                      background: "rgba(255,255,255,0.12)",
+                      color: "#fff",
+                      fontFamily: F.sans,
+                    }}
                   >
                     #{tag}
                   </span>
@@ -235,32 +467,82 @@ const GalleryLightbox = ({
             )}
 
             {canEdit && !isVideo && (
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: SPACING.sm,
+                  marginTop: SPACING.sm,
+                  alignItems: "center",
+                }}
+              >
                 <button
                   onClick={() => handleAiEdit("background_removed")}
                   disabled={aiBusy}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
+                  style={{
+                    ...aiButtonStyle(C.purple),
+                    opacity: aiBusy ? 0.5 : 1,
+                    cursor: aiBusy ? "not-allowed" : "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!aiBusy)
+                      e.currentTarget.style.transform = "translateY(-1px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                  }}
                 >
-                  <FiZap /> {t("gallery.removeBackground")}
+                  <FiZap size={12} /> {t("gallery.removeBackground")}
                 </button>
                 <button
                   onClick={() => handleAiEdit("enhanced")}
                   disabled={aiBusy}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
+                  style={{
+                    ...aiButtonStyle(C.light),
+                    opacity: aiBusy ? 0.5 : 1,
+                    cursor: aiBusy ? "not-allowed" : "pointer",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!aiBusy)
+                      e.currentTarget.style.transform = "translateY(-1px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                  }}
                 >
-                  <FiZap /> {t("gallery.enhancePhoto")}
+                  <FiZap size={12} /> {t("gallery.enhancePhoto")}
                 </button>
                 {current.aiEdited && (
                   <button
                     onClick={handleRestore}
                     disabled={aiBusy}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-white/10 hover:bg-white/20 disabled:opacity-50"
+                    style={{
+                      ...aiButtonStyle("rgba(255,255,255,0.12)"),
+                      opacity: aiBusy ? 0.5 : 1,
+                      cursor: aiBusy ? "not-allowed" : "pointer",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!aiBusy)
+                        e.currentTarget.style.background =
+                          "rgba(255,255,255,0.22)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background =
+                        "rgba(255,255,255,0.12)";
+                    }}
                   >
-                    <FiRotateCcw /> {t("gallery.restoreOriginal")}
+                    <FiRotateCcw size={12} /> {t("gallery.restoreOriginal")}
                   </button>
                 )}
                 {aiBusy && (
-                  <span className="text-xs opacity-70 self-center">
+                  <span
+                    style={{
+                      fontSize: FONT_SIZES.tiny,
+                      opacity: 0.7,
+                      alignSelf: "center",
+                      fontFamily: F.sans,
+                    }}
+                  >
                     {t("gallery.aiProcessing")}
                   </span>
                 )}

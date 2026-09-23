@@ -1,61 +1,194 @@
 // frontend/src/pages/gallery/AlbumCard.jsx
+import { useState } from "react";
 import { FiFolder, FiImage, FiVideo, FiTrash2 } from "react-icons/fi";
 import { useLanguage } from "../../hooks/useLanguage";
+import { C, F, SPACING, FONT_SIZES, radius } from "../../styles/theme";
+
 const AlbumCard = ({ album, onOpen, onDelete, canDelete }) => {
   const { t } = useLanguage();
+  const [hovered, setHovered] = useState(false);
 
   const dateLabel = album.programDate
     ? new Date(album.programDate).toLocaleDateString()
     : new Date(album.createdAt).toLocaleDateString();
 
+  const hasCover = Boolean(album.coverImage?.url);
+
   return (
-    <div className="group relative rounded-lg overflow-hidden border dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm hover:shadow-md transition">
-      {/* Cover */}
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: "relative",
+        borderRadius: radius.lg,
+        overflow: "hidden",
+        border: `1px solid ${C.border}`,
+        background: "#fff",
+        transition: "box-shadow 0.2s ease, transform 0.2s ease",
+        boxShadow: hovered
+          ? "0 6px 24px rgba(13,26,94,0.14)"
+          : "0 1px 4px rgba(13,26,94,0.06)",
+        transform: hovered ? "translateY(-2px)" : "translateY(0)",
+      }}
+    >
+      {/* ── Cover ─────────────────────────────────────── */}
       <button
         onClick={onOpen}
-        className="block w-full aspect-video bg-gray-100 dark:bg-gray-900 relative"
+        style={{
+          display: "block",
+          width: "100%",
+          aspectRatio: "16 / 9",
+          background: C.bg,
+          border: "none",
+          padding: 0,
+          position: "relative",
+          cursor: "pointer",
+          overflow: "hidden",
+        }}
       >
-        {album.coverImage?.url ? (
+        {hasCover ? (
           <img
             src={album.coverImage.url}
             alt={album.title}
-            className="w-full h-full object-cover"
             loading="lazy"
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+            }}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
-            <FiFolder size={40} />
+          <div
+            style={{
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: C.muted,
+              opacity: 0.5,
+            }}
+          >
+            <FiFolder size={44} />
           </div>
         )}
-        <div className="absolute top-2 right-2 flex gap-1 text-xs">
+
+        {/* Photo + video counts */}
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            display: "flex",
+            gap: 4,
+          }}
+        >
           {album.photoCount > 0 && (
-            <span className="bg-black/60 text-white rounded px-2 py-0.5 flex items-center gap-1">
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "2px 8px",
+                background: "rgba(0,0,0,0.65)",
+                color: "#fff",
+                borderRadius: radius.sm,
+                fontSize: FONT_SIZES.tiny,
+                fontWeight: 600,
+                fontFamily: F.sans,
+              }}
+            >
               <FiImage size={12} /> {album.photoCount}
             </span>
           )}
           {album.videoCount > 0 && (
-            <span className="bg-black/60 text-white rounded px-2 py-0.5 flex items-center gap-1">
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                padding: "2px 8px",
+                background: "rgba(0,0,0,0.65)",
+                color: "#fff",
+                borderRadius: radius.sm,
+                fontSize: FONT_SIZES.tiny,
+                fontWeight: 600,
+                fontFamily: F.sans,
+              }}
+            >
               <FiVideo size={12} /> {album.videoCount}
             </span>
           )}
         </div>
       </button>
 
-      {/* Body */}
-      <div className="p-3">
-        <button onClick={onOpen} className="text-left w-full">
-          <h3 className="font-semibold truncate">{album.title}</h3>
+      {/* ── Body ──────────────────────────────────────── */}
+      <div style={{ padding: SPACING.md }}>
+        <button
+          onClick={onOpen}
+          style={{
+            display: "block",
+            width: "100%",
+            textAlign: "left",
+            background: "none",
+            border: "none",
+            padding: 0,
+            cursor: "pointer",
+            fontFamily: F.sans,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: FONT_SIZES.body,
+              fontWeight: 700,
+              color: C.dark,
+              margin: 0,
+              whiteSpace: "nowrap",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+            }}
+            title={album.title}
+          >
+            {album.title}
+          </h3>
         </button>
-        <p className="text-xs text-gray-500 mt-0.5">
+
+        <p
+          style={{
+            fontSize: FONT_SIZES.tiny,
+            color: C.muted,
+            margin: "4px 0 0",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+          }}
+        >
           {dateLabel}
           {album.location ? ` · ${album.location}` : ""}
         </p>
+
         {album.tags?.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 4,
+              marginTop: 8,
+            }}
+          >
             {album.tags.slice(0, 3).map((tag, i) => (
               <span
                 key={i}
-                className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300"
+                style={{
+                  fontSize: 10,
+                  padding: "2px 8px",
+                  borderRadius: radius.pill,
+                  background: `${C.primary}14`,
+                  color: C.primary,
+                  fontWeight: 600,
+                  fontFamily: F.sans,
+                }}
               >
                 #{tag}
               </span>
@@ -64,16 +197,42 @@ const AlbumCard = ({ album, onOpen, onDelete, canDelete }) => {
         )}
       </div>
 
-      {/* Delete button */}
+      {/* ── Delete button ─────────────────────────────── */}
       {canDelete && onDelete && (
-        <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition">
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            left: 8,
+            opacity: hovered ? 1 : 0,
+            transition: "opacity 0.2s ease",
+            pointerEvents: hovered ? "auto" : "none",
+          }}
+        >
           <button
             onClick={(e) => {
               e.stopPropagation();
               onDelete(album, false);
             }}
-            className="p-1.5 rounded bg-red-600 text-white hover:bg-red-700"
             title={t("gallery.deleteAlbum")}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 6,
+              background: C.red,
+              color: "#fff",
+              border: "none",
+              borderRadius: radius.sm,
+              cursor: "pointer",
+              transition: "background 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#b91c1c";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = C.red;
+            }}
           >
             <FiTrash2 size={14} />
           </button>
