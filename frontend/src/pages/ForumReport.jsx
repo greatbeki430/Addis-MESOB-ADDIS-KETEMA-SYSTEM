@@ -402,6 +402,8 @@ const DynamicFieldGroup = ({
   maxItems = 20,
   helperText = "",
   variant = "default",
+  addFirstLabel = "Add First",
+  addAnotherLabel = "Add Another",
 }) => {
   const handleAdd = () => {
     if (values.length < maxItems) {
@@ -555,7 +557,7 @@ const DynamicFieldGroup = ({
           }}
         >
           <FiPlus size={14} />
-          Add {values.length === 0 ? "First" : "Another"}
+          {values.length === 0 ? addFirstLabel : addAnotherLabel}
         </button>
       )}
 
@@ -2341,6 +2343,8 @@ ${"=".repeat(50)}
               "Add all team members who attended the forum meeting",
             )}
             variant="primary"
+            addFirstLabel={tf("addFirst", "Add First")}
+            addAnotherLabel={tf("addAnother", "Add Another")}
           />
 
           {/* Absent Members */}
@@ -2484,6 +2488,8 @@ ${"=".repeat(50)}
               "List outcomes and action items from the previous meeting",
             )}
             variant="warning"
+            addFirstLabel={tf("addFirst", "Add First")}
+            addAnotherLabel={tf("addAnother", "Add Another")}
           />
 
           {/* Today's Topics */}
@@ -2505,6 +2511,8 @@ ${"=".repeat(50)}
               "Enter each discussion topic separately",
             )}
             variant="primary"
+            addFirstLabel={tf("addFirst", "Add First")}
+            addAnotherLabel={tf("addAnother", "Add Another")}
           />
 
           {/* Explanation - Enhanced with AI Actions */}
@@ -2721,6 +2729,8 @@ ${"=".repeat(50)}
               "Identify gaps or challenges discussed in the forum",
             )}
             variant="danger"
+            addFirstLabel={tf("addFirst", "Add First")}
+            addAnotherLabel={tf("addAnother", "Add Another")}
           />
 
           {/* Agreements */}
@@ -2742,6 +2752,8 @@ ${"=".repeat(50)}
               "Document all points of agreement reached",
             )}
             variant="success"
+            addFirstLabel={tf("addFirst", "Add First")}
+            addAnotherLabel={tf("addAnother", "Add Another")}
           />
 
           {/* Signatures - With Modal */}
