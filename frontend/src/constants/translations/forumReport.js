@@ -135,6 +135,9 @@ export const forumReportTranslations = {
       // ─── Misc ──────────────────────────────────────────────────
       notAssigned: "Not assigned",
       time: "Time",
+      signatureLocked: "🔒 Locked",
+      signatureClickToSign: "Click to sign",
+      historyTab: "History",
     },
   },
   am: {
@@ -267,6 +270,9 @@ export const forumReportTranslations = {
       // ─── Misc ──────────────────────────────────────────────────
       notAssigned: "አልተመደበም",
       time: "ሰዓት",
+      signatureLocked: "🔒 ተቆልፏል",
+      signatureClickToSign: "ለመፈረም ይጫኑ",
+      historyTab: "ታሪክ",
     },
   },
   om: {
@@ -403,6 +409,9 @@ export const forumReportTranslations = {
       // ─── Misc ──────────────────────────────────────────────────
       notAssigned: "Hin ramadamne",
       time: "Yeroo",
+      signatureLocked: "🔒 Cufaa",
+      signatureClickToSign: "Mallatteessuuf cuqaasi",
+      historyTab: "Seenaa",
     },
   },
 };
