@@ -1,7 +1,7 @@
 // frontend/src/pages/gallery/CreateAlbumModal.jsx
 import { useState } from "react";
 import { createPortal } from "react-dom";
-import { FiX, FiFolder } from "react-icons/fi";
+import { FiX, FiPlusCircle } from "react-icons/fi";
 import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
 import { C, F, SPACING, FONT_SIZES, radius } from "../../styles/theme";
@@ -27,6 +27,8 @@ const TYPE_LABEL_KEY = {
 };
 
 // ─── Shared styles ─────────────────────────────────────────
+// SPACING.* values already include units (they're clamp() strings),
+// so they're used directly — no trailing "px" appended.
 const fieldStyle = () => ({
   width: "100%",
   padding: "9px 12px",
@@ -49,6 +51,21 @@ const labelStyle = () => ({
   marginBottom: 6,
   fontFamily: F.sans,
 });
+
+const focusHandlers = {
+  onFocus: (e) => {
+    e.currentTarget.style.borderColor = C.primary;
+    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+  },
+  onBlur: (e) => {
+    e.currentTarget.style.borderColor = C.border;
+    e.currentTarget.style.boxShadow = "none";
+  },
+};
+
+// Header + footer share the same horizontal + vertical inset so the
+// two bars visually align with the body content between them.
+const BAR_PADDING = `${SPACING.md} ${SPACING.lg}`;
 
 const CreateAlbumModal = ({ onClose, onCreated }) => {
   const { t } = useLanguage();
@@ -90,18 +107,6 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
     }
   };
 
-  // Focus ring helper — reused on every input/select/textarea
-  const focusHandlers = {
-    onFocus: (e) => {
-      e.currentTarget.style.borderColor = C.primary;
-      e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
-    },
-    onBlur: (e) => {
-      e.currentTarget.style.borderColor = C.border;
-      e.currentTarget.style.boxShadow = "none";
-    },
-  };
-
   return createPortal(
     <div
       style={{
@@ -129,6 +134,7 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
           display: "flex",
           flexDirection: "column",
           fontFamily: F.sans,
+          overflow: "hidden",
         }}
       >
         {/* ── Header ──────────────────────────────────── */}
@@ -137,7 +143,7 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: `${SPACING.md}px ${SPACING.lg}px`,
+            padding: BAR_PADDING,
             borderBottom: `2px solid ${C.primary}22`,
           }}
         >
@@ -153,7 +159,7 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
               gap: 8,
             }}
           >
-            <FiFolder size={20} style={{ color: C.primary }} />
+            <FiPlusCircle size={20} style={{ color: C.primary }} />
             {t("gallery.createAlbum")}
           </h2>
           <button
@@ -215,7 +221,10 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
           )}
 
           <div>
-            <label style={labelStyle()}>{t("gallery.albumTitle")} *</label>
+            <label style={labelStyle()}>
+              {t("gallery.albumTitle")}
+              <span style={{ color: C.red, marginLeft: 4 }}>*</span>
+            </label>
             <input
               value={form.title}
               onChange={(e) => set("title", e.target.value)}
@@ -264,10 +273,7 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
               <select
                 value={form.programType}
                 onChange={(e) => set("programType", e.target.value)}
-                style={{
-                  ...fieldStyle(),
-                  cursor: "pointer",
-                }}
+                style={{ ...fieldStyle(), cursor: "pointer" }}
                 {...focusHandlers}
               >
                 {PROGRAM_TYPES.map((pt) => (
@@ -308,10 +314,9 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
             display: "flex",
             justifyContent: "flex-end",
             gap: SPACING.sm,
-            padding: `${SPACING.md}px ${SPACING.lg}px`,
+            padding: BAR_PADDING,
             borderTop: `1px solid ${C.border}`,
             background: C.cardBg,
-            borderRadius: `0 0 ${radius.xl}px ${radius.xl}px`,
           }}
         >
           <button
