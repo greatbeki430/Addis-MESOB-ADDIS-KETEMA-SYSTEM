@@ -461,6 +461,12 @@ export const NAV_ITEMS = [
     roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
+    id: "leaderboard",
+    icon: "🏆",
+    label: "Leaderboard",
+    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+  },
+  {
     id: "analytics",
     icon: "📊",
     label: "Analytics",

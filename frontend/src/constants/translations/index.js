@@ -19,6 +19,7 @@ import { landingTranslations } from "./landing";
 
 // Import Golden Monday translations from the original location
 import { goldenMondayTranslations } from "../goldenMondayTranslations";
+import { leaderboardTranslations } from "./leaderboard";
 
 // 🆕 Gallery translations
 import { galleryTranslations } from "./gallery";
@@ -39,8 +40,9 @@ export const modularTranslations = {
     ...userManagementTranslations.en,
     ...employeeManagementTranslations.en,
     ...documentVaultTranslations.en,
-    ...landingTranslations.en, // ✅ Landing translations are included
-    ...galleryTranslations.en, // 🆕 Gallery translations
+    ...landingTranslations.en,
+    ...galleryTranslations.en,
+    ...leaderboardTranslations.en,
     goldenMonday: goldenMondayTranslations.en,
   },
   am: {
@@ -57,8 +59,9 @@ export const modularTranslations = {
     ...userManagementTranslations.am,
     ...employeeManagementTranslations.am,
     ...documentVaultTranslations.am,
-    ...landingTranslations.am, // ✅ Landing translations are included
-    ...galleryTranslations.am, // 🆕 Gallery translations
+    ...landingTranslations.am,
+    ...galleryTranslations.am,
+    ...leaderboardTranslations.am,
     goldenMonday: goldenMondayTranslations.am,
   },
   om: {
@@ -75,8 +78,9 @@ export const modularTranslations = {
     ...userManagementTranslations.om,
     ...employeeManagementTranslations.om,
     ...documentVaultTranslations.om,
-    ...landingTranslations.om, // ✅ Landing translations are included
-    ...galleryTranslations.om, // 🆕 Gallery translations
+    ...landingTranslations.om,
+    ...galleryTranslations.om,
+    ...leaderboardTranslations.om,
     goldenMonday: goldenMondayTranslations.om,
   },
 };

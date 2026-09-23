@@ -6,6 +6,8 @@ import { useLanguage } from "../hooks/useLanguage";
 import { dailyReportAPI, goldenMondayAPI } from "../services/api";
 import { AIDashboardWidget } from "../components/ai";
 // import { dashboardTranslations } from "../constants/dashboard";
+import LeaderboardCelebrationBanner from "../components/dashboard/LeaderboardCelebrationBanner";
+
 import {
   FiTrendingUp,
   FiBarChart2,
@@ -2147,6 +2149,9 @@ export default function Dashboard({ t: tProp }) {
       {/* AI Digest banner — its own flex row, full width, never overlapped */}
       <div className="op-ai-banner">
         <AIDashboardWidget stats={aiStats} refreshInterval={120000} />
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        <LeaderboardCelebrationBanner />
       </div>
 
       <div className="op-grid">

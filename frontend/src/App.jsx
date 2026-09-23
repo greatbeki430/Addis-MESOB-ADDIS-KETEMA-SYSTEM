@@ -45,6 +45,7 @@ import AlertsManagement from "./pages/admin/AlertsManagement";
 import AdminDataManagement from "./pages/admin/AdminDataManagement";
 import ChangePassword from "./pages/ChangePassword";
 import Gallery from "./pages/gallery/Gallery";
+import Leaderboard from "./pages/Leaderboard";
 
 import { FiUserPlus } from "react-icons/fi";
 
@@ -288,6 +289,7 @@ function AuthenticatedApp() {
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
               <Route path="/documents" element={<DocumentVault />} />
               <Route path="/gallery" element={<Gallery />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
               <Route
                 path="/dashboard"
                 element={<Dashboard t={t} lang={language} />}
