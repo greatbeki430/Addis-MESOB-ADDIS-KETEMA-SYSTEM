@@ -388,11 +388,17 @@ export const galleryAPI = {
       data: { reason },
     }),
 
-  // ─── Items ────────────────────────────────────────────
-  // albumId can be a real ObjectId OR the string "loose"
-  uploadItems: (albumId, files) =>
-    api.post(`/gallery/${albumId}/items`, { files }),
+  // ─── Direct-to-Cloudinary upload ──────────────────────
+  // Step 1: ask backend for a signed upload token
+  getUploadSignature: (mediaType, albumId) =>
+    api.post("/gallery/upload-signature", { mediaType, albumId }),
 
+  // Step 2: after the browser finishes POSTing to Cloudinary,
+  // persist the metadata on our side
+  finalizeItem: (albumId, metadata) =>
+    api.post(`/gallery/${albumId || "loose"}/items/finalize`, metadata),
+
+  // ─── Items ────────────────────────────────────────────
   listItems: (params = {}) => {
     const qs = new URLSearchParams(
       Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
@@ -419,8 +425,6 @@ export const galleryAPI = {
     api.post(`/gallery/items/${itemId}/restore-original`),
 
   // ─── Bulk download ────────────────────────────────────
-  // Returns a ZIP stream (responseType: "blob") for the selected items
-  // or for an entire album.
   bulkDownload: (payload) =>
     api.post("/gallery/bulk-download", payload, { responseType: "blob" }),
 };

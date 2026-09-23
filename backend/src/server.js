@@ -145,8 +145,10 @@ app.use(
 // becomes ~267MB once base64-encoded, so the parser has to be able to
 // accept that before it hits the controller (which then enforces its own
 // per-file caps: 25MB photos / 200MB videos).
-app.use(express.json({ limit: "300mb" }));
-app.use(express.urlencoded({ extended: true, limit: "300mb" }));
+// Direct-to-Cloudinary uploads mean no big JSON bodies ever reach this
+// server. 5 MB is generous for metadata.
+app.use(express.json({ limit: "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: "5mb" }));
 app.use(morgan("dev"));
 
 // =============================================

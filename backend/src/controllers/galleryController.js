@@ -1,12 +1,22 @@
 // backend/src/controllers/galleryController.js
 // Gallery — albums (programs) + media items (photos/videos).
+//
+// Upload flow is now:
+//   1. POST /api/gallery/upload-signature  → returns a signed token
+//   2. Browser POSTs the file directly to Cloudinary
+//   3. POST /api/gallery/:albumId/items/finalize → persists metadata
+//
+// The old base64-through-JSON path is gone.
 
 const mongoose = require("mongoose");
 const GalleryAlbum = require("../models/GalleryAlbum");
 const GalleryItem = require("../models/GalleryItem");
 const {
-  uploadGalleryFile,
+  signUpload,
+  verifyCloudinaryAsset,
   deleteGalleryFile,
+  buildVideoThumbnailUrl,
+  buildPhotoThumbnailUrl,
 } = require("../services/galleryService");
 
 // ─── Role helpers ──────────────────────────────────────────
@@ -16,9 +26,7 @@ const canUpload = (user) => LEADER_TIER.has(user?.role);
 const canDelete = (user) => ADMIN_TIER.has(user?.role);
 const canHardDelete = (user) => user?.role === "superadmin";
 
-// ─── Resolve access filter by role ─────────────────────────
-// Everyone reads everything that isn't admin-only; the accessLevel
-// field on the album still gates items inside it.
+// ─── Access filter by role ─────────────────────────────────
 const buildAccessFilter = (user) => {
   if (ADMIN_TIER.has(user?.role)) return {};
   if (user?.role === "leader") {
@@ -28,11 +36,65 @@ const buildAccessFilter = (user) => {
 };
 
 // ============================================================
+// UPLOAD SIGNATURE (direct-to-Cloudinary)
+// ============================================================
+
+// POST /api/gallery/upload-signature
+// Body: { mediaType: "photo"|"video", albumId: "<id>"|"loose"|null }
+const signUploadHandler = async (req, res) => {
+  try {
+    if (!canUpload(req.user)) {
+      return res.status(403).json({
+        success: false,
+        message: "Only team leaders and above can upload media.",
+      });
+    }
+
+    const { mediaType, albumId } = req.body || {};
+
+    if (!["photo", "video"].includes(mediaType)) {
+      return res.status(400).json({
+        success: false,
+        message: "mediaType must be 'photo' or 'video'.",
+      });
+    }
+
+    const isLoose = !albumId || albumId === "loose";
+    if (!isLoose) {
+      if (!mongoose.Types.ObjectId.isValid(albumId)) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid album ID." });
+      }
+      const album = await GalleryAlbum.findOne({
+        _id: albumId,
+        isDeleted: false,
+      });
+      if (!album) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Album not found." });
+      }
+    }
+
+    const sig = signUpload({
+      mediaType,
+      albumId: isLoose ? null : albumId,
+      userId: req.user._id.toString(),
+    });
+
+    res.json({ success: true, ...sig });
+  } catch (error) {
+    console.error("signUploadHandler error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ============================================================
 // ALBUMS
 // ============================================================
 
 // GET /api/gallery
-// List albums with item counts. Loose uploads shown separately.
 const listAlbums = async (req, res) => {
   try {
     const {
@@ -75,7 +137,6 @@ const listAlbums = async (req, res) => {
         .lean(),
     ]);
 
-    // Loose uploads count (for a dedicated tile)
     const looseFilter = {
       album: null,
       isDeleted: false,
@@ -101,7 +162,6 @@ const listAlbums = async (req, res) => {
 };
 
 // POST /api/gallery
-// Create a new album.
 const createAlbum = async (req, res) => {
   try {
     if (!canUpload(req.user)) {
@@ -120,7 +180,6 @@ const createAlbum = async (req, res) => {
         .json({ success: false, message: "Album title is required." });
     }
 
-    // Generate slug
     const baseSlug = title
       .toLowerCase()
       .replace(/[^a-z0-9\u1200-\u137F]+/g, "-")
@@ -154,7 +213,6 @@ const createAlbum = async (req, res) => {
 };
 
 // GET /api/gallery/:albumId
-// Get one album + its items (paginated).
 const getAlbum = async (req, res) => {
   try {
     const { albumId } = req.params;
@@ -215,7 +273,6 @@ const getAlbum = async (req, res) => {
 };
 
 // PATCH /api/gallery/:albumId
-// Update album metadata (title, description, tags, cover, archive).
 const updateAlbum = async (req, res) => {
   try {
     if (!canUpload(req.user)) {
@@ -242,7 +299,6 @@ const updateAlbum = async (req, res) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
 
-    // Normalize tags if provided as a comma string
     if (updates.tags && !Array.isArray(updates.tags)) {
       updates.tags = updates.tags
         .split(",")
@@ -270,8 +326,6 @@ const updateAlbum = async (req, res) => {
 };
 
 // DELETE /api/gallery/:albumId
-// Soft-delete by default. Superadmin can pass ?hard=true to also
-// delete all items from Cloudinary and drop the album row.
 const deleteAlbum = async (req, res) => {
   try {
     if (!canDelete(req.user)) {
@@ -299,7 +353,6 @@ const deleteAlbum = async (req, res) => {
         });
       }
 
-      // Delete every item's file from Cloudinary
       const items = await GalleryItem.find({ album: albumId });
       await Promise.all(
         items.map((it) =>
@@ -307,7 +360,6 @@ const deleteAlbum = async (req, res) => {
         ),
       );
 
-      // If album has a cover, delete it too
       if (album.coverImage?.publicId) {
         await deleteGalleryFile(album.coverImage.publicId, "photo").catch(
           () => {},
@@ -323,7 +375,6 @@ const deleteAlbum = async (req, res) => {
       });
     }
 
-    // Soft delete
     album.isDeleted = true;
     album.deletedBy = req.user._id;
     album.deletedAt = new Date();
@@ -338,14 +389,16 @@ const deleteAlbum = async (req, res) => {
 };
 
 // ============================================================
-// ITEMS (photos & videos)
+// ITEMS
 // ============================================================
 
-// POST /api/gallery/:albumId/items
-// Body: { files: [{ file: "data:...", fileName, caption, capturedAt, tags }, ...] }
-// Or:   { file: "data:...", fileName, caption, capturedAt, tags }  (single)
-// Album id "loose" → uploads to Loose Uploads.
-const uploadItems = async (req, res) => {
+// POST /api/gallery/:albumId/items/finalize
+// Body: {
+//   cloudinaryPublicId, cloudinaryUrl, cloudinaryResourceType,
+//   mediaType, fileName, fileSize, mimeType, width, height, duration,
+//   caption?, capturedAt?, tags?
+// }
+const finalizeItem = async (req, res) => {
   try {
     if (!canUpload(req.user)) {
       return res.status(403).json({
@@ -372,95 +425,94 @@ const uploadItems = async (req, res) => {
       }
     }
 
-    // Accept single file or array of files
-    const incoming = Array.isArray(req.body.files)
-      ? req.body.files
-      : [req.body];
+    const {
+      cloudinaryPublicId,
+      cloudinaryUrl,
+      mediaType,
+      fileName,
+      fileSize,
+      mimeType,
+      width,
+      height,
+      duration,
+      caption,
+      capturedAt,
+      tags,
+    } = req.body || {};
 
-    if (incoming.length === 0) {
+    if (!cloudinaryPublicId || !cloudinaryUrl) {
+      return res.status(400).json({
+        success: false,
+        message: "cloudinaryPublicId and cloudinaryUrl are required.",
+      });
+    }
+    if (!["photo", "video"].includes(mediaType)) {
       return res
         .status(400)
-        .json({ success: false, message: "No files provided." });
+        .json({ success: false, message: "mediaType is required." });
     }
 
-    const created = [];
-    const failed = [];
-
-    for (const entry of incoming) {
-      const { file, fileName, caption, capturedAt, tags } = entry || {};
-      if (!file) continue;
-
-      try {
-        const upload = await uploadGalleryFile(file, {
-          albumId: isLoose ? null : albumId,
-        });
-
-        const item = await GalleryItem.create({
-          album: isLoose ? null : albumId,
-          mediaType: upload.mediaType,
-          fileUrl: upload.fileUrl,
-          filePublicId: upload.filePublicId,
-          thumbnailUrl: upload.thumbnailUrl,
-          fileName: fileName || upload.fileName,
-          fileSize: upload.fileSize,
-          mimeType: upload.mimeType,
-          width: upload.width,
-          height: upload.height,
-          duration: upload.duration,
-          caption: (caption || "").trim(),
-          capturedAt: capturedAt ? new Date(capturedAt) : undefined,
-          tags: Array.isArray(tags)
-            ? tags
-            : (tags || "")
-                .split(",")
-                .map((t) => t.trim())
-                .filter(Boolean),
-          uploadedBy: req.user._id,
-          uploadedByName: req.user.name,
-        });
-
-        created.push(item);
-      } catch (err) {
-        console.error(`uploadItems: item failed — ${err.message}`);
-        failed.push({
-          fileName: entry?.fileName || "unknown",
-          error: err.message,
-        });
-      }
+    // Verify the asset really exists on Cloudinary before persisting.
+    try {
+      await verifyCloudinaryAsset(cloudinaryPublicId, mediaType);
+    } catch (verifyErr) {
+      console.warn(
+        `finalizeItem: Cloudinary asset ${cloudinaryPublicId} not found`,
+      );
+      return res.status(400).json({
+        success: false,
+        message:
+          "Cloudinary asset could not be verified. The upload may have failed.",
+      });
     }
 
-    // Update album counters if this was an album upload
-    if (album && created.length > 0) {
-      const photos = created.filter((c) => c.mediaType === "photo").length;
-      const videos = created.filter((c) => c.mediaType === "video").length;
-      album.itemCount += created.length;
-      album.photoCount += photos;
-      album.videoCount += videos;
-      if (!album.coverImage?.url && created[0]?.thumbnailUrl) {
-        album.coverImage = {
-          url: created[0].thumbnailUrl,
-          publicId: created[0].filePublicId,
-        };
+    const thumbnailUrl =
+      mediaType === "video"
+        ? buildVideoThumbnailUrl(cloudinaryUrl)
+        : buildPhotoThumbnailUrl(cloudinaryUrl);
+
+    const item = await GalleryItem.create({
+      album: isLoose ? null : albumId,
+      mediaType,
+      fileUrl: cloudinaryUrl,
+      filePublicId: cloudinaryPublicId,
+      thumbnailUrl,
+      fileName: fileName || "",
+      fileSize: fileSize || 0,
+      mimeType: mimeType || "",
+      width: width || 0,
+      height: height || 0,
+      duration: duration || 0,
+      caption: (caption || "").trim(),
+      capturedAt: capturedAt ? new Date(capturedAt) : undefined,
+      tags: Array.isArray(tags)
+        ? tags
+        : (tags || "")
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean),
+      uploadedBy: req.user._id,
+      uploadedByName: req.user.name,
+    });
+
+    if (album) {
+      album.itemCount += 1;
+      if (mediaType === "photo") album.photoCount += 1;
+      if (mediaType === "video") album.videoCount += 1;
+      if (!album.coverImage?.url && thumbnailUrl) {
+        album.coverImage = { url: thumbnailUrl, publicId: cloudinaryPublicId };
       }
       await album.save();
     }
 
-    res.status(201).json({
-      success: true,
-      items: created,
-      failed,
-      message: `${created.length} file(s) uploaded${
-        failed.length ? `, ${failed.length} failed` : ""
-      }.`,
-    });
+    res.status(201).json({ success: true, item });
   } catch (error) {
-    console.error("uploadItems error:", error);
+    console.error("finalizeItem error:", error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
 // GET /api/gallery/items
-// Flat listing of all items across albums (used by search + loose uploads).
 const listItems = async (req, res) => {
   try {
     const {
@@ -590,7 +642,6 @@ const deleteItem = async (req, res) => {
           message: "Only superadmins can permanently delete media.",
         });
       }
-
       await deleteGalleryFile(item.filePublicId, item.mediaType).catch(
         () => {},
       );
@@ -603,7 +654,6 @@ const deleteItem = async (req, res) => {
       await item.save();
     }
 
-    // Decrement album counters
     if (item.album) {
       const album = await GalleryAlbum.findById(item.album);
       if (album) {
@@ -627,7 +677,6 @@ const deleteItem = async (req, res) => {
 };
 
 // POST /api/gallery/items/:itemId/view
-// Increment view counter (called by lightbox on open).
 const incrementView = async (req, res) => {
   try {
     const { itemId } = req.params;
@@ -639,7 +688,6 @@ const incrementView = async (req, res) => {
 };
 
 // POST /api/gallery/items/:itemId/download
-// Increment download counter (called before triggering download).
 const incrementDownload = async (req, res) => {
   try {
     const { itemId } = req.params;
@@ -659,8 +707,6 @@ const incrementDownload = async (req, res) => {
 
 // POST /api/gallery/items/:itemId/ai-edit
 // Body: { operation: "background_removed" | "enhanced" }
-// Uses Cloudinary's AI background removal add-on if available;
-// otherwise returns 501 so the frontend can hide the button.
 const aiEditItem = async (req, res) => {
   try {
     if (!canUpload(req.user)) {
@@ -674,10 +720,9 @@ const aiEditItem = async (req, res) => {
     const { operation } = req.body;
 
     if (!["background_removed", "enhanced"].includes(operation)) {
-      return res.status(400).json({
-        success: false,
-        message: "Unsupported operation.",
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Unsupported operation." });
     }
 
     const item = await GalleryItem.findOne({ _id: itemId, isDeleted: false });
@@ -694,18 +739,10 @@ const aiEditItem = async (req, res) => {
       });
     }
 
-    // Cloudinary AI background removal — requires the "remove_the_background"
-    // add-on to be enabled on your Cloudinary account. If it isn't, the
-    // URL transform below returns the original image and this becomes a no-op.
-    //
-    // NOTE: the require path is "../config/cloudinary" (one level up from
-    // src/controllers/ → src/config/cloudinary.js). An earlier copy of this
-    // file used "../../config/cloudinary" which resolves to
-    // backend/config/cloudinary — a directory that doesn't exist — and
-    // crashed at runtime the first time an AI-edit button was clicked.
+    // Requires the Cloudinary "remove_the_background" add-on. Without it,
+    // the transformed URL returns the original — a no-op, not an error.
     const cloudinary = require("../config/cloudinary");
 
-    // Build a transformed URL. Preserve original in `originalFileUrl`.
     const transformation =
       operation === "background_removed"
         ? [{ effect: "background_removal" }]
@@ -738,7 +775,6 @@ const aiEditItem = async (req, res) => {
 };
 
 // POST /api/gallery/items/:itemId/restore-original
-// Revert an AI-edited photo back to its original URL.
 const restoreOriginal = async (req, res) => {
   try {
     if (!canUpload(req.user)) {
@@ -782,8 +818,6 @@ const restoreOriginal = async (req, res) => {
 // ============================================================
 
 // POST /api/gallery/bulk-download
-// Body: { itemIds: [...], albumId?: "..." }
-// Streams a ZIP of the requested media.
 const bulkDownload = async (req, res) => {
   try {
     const archiver = require("archiver");
@@ -835,7 +869,6 @@ const bulkDownload = async (req, res) => {
           (item.fileName?.includes(".") ? "" : `.${ext}`);
         archive.append(response.data, { name: safeName });
 
-        // Best-effort download counter
         GalleryItem.updateOne(
           { _id: item._id },
           { $inc: { downloadCount: 1 } },
@@ -858,25 +891,19 @@ const bulkDownload = async (req, res) => {
 // EXPORTS
 // ============================================================
 module.exports = {
-  // Albums
+  signUploadHandler,
   listAlbums,
   createAlbum,
   getAlbum,
   updateAlbum,
   deleteAlbum,
-
-  // Items
-  uploadItems,
+  finalizeItem,
   listItems,
   updateItem,
   deleteItem,
   incrementView,
   incrementDownload,
-
-  // AI editing
   aiEditItem,
   restoreOriginal,
-
-  // Bulk
   bulkDownload,
 };
