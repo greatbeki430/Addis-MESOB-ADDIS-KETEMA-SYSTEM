@@ -430,6 +430,39 @@ export const galleryAPI = {
 };
 
 // ============================================================
+// LEADERBOARD API
+// ============================================================
+export const leaderboardAPI = {
+  // Public to every role — current-month top team only. Used by the
+  // Dashboard celebration banner. Never carries per-member data.
+  getCelebration: () => api.get("/leaderboard/celebration"),
+
+  // Self-service — the caller's own scores + team position.
+  getMyPerformance: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+    ).toString();
+    return api.get(`/leaderboard/me${qs ? `?${qs}` : ""}`);
+  },
+
+  // Team board. source = "evaluation" | "forum". from/to = ISO dates.
+  getTeamLeaderboard: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+    ).toString();
+    return api.get(`/leaderboard/teams${qs ? `?${qs}` : ""}`);
+  },
+
+  // Individual board — leader + admin only, enforced server-side.
+  getPersonLeaderboard: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+    ).toString();
+    return api.get(`/leaderboard/people${qs ? `?${qs}` : ""}`);
+  },
+};
+
+// ============================================================
 // DEPARTMENTS API
 // ============================================================
 export const departmentAPI = {
