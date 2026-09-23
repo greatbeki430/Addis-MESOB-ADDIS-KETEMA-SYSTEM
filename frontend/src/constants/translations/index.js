@@ -20,6 +20,9 @@ import { landingTranslations } from "./landing";
 // Import Golden Monday translations from the original location
 import { goldenMondayTranslations } from "../goldenMondayTranslations";
 
+// 🆕 Gallery translations
+import { galleryTranslations } from "./gallery";
+
 // Combine all modular translations
 export const modularTranslations = {
   en: {
@@ -37,6 +40,7 @@ export const modularTranslations = {
     ...employeeManagementTranslations.en,
     ...documentVaultTranslations.en,
     ...landingTranslations.en, // ✅ Landing translations are included
+    ...galleryTranslations.en, // 🆕 Gallery translations
     goldenMonday: goldenMondayTranslations.en,
   },
   am: {
@@ -54,6 +58,7 @@ export const modularTranslations = {
     ...employeeManagementTranslations.am,
     ...documentVaultTranslations.am,
     ...landingTranslations.am, // ✅ Landing translations are included
+    ...galleryTranslations.am, // 🆕 Gallery translations
     goldenMonday: goldenMondayTranslations.am,
   },
   om: {
@@ -71,6 +76,7 @@ export const modularTranslations = {
     ...employeeManagementTranslations.om,
     ...documentVaultTranslations.om,
     ...landingTranslations.om, // ✅ Landing translations are included
+    ...galleryTranslations.om, // 🆕 Gallery translations
     goldenMonday: goldenMondayTranslations.om,
   },
 };

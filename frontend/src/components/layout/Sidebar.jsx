@@ -33,6 +33,7 @@ import {
   FiBell,
   FiClipboard,
   FiMail,
+  FiImage,
 } from "react-icons/fi";
 
 // =============================================
@@ -391,6 +392,7 @@ export default function Sidebar({
       evaluation: <FiStar size={20} />,
       report: <FiFileText size={20} />,
       services: <FiGrid size={20} />,
+      gallery: <FiImage size={20} />,
       documents: <FiFileText size={20} />,
       analytics: <FiBarChart2 size={20} />,
       "golden-monday": <FiSunrise size={20} />,

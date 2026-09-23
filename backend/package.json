@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@google/genai": "^2.10.0",
+    "archiver": "^8.0.0",
     "axios": "^1.18.1",
     "bcryptjs": "^2.4.3",
     "blockhash-core": "latest",

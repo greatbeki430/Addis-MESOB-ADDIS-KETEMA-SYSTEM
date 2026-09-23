@@ -4,7 +4,7 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { initPDFFonts } from "./utils/pdf/fontPreloader";
 import { C, F } from "./styles/theme";
 import Sidebar from "./components/layout/Sidebar";
-import Header from "./components/layout/Header"; // ✅ RESTORED: Header with dropdown
+import Header from "./components/layout/Header";
 
 import Dashboard from "./pages/Dashboard";
 import ForumReport from "./pages/ForumReport";
@@ -44,6 +44,7 @@ import AlertsManagement from "./pages/admin/AlertsManagement";
 // Admin Data Management
 import AdminDataManagement from "./pages/admin/AdminDataManagement";
 import ChangePassword from "./pages/ChangePassword";
+import Gallery from "./pages/gallery/Gallery";
 
 import { FiUserPlus } from "react-icons/fi";
 
@@ -285,6 +286,8 @@ function AuthenticatedApp() {
                   Landing page inside the authenticated Sidebar/Header
                   shell (which duplicated navigation and looked broken). */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/documents" element={<DocumentVault />} />
+              <Route path="/gallery" element={<Gallery />} />
               <Route
                 path="/dashboard"
                 element={<Dashboard t={t} lang={language} />}
@@ -384,7 +387,6 @@ function AuthenticatedApp() {
                   )
                 }
               />
-              <Route path="/documents" element={<DocumentVault />} />
               <Route
                 path="/digital-attendance"
                 element={<DigitalAttendance />}

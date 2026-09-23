@@ -455,9 +455,9 @@ export const NAV_ITEMS = [
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
-    id: "documents",
-    icon: "📁",
-    label: "Document Vault",
+    id: "gallery",
+    icon: "🖼️",
+    label: "Gallery",
     roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
@@ -544,13 +544,6 @@ export const NAV_ITEMS = [
     label: "Manage Requests",
     roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
-  // ─── NEW: Admin Extensions Navigation Item ─────────────────────────
-  {
-    id: "admin-extensions",
-    icon: "⏰",
-    label: "Extension Requests",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
-  },
 ];
 
 export const getFilteredNavItems = (userRole) => {
@@ -558,3 +551,8 @@ export const getFilteredNavItems = (userRole) => {
     item.roles.some((role) => hasMinRole(userRole, role)),
   );
 };
+
+// ─── GALLERY PERMISSIONS ─────────────────────────────────
+export const canManageGallery = (user) => isLeaderOrAbove(user);
+export const canDeleteGallery = (user) => isAdminOrAbove(user);
+export const canHardDeleteGallery = (user) => isSuperAdmin(user);
