@@ -67,6 +67,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     if (path.startsWith("/teams")) return "teams";
     if (path.startsWith("/admin/services")) return "admin/services";
     if (path.startsWith("/gallery")) return "gallery";
+    if (path.startsWith("/leaderboard")) return "leaderboard";
     if (path.startsWith("/documents")) return "documents";
     if (path.startsWith("/golden-monday")) return "golden-monday";
     if (path.startsWith("/employees")) return "employees";
@@ -108,6 +109,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     "admin-requests": <FiMail size={18} />,
     documents: <FiFileText size={18} />,
     gallery: <FiImage size={18} />,
+    leaderboard: <FiAward size={18} />,
     profile: <FiUser size={18} />,
     settings: <FiSettings size={18} />,
     "change-password": <FiLock size={18} />,
@@ -123,6 +125,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
     analytics: "Analytics",
     documents: "Document Vault",
     gallery: "Gallery",
+    leaderboard: "Leaderboard",
     "golden-monday": "Golden Monday",
     users: "User Management",
     teams: "Team Management",
