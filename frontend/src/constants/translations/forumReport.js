@@ -138,6 +138,8 @@ export const forumReportTranslations = {
       signatureLocked: "🔒 Locked",
       signatureClickToSign: "Click to sign",
       historyTab: "History",
+      addFirst: "Add First",
+      addAnother: "Add Another",
     },
   },
   am: {
@@ -273,6 +275,8 @@ export const forumReportTranslations = {
       signatureLocked: "🔒 ተቆልፏል",
       signatureClickToSign: "ለመፈረም ይጫኑ",
       historyTab: "ታሪክ",
+      addFirst: "መጀመሪያውን ጨምር",
+      addAnother: "ሌላ ጨምር",
     },
   },
   om: {
@@ -412,6 +416,8 @@ export const forumReportTranslations = {
       signatureLocked: "🔒 Cufaa",
       signatureClickToSign: "Mallatteessuuf cuqaasi",
       historyTab: "Seenaa",
+      addFirst: "Isa Jalqabaa Dabali",
+      addAnother: "Kan Biraa Dabali",
     },
   },
 };
