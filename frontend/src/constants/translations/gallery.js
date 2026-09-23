@@ -11,7 +11,7 @@ export const galleryTranslations = {
       // ─── Tabs / views ──────────────────────────────────
       albumsTab: "Albums",
       allMediaTab: "All Media",
-      looseUploads: "Loose Uploads",
+      looseUploads: "Standalone",
       recentTab: "Recently Added",
       mostViewedTab: "Most Viewed",
 
@@ -146,7 +146,7 @@ export const galleryTranslations = {
 
       albumsTab: "አልበሞች",
       allMediaTab: "ሁሉም ሚዲያ",
-      looseUploads: "ያልተደራጁ ጭነቶች",
+      looseUploads: "ያልተደራጁ/ተናጥል",
       recentTab: "በቅርብ የተጨመሩ",
       mostViewedTab: "በብዛት የታዩ",
 
@@ -269,7 +269,7 @@ export const galleryTranslations = {
 
       albumsTab: "Albamoota",
       allMediaTab: "Miidiyaa Hunda",
-      looseUploads: "Fe'umsa Walaba",
+      looseUploads: "Tokkoon Tokkoon",
       recentTab: "Dhiyeenyaan Dabalame",
       mostViewedTab: "Baay'ee Ilaalame",
 
