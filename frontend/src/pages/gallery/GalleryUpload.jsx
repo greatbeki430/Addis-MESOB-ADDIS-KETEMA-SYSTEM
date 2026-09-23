@@ -1,5 +1,6 @@
 // frontend/src/pages/gallery/GalleryUpload.jsx
 import { useState, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   FiX,
   FiUploadCloud,
@@ -118,7 +119,7 @@ const GalleryUpload = ({
 
   const readyCount = files.filter((f) => f.status === "ready").length;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700">
@@ -288,7 +289,8 @@ const GalleryUpload = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

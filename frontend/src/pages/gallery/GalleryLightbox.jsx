@@ -1,5 +1,6 @@
 // frontend/src/pages/gallery/GalleryLightbox.jsx
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import {
   FiX,
   FiChevronLeft,
@@ -111,7 +112,7 @@ const GalleryLightbox = ({
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[60] bg-black/95 flex flex-col">
       {/* Top bar */}
       <div className="flex items-center justify-between px-4 py-3 text-white">
@@ -268,7 +269,8 @@ const GalleryLightbox = ({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
