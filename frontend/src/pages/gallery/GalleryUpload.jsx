@@ -12,14 +12,57 @@ import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
 
 const MAX_PHOTO_MB = 25;
-const MAX_VIDEO_MB = 200;
+const MAX_VIDEO_MB = 100; // Cloudinary free-tier per-file limit
 
-const fileToBase64 = (file) =>
+// POST one file directly to Cloudinary using the signed params the backend
+// issued. Uses XHR (not fetch/axios) specifically to get real upload
+// progress events.
+const uploadToCloudinary = (file, signature, onProgress) =>
   new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
+    const formData = new FormData();
+    // Cloudinary expects: file, then signed params, then api_key + signature.
+    // The signature itself is NOT part of what's signed — only its inputs are.
+    formData.append("file", file);
+    formData.append("api_key", signature.apiKey);
+    formData.append("timestamp", signature.timestamp);
+    formData.append("folder", signature.folder);
+    formData.append("tags", signature.tags);
+    formData.append("signature", signature.signature);
+
+    const xhr = new XMLHttpRequest();
+    const url = `https://api.cloudinary.com/v1_1/${signature.cloudName}/${signature.resourceType}/upload`;
+
+    xhr.open("POST", url, true);
+
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round((e.loaded / e.total) * 100));
+      }
+    };
+
+    xhr.onload = () => {
+      let body;
+      try {
+        body = JSON.parse(xhr.responseText);
+      } catch {
+        return reject(new Error("Cloudinary returned invalid JSON."));
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(body);
+      } else {
+        reject(
+          new Error(
+            body?.error?.message || `Cloudinary upload failed (${xhr.status}).`,
+          ),
+        );
+      }
+    };
+
+    xhr.onerror = () =>
+      reject(new Error("Network error during Cloudinary upload."));
+    xhr.onabort = () => reject(new Error("Upload cancelled."));
+
+    xhr.send(formData);
   });
 
 const GalleryUpload = ({
@@ -38,6 +81,7 @@ const GalleryUpload = ({
   const [capturedAt, setCapturedAt] = useState("");
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [currentFilePct, setCurrentFilePct] = useState(0);
 
   const addFiles = useCallback(
     (incoming) => {
@@ -89,31 +133,69 @@ const GalleryUpload = ({
 
     setUploading(true);
     setProgress({ done: 0, total: ready.length });
+    setCurrentFilePct(0);
 
-    const payload = [];
+    let succeeded = 0;
+    const errors = [];
+
     for (const entry of ready) {
+      const file = entry.file;
+      const mediaType = file.type.startsWith("video/") ? "video" : "photo";
+
       try {
-        const b64 = await fileToBase64(entry.file);
-        payload.push({
-          file: b64,
-          fileName: entry.file.name,
+        // 1. Signature from our backend
+        const sigRes = await galleryAPI.getUploadSignature(
+          mediaType,
+          targetAlbumId === "loose" ? null : targetAlbumId,
+        );
+        const signature = sigRes.data;
+
+        // 2. Direct upload to Cloudinary, with real progress
+        setCurrentFilePct(0);
+        const cloudRes = await uploadToCloudinary(
+          file,
+          signature,
+          setCurrentFilePct,
+        );
+
+        // 3. Persist metadata
+        await galleryAPI.finalizeItem(targetAlbumId, {
+          cloudinaryPublicId: cloudRes.public_id,
+          cloudinaryUrl: cloudRes.secure_url,
+          cloudinaryResourceType: cloudRes.resource_type,
+          mediaType,
+          fileName: cloudRes.original_filename || file.name,
+          fileSize: cloudRes.bytes || file.size,
+          mimeType: file.type,
+          width: cloudRes.width || 0,
+          height: cloudRes.height || 0,
+          duration: cloudRes.duration || 0,
           caption,
           capturedAt: capturedAt || undefined,
           tags,
         });
-      } catch {
-        /* skip */
+
+        succeeded += 1;
+      } catch (err) {
+        console.error(`Upload failed for ${file.name}:`, err);
+        errors.push({ fileName: file.name, error: err.message });
+      } finally {
+        setProgress((p) => ({ ...p, done: p.done + 1 }));
+        setCurrentFilePct(0);
       }
     }
 
-    try {
-      const res = await galleryAPI.uploadItems(targetAlbumId, payload);
-      setProgress({ done: ready.length, total: ready.length });
-      onUploaded?.(res.data);
-    } catch (e) {
-      alert(e?.response?.data?.message || t("gallery.uploadError"));
-    } finally {
-      setUploading(false);
+    setUploading(false);
+
+    if (errors.length === 0) {
+      onUploaded?.({ success: true, count: succeeded });
+    } else if (succeeded === 0) {
+      alert(errors[0].error || t("gallery.uploadError"));
+    } else {
+      alert(
+        `${succeeded} uploaded, ${errors.length} failed. First error: ${errors[0].error}`,
+      );
+      onUploaded?.({ success: true, count: succeeded, failed: errors.length });
     }
   };
 
@@ -262,10 +344,20 @@ const GalleryUpload = ({
           )}
 
           {uploading && (
-            <div className="text-sm text-center text-gray-600 dark:text-gray-300">
-              {t("gallery.uploadProgress")
-                .replace("{{done}}", progress.done)
-                .replace("{{total}}", progress.total)}
+            <div className="text-sm text-center text-gray-600 dark:text-gray-300 space-y-1">
+              <div>
+                {t("gallery.uploadProgress")
+                  .replace("{{done}}", progress.done)
+                  .replace("{{total}}", progress.total)}
+              </div>
+              {currentFilePct > 0 && currentFilePct < 100 && (
+                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="bg-blue-600 h-full transition-all"
+                    style={{ width: `${currentFilePct}%` }}
+                  />
+                </div>
+              )}
             </div>
           )}
         </div>
