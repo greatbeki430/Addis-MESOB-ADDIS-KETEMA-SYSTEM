@@ -52,6 +52,7 @@ const registrationRoutes = require("./routes/registrationRoutes");
 const { setupPersistentMenu } = require("./services/telegramService");
 const feedRoutes = require("./routes/feedRoutes");
 const galleryRoutes = require("./routes/galleryRoutes");
+const leaderboardRoutes = require("./routes/leaderboardRoutes");
 
 const app = express();
 
@@ -190,6 +191,7 @@ app.use("/api/feed", feedRoutes);
 
 //NOTIFICATIONS
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/leaderboard", leaderboardRoutes);
 
 // =============================================
 // HEALTH CHECK
