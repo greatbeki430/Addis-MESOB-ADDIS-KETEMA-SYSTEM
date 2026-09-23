@@ -51,6 +51,7 @@ const registrationRoutes = require("./routes/registrationRoutes");
 // =============================================
 const { setupPersistentMenu } = require("./services/telegramService");
 const feedRoutes = require("./routes/feedRoutes");
+const galleryRoutes = require("./routes/galleryRoutes");
 
 const app = express();
 
@@ -140,8 +141,12 @@ app.use(
 // =============================================
 // ✅ MIDDLEWARE
 // =============================================
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+// Gallery uploads send base64 media inside a JSON body. A 200MB video
+// becomes ~267MB once base64-encoded, so the parser has to be able to
+// accept that before it hits the controller (which then enforces its own
+// per-file caps: 25MB photos / 200MB videos).
+app.use(express.json({ limit: "300mb" }));
+app.use(express.urlencoded({ extended: true, limit: "300mb" }));
 app.use(morgan("dev"));
 
 // =============================================
@@ -161,6 +166,7 @@ app.use("/api/public", publicRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/chatbot", chatbotRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/gallery", galleryRoutes);
 app.use("/api/golden-monday", goldenMondayRoutes);
 // ✅ FIX: mounted AFTER goldenMondayRoutes so it still sits behind the
 // same "/api/golden-monday" prefix at the more specific
@@ -175,16 +181,16 @@ app.use("/api/upload", uploadRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/registrations", registrationRoutes);
 
-// Departments — NEW
+// Departments
 app.use("/api/departments", departmentRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/feed", feedRoutes);
 
-// ✅ NOTIFICATIONS — NEW
+//NOTIFICATIONS
 app.use("/api/notifications", notificationRoutes);
 
 // =============================================
-// ✅ HEALTH CHECK
+// HEALTH CHECK
 // =============================================
 app.get("/api/health", (req, res) => {
   res.json({
@@ -207,6 +213,7 @@ app.get("/", (req, res) => {
       ai: "/api/ai",
       chatbot: "/api/chatbot",
       documents: "/api/documents",
+      gallery: "/api/gallery",
       "golden-monday": "/api/golden-monday",
       departments: "/api/departments",
       notifications: "/api/notifications",
@@ -264,7 +271,7 @@ const startServer = async () => {
       console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
       console.log(`✅ CORS enabled for: ${allowedOrigins.join(", ")}`);
       console.log(
-        `🤖 AI routes: /api/ai, /api/chatbot, /api/documents, /api/golden-monday`,
+        `🤖 AI routes: /api/ai, /api/chatbot, /api/documents, /api/gallery, /api/golden-monday`,
       );
       console.log(`📨 Telegram webhook ready at /api/telegram/webhook`);
       console.log(`📌 Bot menu button (⊞) is now INSIDE the input bar!`);

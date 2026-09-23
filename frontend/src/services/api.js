@@ -361,6 +361,71 @@ export const documentAPI = {
 };
 
 // ============================================================
+// GALLERY API
+// ============================================================
+export const galleryAPI = {
+  // ─── Albums ───────────────────────────────────────────
+  listAlbums: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+    ).toString();
+    return api.get(`/gallery${qs ? `?${qs}` : ""}`);
+  },
+
+  createAlbum: (payload) => api.post("/gallery", payload),
+
+  getAlbum: (albumId, params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+    ).toString();
+    return api.get(`/gallery/${albumId}${qs ? `?${qs}` : ""}`);
+  },
+
+  updateAlbum: (albumId, payload) => api.patch(`/gallery/${albumId}`, payload),
+
+  deleteAlbum: (albumId, { hard = false, reason = "" } = {}) =>
+    api.delete(`/gallery/${albumId}${hard ? "?hard=true" : ""}`, {
+      data: { reason },
+    }),
+
+  // ─── Items ────────────────────────────────────────────
+  // albumId can be a real ObjectId OR the string "loose"
+  uploadItems: (albumId, files) =>
+    api.post(`/gallery/${albumId}/items`, { files }),
+
+  listItems: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v !== undefined && v !== ""),
+    ).toString();
+    return api.get(`/gallery/items${qs ? `?${qs}` : ""}`);
+  },
+
+  updateItem: (itemId, payload) =>
+    api.patch(`/gallery/items/${itemId}`, payload),
+
+  deleteItem: (itemId, { hard = false, reason = "" } = {}) =>
+    api.delete(`/gallery/items/${itemId}${hard ? "?hard=true" : ""}`, {
+      data: { reason },
+    }),
+
+  incrementView: (itemId) => api.post(`/gallery/items/${itemId}/view`),
+  incrementDownload: (itemId) => api.post(`/gallery/items/${itemId}/download`),
+
+  // ─── AI editing ───────────────────────────────────────
+  aiEdit: (itemId, operation) =>
+    api.post(`/gallery/items/${itemId}/ai-edit`, { operation }),
+
+  restoreOriginal: (itemId) =>
+    api.post(`/gallery/items/${itemId}/restore-original`),
+
+  // ─── Bulk download ────────────────────────────────────
+  // Returns a ZIP stream (responseType: "blob") for the selected items
+  // or for an entire album.
+  bulkDownload: (payload) =>
+    api.post("/gallery/bulk-download", payload, { responseType: "blob" }),
+};
+
+// ============================================================
 // DEPARTMENTS API
 // ============================================================
 export const departmentAPI = {
