@@ -5,38 +5,51 @@ import { useLanguage } from "../../hooks/useLanguage";
 import { C, F, radius, FONT_SIZES } from "../../styles/theme";
 
 // ─── Date helpers ──────────────────────────────────────────
-const startOfMonthISO = (d = new Date()) =>
-  new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+// We deliberately do NOT use `.toISOString().slice(0,10)`. That path
+// converts the local Date into UTC first, which for a user in Addis
+// Ababa (UTC+3) turns "Sept 1 local" into "Aug 31 UTC" and produces
+// an off-by-one-day range. The period selector should send exactly the
+// calendar dates the user's browser displays — no timezone math.
 
-const startOfNextMonthISO = (d = new Date()) =>
-  new Date(d.getFullYear(), d.getMonth() + 1, 1).toISOString().slice(0, 10);
+const toYMD = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const startOfMonth = (d = new Date()) =>
+  new Date(d.getFullYear(), d.getMonth(), 1);
+
+const startOfNextMonth = (d = new Date()) =>
+  new Date(d.getFullYear(), d.getMonth() + 1, 1);
+
+const thisMonthRange = () => ({
+  from: toYMD(startOfMonth()),
+  // Use start of *next* month so the backend can treat it as a
+  // half-open interval [from, to). This is the same convention
+  // leaderboardService already uses.
+  to: toYMD(startOfNextMonth()),
+});
 
 const lastMonthRange = () => {
   const d = new Date();
   d.setMonth(d.getMonth() - 1);
   return {
-    from: startOfMonthISO(d),
-    to: startOfNextMonthISO(d),
+    from: toYMD(startOfMonth(d)),
+    to: toYMD(startOfNextMonth(d)),
   };
 };
-
-const thisMonthRange = () => ({
-  from: startOfMonthISO(),
-  to: startOfNextMonthISO(),
-});
 
 const thisQuarterRange = () => {
   const now = new Date();
   const q = Math.floor(now.getMonth() / 3);
-  const start = new Date(now.getFullYear(), q * 3, 1);
-  const end = new Date(now.getFullYear(), q * 3 + 3, 1);
   return {
-    from: start.toISOString().slice(0, 10),
-    to: end.toISOString().slice(0, 10),
+    from: toYMD(new Date(now.getFullYear(), q * 3, 1)),
+    to: toYMD(new Date(now.getFullYear(), q * 3 + 3, 1)),
   };
 };
 
-// ─── Preset chips ──────────────────────────────────────────
 const PRESETS = [
   { key: "thisMonth", labelKey: "periodThisMonth", compute: thisMonthRange },
   { key: "lastMonth", labelKey: "periodLastMonth", compute: lastMonthRange },
@@ -59,8 +72,6 @@ const PeriodSelector = ({ value, onChange }) => {
       const r = p.compute();
       if (r.from === value?.from && r.to === value?.to) return p.key;
     }
-    // Empty value means "backend defaults to current month", which is
-    // the same as the This Month preset.
     if (!value?.from && !value?.to) return "thisMonth";
     return "custom";
   }, [value, customMode]);
@@ -75,7 +86,15 @@ const PeriodSelector = ({ value, onChange }) => {
       onChange({ from: "", to: "" });
       return;
     }
-    onChange({ from: localFrom, to: localTo });
+    // Custom mode: treat the "to" date as inclusive. Bump it by one day
+    // before sending so [from, to) on the backend covers the whole day.
+    let toInclusive = localTo;
+    if (localTo) {
+      const d = new Date(localTo + "T00:00:00");
+      d.setDate(d.getDate() + 1);
+      toInclusive = toYMD(d);
+    }
+    onChange({ from: localFrom, to: toInclusive });
   };
 
   return (

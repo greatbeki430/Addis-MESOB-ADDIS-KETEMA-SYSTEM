@@ -20,18 +20,44 @@ const User = require("../models/User");
 // [from, to). Passing `from` and `to` in explicitly keeps the service
 // deterministic and testable; the controller derives them from query
 // params (defaults to the current calendar month).
+//
+// Both defaults produce UTC midnight. That matters because:
+//   • The frontend sends bare YYYY-MM-DD strings, which
+//     parseDateParam below interprets as UTC midnight.
+//   • Using server-local midnight (new Date(y, m, 1)) would shift the
+//     window by the server's UTC offset, so a user who picked "This
+//     Month" would get a different range than the same user who sent
+//     no period at all. Keeping both paths on UTC means they always
+//     match, and a document created at 23:00 EAT on the last day of
+//     a month lands inside the month it belongs to in Addis.
 
 const startOfMonth = (d = new Date()) =>
-  new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0);
+  new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1, 0, 0, 0, 0));
 
 const startOfNextMonth = (d = new Date()) =>
-  new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0);
+  new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+
+// Parse a "YYYY-MM-DD" string as UTC midnight of that calendar day.
+// `new Date("2026-09-01")` already does this per spec, but being explicit
+// avoids surprises if a caller ever sends a full ISO timestamp. Anything
+// that already contains time information (T or Z) is trusted as-is.
+const parseDateParam = (value, fallback) => {
+  if (!value) return fallback;
+  if (typeof value === "string" && /[TZ]/.test(value)) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) throw new Error("Invalid date range");
+    return d;
+  }
+  const d = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) throw new Error("Invalid date range");
+  return d;
+};
 
 const resolveRange = ({ from, to } = {}) => {
-  const fromDate = from ? new Date(from) : startOfMonth();
-  const toDate = to ? new Date(to) : startOfNextMonth();
-  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
-    throw new Error("Invalid date range");
+  const fromDate = parseDateParam(from, startOfMonth());
+  const toDate = parseDateParam(to, startOfNextMonth());
+  if (toDate <= fromDate) {
+    throw new Error("Invalid date range: to must be after from");
   }
   return { from: fromDate, to: toDate };
 };
@@ -58,7 +84,6 @@ const computeEvaluationTeamBoard = async ({ from, to, teamFilter = null }) => {
       $project: {
         team: 1,
         teamName: 1,
-        // totalScores is [{ name, total }] — precomputed on the eval.
         totalScores: 1,
         bestPerformer: 1,
         createdAt: 1,
@@ -67,8 +92,6 @@ const computeEvaluationTeamBoard = async ({ from, to, teamFilter = null }) => {
     },
   ]);
 
-  // Group by team in JS. Small N (dozens of evaluations), simpler than
-  // an unwind+regroup and easier to keep the tiebreakers legible.
   const teamMap = new Map();
 
   for (const ev of rows) {
@@ -78,7 +101,7 @@ const computeEvaluationTeamBoard = async ({ from, to, teamFilter = null }) => {
         teamId: ev.team ? ev.team.toString() : null,
         teamName: ev.teamName || "Untitled Team",
         membersSeen: new Set(),
-        memberTotals: new Map(), // name → [totals across evaluations]
+        memberTotals: new Map(),
         bestPerformerScore: -1,
         bestPerformerName: null,
         firstSubmission: ev.createdAt,
@@ -111,8 +134,6 @@ const computeEvaluationTeamBoard = async ({ from, to, teamFilter = null }) => {
 
   const teams = [];
   for (const [, bucket] of teamMap) {
-    // Per-member average across every evaluation they appear in,
-    // then the team average across every member.
     let sum = 0;
     let count = 0;
     for (const [, arr] of bucket.memberTotals) {
@@ -150,10 +171,6 @@ const computeEvaluationTeamBoard = async ({ from, to, teamFilter = null }) => {
 };
 
 // ─── Evaluation — People ───────────────────────────────────
-// Every distinct member name appearing in any evaluation in the period
-// gets one row. Score is the average across every evaluation that
-// mentions them, so a member who appears in three evaluations doesn't
-// outrank a member with one perfect score just by showing up more.
 const computeEvaluationPersonBoard = async ({
   from,
   to,
@@ -190,7 +207,6 @@ const computeEvaluationPersonBoard = async ({
       }
       const p = personMap.get(name);
       p.scores.push(value);
-      // Latest team name wins if the person moved teams this period.
       p.teamName = ev.teamName || p.teamName;
       if (ev.createdAt < p.firstSeen) p.firstSeen = ev.createdAt;
     }
@@ -229,8 +245,7 @@ const computeEvaluationPersonBoard = async ({
 // Composite score per team:
 //   0.4 × meetings held (normalized against the busiest team)
 //   0.3 × average attendance rate (present count / team size)
-//   0.3 × average form completeness (fraction of CRITERIA_ITEM_COUNT
-//         fields the report actually contains data for)
+//   0.3 × average form completeness
 // Everything scaled to 0–100.
 const computeForumTeamBoard = async ({ from, to, teamFilter = null }) => {
   const matchStage = {
@@ -240,9 +255,7 @@ const computeForumTeamBoard = async ({ from, to, teamFilter = null }) => {
   if (teamFilter) matchStage.team = new mongoose.Types.ObjectId(teamFilter);
 
   const rows = await Meeting.aggregate([
-    {
-      $match: matchStage,
-    },
+    { $match: matchStage },
     {
       $project: {
         team: 1,
@@ -260,9 +273,6 @@ const computeForumTeamBoard = async ({ from, to, teamFilter = null }) => {
     },
   ]);
 
-  // Team sizes come from the Team collection, so we can compute an
-  // attendance rate. Teams with no size fall back to using the
-  // maximum observed attendee count as the denominator.
   const teamIds = [...new Set(rows.map((r) => r.team).filter(Boolean))];
   const teamDocs = await Team.find({ _id: { $in: teamIds } })
     .select("_id members")
@@ -292,7 +302,6 @@ const computeForumTeamBoard = async ({ from, to, teamFilter = null }) => {
     b.attendeesSum += presentCount;
     if (presentCount > b.attendeesMax) b.attendeesMax = presentCount;
 
-    // Completeness: fraction of the fields that have real data.
     let filled = 0;
     if (presentCount > 0) filled += 1;
     if (Array.isArray(m.absent) && m.absent.length > 0) filled += 1;
@@ -302,10 +311,7 @@ const computeForumTeamBoard = async ({ from, to, teamFilter = null }) => {
     if (Array.isArray(m.gaps) && m.gaps.length > 0) filled += 1;
     if (Array.isArray(m.agreements) && m.agreements.length > 0) filled += 1;
     if (Array.isArray(m.signatures) && m.signatures.length > 0) filled += 1;
-    // Remaining fields are derived from those — count them as 1 each
-    // only when the report actually progressed far enough to have them.
-    // Cap the total at CRITERIA_ITEM_COUNT.
-    b.completenessSum += Math.min(filled / 8, 1); // normalized 0–1 per report
+    b.completenessSum += Math.min(filled / 8, 1);
 
     if (m.createdAt < b.firstSubmission) b.firstSubmission = m.createdAt;
   }
@@ -362,14 +368,10 @@ const computeForumTeamBoard = async ({ from, to, teamFilter = null }) => {
 };
 
 // ─── Self-service summary ──────────────────────────────────
-// Used by the "My Performance" panel. Returns only the current user's
-// own stats plus their team's cross-team position — never other
-// members' scores.
 const computeMySummary = async ({ userId, from, to }) => {
   const user = await User.findById(userId).select("name team").lean();
   if (!user) return null;
 
-  // Personal evaluation average
   const myEvals = await Evaluation.find({
     createdAt: { $gte: from, $lt: to },
     "totalScores.name": user.name,
@@ -390,9 +392,6 @@ const computeMySummary = async ({ userId, from, to }) => {
       : null;
   const myBest = myScores.length > 0 ? Math.max(...myScores) : null;
 
-  // Personal forum participation: count meetings where their name appears
-  // in `present`, plus meetings they authored. Attendance is by name
-  // because Meeting.present is [String] today.
   const meetingsWithMe = await Meeting.find({
     date: { $gte: from, $lt: to },
     $or: [{ present: user.name }, { createdByName: user.name }],
@@ -405,7 +404,6 @@ const computeMySummary = async ({ userId, from, to }) => {
     (m) => m.createdByName === user.name,
   ).length;
 
-  // Team rank from the evaluation board (public-safe fields only)
   let teamRank = null;
   let teamBoardSize = null;
   let teamName = null;

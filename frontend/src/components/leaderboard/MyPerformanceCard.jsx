@@ -10,6 +10,7 @@ import {
   FiAlertCircle,
 } from "react-icons/fi";
 import { useLanguage } from "../../hooks/useLanguage";
+import { useAuth } from "../../hooks/useAuth";
 import { leaderboardAPI } from "../../services/api";
 import { C, F, SPACING, FONT_SIZES, radius } from "../../styles/theme";
 
@@ -82,18 +83,23 @@ const Stat = ({ icon, label, value, accent = C.primary, suffix = "" }) => (
 
 const MyPerformanceCard = ({ period, refreshKey }) => {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const isAdminTier = user?.role === "admin" || user?.role === "superadmin";
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [data, setData] = useState(null);
+
+  const periodFrom = period?.from;
+  const periodTo = period?.to;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const params = {};
-      if (period?.from) params.from = period.from;
-      if (period?.to) params.to = period.to;
+      if (periodFrom) params.from = periodFrom;
+      if (periodTo) params.to = periodTo;
       const res = await leaderboardAPI.getMyPerformance(params);
       setData(res.data);
     } catch (e) {
@@ -105,7 +111,7 @@ const MyPerformanceCard = ({ period, refreshKey }) => {
     } finally {
       setLoading(false);
     }
-  }, [period, t]);
+  }, [periodFrom, periodTo, t]);
 
   useEffect(() => {
     const timer = setTimeout(load, 0);
@@ -162,6 +168,17 @@ const MyPerformanceCard = ({ period, refreshKey }) => {
   const teamRank = data.team?.rank;
   const teamSize = data.team?.boardSize;
 
+  // Team-context line: three cases, each with its own copy.
+  //   1. The user has a team → show the team name
+  //   2. The user is admin/superadmin → they typically aren't on a team;
+  //      "Viewing as Administrator" is clearer than "Not currently on a team"
+  //   3. Everyone else → the original "not on a team" message
+  const teamLine = data.user?.teamName
+    ? `${t("leaderboard.memberOf") || "Member of"} ${data.user.teamName}`
+    : isAdminTier
+      ? t("leaderboard.viewingAsAdmin") || "Viewing as Administrator"
+      : t("leaderboard.notOnTeam") || "Not currently on a team";
+
   return (
     <div
       style={{
@@ -170,7 +187,6 @@ const MyPerformanceCard = ({ period, refreshKey }) => {
         gap: SPACING.md,
       }}
     >
-      {/* Greeting card */}
       <div
         style={{
           padding: SPACING.lg,
@@ -197,13 +213,10 @@ const MyPerformanceCard = ({ period, refreshKey }) => {
             fontFamily: F.sans,
           }}
         >
-          {data.user?.teamName
-            ? `${t("leaderboard.memberOf") || "Member of"} ${data.user.teamName}`
-            : t("leaderboard.notOnTeam") || "Not currently on a team"}
+          {teamLine}
         </div>
       </div>
 
-      {/* Stats grid */}
       <div
         style={{
           display: "grid",
@@ -249,7 +262,6 @@ const MyPerformanceCard = ({ period, refreshKey }) => {
         ) : null}
       </div>
 
-      {/* Footnote */}
       <p
         style={{
           fontSize: FONT_SIZES.tiny,

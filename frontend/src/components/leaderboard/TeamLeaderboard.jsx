@@ -19,6 +19,7 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
   const [periodFrom, setPeriodFrom] = useState("");
   const [periodTo, setPeriodTo] = useState("");
   const [drillTeam, setDrillTeam] = useState(null);
+
   const periodFromParam = period?.from;
   const periodToParam = period?.to;
 
@@ -49,15 +50,28 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
     return () => clearTimeout(task);
   }, [load, refreshKey]);
 
-  // ─── Score shape differs between sources ──────────────────
-  const scoreFor = (row) =>
-    source === "forum" ? row.compositeScore : row.averageScore;
+  // ─── Pluralization helpers ────────────────────────────────
+  // The translation file has both `eval`/`evals` and `team`/`teams` keys.
+  // Previously the count label always rendered the plural form, so a
+  // team with a single evaluation displayed "1 evals".
+  const evalCountLabel = (count) => {
+    const key = count === 1 ? "eval" : "evals";
+    return `${count} ${t(`leaderboard.${key}`) || key}`;
+  };
+
+  const memberCountLabel = (count) => {
+    // `members` is used for both singular and plural today; kept as-is
+    // to avoid adding a new translation key just for this.
+    return `${count} ${t("leaderboard.members") || "members"}`;
+  };
 
   const scoreLabelFor = (row) => {
     if (source === "forum") {
-      return `${row.meetingsHeld} ${t("leaderboard.meetings") || "meetings"}`;
+      const count = row.meetingsHeld || 0;
+      const key = count === 1 ? "meeting" : "meetings";
+      return `${count} ${t(`leaderboard.${key}`) || key}`;
     }
-    return `${row.evaluationCount} ${t("leaderboard.evaluations") || "evals"}`;
+    return evalCountLabel(row.evaluationCount || 0);
   };
 
   const metaLineFor = (row) => {
@@ -77,9 +91,7 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
     }
     return (
       <>
-        <span>
-          {row.memberCount} {t("leaderboard.members") || "members"}
-        </span>
+        <span>{memberCountLabel(row.memberCount || 0)}</span>
         {row.bestPerformerScore > 0 && (
           <>
             <span>·</span>
@@ -93,7 +105,6 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
     );
   };
 
-  // ─── States ───────────────────────────────────────────────
   if (loading) {
     return (
       <div
@@ -193,7 +204,6 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
 
   return (
     <>
-      {/* ── Period banner ───────────────────────────────── */}
       {periodFrom && periodTo && (
         <div
           style={{
@@ -219,7 +229,6 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
         </div>
       )}
 
-      {/* ── Rows ────────────────────────────────────────── */}
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {teams.map((row) => {
           const isDrillable =
@@ -230,7 +239,7 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
               rank={row.rank}
               kind="team"
               name={row.teamName}
-              score={scoreFor(row)}
+              score={source === "forum" ? row.compositeScore : row.averageScore}
               scoreLabel={scoreLabelFor(row)}
               metaLine={metaLineFor(row)}
               bestPerformerName={
@@ -252,7 +261,6 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
         })}
       </div>
 
-      {/* ── Footnote for the "outside top" row ─────────── */}
       {teams.some((r) => r.outsideTop) && (
         <p
           style={{
@@ -268,7 +276,6 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
         </p>
       )}
 
-      {/* ── Drill-down modal (admin only) ───────────────── */}
       {drillTeam && (
         <MemberDrilldown
           teamId={drillTeam.id}
