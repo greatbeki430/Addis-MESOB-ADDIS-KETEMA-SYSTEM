@@ -1,7 +1,7 @@
 // backend/src/services/galleryService.js
 // Cloudinary upload/delete helpers for Gallery photos and videos.
 
-const cloudinary = require("../../config/cloudinary");
+const cloudinary = require("../config/cloudinary");
 
 // ─── Config ────────────────────────────────────────────────
 const PHOTO_MAX_BYTES = 25 * 1024 * 1024; // 25 MB
