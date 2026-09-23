@@ -7,7 +7,7 @@ import {
   FiCheck,
   FiAlertCircle,
 } from "react-icons/fi";
-import { useLanguage } from "../../constants/translations";
+import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
 
 const MAX_PHOTO_MB = 25;

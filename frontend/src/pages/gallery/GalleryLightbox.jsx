@@ -6,11 +6,11 @@ import {
   FiChevronRight,
   FiDownload,
   FiEdit2,
-  FiWand,
+  FiZap,
   FiRotateCcw,
   FiSave,
 } from "react-icons/fi";
-import { useLanguage } from "../../constants/translations";
+import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
 
 const GalleryLightbox = ({
@@ -240,14 +240,14 @@ const GalleryLightbox = ({
                   disabled={aiBusy}
                   className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-purple-600 hover:bg-purple-700 disabled:opacity-50"
                 >
-                  <FiWand /> {t("gallery.removeBackground")}
+                  <FiZap /> {t("gallery.removeBackground")}
                 </button>
                 <button
                   onClick={() => handleAiEdit("enhanced")}
                   disabled={aiBusy}
                   className="flex items-center gap-1 px-3 py-1.5 text-xs rounded bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  <FiWand /> {t("gallery.enhancePhoto")}
+                  <FiZap /> {t("gallery.enhancePhoto")}
                 </button>
                 {current.aiEdited && (
                   <button
