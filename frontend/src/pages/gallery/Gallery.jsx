@@ -21,6 +21,8 @@ import GalleryLightbox from "./GalleryLightbox";
 import AlbumCard from "./AlbumCard";
 import GalleryItemCard from "./GalleryItemCard";
 import CreateAlbumModal from "./CreateAlbumModal";
+import ConfirmDeleteModal from "./ConfirmDeleteModal";
+import DownloadModal from "./DownloadModal";
 
 const TABS = ["albums", "all", "loose", "recent", "mostViewed"];
 const LEADER_TIER = ["leader", "admin", "superadmin"];
@@ -34,9 +36,9 @@ const TAB_LABEL_KEY = {
 };
 
 // ─── Shared inline-style helpers ───────────────────────────
-// theme.js's `btn` / `inp` objects use `&:hover` syntax which is a
-// CSS-in-JS pattern, not valid for React's style={{}} prop — so we
-// hand-roll hover via onMouseEnter/onMouseLeave where it matters.
+// theme.js's `btn` / `inp` objects use `&:hover` syntax, which is a
+// CSS-in-JS pattern — invalid for React's style={{}} prop — so hover
+// states are hand-rolled with onMouseEnter/onMouseLeave.
 const primaryBtnStyle = (disabled = false) => ({
   display: "inline-flex",
   alignItems: "center",
@@ -124,6 +126,10 @@ const Gallery = () => {
   const [viewMode, setViewMode] = useState("grid");
   const [openAlbum, setOpenAlbum] = useState(null);
   const [lightboxItem, setLightboxItem] = useState(null);
+
+  // Modal targets
+  const [downloadTarget, setDownloadTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const [albums, setAlbums] = useState([]);
   const [items, setItems] = useState([]);
@@ -234,11 +240,16 @@ const Gallery = () => {
     }
   };
 
-  const handleDownloadOne = async (item) => {
+  // ─── Download ────────────────────────────────────────
+  // Opens the Download modal. The actual file download is performed
+  // inside the modal's onPerform callback (performDownload below).
+  const openDownload = (item) => setDownloadTarget(item);
+
+  const performDownload = async (item) => {
     try {
       await galleryAPI.incrementDownload(item._id);
     } catch {
-      /* silent */
+      /* silent — counter is best-effort */
     }
     const a = document.createElement("a");
     a.href = item.fileUrl;
@@ -270,13 +281,15 @@ const Gallery = () => {
     }
   };
 
-  const handleDeleteItem = async (item, hard = false) => {
-    const confirmMsg = hard
-      ? t("gallery.confirmHardDeleteBody")
-      : t("gallery.confirmDeleteBody");
-    if (!window.confirm(confirmMsg)) return;
+  // ─── Delete ──────────────────────────────────────────
+  const openDeleteItem = (item) =>
+    setDeleteTarget({ kind: "item", data: item });
+
+  const confirmDeleteItem = async ({ hard, reason }) => {
+    const item = deleteTarget?.data;
+    if (!item) return;
     try {
-      await galleryAPI.deleteItem(item._id, { hard });
+      await galleryAPI.deleteItem(item._id, { hard, reason });
       setItems((prev) => prev.filter((i) => i._id !== item._id));
       if (openAlbum) {
         setOpenAlbum((a) =>
@@ -296,22 +309,29 @@ const Gallery = () => {
             : a,
         );
       }
+      setDeleteTarget(null);
     } catch (e) {
       alert(e?.response?.data?.message || t("gallery.uploadError"));
     }
   };
 
-  const handleDeleteAlbum = async (album, hard = false) => {
-    if (!window.confirm(t("gallery.confirmDeleteBody"))) return;
+  const openDeleteAlbum = (album) =>
+    setDeleteTarget({ kind: "album", data: album });
+
+  const confirmDeleteAlbum = async ({ hard, reason }) => {
+    const album = deleteTarget?.data;
+    if (!album) return;
     try {
-      await galleryAPI.deleteAlbum(album._id, { hard });
+      await galleryAPI.deleteAlbum(album._id, { hard, reason });
       setAlbums((prev) => prev.filter((a) => a._id !== album._id));
       if (openAlbum?._id === album._id) setOpenAlbum(null);
+      setDeleteTarget(null);
     } catch (e) {
       alert(e?.response?.data?.message || t("gallery.uploadError"));
     }
   };
 
+  // ─── Grid renderers ─────────────────────────────────
   const renderAlbumGrid = () => (
     <div
       style={{
@@ -325,7 +345,7 @@ const Gallery = () => {
           key={album._id}
           album={album}
           onOpen={() => setOpenAlbum(album)}
-          onDelete={canUpload ? handleDeleteAlbum : null}
+          onDelete={canUpload ? openDeleteAlbum : null}
           canDelete={canDelete}
         />
       ))}
@@ -357,8 +377,8 @@ const Gallery = () => {
           selected={selectedIds.has(item._id)}
           onToggleSelect={() => toggleSelect(item._id)}
           onOpen={() => openLightbox(item)}
-          onDownload={() => handleDownloadOne(item)}
-          onDelete={canUpload ? () => handleDeleteItem(item) : null}
+          onDownload={() => openDownload(item)}
+          onDelete={canUpload ? () => openDeleteItem(item) : null}
         />
       ))}
     </div>
@@ -639,15 +659,14 @@ const Gallery = () => {
           <>
             <button
               onClick={handleBulkDownload}
-              style={{
-                ...primaryBtnStyle(),
-                background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
-              }}
+              style={primaryBtnStyle()}
               onMouseEnter={(e) => {
                 e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = `0 4px 14px ${C.primary}55`;
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.transform = "translateY(0)";
+                e.currentTarget.style.boxShadow = `0 2px 8px ${C.primary}33`;
               }}
             >
               <FiDownload />{" "}
@@ -793,7 +812,7 @@ const Gallery = () => {
           current={lightboxItem}
           onClose={() => setLightboxItem(null)}
           onNavigate={(item) => setLightboxItem(item)}
-          onDownload={handleDownloadOne}
+          onDownload={openDownload}
           canEdit={canUpload && lightboxItem.mediaType === "photo"}
           onUpdated={(updated) =>
             setItems((prev) =>
@@ -802,6 +821,54 @@ const Gallery = () => {
           }
         />
       )}
+
+      {/* ── Delete confirmation modal ────────────────── */}
+      <ConfirmDeleteModal
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={
+          deleteTarget?.kind === "album"
+            ? confirmDeleteAlbum
+            : confirmDeleteItem
+        }
+        kind={deleteTarget?.kind || "item"}
+        title={
+          deleteTarget?.kind === "album"
+            ? deleteTarget?.data?.title || ""
+            : deleteTarget?.data?.caption ||
+              deleteTarget?.data?.fileName ||
+              t("gallery.item") ||
+              "Item"
+        }
+        subtitle={
+          deleteTarget?.kind === "album"
+            ? `${deleteTarget?.data?.itemCount || 0} ${
+                t("gallery.itemCount")?.replace(
+                  "{{count}}",
+                  deleteTarget?.data?.itemCount || 0,
+                ) || "items"
+              }`
+            : `${deleteTarget?.data?.mediaType === "video" ? t("gallery.video") : t("gallery.photo")}${
+                deleteTarget?.data?.fileSize
+                  ? ` · ${(deleteTarget.data.fileSize / 1024 / 1024).toFixed(2)} MB`
+                  : ""
+              }`
+        }
+        thumbnailUrl={
+          deleteTarget?.kind === "album"
+            ? deleteTarget?.data?.coverImage?.url
+            : deleteTarget?.data?.thumbnailUrl
+        }
+        canHardDelete={user?.role === "superadmin"}
+      />
+
+      {/* ── Download modal ───────────────────────────── */}
+      <DownloadModal
+        open={Boolean(downloadTarget)}
+        item={downloadTarget}
+        onClose={() => setDownloadTarget(null)}
+        onPerform={() => performDownload(downloadTarget)}
+      />
     </div>
   );
 };

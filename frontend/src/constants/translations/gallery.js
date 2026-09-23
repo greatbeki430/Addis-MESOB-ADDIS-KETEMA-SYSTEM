@@ -136,6 +136,13 @@ export const galleryTranslations = {
       unsupportedType: "Only images and videos are allowed.",
       noResults: "No results found.",
       retry: "Retry",
+      confirmDeleteAlbumTitle: "Delete this album?",
+      confirmDeleteAlbumBody:
+        "The album and its contents will be moved to trash. Superadmins can permanently delete later.",
+      downloadConfirm:
+        "The file will be saved to your device. Large videos may take a moment.",
+      downloading: "Downloading…",
+      downloadComplete: "Download started",
     },
   },
 
@@ -259,6 +266,12 @@ export const galleryTranslations = {
       unsupportedType: "ምስሎች እና ቪዲዮዎች ብቻ ይፈቀዳሉ።",
       noResults: "ምንም ውጤት አልተገኘም።",
       retry: "እንደገና ሞክር",
+      confirmDeleteAlbumTitle: "ይህን አልበም ያጥፉ?",
+      confirmDeleteAlbumBody:
+        "አልበሙ እና ይዘቱ ወደ መጣያ ይዛወራሉ። ሱፐር አድሚኖች በኋላ ነባሪ አድርገው ማጥፋት ይችላሉ።",
+      downloadConfirm: "ፋይሉ ወደ መሳሪያዎ ይቀመጣል። ትላልቅ ቪዲዮዎች ትንሽ ጊዜ ሊወስዱ ይችላሉ።",
+      downloading: "በማውረድ ላይ…",
+      downloadComplete: "ማውረድ ተጀምሯል",
     },
   },
 
@@ -385,6 +398,13 @@ export const galleryTranslations = {
       unsupportedType: "Suuraawwan fi viidiyoowwan qofa hayyamamu.",
       noResults: "Bu'aan hin argamne.",
       retry: "Irra deebi'i",
+      confirmDeleteAlbumTitle: "Albamii kana haquu?",
+      confirmDeleteAlbumBody:
+        "Albamiin fi qabiyyeen isaa gara kuusaa balfiitti ni ce'u. Superadminoonni booda guutummaatti haquu danda'u.",
+      downloadConfirm:
+        "Faayiliin meeshaa keessaniif ni olkaa'ama. Viidiyoonni gurguddoon yeroo xiqqoo fudhachuu danda'u.",
+      downloading: "Buusaa jira…",
+      downloadComplete: "Buusuun jalqabameera",
     },
   },
 };
