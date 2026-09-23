@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { FiX, FiFolder } from "react-icons/fi";
 import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
+import { C, F, SPACING, FONT_SIZES, radius } from "../../styles/theme";
 
 const PROGRAM_TYPES = [
   "training",
@@ -24,6 +25,30 @@ const TYPE_LABEL_KEY = {
   awareness: "typeAwareness",
   other: "typeOther",
 };
+
+// ─── Shared styles ─────────────────────────────────────────
+const fieldStyle = () => ({
+  width: "100%",
+  padding: "9px 12px",
+  border: `1.5px solid ${C.border}`,
+  borderRadius: radius.md,
+  fontSize: FONT_SIZES.body,
+  fontFamily: F.sans,
+  color: C.dark,
+  background: "#fff",
+  outline: "none",
+  boxSizing: "border-box",
+  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+});
+
+const labelStyle = () => ({
+  display: "block",
+  fontSize: FONT_SIZES.small,
+  fontWeight: 600,
+  color: C.dark,
+  marginBottom: 6,
+  fontFamily: F.sans,
+});
 
 const CreateAlbumModal = ({ onClose, onCreated }) => {
   const { t } = useLanguage();
@@ -65,79 +90,185 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
     }
   };
 
+  // Focus ring helper — reused on every input/select/textarea
+  const focusHandlers = {
+    onFocus: (e) => {
+      e.currentTarget.style.borderColor = C.primary;
+      e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+    },
+    onBlur: (e) => {
+      e.currentTarget.style.borderColor = C.border;
+      e.currentTarget.style.boxShadow = "none";
+    },
+  };
+
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(13,26,94,0.55)",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
+        padding: SPACING.md,
+      }}
+    >
       <form
         onSubmit={handleSubmit}
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col"
+        style={{
+          background: "#fff",
+          borderRadius: radius.xl,
+          boxShadow: "0 20px 60px rgba(13,26,94,0.35)",
+          width: "100%",
+          maxWidth: 560,
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+          fontFamily: F.sans,
+        }}
       >
-        <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700">
-          <h2 className="font-semibold flex items-center gap-2">
-            <FiFolder /> {t("gallery.createAlbum")}
+        {/* ── Header ──────────────────────────────────── */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: `${SPACING.md}px ${SPACING.lg}px`,
+            borderBottom: `2px solid ${C.primary}22`,
+          }}
+        >
+          <h2
+            style={{
+              fontSize: FONT_SIZES.h3,
+              fontWeight: 700,
+              fontFamily: F.serif,
+              color: C.dark,
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <FiFolder size={20} style={{ color: C.primary }} />
+            {t("gallery.createAlbum")}
           </h2>
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 6,
+              background: "transparent",
+              border: "none",
+              borderRadius: radius.sm,
+              color: C.muted,
+              cursor: saving ? "not-allowed" : "pointer",
+              opacity: saving ? 0.5 : 1,
+              transition: "background 0.15s ease, color 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (!saving) {
+                e.currentTarget.style.background = C.bg;
+                e.currentTarget.style.color = C.dark;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = C.muted;
+            }}
           >
-            <FiX />
+            <FiX size={18} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* ── Body ────────────────────────────────────── */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: SPACING.lg,
+            display: "flex",
+            flexDirection: "column",
+            gap: SPACING.md,
+          }}
+        >
           {error && (
-            <div className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded">
+            <div
+              style={{
+                fontSize: FONT_SIZES.small,
+                color: C.red,
+                background: "#fee2e2",
+                padding: "10px 14px",
+                borderRadius: radius.md,
+                border: `1px solid ${C.red}44`,
+              }}
+            >
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              {t("gallery.albumTitle")} *
-            </label>
+            <label style={labelStyle()}>{t("gallery.albumTitle")} *</label>
             <input
               value={form.title}
               onChange={(e) => set("title", e.target.value)}
               placeholder={t("gallery.albumTitlePlaceholder")}
-              className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:border-gray-700"
+              style={fieldStyle()}
               autoFocus
+              {...focusHandlers}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              {t("gallery.albumDescription")}
-            </label>
+            <label style={labelStyle()}>{t("gallery.albumDescription")}</label>
             <textarea
               value={form.description}
               onChange={(e) => set("description", e.target.value)}
               placeholder={t("gallery.albumDescriptionPlaceholder")}
               rows={3}
-              className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:border-gray-700"
+              style={{
+                ...fieldStyle(),
+                resize: "vertical",
+                minHeight: 72,
+              }}
+              {...focusHandlers}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: SPACING.md,
+            }}
+          >
             <div>
-              <label className="block text-sm font-medium mb-1">
-                {t("gallery.programDate")}
-              </label>
+              <label style={labelStyle()}>{t("gallery.programDate")}</label>
               <input
                 type="date"
                 value={form.programDate}
                 onChange={(e) => set("programDate", e.target.value)}
-                className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:border-gray-700"
+                style={fieldStyle()}
+                {...focusHandlers}
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">
-                {t("gallery.programType")}
-              </label>
+              <label style={labelStyle()}>{t("gallery.programType")}</label>
               <select
                 value={form.programType}
                 onChange={(e) => set("programType", e.target.value)}
-                className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:border-gray-700"
+                style={{
+                  ...fieldStyle(),
+                  cursor: "pointer",
+                }}
+                {...focusHandlers}
               >
                 {PROGRAM_TYPES.map((pt) => (
                   <option key={pt} value={pt}>
@@ -149,43 +280,97 @@ const CreateAlbumModal = ({ onClose, onCreated }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              {t("gallery.programLocation")}
-            </label>
+            <label style={labelStyle()}>{t("gallery.programLocation")}</label>
             <input
               value={form.location}
               onChange={(e) => set("location", e.target.value)}
               placeholder={t("gallery.programLocationPlaceholder")}
-              className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:border-gray-700"
+              style={fieldStyle()}
+              {...focusHandlers}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              {t("gallery.tags")}
-            </label>
+            <label style={labelStyle()}>{t("gallery.tags")}</label>
             <input
               value={form.tags}
               onChange={(e) => set("tags", e.target.value)}
               placeholder={t("gallery.tagsPlaceholder")}
-              className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:border-gray-700"
+              style={fieldStyle()}
+              {...focusHandlers}
             />
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 px-4 py-3 border-t dark:border-gray-700">
+        {/* ── Footer ──────────────────────────────────── */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: SPACING.sm,
+            padding: `${SPACING.md}px ${SPACING.lg}px`,
+            borderTop: `1px solid ${C.border}`,
+            background: C.cardBg,
+            borderRadius: `0 0 ${radius.xl}px ${radius.xl}px`,
+          }}
+        >
           <button
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="px-4 py-2 text-sm rounded border hover:bg-gray-100 dark:hover:bg-gray-700"
+            style={{
+              padding: "9px 20px",
+              background: "#fff",
+              color: C.dark,
+              border: `1.5px solid ${C.border}`,
+              borderRadius: radius.md,
+              fontSize: FONT_SIZES.small,
+              fontWeight: 600,
+              fontFamily: F.sans,
+              cursor: saving ? "not-allowed" : "pointer",
+              opacity: saving ? 0.6 : 1,
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (!saving) {
+                e.currentTarget.style.background = C.bg;
+                e.currentTarget.style.borderColor = C.primary;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#fff";
+              e.currentTarget.style.borderColor = C.border;
+            }}
           >
             {t("gallery.cancel")}
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            style={{
+              padding: "9px 22px",
+              background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+              color: "#fff",
+              border: "none",
+              borderRadius: radius.md,
+              fontSize: FONT_SIZES.small,
+              fontWeight: 700,
+              fontFamily: F.sans,
+              cursor: saving ? "not-allowed" : "pointer",
+              opacity: saving ? 0.6 : 1,
+              boxShadow: `0 3px 12px ${C.primary}44`,
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (!saving) {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = `0 6px 18px ${C.primary}55`;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow = `0 3px 12px ${C.primary}44`;
+            }}
           >
             {saving ? t("gallery.uploading") : t("gallery.createAlbum")}
           </button>

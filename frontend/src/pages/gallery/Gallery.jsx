@@ -15,6 +15,7 @@ import {
 import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
+import { C, F, SPACING, FONT_SIZES, radius } from "../../styles/theme";
 import GalleryUpload from "./GalleryUpload";
 import GalleryLightbox from "./GalleryLightbox";
 import AlbumCard from "./AlbumCard";
@@ -31,6 +32,86 @@ const TAB_LABEL_KEY = {
   recent: "recentTab",
   mostViewed: "mostViewedTab",
 };
+
+// ─── Shared inline-style helpers ───────────────────────────
+// theme.js's `btn` / `inp` objects use `&:hover` syntax which is a
+// CSS-in-JS pattern, not valid for React's style={{}} prop — so we
+// hand-roll hover via onMouseEnter/onMouseLeave where it matters.
+const primaryBtnStyle = (disabled = false) => ({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "8px 14px",
+  background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+  color: "#fff",
+  border: "none",
+  borderRadius: radius.md,
+  fontSize: FONT_SIZES.small,
+  fontWeight: 700,
+  fontFamily: F.sans,
+  cursor: disabled ? "not-allowed" : "pointer",
+  opacity: disabled ? 0.6 : 1,
+  boxShadow: `0 2px 8px ${C.primary}33`,
+  transition: "all 0.15s ease",
+  whiteSpace: "nowrap",
+});
+
+const subtleBtnStyle = () => ({
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "8px 14px",
+  background: C.bg,
+  color: C.primary,
+  border: `1px solid ${C.border}`,
+  borderRadius: radius.md,
+  fontSize: FONT_SIZES.small,
+  fontWeight: 600,
+  fontFamily: F.sans,
+  cursor: "pointer",
+  transition: "all 0.15s ease",
+  whiteSpace: "nowrap",
+});
+
+const iconBtnStyle = () => ({
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 8,
+  background: "#fff",
+  border: `1px solid ${C.border}`,
+  borderRadius: radius.md,
+  color: C.primary,
+  cursor: "pointer",
+  transition: "all 0.15s ease",
+});
+
+const inputStyle = () => ({
+  width: "100%",
+  padding: "8px 12px",
+  border: `1.5px solid ${C.border}`,
+  borderRadius: radius.md,
+  fontSize: FONT_SIZES.small,
+  fontFamily: F.sans,
+  color: C.dark,
+  background: "#fff",
+  outline: "none",
+  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+  boxSizing: "border-box",
+});
+
+const selectStyle = () => ({
+  padding: "8px 12px",
+  border: `1.5px solid ${C.border}`,
+  borderRadius: radius.md,
+  fontSize: FONT_SIZES.small,
+  fontFamily: F.sans,
+  color: C.dark,
+  background: "#fff",
+  cursor: "pointer",
+  outline: "none",
+  transition: "border-color 0.15s ease",
+});
 
 const Gallery = () => {
   const { t } = useLanguage();
@@ -232,7 +313,13 @@ const Gallery = () => {
   };
 
   const renderAlbumGrid = () => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 260px), 1fr))",
+        gap: SPACING.lg,
+      }}
+    >
       {albums.map((album) => (
         <AlbumCard
           key={album._id}
@@ -247,10 +334,19 @@ const Gallery = () => {
 
   const renderItemGrid = () => (
     <div
-      className={
+      style={
         viewMode === "grid"
-          ? "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3"
-          : "flex flex-col gap-2"
+          ? {
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fill, minmax(min(100%, 160px), 1fr))",
+              gap: SPACING.md,
+            }
+          : {
+              display: "flex",
+              flexDirection: "column",
+              gap: SPACING.sm,
+            }
       }
     >
       {items.map((item) => (
@@ -269,20 +365,64 @@ const Gallery = () => {
   );
 
   return (
-    <div className="p-4 md:p-6 max-w-7xl mx-auto">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+    <div
+      style={{
+        padding: SPACING.lg,
+        maxWidth: 1400,
+        margin: "0 auto",
+        fontFamily: F.sans,
+        color: C.dark,
+      }}
+    >
+      {/* ── Header row ─────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: SPACING.md,
+          marginBottom: SPACING.lg,
+        }}
+      >
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FiImage /> {t("gallery.title")}
+          <h1
+            style={{
+              fontSize: FONT_SIZES.h2,
+              fontWeight: 800,
+              fontFamily: F.serif,
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              color: C.dark,
+            }}
+          >
+            <FiImage size={24} style={{ color: C.primary }} />
+            {t("gallery.title")}
           </h1>
-          <p className="text-sm text-gray-500">{t("gallery.subtitle")}</p>
+          <p
+            style={{
+              fontSize: FONT_SIZES.small,
+              color: C.muted,
+              margin: "4px 0 0",
+            }}
+          >
+            {t("gallery.subtitle")}
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <button
             onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-            className="p-2 rounded border hover:bg-gray-100 dark:hover:bg-gray-800"
+            style={iconBtnStyle()}
             title={viewMode === "grid" ? "List view" : "Grid view"}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = C.bg;
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#fff";
+            }}
           >
             {viewMode === "grid" ? <FiList /> : <FiGrid />}
           </button>
@@ -291,7 +431,15 @@ const Gallery = () => {
             <>
               <button
                 onClick={() => setShowCreateAlbum(true)}
-                className="flex items-center gap-1 px-3 py-2 rounded bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-sm"
+                style={subtleBtnStyle()}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#fff";
+                  e.currentTarget.style.borderColor = C.primary;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = C.bg;
+                  e.currentTarget.style.borderColor = C.border;
+                }}
               >
                 <FiPlus /> {t("gallery.createAlbum")}
               </button>
@@ -300,7 +448,15 @@ const Gallery = () => {
                   setUploadAlbumId(openAlbum?._id || null);
                   setShowUpload(true);
                 }}
-                className="flex items-center gap-1 px-3 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                style={primaryBtnStyle()}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = "translateY(-1px)";
+                  e.currentTarget.style.boxShadow = `0 4px 14px ${C.primary}55`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = "translateY(0)";
+                  e.currentTarget.style.boxShadow = `0 2px 8px ${C.primary}33`;
+                }}
               >
                 <FiUploadCloud /> {t("gallery.upload")}
               </button>
@@ -309,62 +465,154 @@ const Gallery = () => {
         </div>
       </div>
 
+      {/* ── Album breadcrumb ──────────────────────────── */}
       {openAlbum && (
-        <div className="flex items-center gap-2 mb-4">
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: SPACING.md,
+            flexWrap: "wrap",
+          }}
+        >
           <button
             onClick={() => setOpenAlbum(null)}
-            className="flex items-center gap-1 text-sm text-blue-600 hover:underline"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              background: "none",
+              border: "none",
+              color: C.primary,
+              fontSize: FONT_SIZES.small,
+              fontWeight: 600,
+              cursor: "pointer",
+              padding: 0,
+              fontFamily: F.sans,
+              textDecoration: "underline",
+            }}
           >
-            <FiChevronLeft /> {t("gallery.albums")}
+            <FiChevronLeft size={14} /> {t("gallery.albums")}
           </button>
-          <span className="text-gray-400">/</span>
-          <span className="font-semibold">{openAlbum.title}</span>
+          <span style={{ color: C.muted, fontSize: FONT_SIZES.small }}>/</span>
+          <span
+            style={{
+              fontWeight: 700,
+              color: C.dark,
+              fontSize: FONT_SIZES.body,
+            }}
+          >
+            {openAlbum.title}
+          </span>
           {openAlbum.programDate && (
-            <span className="text-xs text-gray-500">
+            <span style={{ fontSize: FONT_SIZES.tiny, color: C.muted }}>
               · {new Date(openAlbum.programDate).toLocaleDateString()}
             </span>
           )}
           {openAlbum.location && (
-            <span className="text-xs text-gray-500">
+            <span style={{ fontSize: FONT_SIZES.tiny, color: C.muted }}>
               · {openAlbum.location}
             </span>
           )}
         </div>
       )}
 
+      {/* ── Tabs ──────────────────────────────────────── */}
       {!openAlbum && (
-        <div className="flex flex-wrap gap-1 border-b mb-4">
-          {TABS.map((tabKey) => (
-            <button
-              key={tabKey}
-              onClick={() => setTab(tabKey)}
-              className={`px-3 py-2 text-sm border-b-2 -mb-px transition ${
-                tab === tabKey
-                  ? "border-blue-600 text-blue-600 font-semibold"
-                  : "border-transparent text-gray-500 hover:text-gray-800"
-              }`}
-            >
-              {t(`gallery.${TAB_LABEL_KEY[tabKey]}`)}
-            </button>
-          ))}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 2,
+            borderBottom: `1px solid ${C.border}`,
+            marginBottom: SPACING.md,
+          }}
+        >
+          {TABS.map((tabKey) => {
+            const active = tab === tabKey;
+            return (
+              <button
+                key={tabKey}
+                onClick={() => setTab(tabKey)}
+                style={{
+                  padding: "10px 14px",
+                  background: "none",
+                  border: "none",
+                  borderBottom: `2px solid ${active ? C.primary : "transparent"}`,
+                  marginBottom: -1,
+                  fontSize: FONT_SIZES.small,
+                  fontWeight: active ? 700 : 500,
+                  fontFamily: F.sans,
+                  color: active ? C.primary : C.muted,
+                  cursor: "pointer",
+                  transition: "color 0.15s ease, border-color 0.15s ease",
+                }}
+                onMouseEnter={(e) => {
+                  if (!active) e.currentTarget.style.color = C.dark;
+                }}
+                onMouseLeave={(e) => {
+                  if (!active) e.currentTarget.style.color = C.muted;
+                }}
+              >
+                {t(`gallery.${TAB_LABEL_KEY[tabKey]}`)}
+              </button>
+            );
+          })}
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+      {/* ── Filter row ────────────────────────────────── */}
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: SPACING.sm,
+          marginBottom: SPACING.md,
+        }}
+      >
+        <div style={{ position: "relative", flex: "1 1 220px", minWidth: 220 }}>
+          <FiSearch
+            size={14}
+            style={{
+              position: "absolute",
+              left: 12,
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: C.muted,
+              pointerEvents: "none",
+            }}
+          />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t("gallery.searchPlaceholder")}
-            className="w-full pl-9 pr-3 py-2 border rounded dark:bg-gray-800 dark:border-gray-700"
+            style={{
+              ...inputStyle(),
+              paddingLeft: 34,
+            }}
+            onFocus={(e) => {
+              e.currentTarget.style.borderColor = C.primary;
+              e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = C.border;
+              e.currentTarget.style.boxShadow = "none";
+            }}
           />
         </div>
 
         <select
           value={mediaType}
           onChange={(e) => setMediaType(e.target.value)}
-          className="px-3 py-2 border rounded dark:bg-gray-800 dark:border-gray-700"
+          style={selectStyle()}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = C.primary;
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = C.border;
+          }}
         >
           <option value="all">{t("gallery.allMedia")}</option>
           <option value="photo">{t("gallery.photos")}</option>
@@ -374,7 +622,13 @@ const Gallery = () => {
         <select
           value={sortBy}
           onChange={(e) => setSortBy(e.target.value)}
-          className="px-3 py-2 border rounded dark:bg-gray-800 dark:border-gray-700"
+          style={selectStyle()}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = C.primary;
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = C.border;
+          }}
         >
           <option value="newest">{t("gallery.sortNewest")}</option>
           <option value="oldest">{t("gallery.sortOldest")}</option>
@@ -385,7 +639,16 @@ const Gallery = () => {
           <>
             <button
               onClick={handleBulkDownload}
-              className="flex items-center gap-1 px-3 py-2 rounded bg-green-600 text-white text-sm hover:bg-green-700"
+              style={{
+                ...primaryBtnStyle(),
+                background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-1px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
             >
               <FiDownload />{" "}
               {t("gallery.downloadSelected").replace(
@@ -395,7 +658,13 @@ const Gallery = () => {
             </button>
             <button
               onClick={clearSelection}
-              className="flex items-center gap-1 px-3 py-2 rounded bg-gray-200 dark:bg-gray-700 text-sm"
+              style={subtleBtnStyle()}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#fff";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = C.bg;
+              }}
             >
               <FiX /> {t("gallery.clearSelection")}
             </button>
@@ -405,23 +674,53 @@ const Gallery = () => {
         {items.length > 0 && (
           <button
             onClick={toggleSelectAll}
-            className="px-3 py-2 text-sm rounded border hover:bg-gray-100 dark:hover:bg-gray-800"
+            style={subtleBtnStyle()}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#fff";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = C.bg;
+            }}
           >
             {allSelected ? t("gallery.clearSelection") : t("gallery.selectAll")}
           </button>
         )}
       </div>
 
+      {/* ── Body ──────────────────────────────────────── */}
       {loading ? (
-        <div className="py-16 text-center text-gray-500">
+        <div
+          style={{
+            padding: "64px 0",
+            textAlign: "center",
+            color: C.muted,
+            fontSize: FONT_SIZES.body,
+          }}
+        >
           {t("gallery.uploading")}
         </div>
       ) : error ? (
-        <div className="py-16 text-center text-red-600">
+        <div
+          style={{
+            padding: "64px 0",
+            textAlign: "center",
+            color: C.red,
+            fontSize: FONT_SIZES.body,
+          }}
+        >
           {error}
           <button
             onClick={() => (tab === "albums" ? loadAlbums() : loadItems())}
-            className="ml-3 underline"
+            style={{
+              marginLeft: 12,
+              background: "none",
+              border: "none",
+              color: C.primary,
+              textDecoration: "underline",
+              cursor: "pointer",
+              fontFamily: F.sans,
+              fontSize: FONT_SIZES.small,
+            }}
           >
             {t("gallery.retry")}
           </button>
@@ -463,6 +762,7 @@ const Gallery = () => {
         renderItemGrid()
       )}
 
+      {/* ── Modals ────────────────────────────────────── */}
       {showCreateAlbum && (
         <CreateAlbumModal
           onClose={() => setShowCreateAlbum(false)}
@@ -506,14 +806,56 @@ const Gallery = () => {
   );
 };
 
+// ─── Empty state ───────────────────────────────────────────
 const EmptyState = ({ icon, text, action }) => (
-  <div className="py-16 text-center text-gray-500">
-    <div className="text-4xl mb-2 flex justify-center">{icon}</div>
-    <p>{text}</p>
+  <div
+    style={{
+      padding: "64px 0",
+      textAlign: "center",
+      color: C.muted,
+      fontFamily: F.sans,
+    }}
+  >
+    <div
+      style={{
+        fontSize: 44,
+        marginBottom: SPACING.sm,
+        display: "flex",
+        justifyContent: "center",
+        color: C.primary,
+        opacity: 0.45,
+      }}
+    >
+      {icon}
+    </div>
+    <p style={{ fontSize: FONT_SIZES.body, margin: 0 }}>{text}</p>
     {action && (
       <button
         onClick={action.onClick}
-        className="mt-4 px-4 py-2 rounded bg-blue-600 text-white text-sm hover:bg-blue-700"
+        style={{
+          marginTop: SPACING.md,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          padding: "10px 20px",
+          background: `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+          color: "#fff",
+          border: "none",
+          borderRadius: radius.md,
+          fontSize: FONT_SIZES.small,
+          fontWeight: 700,
+          fontFamily: F.sans,
+          cursor: "pointer",
+          boxShadow: `0 2px 8px ${C.primary}33`,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "translateY(-1px)";
+          e.currentTarget.style.boxShadow = `0 4px 14px ${C.primary}55`;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "translateY(0)";
+          e.currentTarget.style.boxShadow = `0 2px 8px ${C.primary}33`;
+        }}
       >
         {action.label}
       </button>

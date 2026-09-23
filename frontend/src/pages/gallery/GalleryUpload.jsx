@@ -10,6 +10,7 @@ import {
 } from "react-icons/fi";
 import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
+import { C, F, SPACING, FONT_SIZES, radius } from "../../styles/theme";
 
 const MAX_PHOTO_MB = 25;
 const MAX_VIDEO_MB = 100; // Cloudinary free-tier per-file limit
@@ -65,6 +66,42 @@ const uploadToCloudinary = (file, signature, onProgress) =>
     xhr.send(formData);
   });
 
+// ─── Shared styles ─────────────────────────────────────────
+const labelStyle = () => ({
+  display: "block",
+  fontSize: FONT_SIZES.small,
+  fontWeight: 600,
+  color: C.dark,
+  marginBottom: 6,
+  fontFamily: F.sans,
+});
+
+const fieldStyle = (disabled = false) => ({
+  width: "100%",
+  padding: "9px 12px",
+  border: `1.5px solid ${C.border}`,
+  borderRadius: radius.md,
+  fontSize: FONT_SIZES.body,
+  fontFamily: F.sans,
+  color: C.dark,
+  background: disabled ? C.bg : "#fff",
+  cursor: disabled ? "not-allowed" : "text",
+  outline: "none",
+  boxSizing: "border-box",
+  transition: "border-color 0.15s ease, box-shadow 0.15s ease",
+});
+
+const focusHandlers = {
+  onFocus: (e) => {
+    e.currentTarget.style.borderColor = C.primary;
+    e.currentTarget.style.boxShadow = `0 0 0 3px ${C.primary}22`;
+  },
+  onBlur: (e) => {
+    e.currentTarget.style.borderColor = C.border;
+    e.currentTarget.style.boxShadow = "none";
+  },
+};
+
 const GalleryUpload = ({
   albumId = null,
   albums = [],
@@ -73,6 +110,7 @@ const GalleryUpload = ({
 }) => {
   const { t } = useLanguage();
   const inputRef = useRef(null);
+  const [dragOver, setDragOver] = useState(false);
 
   const [targetAlbumId, setTargetAlbumId] = useState(albumId || "loose");
   const [files, setFiles] = useState([]);
@@ -120,6 +158,7 @@ const GalleryUpload = ({
 
   const handleDrop = (e) => {
     e.preventDefault();
+    setDragOver(false);
     addFiles(Array.from(e.dataTransfer.files));
   };
 
@@ -200,33 +239,115 @@ const GalleryUpload = ({
   };
 
   const readyCount = files.filter((f) => f.status === "ready").length;
+  const albumLocked = Boolean(albumId);
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-4 py-3 border-b dark:border-gray-700">
-          <h2 className="font-semibold flex items-center gap-2">
-            <FiUploadCloud /> {t("gallery.uploadMedia")}
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "rgba(13,26,94,0.55)",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
+        padding: SPACING.md,
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: radius.xl,
+          boxShadow: "0 20px 60px rgba(13,26,94,0.35)",
+          width: "100%",
+          maxWidth: 720,
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+          fontFamily: F.sans,
+        }}
+      >
+        {/* ── Header ──────────────────────────────────── */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: `${SPACING.md}px ${SPACING.lg}px`,
+            borderBottom: `2px solid ${C.primary}22`,
+          }}
+        >
+          <h2
+            style={{
+              fontSize: FONT_SIZES.h3,
+              fontWeight: 700,
+              fontFamily: F.serif,
+              color: C.dark,
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <FiUploadCloud size={20} style={{ color: C.primary }} />
+            {t("gallery.uploadMedia")}
           </h2>
           <button
             onClick={onClose}
             disabled={uploading}
-            className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 6,
+              background: "transparent",
+              border: "none",
+              borderRadius: radius.sm,
+              color: C.muted,
+              cursor: uploading ? "not-allowed" : "pointer",
+              opacity: uploading ? 0.5 : 1,
+              transition: "background 0.15s ease, color 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (!uploading) {
+                e.currentTarget.style.background = C.bg;
+                e.currentTarget.style.color = C.dark;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = C.muted;
+            }}
           >
-            <FiX />
+            <FiX size={18} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* ── Body ────────────────────────────────────── */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: "auto",
+            padding: SPACING.lg,
+            display: "flex",
+            flexDirection: "column",
+            gap: SPACING.md,
+          }}
+        >
+          {/* Album selector */}
           <div>
-            <label className="block text-sm font-medium mb-1">
-              {t("gallery.album")}
-            </label>
+            <label style={labelStyle()}>{t("gallery.album")}</label>
             <select
               value={targetAlbumId}
               onChange={(e) => setTargetAlbumId(e.target.value)}
-              disabled={!!albumId || uploading}
-              className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:border-gray-700"
+              disabled={albumLocked || uploading}
+              style={{
+                ...fieldStyle(albumLocked || uploading),
+                cursor: albumLocked || uploading ? "not-allowed" : "pointer",
+              }}
+              {...(albumLocked || uploading ? {} : focusHandlers)}
             >
               <option value="loose">{t("gallery.looseUploads")}</option>
               {albums.map((a) => (
@@ -237,15 +358,53 @@ const GalleryUpload = ({
             </select>
           </div>
 
+          {/* Dropzone */}
           <div
-            onDragOver={(e) => e.preventDefault()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (!dragOver) setDragOver(true);
+            }}
+            onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={() => inputRef.current?.click()}
-            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition"
+            style={{
+              border: `2px dashed ${dragOver ? C.primary : C.border}`,
+              borderRadius: radius.lg,
+              padding: "32px 24px",
+              textAlign: "center",
+              cursor: "pointer",
+              background: dragOver ? `${C.primary}0a` : C.cardBg,
+              transition: "border-color 0.15s ease, background 0.15s ease",
+            }}
           >
-            <FiUploadCloud className="mx-auto text-3xl text-gray-400 mb-2" />
-            <p className="text-sm">{t("gallery.dragDropHere")}</p>
-            <p className="text-xs text-gray-500 mt-1">
+            <FiUploadCloud
+              size={32}
+              style={{
+                color: dragOver ? C.primary : C.muted,
+                marginBottom: 8,
+                display: "block",
+                marginLeft: "auto",
+                marginRight: "auto",
+              }}
+            />
+            <p
+              style={{
+                fontSize: FONT_SIZES.body,
+                color: C.dark,
+                margin: 0,
+                fontFamily: F.sans,
+              }}
+            >
+              {t("gallery.dragDropHere")}
+            </p>
+            <p
+              style={{
+                fontSize: FONT_SIZES.small,
+                color: C.muted,
+                margin: "4px 0 0",
+                fontFamily: F.sans,
+              }}
+            >
               {t("gallery.dragDropHint")}
             </p>
             <input
@@ -253,108 +412,236 @@ const GalleryUpload = ({
               type="file"
               multiple
               accept="image/*,video/*"
-              className="hidden"
+              style={{ display: "none" }}
               onChange={(e) => addFiles(Array.from(e.target.files))}
             />
           </div>
 
+          {/* File list */}
           {files.length > 0 && (
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                maxHeight: 200,
+                overflowY: "auto",
+              }}
+            >
               {files.map((entry, idx) => (
                 <div
                   key={idx}
-                  className="flex items-center gap-2 p-2 rounded border dark:border-gray-700"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: SPACING.sm,
+                    padding: "8px 10px",
+                    borderRadius: radius.md,
+                    border: `1px solid ${entry.error ? `${C.red}55` : C.border}`,
+                    background: entry.error ? "#fef2f2" : "#fff",
+                  }}
                 >
                   {entry.preview ? (
                     <img
                       src={entry.preview}
                       alt=""
-                      className="w-10 h-10 object-cover rounded"
+                      style={{
+                        width: 40,
+                        height: 40,
+                        objectFit: "cover",
+                        borderRadius: radius.sm,
+                        flexShrink: 0,
+                      }}
                     />
                   ) : (
-                    <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center">
+                    <div
+                      style={{
+                        width: 40,
+                        height: 40,
+                        background: C.bg,
+                        borderRadius: radius.sm,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        color: C.muted,
+                        flexShrink: 0,
+                      }}
+                    >
                       <FiUploadCloud size={14} />
                     </div>
                   )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs truncate">{entry.file.name}</p>
-                    <p className="text-[10px] text-gray-500">
+
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p
+                      style={{
+                        fontSize: FONT_SIZES.small,
+                        color: C.dark,
+                        margin: 0,
+                        fontFamily: F.sans,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                      title={entry.file.name}
+                    >
+                      {entry.file.name}
+                    </p>
+                    <p
+                      style={{
+                        fontSize: 10,
+                        color: C.muted,
+                        margin: "2px 0 0",
+                        fontFamily: F.sans,
+                      }}
+                    >
                       {(entry.file.size / 1024 / 1024).toFixed(2)} MB
                     </p>
                     {entry.error && (
-                      <p className="text-[10px] text-red-600 flex items-center gap-1">
+                      <p
+                        style={{
+                          fontSize: 10,
+                          color: C.red,
+                          margin: "2px 0 0",
+                          fontFamily: F.sans,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
                         <FiAlertCircle size={10} /> {entry.error}
                       </p>
                     )}
                   </div>
+
                   {entry.status === "ready" ? (
                     <button
                       onClick={() => removeFile(idx)}
                       disabled={uploading}
-                      className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded"
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 6,
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: radius.sm,
+                        color: C.red,
+                        cursor: uploading ? "not-allowed" : "pointer",
+                        opacity: uploading ? 0.5 : 1,
+                        flexShrink: 0,
+                        transition: "background 0.15s ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!uploading)
+                          e.currentTarget.style.background = "#fee2e2";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = "transparent";
+                      }}
                     >
                       <FiTrash2 size={14} />
                     </button>
                   ) : (
-                    <FiCheck className="text-green-600" />
+                    <FiCheck
+                      size={16}
+                      style={{ color: "#16a34a", flexShrink: 0 }}
+                    />
                   )}
                 </div>
               ))}
             </div>
           )}
 
+          {/* Shared metadata fields */}
           {files.length > 0 && (
-            <div className="space-y-3">
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: SPACING.sm,
+              }}
+            >
               <div>
-                <label className="block text-sm font-medium mb-1">
-                  {t("gallery.caption")}
-                </label>
+                <label style={labelStyle()}>{t("gallery.caption")}</label>
                 <input
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder={t("gallery.captionPlaceholder")}
-                  className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:border-gray-700"
+                  style={fieldStyle()}
+                  {...focusHandlers}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: SPACING.sm,
+                }}
+              >
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {t("gallery.capturedAt")}
-                  </label>
+                  <label style={labelStyle()}>{t("gallery.capturedAt")}</label>
                   <input
                     type="date"
                     value={capturedAt}
                     onChange={(e) => setCapturedAt(e.target.value)}
-                    className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:border-gray-700"
+                    style={fieldStyle()}
+                    {...focusHandlers}
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    {t("gallery.tags")}
-                  </label>
+                  <label style={labelStyle()}>{t("gallery.tags")}</label>
                   <input
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
                     placeholder={t("gallery.tagsPlaceholder")}
-                    className="w-full px-3 py-2 border rounded dark:bg-gray-900 dark:border-gray-700"
+                    style={fieldStyle()}
+                    {...focusHandlers}
                   />
                 </div>
               </div>
             </div>
           )}
 
+          {/* Progress */}
           {uploading && (
-            <div className="text-sm text-center text-gray-600 dark:text-gray-300 space-y-1">
-              <div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+                alignItems: "center",
+                padding: `${SPACING.sm}px 0`,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: FONT_SIZES.small,
+                  color: C.muted,
+                  fontFamily: F.sans,
+                }}
+              >
                 {t("gallery.uploadProgress")
                   .replace("{{done}}", progress.done)
                   .replace("{{total}}", progress.total)}
               </div>
               {currentFilePct > 0 && currentFilePct < 100 && (
-                <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                <div
+                  style={{
+                    width: "100%",
+                    maxWidth: 400,
+                    height: 6,
+                    background: C.bg,
+                    borderRadius: radius.pill,
+                    overflow: "hidden",
+                  }}
+                >
                   <div
-                    className="bg-blue-600 h-full transition-all"
-                    style={{ width: `${currentFilePct}%` }}
+                    style={{
+                      width: `${currentFilePct}%`,
+                      height: "100%",
+                      background: `linear-gradient(90deg, ${C.primary}, ${C.light})`,
+                      transition: "width 0.2s ease",
+                    }}
                   />
                 </div>
               )}
@@ -362,18 +649,83 @@ const GalleryUpload = ({
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t dark:border-gray-700">
+        {/* ── Footer ──────────────────────────────────── */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: SPACING.sm,
+            padding: `${SPACING.md}px ${SPACING.lg}px`,
+            borderTop: `1px solid ${C.border}`,
+            background: C.cardBg,
+            borderRadius: `0 0 ${radius.xl}px ${radius.xl}px`,
+          }}
+        >
           <button
             onClick={onClose}
             disabled={uploading}
-            className="px-4 py-2 text-sm rounded border hover:bg-gray-100 dark:hover:bg-gray-700"
+            style={{
+              padding: "9px 20px",
+              background: "#fff",
+              color: C.dark,
+              border: `1.5px solid ${C.border}`,
+              borderRadius: radius.md,
+              fontSize: FONT_SIZES.small,
+              fontWeight: 600,
+              fontFamily: F.sans,
+              cursor: uploading ? "not-allowed" : "pointer",
+              opacity: uploading ? 0.6 : 1,
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (!uploading) {
+                e.currentTarget.style.background = C.bg;
+                e.currentTarget.style.borderColor = C.primary;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#fff";
+              e.currentTarget.style.borderColor = C.border;
+            }}
           >
             {t("gallery.cancel")}
           </button>
           <button
             onClick={handleUpload}
             disabled={uploading || readyCount === 0}
-            className="px-4 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+            style={{
+              padding: "9px 22px",
+              background:
+                uploading || readyCount === 0
+                  ? C.muted
+                  : `linear-gradient(135deg, ${C.primary}, ${C.light})`,
+              color: "#fff",
+              border: "none",
+              borderRadius: radius.md,
+              fontSize: FONT_SIZES.small,
+              fontWeight: 700,
+              fontFamily: F.sans,
+              cursor: uploading || readyCount === 0 ? "not-allowed" : "pointer",
+              opacity: uploading || readyCount === 0 ? 0.5 : 1,
+              boxShadow:
+                uploading || readyCount === 0
+                  ? "none"
+                  : `0 3px 12px ${C.primary}44`,
+              transition: "all 0.15s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (!uploading && readyCount > 0) {
+                e.currentTarget.style.transform = "translateY(-1px)";
+                e.currentTarget.style.boxShadow = `0 6px 18px ${C.primary}55`;
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = "translateY(0)";
+              e.currentTarget.style.boxShadow =
+                uploading || readyCount === 0
+                  ? "none"
+                  : `0 3px 12px ${C.primary}44`;
+            }}
           >
             {uploading
               ? t("gallery.uploading")
