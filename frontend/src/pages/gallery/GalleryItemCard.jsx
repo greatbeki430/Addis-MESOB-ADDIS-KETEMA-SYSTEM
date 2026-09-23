@@ -1,7 +1,6 @@
 // frontend/src/pages/gallery/GalleryItemCard.jsx
 import { FiVideo, FiDownload, FiTrash2, FiCheck } from "react-icons/fi";
-import { useLanguage } from "../../constants/translations";
-
+import { useLanguage } from "../../hooks/useLanguage";
 const GalleryItemCard = ({
   item,
   viewMode = "grid",

@@ -1,7 +1,7 @@
 // frontend/src/pages/gallery/CreateAlbumModal.jsx
 import { useState } from "react";
 import { FiX, FiFolder } from "react-icons/fi";
-import { useLanguage } from "../../constants/translations";
+import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
 
 const PROGRAM_TYPES = [

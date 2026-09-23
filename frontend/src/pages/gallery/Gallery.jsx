@@ -12,7 +12,7 @@ import {
   FiX,
   FiChevronLeft,
 } from "react-icons/fi";
-import { useLanguage } from "../../constants/translations";
+import { useLanguage } from "../../hooks/useLanguage";
 import { galleryAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
 import GalleryUpload from "./GalleryUpload";

@@ -1,7 +1,6 @@
 // frontend/src/pages/gallery/AlbumCard.jsx
 import { FiFolder, FiImage, FiVideo, FiTrash2 } from "react-icons/fi";
-import { useLanguage } from "../../constants/translations";
-
+import { useLanguage } from "../../hooks/useLanguage";
 const AlbumCard = ({ album, onOpen, onDelete, canDelete }) => {
   const { t } = useLanguage();
 
