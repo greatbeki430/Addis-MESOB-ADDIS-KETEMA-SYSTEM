@@ -12,7 +12,6 @@ import {
 
 const VisionMission = ({ t }) => {
   const [isVisible, setIsVisible] = useState(false);
-  const [setHoveredCard] = useState(null);
   const sectionRef = useRef(null);
 
   useEffect(() => {
@@ -37,9 +36,40 @@ const VisionMission = ({ t }) => {
     };
   }, []);
 
-  // Get translations or fallback
+  // The `t` prop is an object, not a function (see how it is
+  // produced in the landing page — it is typically
+  // `landingTranslations[language]` or a flattened equivalent).
+  // Supporting both shapes here so the component works regardless
+  // of how the parent wires it up.
+  //
+  // `key` is a dotted path like "landing.visionTitle". Walk the
+  // object by splitting on dots and reading each segment. If any
+  // segment is missing, fall back to the provided default.
   const getTranslation = (key, fallback) => {
-    return t ? t(key) || fallback : fallback;
+    if (!t) return fallback;
+
+    // Shape 1: t is a function (rare, but supported).
+    if (typeof t === "function") {
+      try {
+        const v = t(key);
+        return v || fallback;
+      } catch {
+        return fallback;
+      }
+    }
+
+    // Shape 2: t is an object — walk the dotted path.
+    if (typeof t === "object") {
+      const segments = String(key).split(".");
+      let cur = t;
+      for (const seg of segments) {
+        if (cur == null) return fallback;
+        cur = cur[seg];
+      }
+      return cur ?? fallback;
+    }
+
+    return fallback;
   };
 
   const content = {
@@ -53,7 +83,11 @@ const VisionMission = ({ t }) => {
       "Building a digital future for Ethiopia, one service at a time",
     ),
     vision: {
-      title: getTranslation("landing.visionTitle", "Our Vision"),
+      // Note: uses visionCardTitle, NOT visionTitle. visionTitle is
+      // the section header string ("The Vision & Mission of Addis
+      // MESOB"); the card label is the short one ("Our Vision" /
+      // "ራዕያችን" / "Mul'ata Keenya").
+      title: getTranslation("landing.visionCardTitle", "Our Vision"),
       text: getTranslation(
         "landing.visionText",
         "To become Africa's premier digital government service hub by 2023, where technology empowers every citizen through seamless, accessible, and trusted government services.",
@@ -68,6 +102,7 @@ const VisionMission = ({ t }) => {
       ),
       icon: <FiTarget size={28} />,
     },
+    coreValuesHeading: getTranslation("landing.coreValues", "Our Core Values"),
     pillars: [
       {
         title: getTranslation("landing.pillar1Title", "Digital Excellence"),
@@ -144,7 +179,7 @@ const VisionMission = ({ t }) => {
           0%, 100% { border-color: rgba(245, 197, 24, 0.3); }
           50% { border-color: rgba(245, 197, 24, 0.8); }
         }
-        
+
         .vision-particle {
           position: absolute;
           border-radius: 50%;
@@ -157,7 +192,7 @@ const VisionMission = ({ t }) => {
         .vision-particle:nth-child(2) { width: 150px; height: 150px; bottom: -30px; left: -30px; animation-delay: 2s; }
         .vision-particle:nth-child(3) { width: 100px; height: 100px; top: 50%; left: 10%; animation-delay: 4s; }
         .vision-particle:nth-child(4) { width: 80px; height: 80px; bottom: 20%; right: 15%; animation-delay: 1s; }
-        
+
         .vision-glow {
           position: absolute;
           width: 300px;
@@ -168,7 +203,7 @@ const VisionMission = ({ t }) => {
         }
         .vision-glow:nth-child(5) { top: 20%; right: 10%; }
         .vision-glow:nth-child(6) { bottom: 20%; left: 10%; }
-        
+
         .vision-card {
           background: rgba(255, 255, 255, 0.03);
           backdrop-filter: blur(10px);
@@ -198,7 +233,7 @@ const VisionMission = ({ t }) => {
           border-color: ${C.gold}55;
           box-shadow: 0 20px 60px rgba(245, 197, 24, 0.15);
         }
-        
+
         .vision-main-card {
           background: linear-gradient(135deg, rgba(245, 197, 24, 0.08), rgba(245, 197, 24, 0.02));
           border: 2px solid rgba(245, 197, 24, 0.2);
@@ -210,7 +245,7 @@ const VisionMission = ({ t }) => {
           box-shadow: 0 15px 50px rgba(245, 197, 24, 0.2);
           border-color: ${C.gold};
         }
-        
+
         .vision-icon-wrapper {
           display: inline-flex;
           align-items: center;
@@ -228,7 +263,7 @@ const VisionMission = ({ t }) => {
           color: #fff;
           transform: scale(1.1) rotate(-10deg);
         }
-        
+
         .vision-pillar-icon {
           display: inline-flex;
           align-items: center;
@@ -246,7 +281,7 @@ const VisionMission = ({ t }) => {
           color: #fff;
           transform: scale(1.1) rotate(5deg);
         }
-        
+
         .vision-title-gradient {
           background: linear-gradient(135deg, ${C.gold}, ${C.goldLight}, ${C.gold});
           background-size: 200% auto;
@@ -255,12 +290,12 @@ const VisionMission = ({ t }) => {
           background-clip: text;
           animation: shimmer 4s ease-in-out infinite;
         }
-        
+
         .vision-subtitle-glow {
           color: rgba(255, 255, 255, 0.6);
           text-shadow: 0 0 30px rgba(245, 197, 24, 0.1);
         }
-        
+
         @media (max-width: 768px) {
           .vision-particle {
             display: none;
@@ -353,8 +388,6 @@ const VisionMission = ({ t }) => {
               borderRadius: 20,
               ...getDelay(0),
             }}
-            onMouseEnter={() => setHoveredCard("vision")}
-            onMouseLeave={() => setHoveredCard(null)}
           >
             <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
               <div className="vision-icon-wrapper">{content.vision.icon}</div>
@@ -392,8 +425,6 @@ const VisionMission = ({ t }) => {
               borderRadius: 20,
               ...getDelay(1),
             }}
-            onMouseEnter={() => setHoveredCard("mission")}
-            onMouseLeave={() => setHoveredCard(null)}
           >
             <div style={{ display: "flex", alignItems: "flex-start", gap: 16 }}>
               <div className="vision-icon-wrapper">{content.mission.icon}</div>
@@ -436,7 +467,7 @@ const VisionMission = ({ t }) => {
               marginBottom: 40,
             }}
           >
-            Our Core Values
+            {content.coreValuesHeading}
           </h4>
           <div
             style={{
@@ -456,8 +487,6 @@ const VisionMission = ({ t }) => {
                   cursor: "pointer",
                   ...getDelay(index + 2),
                 }}
-                onMouseEnter={() => setHoveredCard(`pillar-${index}`)}
-                onMouseLeave={() => setHoveredCard(null)}
               >
                 <div
                   style={{

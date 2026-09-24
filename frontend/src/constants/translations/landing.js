@@ -4,37 +4,37 @@
 export const landingTranslations = {
   en: {
     landing: {
-      // Hero & Header
+      // ─── Hero & Header ────────────────────────────────────────
       eyebrow: "Digital Ethiopia · Addis MESOB Platform",
       heroTitle: "Every service, in one basket.",
       heroBody:
         "For generations, a mesob has meant many dishes served from one vessel. Addis MESOB carries that same idea into government service — registration, evaluation, reporting, documents, and AI assistance, gathered into one digital basket for staff and citizens alike.",
 
-      // CTAs
+      // ─── CTAs ─────────────────────────────────────────────────
       ctaPrimary: "Sign in to your account",
       ctaSecondary: "See what's inside",
 
-      // Stats
+      // ─── Stats ────────────────────────────────────────────────
       statServices: "Services",
       statAgencies: "Agencies",
       statLanguages: "Languages",
       statAI: "AI-assisted",
 
-      // Departments Marquee
+      // ─── Departments Marquee ──────────────────────────────────
       deptsEyebrow: "One login, every department",
 
-      // ✅ Hero Feature Pills (NEW)
+      // ─── Hero Feature Pills ───────────────────────────────────
       serviceManagement: "Service Management",
       evaluationReporting: "Evaluation & Reporting",
       secureReliable: "Secure & Reliable",
 
-      // Features Section
+      // ─── Features Section ─────────────────────────────────────
       featuresEyebrow: "What's inside the basket",
       featuresTitle: "Everything your organization needs, in one place",
       featuresSub:
         "Access adapts automatically to your role — employee, team leader, admin, or super admin.",
 
-      // Feature Titles
+      // ─── Feature Titles ───────────────────────────────────────
       featureDashboardAnalytics: "Dashboard & Analytics",
       featureGoldenMonday: "Golden Monday",
       featurePeerForum: "Peer Forum",
@@ -45,7 +45,7 @@ export const landingTranslations = {
       featureTeamUserManagement: "Team & User Management",
       featureThreeLanguages: "Three languages, natively",
 
-      // Feature Bodies
+      // ─── Feature Bodies ───────────────────────────────────────
       featureDashboardAnalyticsBody:
         "Live overview of organizational performance, submissions, and trends, with drill-down reports for leaders and admins.",
       featureGoldenMondayBody:
@@ -65,16 +65,16 @@ export const landingTranslations = {
       featureThreeLanguagesBody:
         "Every screen works in English, Amharic, and Afaan Oromo, switchable anytime.",
 
-      // How It Works Section
+      // ─── How It Works Section ─────────────────────────────────
       howEyebrow: "How it works",
       howTitle: "Three steps from login to done",
 
-      // Step Titles
+      // ─── Step Titles ──────────────────────────────────────────
       step1Title: "Sign in with your organization account",
       step2Title: "Your role decides what you see",
       step3Title: "Work, report, and let AI help",
 
-      // Step Bodies
+      // ─── Step Bodies ──────────────────────────────────────────
       step1Body:
         "Your admin creates your account; you sign in and land straight on your dashboard.",
       step2Body:
@@ -82,29 +82,29 @@ export const landingTranslations = {
       step3Body:
         "Log activity, evaluate staff, upload documents — AI summaries are one click away the whole time.",
 
-      // Golden Monday Teaser
+      // ─── Golden Monday Teaser ─────────────────────────────────
       gmEyebrow: "The philosophy behind it",
       gmTitle: "Built on the Golden Monday mindset",
       gmBody:
         "Ethiopia's weekly Golden Monday (ወርቃማ ሰኞ) sessions push every employee toward multiskilling and peer-led learning. Addis MESOB carries that same drive for less friction into how citizens actually get things done — and the program itself now lives inside the platform for every signed-in team.",
       gmCta: "Sign in to view this week's session",
 
-      // FAQ Section
+      // ─── FAQ Section ──────────────────────────────────────────
       faqEyebrow: "Questions",
       faqTitle: "Frequently asked questions",
 
-      // Footer
+      // ─── Footer ───────────────────────────────────────────────
       footerTagline:
         "A one-stop digital service platform for Digital Ethiopia.",
       footerPrivacy: "Privacy Policy",
       footerTerms: "Terms of Service",
       footerContact: "Contact Us",
 
-      // Utilities
+      // ─── Utilities ────────────────────────────────────────────
       skipToContent: "Skip to content",
       backToTop: "Back to top",
 
-      // Orbit Labels
+      // ─── Orbit Labels ─────────────────────────────────────────
       orbitDashboard: "Dashboard",
       orbitForum: "Forum",
       orbitEvaluation: "Evaluation",
@@ -112,7 +112,7 @@ export const landingTranslations = {
       orbitDocuments: "Documents",
       orbitGoldenMonday: "Golden Monday",
 
-      // Services Section
+      // ─── Services Section ─────────────────────────────────────
       servicesAvailable: "Available Services",
       servicesTitle: "Browse our service catalogue",
       servicesSub:
@@ -132,9 +132,15 @@ export const landingTranslations = {
       noServicesFound: "No services found matching your criteria",
       servicesLoadError: "Failed to load services. Please try again.",
 
-      // ✅ Vision & Mission Section
+      // ─── Vision & Mission Section ─────────────────────────────
+      // `visionTitle` is the section header ("The Vision & Mission of
+      // Addis MESOB"). `visionCardTitle` is the label on the left-hand
+      // vision card itself, which is deliberately shorter. Keeping
+      // them separate so the section header never gets reused inside
+      // the card.
       visionEyebrow: "🌟 Our Guiding Star",
       visionTitle: "The Vision & Mission of Addis MESOB",
+      visionCardTitle: "Our Vision",
       visionSubtitle:
         "Building a digital future for Ethiopia, one service at a time",
       visionText:
@@ -142,6 +148,7 @@ export const landingTranslations = {
       missionTitle: "Our Mission",
       missionText:
         "To revolutionize government service delivery in Addis Ababa through innovative digital solutions, ensuring every citizen experiences efficiency, transparency, and excellence in public service.",
+      coreValues: "Our Core Values",
       pillar1Title: "Digital Excellence",
       pillar1Text:
         "Leveraging cutting-edge technology to transform government services",
@@ -153,29 +160,40 @@ export const landingTranslations = {
       pillar4Text: "Building trust through transparency and accountability",
     },
   },
+
   am: {
     landing: {
+      // ─── Hero & Header ────────────────────────────────────────
       eyebrow: "ዲጂታል ኢትዮጵያ · አዲስ መሶብ መድረክ",
       heroTitle: "ሁሉም አገልግሎት፣ በአንድ መሶብ።",
       heroBody:
         "ለብዙ ትውልዶች መሶብ ማለት ከአንድ ዕቃ የሚቀርቡ የተለያዩ ምግቦችን ማለት ነው። አዲስ መሶብ ይህንኑ ሀሳብ ወደ መንግስት አገልግሎት ያመጣል — ምዝገባ፣ ግምገማ፣ ሪፖርት፣ ሰነድ እና በAI የታገዘ ድጋፍ በአንድ ዲጂታል መሶብ ውስጥ ተሰብስበዋል።",
+
+      // ─── CTAs ─────────────────────────────────────────────────
       ctaPrimary: "ወደ መለያዎ ይግቡ",
       ctaSecondary: "የያዘውን ይመልከቱ",
+
+      // ─── Stats ────────────────────────────────────────────────
       statServices: "አገልግሎቶች",
       statAgencies: "ተቋማት",
       statLanguages: "ቋንቋዎች",
       statAI: "በAI የተደገፈ",
+
+      // ─── Departments Marquee ──────────────────────────────────
       deptsEyebrow: "አንድ መግቢያ፣ ሁሉም ክፍል",
 
-      // ✅ Hero Feature Pills (NEW)
+      // ─── Hero Feature Pills ───────────────────────────────────
       serviceManagement: "የአገልግሎት አስተዳደር",
       evaluationReporting: "ግምገማ እና ሪፖርት ማዘጋጀት",
       secureReliable: "ደህንነቱ የተጠበቀ እና አስተማማኝ",
 
+      // ─── Features Section ─────────────────────────────────────
       featuresEyebrow: "በመሶቡ ውስጥ ያለው",
       featuresTitle: "ድርጅትዎ የሚያስፈልገው ሁሉ በአንድ ቦታ",
       featuresSub:
         "ተደራሽነት እንደ ሚና ደረጃዎ በራስ-ሰር ይስተካከላል — ሰራተኛ፣ ቡድን መሪ፣ አድሚን ወይም ሱፐር አድሚን።",
+
+      // ─── Feature Titles ───────────────────────────────────────
       featureDashboardAnalytics: "ዳሽቦርድና ትንተና",
       featureGoldenMonday: "ወርቃማ ሰኞ",
       featurePeerForum: "የእኩዮች መድረክ",
@@ -185,6 +203,8 @@ export const landingTranslations = {
       featureAiAssistant: "የAI ረዳት፣ በየትም",
       featureTeamUserManagement: "የቡድንና ተጠቃሚ አስተዳደር",
       featureThreeLanguages: "ለሶስት ቋንቋዎች የተገነባ",
+
+      // ─── Feature Bodies ───────────────────────────────────────
       featureDashboardAnalyticsBody:
         "የድርጅት አፈጻጸም፣ ማስገቢያዎችና አዝማሚያዎች ቀጥታ ዕይታ፣ ለመሪዎችና አድሚኖች ዝርዝር ሪፖርቶች ጋር።",
       featureGoldenMondayBody:
@@ -203,35 +223,53 @@ export const landingTranslations = {
         "አድሚኖች ቡድኖችን፣ ሚናዎችንና ተደራሽነትን ከአንድ ማዕከል ያስተዳድራሉ።",
       featureThreeLanguagesBody:
         "እያንዳንዱ ገጽ በእንግሊዝኛ፣ በአማርኛና በአፋን ኦሮሞ ይሰራል፣ በማንኛውም ጊዜ ሊቀየር ይችላል።",
+
+      // ─── How It Works Section ─────────────────────────────────
       howEyebrow: "እንዴት እንደሚሰራ",
       howTitle: "ከመግቢያ እስከ ማጠናቀቅ ሶስት ደረጃዎች",
+
+      // ─── Step Titles ──────────────────────────────────────────
       step1Title: "በድርጅትዎ መለያ ይግቡ",
       step2Title: "ሚናዎ የሚያዩትን ይወስናል",
       step3Title: "ይስሩ፣ ሪፖርት ያድርጉ፣ AIም ያግዝዎት",
+
+      // ─── Step Bodies ──────────────────────────────────────────
       step1Body: "የድርጅትዎ አድሚን መለያዎን ይፈጥራል፤ ይግቡና በቀጥታ ወደ ዳሽቦርድዎ ይደርሳሉ።",
       step2Body:
         "ሰራተኞች፣ ቡድን መሪዎች፣ አድሚኖችና ሱፐር አድሚኖች ለሚናቸው የሚያስፈልጋቸውን መሳሪያ በትክክል ያገኛሉ።",
       step3Body:
         "እንቅስቃሴ ይመዝግቡ፣ ሰራተኛ ይገምግሙ፣ ሰነድ ይስቀሉ — የAI ማጠቃለያ ሁልጊዜ በአንድ ጠቅታ ርቀት ላይ ነው።",
+
+      // ─── Golden Monday Teaser ─────────────────────────────────
       gmEyebrow: "ከበስተጀርባ ያለው ፍልስፍና",
       gmTitle: "በወርቃማ ሰኞ አስተሳሰብ ላይ የተገነባ",
       gmBody:
         "የኢትዮጵያ ሳምንታዊ ወርቃማ ሰኞ ስብሰባዎች እያንዳንዱን ሰራተኛ ወደ ብዙ ክህሎትና በእኩዮች ወደሚመራ ትምህርት ይገፋፋሉ። አዲስ መሶብ ያንኑ ግፊት ወደ ዜጎች ትክክለኛ አገልግሎት አሰጣጥ ተግባራዊ ያደርገዋል — ፕሮግራሙም ራሱ ለተመዘገበ እያንዳንዱ ቡድን በመድረኩ ውስጥ ይገኛል።",
       gmCta: "የዚህ ሳምንት ስብሰባን ለማየት ይግቡ",
+
+      // ─── FAQ Section ──────────────────────────────────────────
       faqEyebrow: "ጥያቄዎች",
       faqTitle: "በተደጋጋሚ የሚነሱ ጥያቄዎች",
+
+      // ─── Footer ───────────────────────────────────────────────
       footerTagline: "ለዲጂታል ኢትዮጵያ የአንድ ማዕከል ዲጂታል አገልግሎት መድረክ።",
       footerPrivacy: "የግላዊነት ፖሊሲ",
       footerTerms: "የአገልግሎት ውሎች",
       footerContact: "ያግኙን",
+
+      // ─── Utilities ────────────────────────────────────────────
       skipToContent: "ወደ ይዘቱ ዝለል",
       backToTop: "ወደ ላይ ተመለስ",
+
+      // ─── Orbit Labels ─────────────────────────────────────────
       orbitDashboard: "ዳሽቦርድ",
       orbitForum: "ፎረም",
       orbitEvaluation: "ምዘና",
       orbitReports: "ሪፖርቶች",
       orbitDocuments: "ሰነዶች",
       orbitGoldenMonday: "ወርቃማ ሰኞ",
+
+      // ─── Services Section ─────────────────────────────────────
       servicesAvailable: "የሚገኙ አገልግሎቶች",
       servicesTitle: "የአገልግሎት ዝርዝራችንን ያስሱ",
       servicesSub: "ሁሉንም የሚገኙ አገልግሎቶችን ያስሱ። ሙሉ ተግባራትን እና አስተዳደርን ለመድረስ ይግቡ።",
@@ -250,15 +288,17 @@ export const landingTranslations = {
       noServicesFound: "ከመስፈርትዎ ጋር የሚዛመዱ አገልግሎቶች አልተገኙም",
       servicesLoadError: "አገልግሎቶችን መጫን አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
 
-      // ✅ Vision & Mission Section - Amharic
+      // ─── Vision & Mission Section ─────────────────────────────
       visionEyebrow: "🌟 የእኛ መሪ ኮከብ",
       visionTitle: "የአዲስ መሶብ ራዕይ እና ተልዕኮ",
+      visionCardTitle: "ራዕያችን",
       visionSubtitle:
         "ለኢትዮጵያ የወደፊት የዲጂታል ጊዜ መገንባት፣ እያንዳንዱን አገልግሎት በአንድ ጊዜ፣ በአንድ ጣራ።",
       visionText: "በ2023 በአፍሪካ ቀዳሚ ዲጂታል የመንግሥት አገልግሎት ሰጪ ተቋም መሆን",
       missionTitle: "ተልዕካችን",
       missionText:
         "ለአዲስ አበባ ከተማ ነዋሪዎች በቴክኖሎጂ የታገዘ የአንድ ማዕከል ዲጂታል የመንግሥት አገልግሎት በመስጠት የተገልጋይን ዕርካታ ማሳደግ ነው።",
+      coreValues: "ዋና እሴቶቻችን",
       pillar1Title: "ዲጂታል ልቀት",
       pillar1Text: "የመንግሥት አገልግሎቶችን ለመለወጥ ዘመናዊ ቴክኖሎጂን መጠቀም",
       pillar2Title: "ዜጋ ቀዳሚ",
@@ -269,29 +309,40 @@ export const landingTranslations = {
       pillar4Text: "በግልጽነት እና በሃላፊነት መተማመንን መገንባት",
     },
   },
+
   om: {
     landing: {
+      // ─── Hero & Header ────────────────────────────────────────
       eyebrow: "Itoophiyaa Dijitaalaa · Addis MESOB Platform",
       heroTitle: "Tajaajila Hunda, Guuboo Tokko Keessatti.",
       heroBody:
         "Dhaloota hedduuf, gubbeen waan nyaata garaagaraa meeshaa tokko irraa dhiheessu jechuudha. Addis MESOB yaadicha gara tajaajila mootummaatti fida — galmee, madaallii, gabaasa, ragaa, fi deeggarsa AI, hundi gubbeen dijitaalaa tokko keessatti walitti qabaman.",
+
+      // ─── CTAs ─────────────────────────────────────────────────
       ctaPrimary: "Gara Herrega Keetii Seeni",
       ctaSecondary: "Waan Keessa Jiru Ilaali",
+
+      // ─── Stats ────────────────────────────────────────────────
       statServices: "Tajaajiloota",
       statAgencies: "Dhaabbilee",
       statLanguages: "Afaanota",
       statAI: "AI-n Deeggarame",
+
+      // ─── Departments Marquee ──────────────────────────────────
       deptsEyebrow: "Seensa Tokko, Kutaa Hunda",
 
-      // ✅ Hero Feature Pills (NEW)
+      // ─── Hero Feature Pills ───────────────────────────────────
       serviceManagement: "Bulchiinsa Tajaajilaa",
       evaluationReporting: "Madaallii fi Gabaasa",
       secureReliable: "Nageenya qabu fi Amantamaa",
 
+      // ─── Features Section ─────────────────────────────────────
       featuresEyebrow: "Wanti Guuboo Keessa Jiru",
       featuresTitle: "Wanti Dhaabbileen Keessan Barbaadu Hundi Bakka Tokkotti",
       featuresSub:
         "Dhaqqabamummaan akkaataa gahee keetiitiin ofumaan sirreeffama — hojjetaa, hoogganaa garee, admin, ykn super admin.",
+
+      // ─── Feature Titles ───────────────────────────────────────
       featureDashboardAnalytics: "Daashboordii fi Xiinxala",
       featureGoldenMonday: "Wiixata Warqee",
       featurePeerForum: "Waltajjii Hiriyootaa",
@@ -301,6 +352,8 @@ export const landingTranslations = {
       featureAiAssistant: "Deeggartuu AI, Bakka Hundatti",
       featureTeamUserManagement: "Bulchiinsa Garee fi Fayyadamaa",
       featureThreeLanguages: "Afaan Sadiif Ijaarame",
+
+      // ─── Feature Bodies ───────────────────────────────────────
       featureDashboardAnalyticsBody:
         "Ilaalcha yeroo dhugaa raawwii dhaabbilee, galmee fi ce'umsaa, gabaasa bal'aa hoogganootaa fi admin-oota waliin.",
       featureGoldenMondayBody:
@@ -319,37 +372,55 @@ export const landingTranslations = {
         "Admin-oonni garee, gahee, fi dhaqqabamummaa bakka tokko irraa bulchu.",
       featureThreeLanguagesBody:
         "Fuulli hundi Ingiliffaan, Amaariffaan, fi Afaan Oromootiin hojjeta.",
+
+      // ─── How It Works Section ─────────────────────────────────
       howEyebrow: "Akkaataa Hojjatuu",
       howTitle: "Seensaa hanga Xumuraatti Tarkaanfii Sadii",
+
+      // ─── Step Titles ──────────────────────────────────────────
       step1Title: "Herrega Dhaabbilee Keetiin Seeni",
       step2Title: "Gaheen Kee Waan Argitu Murteessa",
       step3Title: "Hojjedhu, Gabaasi, AI-nis si Gargaaru",
+
+      // ─── Step Bodies ──────────────────────────────────────────
       step1Body:
         "Admin-iin dhaabbilee keetii herrega siif uuma; seentee kallattiin gara daashboordii keetiitti geessa.",
       step2Body:
         "Hojjettoonni, hoogganoonni garee, admin-oonni, fi super admin-oonni meeshaa gaheen isaanii barbaadu qofa argatu.",
       step3Body:
         "Sochii galmeessi, hojjetaa madaali, ragaa fe'i — cuunfaan AI yeroo hunda tuqaa tokko fagaatu.",
+
+      // ─── Golden Monday Teaser ─────────────────────────────────
       gmEyebrow: "Yaad-rimee Duuba Jiru",
       gmTitle: "Yaad-rimee Wiixata Warqee Irratti Ijaarame",
       gmBody:
         "Walga'iiwwan Wiixata Warqee (ወርቃማ ሰኞ) torbaniin Itoophiyaa hojjetaa hunda gara dandeettii hedduu fi barnoota hiriyaan durfamu geggeessa. Addis MESOB dhiibbaa wal fakkaataa kanaan rakkina hir'isuun, akkaataa lammiin dhugumaan waan hojjetan irratti hojjeta — sagantichi mataan isaas amma garee seenan hundaaf waltajjicha keessatti argama.",
       gmCta: "Walga'ii Torban Kanaa Ilaaluuf Seeni",
+
+      // ─── FAQ Section ──────────────────────────────────────────
       faqEyebrow: "Gaaffilee",
       faqTitle: "Gaaffilee Yeroo Baay'ee Gaafataman",
+
+      // ─── Footer ───────────────────────────────────────────────
       footerTagline:
         "Waltajjii tajaajila dijitaalaa bakka tokkotti Itoophiyaa Dijitaalaatiif.",
       footerPrivacy: "Imaammata Dhuunfaa",
       footerTerms: "Haala Tajaajilaa",
       footerContact: "Nu Qunnamaa",
+
+      // ─── Utilities ────────────────────────────────────────────
       skipToContent: "Gara Qabiyyeetti Utaali",
       backToTop: "Gara Olii Deebi'i",
+
+      // ─── Orbit Labels ─────────────────────────────────────────
       orbitDashboard: "Daashboordii",
       orbitForum: "Fooraamii",
       orbitEvaluation: "Madaallii",
       orbitReports: "Gabaasota",
       orbitDocuments: "Ragaa",
       orbitGoldenMonday: "Wiixata Warqee",
+
+      // ─── Services Section ─────────────────────────────────────
       servicesAvailable: "Tajaajiloota Argaman",
       servicesTitle: "Tarree Tajaajila keenya ilaali",
       servicesSub:
@@ -370,9 +441,10 @@ export const landingTranslations = {
       servicesLoadError:
         "Tajaajiloota fe'uun hin dandeenye. Maaloo irra deebi'ii yaali.",
 
-      // ✅ Vision & Mission Section - Oromo
+      // ─── Vision & Mission Section ─────────────────────────────
       visionEyebrow: "🌟 Barsiisaa Keenya",
       visionTitle: "Mul'ata fi Ergaa Addis MESOB",
+      visionCardTitle: "Mul'ata Keenya",
       visionSubtitle:
         "Fuula Dijitaalaa Itoophiyaa ijaaruu, tajaajila tokkoo tokkoo yeroo tokko",
       visionText:
@@ -380,6 +452,7 @@ export const landingTranslations = {
       missionTitle: "Ergaa Keenya",
       missionText:
         "Tajaajila mootummaa magaalaa Finfinnee akkaataa hojiirra oolchuun, uummanni hundi olaantummaa, iftoomummaa fi gaariinsa tajaajila mootummaarra argatu mirkaneessuu",
+      coreValues: "Gatiiwwan Keenya Ijoo",
       pillar1Title: "Dijitaalaa Olaantummaa",
       pillar1Text:
         "Teeknoolojii ammayyaa fayyadamuun tajaajila mootummaa fooyyessuu",
