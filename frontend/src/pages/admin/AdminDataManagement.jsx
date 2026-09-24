@@ -498,9 +498,24 @@ const AdminDataManagement = ({ dataType }) => {
     async (item) => {
       setGeneratingPdfId(item.id);
       try {
+        // Diagnostic: log the row we're about to generate from, so a
+        // field-name mismatch shows up immediately in the console
+        // instead of as a silent "PDF could not be generated".
+        console.log(
+          "[AdminDataManagement] generate PDF for dataType:",
+          dataType,
+          "row keys:",
+          Object.keys(item || {}),
+          "row:",
+          item,
+        );
+
         const result = await generateReportForRow(item, dataType, {
           language: "am",
         });
+
+        console.log("[AdminDataManagement] generate PDF result:", result);
+
         if (!result.success) {
           alert(result.error || "Failed to generate PDF.");
         }
