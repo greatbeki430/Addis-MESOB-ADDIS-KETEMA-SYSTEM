@@ -500,17 +500,17 @@ function NoPresenterCard({ t, onOpenManualPicker }) {
               gap: 6,
               padding: "8px 18px",
               borderRadius: 20,
-              background: "linear-gradient(135deg, #f5c518, #d4a017)",
-              border: "none",
-              color: C.dark,
+              background: "transparent",
+              border: `1.5px solid ${C.border}`,
+              color: C.muted,
               fontSize: 12,
-              fontWeight: 700,
+              fontWeight: 600,
               cursor: "pointer",
               fontFamily: F.sans,
             }}
           >
             <FiUsers size={14} />
-            {t.pickManually || "Pick a presenter manually"}
+            {t.pickManually || "Or pick someone manually"}
           </button>
         )}
       </div>

@@ -103,8 +103,13 @@ export default function RotationPanel({ onRefresh }) {
   const isNextWeek = isSameWeek(weekOverride, nextMondayISO());
   const isAuto = !weekOverride;
 
-  const alreadyAssignedOpen =
-    !!alreadyAssignedFor?._id && alreadyAssignedFor._id === sessionId;
+  // Show the dialog whenever the assign call returned an already-assigned
+  // session. Do NOT gate it on `=== sessionId`: `sessionId` comes from a
+  // different API call (previewRotation) at a different time, and any
+  // mismatch (null currentSession, week override, refresh race) causes
+  // this dialog to silently never render — which is what made "Assign
+  // Next" look like a no-op.
+  const alreadyAssignedOpen = !!alreadyAssignedFor?._id;
 
   const manualPickerOpen = isPrivileged && !!manualPickerFor;
 
@@ -155,7 +160,33 @@ export default function RotationPanel({ onRefresh }) {
   const handleAssignNext = useCallback(async () => {
     setAssigning(true);
     try {
+      // Diagnostic: confirms exactly which week is being posted and
+      // whether the backend took the auto or already-assigned path.
+      console.log(
+        "[RotationPanel] assignRotation →",
+        "targetWeekOf:",
+        targetWeekOf,
+        "weekOverride:",
+        weekOverride,
+        "currentSessionWeekOf:",
+        currentSession?.weekOf || null,
+        "currentSessionPresenter:",
+        currentSession?.presenterName || null,
+      );
+
       const res = await goldenMondayAPI.assignRotation(targetWeekOf);
+
+      console.log(
+        "[RotationPanel] assignRotation ←",
+        "alreadyAssigned:",
+        res.data?.alreadyAssigned,
+        "method:",
+        res.data?.method,
+        "presenter:",
+        res.data?.session?.presenterName,
+        "weekOf:",
+        res.data?.session?.weekOf,
+      );
       if (res.data.alreadyAssigned && res.data.session) {
         setAlreadyAssignedFor(res.data.session);
       } else {

@@ -43,7 +43,7 @@ const generateParticles = () => {
 
 const PARTICLES = generateParticles();
 
-export default function PresenterSpotlight({ onRefresh }) {
+export default function PresenterSpotlight({ onRefresh, refreshKey }) {
   const { language } = useLanguage();
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
@@ -187,16 +187,19 @@ export default function PresenterSpotlight({ onRefresh }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle refresh from parent
-  const prevRefreshRef = useRef(onRefresh);
-
+  // Re-fetch whenever the parent bumps `refreshKey`. This replaces
+  // the old effect that compared `onRefresh` by identity — that never
+  // fired because GoldenMonday.jsx passes a stable useCallback ref,
+  // so the Spotlight showed stale data forever after an assignment.
+  //
+  // `undefined` means "first render, caller didn't opt into keys" —
+  // in that case the mount effect above already loaded once, so we
+  // skip here to avoid a duplicate fetch.
   useEffect(() => {
-    if (onRefresh && onRefresh !== prevRefreshRef.current) {
-      prevRefreshRef.current = onRefresh;
-      loadPresenter();
-    }
+    if (refreshKey === undefined) return;
+    loadPresenter();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onRefresh]);
+  }, [refreshKey]);
 
   const getGlowStyle = () => {
     const intensity = 50 + Math.sin(glowIntensity / 10) * 30;
