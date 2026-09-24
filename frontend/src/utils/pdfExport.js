@@ -21,7 +21,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { showErrorToast, showSuccessToast } from "./toastHelper";
 import { loadFonts, FONT_NAMES } from "./pdf/fontLoader";
-import { isAmharic, detectLanguage } from "./pdf/language";
+import { isAmharic } from "./pdf/language";
 import { drawMixedScriptText } from "./pdf/pdfHelpers";
 import { generateDailyReportPDF } from "./pdf/reports/dailyReport";
 
@@ -90,9 +90,8 @@ const encodeText = (text) => {
 };
 
 // ─── FORUM REPORT LABELS (language-aware) ─────────────────────
-// Amharic is the primary language. English and Afan Oromo are honored
-// when `lang` says so. Falls back to `t.forum.*` translations first,
-// then to hardcoded strings.
+// Amharic is the default. `lang` may be "en" or "om" to override.
+// No content auto-detection — the caller decides (see exportForumReportToPDF).
 function getForumLabels(lang, t) {
   const tf = (key, fallback) => t?.forum?.[key] || fallback;
 
@@ -114,15 +113,23 @@ function getForumLabels(lang, t) {
     ),
     date: tf("date", isAm ? "ቀን" : isOm ? "Guyyaa" : "Date"),
     time: isAm ? "ሰዓት" : isOm ? "Yeroo" : "Time",
-    presentMembers: tf(
+    team: isAm ? "ቡድን" : isOm ? "Garee" : "Team",
+    explanation: tf(
+      "explanation",
+      isAm ? "ማብራሪያ" : isOm ? "Ibsa" : "Explanation",
+    ),
+    aiBlock: isAm ? "የ AI ማጠቃለያ" : isOm ? "Cuunfaa AI" : "AI Generated Summary",
+
+    // ─── Section names (row label in the table's Section column) ──
+    secPresent: tf(
       "presentMembers",
       isAm ? "የተገኙ አባላት" : isOm ? "Miseensota Argaman" : "Present Members",
     ),
-    absentMembers: tf(
+    secAbsent: tf(
       "absentMembers",
       isAm ? "ያልተገኙ አባላት" : isOm ? "Miseensota Hin Argamne" : "Absent Members",
     ),
-    prevResults: tf(
+    secPrevResults: tf(
       "prevResults",
       isAm
         ? "ያለፈው ስብሰባ ውጤቶች"
@@ -130,30 +137,30 @@ function getForumLabels(lang, t) {
           ? "Bu'aa Walgahii Darbee"
           : "Previous Results",
     ),
-    topics: tf(
+    secTopics: tf(
       "todayTopics",
       isAm ? "የእለቱ ርዕሶች" : isOm ? "Mata-duree Marii" : "Discussion Topics",
     ),
-    explanation: tf(
-      "explanation",
-      isAm ? "ማብራሪያ" : isOm ? "Ibsa" : "Explanation",
-    ),
-    gaps: tf(
+    secGaps: tf(
       "gaps",
       isAm ? "የታዩ ክፍተቶች" : isOm ? "Hanqinaalee" : "Identified Gaps",
     ),
-    agreements: tf(
+    secAgreements: tf(
       "agreements",
       isAm ? "የተስማሙባቸው ነጥቦች" : isOm ? "Qabxii Walii Galame" : "Agreed Points",
     ),
-    signatures: tf(
+    secSignatures: tf(
       "signatures",
       isAm ? "ፊርማዎች" : isOm ? "Mallattoo" : "Signatures",
     ),
-    signatureN: tf(
-      "signatureN",
-      isAm ? "ኛ ፊርማ" : isOm ? " Mallattoo" : "th Signature",
-    ),
+
+    // ─── Table column headers ─────────────────────────────────────
+    colNo: isAm ? "ተ.ቁ" : isOm ? "Lak." : "#",
+    colSection: isAm ? "ክፍል" : isOm ? "Kutaa" : "Section",
+    colItem: isAm ? "ዝርዝር" : isOm ? "Ibsa" : "Item",
+    colDetail: isAm ? "ማብራሪያ" : isOm ? "Ibsa Dabalataa" : "Detail",
+    colSignature: isAm ? "ፊርማ" : isOm ? "Mallattoo" : "Signature",
+
     footer: isAm
       ? "በአዲስ መሶብ የአንድ ማዕከል አገልግሎት የተዘጋጀ"
       : isOm
@@ -480,7 +487,24 @@ export const exportBiWeeklyAggregateReportToPDF = (
   }
 };
 
-// ─── EXPORT FORUM REPORT (language-aware, mixed-script safe) ───
+// ─── FORUM REPORT PDF CONSTANTS ─────────────────────────────
+// The exact substring the ForumReport page prefixes AI-appended text
+// with (see handleApplySuggestion in ForumReport.jsx). Keep in sync.
+const AI_MARKER = "📝 AI Generated Summary:";
+
+// Split explanation into (manual text, ai text). If the marker is not
+// present, ai text is empty and manual is the whole thing.
+const splitExplanationAi = (explanation) => {
+  const raw = String(explanation || "");
+  const idx = raw.indexOf(AI_MARKER);
+  if (idx < 0) return { manual: raw.trim(), ai: "" };
+  return {
+    manual: raw.slice(0, idx).trim(),
+    ai: raw.slice(idx + AI_MARKER.length).trim(),
+  };
+};
+
+// ─── EXPORT FORUM REPORT (unified table, Amharic-first) ─────
 export const exportForumReportToPDF = (
   formData,
   t,
@@ -489,12 +513,14 @@ export const exportForumReportToPDF = (
   options = {},
 ) => {
   try {
-    console.log("📄 Generating Forum Report PDF...");
+    console.log("📄 Generating Forum Report PDF (table layout)...");
 
     const hasData =
       formData?.present?.some((m) => m && m.trim() !== "") ||
       formData?.absent?.some((i) => i?.name && i.name.trim() !== "") ||
-      formData?.topics?.some((tp) => tp && tp.trim() !== "");
+      formData?.topics?.some((tp) => tp && tp.trim() !== "") ||
+      formData?.gaps?.some((g) => g && g.trim() !== "") ||
+      formData?.agreements?.some((a) => a && a.trim() !== "");
 
     if (!hasData) {
       showErrorToast(
@@ -503,19 +529,16 @@ export const exportForumReportToPDF = (
       return false;
     }
 
-    // ─── Language resolution ────────────────────────────────
-    // Priority: explicit lang (am|en|om) → detect from content → Amharic
-    let reportLang = lang;
-    if (!["am", "en", "om"].includes(reportLang)) {
-      const sample =
-        (formData?.present || []).join(" ") +
-        " " +
-        (formData?.topics || []).join(" ");
-      const detected = detectLanguage(sample);
-      reportLang = detected === "english" ? "en" : "am";
-    }
+    // ─── Language: Amharic default, override only via options.language ──
+    const reportLang = ["am", "en", "om"].includes(options?.language)
+      ? options.language
+      : ["am", "en", "om"].includes(lang)
+        ? lang
+        : "am";
 
     const L = getForumLabels(reportLang, t);
+
+    const includeAI = options?.includeAI !== false; // default true
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -530,7 +553,6 @@ export const exportForumReportToPDF = (
       keywords: options?.keywords || "forum, report, meeting",
     });
 
-    // ✅ CRITICAL: embed the fonts on THIS document instance
     loadFonts(doc);
 
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -538,7 +560,7 @@ export const exportForumReportToPDF = (
     const margin = 15;
     let yPos = margin;
 
-    // ─── Header ────────────────────────────────────────────
+    // ─── Header: title ─────────────────────────────────────────
     doc.setFontSize(18);
     doc.setTextColor(26, 107, 74);
     drawMixedScriptText(doc, L.title, pageWidth / 2, yPos, {
@@ -548,6 +570,7 @@ export const exportForumReportToPDF = (
     doc.setTextColor(0, 0, 0);
     yPos += 8;
 
+    // ─── Header: subtitle ──────────────────────────────────────
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     drawMixedScriptText(doc, L.subtitle, pageWidth / 2, yPos, {
@@ -565,174 +588,234 @@ export const exportForumReportToPDF = (
       yPos += 7;
     }
 
-    doc.setDrawColor(26, 107, 74);
-    doc.setLineWidth(0.5);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 8;
-
-    // ─── Meta line (date + time) ────────────────────────────
+    // ─── Header: date + time line ──────────────────────────────
     const dateText = formData?.date || new Date().toISOString().split("T")[0];
     const timeText =
       formData?.timeStart || formData?.timeEnd
         ? `${formData.timeStart || "—"} - ${formData.timeEnd || "—"}`
         : "—";
-    const metaLine = `${L.date}: ${dateText}    |    ${L.time}: ${timeText}`;
-
     doc.setFontSize(10);
+    const metaLine = `${L.date}: ${dateText}    |    ${L.time}: ${timeText}`;
     drawMixedScriptText(doc, metaLine, margin, yPos);
-    yPos += 10;
+    yPos += 6;
 
-    // ─── Section renderer ────────────────────────────────────
-    // Every section gets the same treatment:
-    //   • colored header bar (mixed-script safe title)
-    //   • wrapped body via drawMixedScriptText
-    //   • pagination
-    const renderSection = (title, bodyLines, opts = {}) => {
-      const { fillColor = [26, 107, 74], minSpace = 30 } = opts;
+    doc.setDrawColor(26, 107, 74);
+    doc.setLineWidth(0.5);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 8;
 
-      if (yPos > pageHeight - minSpace) {
+    // ─── Explanation block (prose above the table) ─────────────
+    const { manual: manualExplanation, ai: aiExplanation } = splitExplanationAi(
+      formData?.explanation,
+    );
+
+    const renderProseBlock = (heading, body) => {
+      if (!body || !body.trim()) return;
+      if (yPos > pageHeight - 40) {
         doc.addPage();
         yPos = margin;
       }
 
-      // Header bar
-      doc.setFillColor(...fillColor);
-      doc.rect(margin, yPos - 4, pageWidth - margin * 2, 8, "F");
-      doc.setTextColor(255, 255, 255);
       doc.setFontSize(11);
-      drawMixedScriptText(doc, title, margin + 2, yPos, { bold: true });
+      doc.setTextColor(26, 107, 74);
+      drawMixedScriptText(doc, heading, margin, yPos, { bold: true });
       doc.setTextColor(0, 0, 0);
-      yPos += 8;
+      yPos += 6;
 
-      if (!bodyLines || bodyLines.length === 0) {
-        doc.setFontSize(9);
-        doc.setTextColor(120, 120, 120);
-        drawMixedScriptText(doc, "—", margin + 2, yPos);
-        doc.setTextColor(0, 0, 0);
-        yPos += 8;
-        return;
-      }
-
-      doc.setFontSize(9);
-      bodyLines.forEach((line) => {
-        const encoded = encodeText(line);
-        const wrapped = doc.splitTextToSize(
-          encoded,
-          pageWidth - margin * 2 - 4,
-        );
-        wrapped.forEach((w) => {
-          if (yPos > pageHeight - 20) {
-            doc.addPage();
-            yPos = margin;
-          }
-          drawMixedScriptText(doc, w, margin + 2, yPos);
-          yPos += 5;
-        });
+      doc.setFontSize(9.5);
+      const wrapped = doc.splitTextToSize(
+        encodeText(body),
+        pageWidth - margin * 2,
+      );
+      wrapped.forEach((line) => {
+        if (yPos > pageHeight - 20) {
+          doc.addPage();
+          yPos = margin;
+        }
+        drawMixedScriptText(doc, line, margin, yPos);
+        yPos += 5;
       });
       yPos += 4;
     };
 
-    // ─── Present Members ────────────────────────────────────
-    const present = (formData?.present || []).filter((m) => m && m.trim());
-    renderSection(
-      L.presentMembers,
-      present.map((name, i) => `${i + 1}. ${name}`),
-      { fillColor: [26, 107, 74] },
-    );
-
-    // ─── Absent Members ─────────────────────────────────────
-    const absent = (formData?.absent || []).filter(
-      (i) => i?.name && i.name.trim(),
-    );
-    renderSection(
-      L.absentMembers,
-      absent.map((i, idx) => `${idx + 1}. ${i.name} — ${i.reason || "—"}`),
-      { fillColor: [139, 26, 26] },
-    );
-
-    // ─── Previous Results ───────────────────────────────────
-    const prev = (formData?.prevResults || []).filter((r) => r && r.trim());
-    renderSection(
-      L.prevResults,
-      prev.map((r, i) => `${i + 1}. ${r}`),
-      { fillColor: [60, 60, 60] },
-    );
-
-    // ─── Topics ─────────────────────────────────────────────
-    const topics = (formData?.topics || []).filter((tp) => tp && tp.trim());
-    renderSection(
-      L.topics,
-      topics.map((tp, i) => `${i + 1}. ${tp}`),
-      { fillColor: [46, 125, 50] },
-    );
-
-    // ─── Explanation ────────────────────────────────────────
-    // Note: the form.explanation field is a single textarea that may
-    // contain multiple newline-separated paragraphs (including the
-    // AI-generated summary block, which itself uses `\n`). We split
-    // on newlines and render each as its own wrapped line.
-    const explanation = formData?.explanation || "";
-    renderSection(
-      L.explanation,
-      explanation.split("\n").filter((l) => l.trim() !== ""),
-      { fillColor: [60, 60, 60], minSpace: 40 },
-    );
-
-    // ─── Gaps ───────────────────────────────────────────────
-    const gaps = (formData?.gaps || []).filter((g) => g && g.trim());
-    renderSection(
-      L.gaps,
-      gaps.map((g, i) => `${i + 1}. ${g}`),
-      { fillColor: [194, 90, 0] },
-    );
-
-    // ─── Agreements ─────────────────────────────────────────
-    const agreements = (formData?.agreements || []).filter(
-      (a) => a && a.trim(),
-    );
-    renderSection(
-      L.agreements,
-      agreements.map((a, i) => `${i + 1}. ${a}`),
-      { fillColor: [26, 107, 74] },
-    );
-
-    // ─── Signatures ─────────────────────────────────────────
-    if (yPos > pageHeight - 60) {
-      doc.addPage();
-      yPos = margin;
-    }
-    doc.setFontSize(11);
-    drawMixedScriptText(doc, L.signatures, margin, yPos, { bold: true });
-    yPos += 12;
-
-    const sigsPerRow = 3;
-    const sigWidth = (pageWidth - margin * 2) / sigsPerRow;
-
-    for (let i = 0; i < 7; i++) {
-      const col = i % sigsPerRow;
-
-      // New row → advance y, reset x
-      if (col === 0 && i > 0) {
-        yPos += 20;
-      }
-      if (yPos > pageHeight - 20) {
-        doc.addPage();
-        yPos = margin;
-      }
-
-      const sigX = margin + col * sigWidth;
-
-      doc.setDrawColor(100, 100, 100);
-      doc.setLineWidth(0.3);
-      doc.line(sigX, yPos, sigX + sigWidth - 12, yPos);
-
-      doc.setFontSize(8);
-      doc.setTextColor(100, 100, 100);
-      drawMixedScriptText(doc, `${i + 1}${L.signatureN}`, sigX, yPos - 3);
-      doc.setTextColor(0, 0, 0);
+    renderProseBlock(L.explanation, manualExplanation);
+    if (includeAI) {
+      renderProseBlock(L.aiBlock, aiExplanation);
     }
 
-    // ─── Footer with page numbers ───────────────────────────
+    // ─── Build the table rows ──────────────────────────────────
+    // Five columns, one shared shape:
+    //   # | Section | Name/Item | Detail/Reason | Signature
+    //
+    // Rows are appended in this order: present, absent, prevResults,
+    // topics, gaps, agreements, then signatures.
+    const rows = [];
+
+    const pushRows = (sectionLabel, entries, buildItem, buildDetail) => {
+      entries.forEach((entry) => {
+        rows.push([
+          "", // # filled in below
+          encodeText(sectionLabel),
+          encodeText(buildItem(entry)),
+          encodeText(buildDetail ? buildDetail(entry) : ""),
+          "", // signature cell (blank by default)
+        ]);
+      });
+    };
+
+    pushRows(
+      L.secPresent,
+      (formData?.present || []).filter((m) => m && m.trim()),
+      (name) => name,
+      null,
+    );
+
+    pushRows(
+      L.secAbsent,
+      (formData?.absent || []).filter((i) => i?.name && i.name.trim()),
+      (i) => i.name,
+      (i) => i.reason || "",
+    );
+
+    pushRows(
+      L.secPrevResults,
+      (formData?.prevResults || []).filter((r) => r && r.trim()),
+      (r) => r,
+      null,
+    );
+
+    pushRows(
+      L.secTopics,
+      (formData?.topics || []).filter((tp) => tp && tp.trim()),
+      (tp) => tp,
+      null,
+    );
+
+    pushRows(
+      L.secGaps,
+      (formData?.gaps || []).filter((g) => g && g.trim()),
+      (g) => g,
+      null,
+    );
+
+    pushRows(
+      L.secAgreements,
+      (formData?.agreements || []).filter((a) => a && a.trim()),
+      (a) => a,
+      null,
+    );
+
+    // ─── Signature rows (A-2: embedded PNG when present) ────────
+    const signatureEntries = Array.isArray(formData?.signatures)
+      ? formData.signatures
+      : [];
+
+    signatureEntries.forEach((sig, i) => {
+      // Row shape identical to the rest; the Signature cell carries
+      // an object placeholder that didDrawCell will fill with the PNG.
+      // Non-signature rows carry an empty string and never render an
+      // image.
+      rows.push([
+        "",
+        encodeText(L.secSignatures),
+        "",
+        "",
+        sig && String(sig).startsWith("data:image")
+          ? { __signatureImage: sig, __index: i + 1 }
+          : "",
+      ]);
+    });
+
+    // Fill the row numbers.
+    rows.forEach((row, i) => {
+      row[0] = String(i + 1);
+    });
+
+    // ─── The single table ──────────────────────────────────────
+    const head = [
+      [L.colNo, L.colSection, L.colItem, L.colDetail, L.colSignature],
+    ];
+
+    autoTable(doc, {
+      startY: yPos,
+      head,
+      body: rows,
+      margin: { left: margin, right: margin },
+      theme: "striped",
+      headStyles: {
+        fillColor: [26, 107, 74],
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        fontStyle: "bold",
+        halign: "center",
+        valign: "middle",
+      },
+      bodyStyles: {
+        fontSize: 9,
+        valign: "middle",
+        cellPadding: 3,
+      },
+      columnStyles: {
+        0: { cellWidth: 12, halign: "center" },
+        1: { cellWidth: 34, halign: "left" },
+        2: { cellWidth: "auto", halign: "left" },
+        3: { cellWidth: "auto", halign: "left" },
+        4: { cellWidth: 34, halign: "center", minCellHeight: 12 },
+      },
+      styles: {
+        overflow: "linebreak",
+      },
+      didParseCell: (data) => {
+        // Per-cell font: mixed-script safe. Every cell's own content
+        // decides whether it needs the Ethiopic or Latin family.
+        const raw = data.cell.raw;
+        if (raw && typeof raw === "object" && raw.__signatureImage) {
+          // Signature cells render an image, not text — leave font alone.
+          data.cell.text = [""];
+          return;
+        }
+        const cellText = String(raw ?? "");
+        if (isAmharic(cellText)) {
+          data.cell.styles.font = doc.__hasEthiopicFont
+            ? FONT_NAMES.ethiopic
+            : "helvetica";
+        } else {
+          data.cell.styles.font = doc.__hasLatinFont
+            ? FONT_NAMES.latin
+            : "helvetica";
+        }
+      },
+      didDrawCell: (data) => {
+        if (data.column.index !== 4) return;
+        const raw = data.row.raw?.[4];
+        if (!raw || typeof raw !== "object" || !raw.__signatureImage) return;
+
+        try {
+          const cell = data.cell;
+          const padding = 2;
+          const maxW = cell.width - padding * 2;
+          const maxH = cell.height - padding * 2;
+          if (maxW <= 0 || maxH <= 0) return;
+
+          // Preserve aspect by scaling to fit the cell.
+          doc.addImage(
+            raw.__signatureImage,
+            "PNG",
+            cell.x + padding,
+            cell.y + padding,
+            maxW,
+            maxH,
+          );
+        } catch (imgErr) {
+          console.warn(
+            `Could not embed signature #${raw.__index}:`,
+            imgErr.message,
+          );
+        }
+      },
+    });
+
+    // ─── Footer with page numbers ──────────────────────────────
     const pageCount = doc.internal.getNumberOfPages();
     const footerY = pageHeight - 10;
 
