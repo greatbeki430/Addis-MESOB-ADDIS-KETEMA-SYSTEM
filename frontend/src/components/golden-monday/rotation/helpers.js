@@ -203,7 +203,12 @@ export function useRotationData({
         Array.isArray(recordingsRes?.data) ? recordingsRes.data : [],
       );
 
-      if (onRefresh) onRefresh();
+      // Deliberately NOT calling onRefresh() here. Doing so caused
+      // duplicate reloads: every loadAll() fired the parent's
+      // refreshData() (which refetches getNextPresenter etc.), and
+      // then callers that wanted a full-page refresh called it again.
+      // Callers should invoke onRefresh() explicitly when they need
+      // the parent (mini card, Spotlight) to update too.
     } catch (err) {
       console.error("[useRotationData] load failed:", err);
       if (isMounted.current) {

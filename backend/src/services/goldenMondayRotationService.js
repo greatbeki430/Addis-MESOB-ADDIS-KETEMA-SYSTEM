@@ -275,7 +275,7 @@ const computeRanking = async (weekOf = nextMondayFrom()) => {
 const getNextPresenterForWeek = async (weekOf = null) => {
   try {
     const resolved = weekOf
-      ? { weekOf: mondayOf(weekOf), session: null }
+      ? await resolveSessionForWeek(weekOf)
       : await resolveTargetWeek();
 
     // ─── If a presenter is already assigned for this week, THAT is

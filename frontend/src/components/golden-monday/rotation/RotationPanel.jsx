@@ -187,6 +187,7 @@ export default function RotationPanel({ onRefresh }) {
         "weekOf:",
         res.data?.session?.weekOf,
       );
+
       if (res.data.alreadyAssigned && res.data.session) {
         setAlreadyAssignedFor(res.data.session);
       } else {
@@ -199,6 +200,14 @@ export default function RotationPanel({ onRefresh }) {
           "success",
         );
         await loadAll();
+        // Refresh the parent (mini card + Spotlight) pinned to the
+        // same week we just wrote to, so all three places read the
+        // same session.
+        if (onRefresh) {
+          await onRefresh({
+            weekOf: res.data?.session?.weekOf || targetWeekOf,
+          });
+        }
       }
     } catch (err) {
       notify(
