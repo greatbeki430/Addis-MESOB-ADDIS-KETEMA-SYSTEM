@@ -1143,7 +1143,7 @@ const AdminDataManagement = ({ dataType }) => {
       </div>
 
       {/* Bulk Actions */}
-      {selectedItems.length > 0 && (
+      {selectedItems.length > 0 && !showModal && (
         <div
           style={{
             position: "fixed",
