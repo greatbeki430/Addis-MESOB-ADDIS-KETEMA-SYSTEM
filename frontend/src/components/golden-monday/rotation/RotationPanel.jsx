@@ -88,6 +88,16 @@ export default function RotationPanel({ onRefresh }) {
 
   const sessionId = currentSession?._id || null;
 
+  // Mirror the latest currentSession into a ref so the diagnostic
+  // log inside handleAssignNext can read it WITHOUT pulling
+  // currentSession.* into that callback's dep array. Including those
+  // fields would re-create handleAssignNext on every previewRotation
+  // refresh, which is wasteful and confusing to read.
+  const currentSessionRef = useRef(currentSession);
+  useEffect(() => {
+    currentSessionRef.current = currentSession;
+  }, [currentSession]);
+
   // ─── The week every action in this panel targets ─────────────
   // When the admin has picked a week, that IS the target — even if
   // no session exists for it yet. Otherwise, derive from the
@@ -162,6 +172,8 @@ export default function RotationPanel({ onRefresh }) {
     try {
       // Diagnostic: confirms exactly which week is being posted and
       // whether the backend took the auto or already-assigned path.
+      // currentSession.* is read via the ref so this callback does
+      // not re-create on every previewRotation load.
       console.log(
         "[RotationPanel] assignRotation →",
         "targetWeekOf:",
@@ -169,9 +181,9 @@ export default function RotationPanel({ onRefresh }) {
         "weekOverride:",
         weekOverride,
         "currentSessionWeekOf:",
-        currentSession?.weekOf || null,
+        currentSessionRef.current?.weekOf || null,
         "currentSessionPresenter:",
-        currentSession?.presenterName || null,
+        currentSessionRef.current?.presenterName || null,
       );
 
       const res = await goldenMondayAPI.assignRotation(targetWeekOf);
@@ -219,7 +231,20 @@ export default function RotationPanel({ onRefresh }) {
     } finally {
       setAssigning(false);
     }
-  }, [t, loadAll, targetWeekOf]);
+    // Deps intentionally limited to what actually determines the
+    // request we send and the refresh we trigger:
+    //   - t: locale, changes the success toast text
+    //   - loadAll: refresh the panel's own data after assign
+    //   - onRefresh: parent refresh (pinned to the same week)
+    //   - targetWeekOf: the week we post to
+    //   - weekOverride: included so the diagnostic log stays accurate
+    //     when the admin flips the week selector mid-session
+    //
+    // currentSession?.weekOf / currentSession?.presenterName are only
+    // used in the diagnostic console.log, and they are now read via
+    // currentSessionRef — so the linter has nothing to complain about
+    // and this callback does not re-create on every data refresh.
+  }, [t, loadAll, onRefresh, targetWeekOf, weekOverride]);
 
   // ─── Already-assigned dialog actions ────────────────────────
   const handleKeepAsIs = useCallback(() => {

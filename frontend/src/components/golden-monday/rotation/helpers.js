@@ -136,11 +136,15 @@ export const pickCurrentSession = (sessions = []) => {
 // the overridden week, `currentSession` comes back null (correctly —
 // "nobody assigned for THIS week"), rather than silently substituting
 // a different week's session.
-export function useRotationData({
-  onRefresh,
-  autoLoad = true,
-  weekOverride = null,
-} = {}) {
+//
+// NOTE ON `onRefresh`: this hook does NOT accept an onRefresh prop.
+// It used to, and used to call it at the end of loadAll(). That
+// produced duplicate full-page reloads: every loadAll() fired the
+// parent's refreshData(), and then callers that wanted a full-page
+// refresh called it again. Callers now invoke onRefresh explicitly
+// (e.g. RotationPanel.handleAssignNext → onRefresh({ weekOf })) so
+// the fan-out is intentional, not incidental.
+export function useRotationData({ autoLoad = true, weekOverride = null } = {}) {
   const isMounted = useRef(true);
   const [ranking, setRanking] = useState([]);
   const [currentSession, setCurrentSession] = useState(null);
@@ -153,7 +157,7 @@ export function useRotationData({
     setLoading(true);
 
     try {
-      // previewRotation(weekOverride) now resolves the target week
+      // previewRotation(weekOverride) resolves the target week
       // SERVER-SIDE: with no override it calls resolveTargetWeek(),
       // the exact same function /rotation/next uses, and returns the
       // actual session for that week in the response body. This
@@ -202,13 +206,6 @@ export function useRotationData({
       setRecordings(
         Array.isArray(recordingsRes?.data) ? recordingsRes.data : [],
       );
-
-      // Deliberately NOT calling onRefresh() here. Doing so caused
-      // duplicate reloads: every loadAll() fired the parent's
-      // refreshData() (which refetches getNextPresenter etc.), and
-      // then callers that wanted a full-page refresh called it again.
-      // Callers should invoke onRefresh() explicitly when they need
-      // the parent (mini card, Spotlight) to update too.
     } catch (err) {
       console.error("[useRotationData] load failed:", err);
       if (isMounted.current) {
@@ -218,7 +215,9 @@ export function useRotationData({
     } finally {
       if (isMounted.current) setLoading(false);
     }
-  }, [onRefresh, weekOverride]);
+    // `loadAll` is only ever re-created when `weekOverride` changes.
+    // That is the single input that changes what this hook fetches.
+  }, [weekOverride]);
 
   useEffect(() => {
     isMounted.current = true;
