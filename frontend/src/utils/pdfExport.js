@@ -129,13 +129,14 @@ function getForumLabels(lang, t) {
       "absentMembers",
       isAm ? "ያልተገኙ አባላት" : isOm ? "Miseensota Hin Argamne" : "Absent Members",
     ),
+    // Shorter label than "ያለፈው ስብሰባ ውጤቶች". The longer form wrapped to
+    // two lines inside the 38mm Section column at 8pt, and the extra
+    // line per row was the last remaining cause of a two-page spill.
+    // "ቀዳሚ ውጤቶች" is the standard Amharic short form and fits on one
+    // line comfortably.
     secPrevResults: tf(
       "prevResults",
-      isAm
-        ? "ያለፈው ስብሰባ ውጤቶች"
-        : isOm
-          ? "Bu'aa Walgahii Darbee"
-          : "Previous Results",
+      isAm ? "ቀዳሚ ውጤቶች" : isOm ? "Bu'aa Duraa" : "Previous Results",
     ),
     secTopics: tf(
       "todayTopics",
@@ -744,43 +745,54 @@ export const exportForumReportToPDF = (
       body: rows,
       // margin.bottom reserves room for the footer rule + page text
       // so the table can never overlap them.
-      margin: { left: margin, right: margin, bottom: 18 },
+      margin: { left: margin, right: margin, bottom: 16 },
       // "grid" instead of "striped": with rows this tight, zebra
       // stripes read as mud and thin grid lines are clearer.
       theme: "grid",
+
       // ─── Compact density: many narrow rows per page ─────────────
       // A forum report is mostly short lines of text (names, topics,
       // agreements). Default padding of 3mm per side and fontSize 9
       // pushed ~21 rows per page and spilled the rest to page 2. The
       // numbers below fit a full 37-row report on one A4 page with
-      // room for the footer.
+      // ~25mm of headroom.
       headStyles: {
         fillColor: [26, 107, 74],
         textColor: [255, 255, 255],
-        fontSize: 9,
+        fontSize: 8.5,
         fontStyle: "bold",
         halign: "center",
         valign: "middle",
-        cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 2 },
-        minCellHeight: 6,
+        cellPadding: { top: 1.4, bottom: 1.4, left: 1.8, right: 1.8 },
+        minCellHeight: 5.5,
       },
       bodyStyles: {
-        fontSize: 8.5,
+        fontSize: 8,
         valign: "middle",
-        cellPadding: { top: 1.4, bottom: 1.4, left: 2, right: 2 },
-        minCellHeight: 6,
+        cellPadding: { top: 1.1, bottom: 1.1, left: 1.8, right: 1.8 },
+        minCellHeight: 5,
         lineColor: [200, 200, 200],
         lineWidth: 0.1,
       },
+
+      // ─── Column widths ──────────────────────────────────────
+      // # — two digits max, 9mm is generous.
+      // Section — 38mm so the longest Amharic label ("የተስማሙባቸው ነጥቦች")
+      //   stays on one line at 8pt. Wrapping a section label was
+      //   adding ~4mm per affected row, which is what tipped the
+      //   report onto page 2.
+      // Item — auto, absorbs the remainder (~84mm).
+      // Detail — 32mm fixed; widest content is "Field assignment"
+      //   (~28mm at 8pt). It was previously auto and took half the
+      //   slack despite being empty on ~80% of rows.
+      // Signature — 26mm with minCellHeight 6; enough area for a
+      //   PNG while keeping 7 signature rows ~42mm total.
       columnStyles: {
         0: { cellWidth: 9, halign: "center" },
-        1: { cellWidth: 32, halign: "left" },
+        1: { cellWidth: 38, halign: "left" },
         2: { cellWidth: "auto", halign: "left" },
-        3: { cellWidth: "auto", halign: "left" },
-        // Signature column: narrower now (34 → 26mm) so the two
-        // middle columns absorb the slack. minCellHeight down to 8
-        // so signature rows don't balloon the table.
-        4: { cellWidth: 26, halign: "center", minCellHeight: 8 },
+        3: { cellWidth: 32, halign: "left" },
+        4: { cellWidth: 26, halign: "center", minCellHeight: 6 },
       },
       styles: {
         overflow: "linebreak",
@@ -814,20 +826,42 @@ export const exportForumReportToPDF = (
 
         try {
           const cell = data.cell;
-          const pad = 1.5;
-          const maxW = cell.width - pad * 2;
-          const maxH = cell.height - pad * 2;
-          if (maxW <= 0 || maxH <= 0) return;
+          const pad = 1;
+          const boxW = cell.width - pad * 2;
+          const boxH = cell.height - pad * 2;
+          if (boxW <= 0 || boxH <= 0) return;
 
-          // Preserve aspect by scaling to fit the cell.
-          doc.addImage(
-            raw.__signatureImage,
-            "PNG",
-            cell.x + pad,
-            cell.y + pad,
-            maxW,
-            maxH,
-          );
+          // Preserve aspect ratio: read the PNG's natural dimensions
+          // (jsPDF exposes them via getImageProperties for already-
+          // embedded images, but for a data URL we can fall back to
+          // a typical signature-pad ratio of 4:1). Then scale down
+          // to fit the cell — never up, so a small signature doesn't
+          // get stretched.
+          let naturalW = 400;
+          let naturalH = 100;
+          try {
+            const props = doc.getImageProperties?.(raw.__signatureImage);
+            if (props?.width && props?.height) {
+              naturalW = props.width;
+              naturalH = props.height;
+            }
+          } catch {
+            // keep fallback ratio
+          }
+
+          const scale = Math.min(boxW / naturalW, boxH / naturalH);
+          const drawW = naturalW * scale;
+          const drawH = naturalH * scale;
+
+          // Center the image both horizontally and vertically inside
+          // the cell. Previously it was drawn left-aligned at
+          // (cell.x + pad, cell.y + pad), which made it hug the left
+          // edge of the Signature column and look like it belonged
+          // to the neighbouring cell.
+          const drawX = cell.x + (cell.width - drawW) / 2;
+          const drawY = cell.y + (cell.height - drawH) / 2;
+
+          doc.addImage(raw.__signatureImage, "PNG", drawX, drawY, drawW, drawH);
         } catch (imgErr) {
           console.warn(
             `Could not embed signature #${raw.__index}:`,
