@@ -8,26 +8,48 @@ import { C, F, SPACING, FONT_SIZES, radius } from "../../styles/theme";
 
 const BAR_PADDING = `${SPACING.md} ${SPACING.lg}`;
 
-const MemberDrilldown = ({ teamName, period, onClose }) => {
+// Normalize a team name for comparison — trim, lowercase, collapse
+// internal whitespace. Two strings that differ only in these ways
+// should match. Anything more exotic than that and we'd have to change
+// the schema; this covers the realistic cases (extra spaces, casing).
+const normalizeTeamName = (s) =>
+  (s || "").trim().toLowerCase().replace(/\s+/g, " ");
+
+const MemberDrilldown = ({ teamId, teamName, period, onClose }) => {
   const { t } = useLanguage();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [members, setMembers] = useState([]);
 
+  const periodFrom = period?.from;
+  const periodTo = period?.to;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      // The leaderboardService currently returns all members across all
-      // teams. We filter client-side. If the team count grows large
-      // enough that this is expensive, we can add a `team` query param
-      // to the endpoint — the service already accepts one.
+      // The person board is the source of truth for "who belongs to which
+      // team in this period". Each row already carries a teamName; some
+      // rows also carry a teamId when the underlying evaluation was saved
+      // with a proper `team` ref. We filter by teamId when both sides have
+      // it, and fall back to a normalized name comparison otherwise.
       const params = { source: "evaluation" };
-      if (period?.from) params.from = period.from;
-      if (period?.to) params.to = period.to;
+      if (periodFrom) params.from = periodFrom;
+      if (periodTo) params.to = periodTo;
       const res = await leaderboardAPI.getPersonLeaderboard(params);
       const all = res.data.people || [];
-      setMembers(all.filter((p) => p.teamName === teamName));
+
+      const targetName = normalizeTeamName(teamName);
+      const filtered = all.filter((p) => {
+        // Preferred: match on teamId when available on both sides.
+        if (teamId && p.teamId) {
+          return String(p.teamId) === String(teamId);
+        }
+        // Fallback: normalized name comparison.
+        return normalizeTeamName(p.teamName) === targetName;
+      });
+
+      setMembers(filtered);
     } catch (e) {
       setError(
         e?.response?.data?.message ||
@@ -37,7 +59,7 @@ const MemberDrilldown = ({ teamName, period, onClose }) => {
     } finally {
       setLoading(false);
     }
-  }, [teamName, period, t]);
+  }, [teamId, teamName, periodFrom, periodTo, t]);
 
   useEffect(() => {
     const timer = setTimeout(load, 0);
@@ -52,6 +74,17 @@ const MemberDrilldown = ({ teamName, period, onClose }) => {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  // Re-sort the filtered members by average score so the numbers shown
+  // inside the drill-down are the team's own ranking, not the
+  // organization-wide ranking. A person who is #12 globally might be #2
+  // on their team; the drill-down should show #2.
+  const ranked = [...members].sort((a, b) => {
+    if (b.averageScore !== a.averageScore)
+      return b.averageScore - a.averageScore;
+    if (b.bestScore !== a.bestScore) return b.bestScore - a.bestScore;
+    return a.name.localeCompare(b.name);
+  });
 
   return createPortal(
     <div
@@ -224,7 +257,7 @@ const MemberDrilldown = ({ teamName, period, onClose }) => {
             </div>
           )}
 
-          {!loading && !error && members.length === 0 && (
+          {!loading && !error && ranked.length === 0 && (
             <div
               style={{
                 padding: "32px 20px",
@@ -243,18 +276,19 @@ const MemberDrilldown = ({ teamName, period, onClose }) => {
 
           {!loading &&
             !error &&
-            members.map((m) => {
+            ranked.map((m, idx) => {
+              const localRank = idx + 1;
               const medal =
-                m.rank === 1
+                localRank === 1
                   ? C.gold
-                  : m.rank === 2
+                  : localRank === 2
                     ? "#9AA6A0"
-                    : m.rank === 3
+                    : localRank === 3
                       ? C.clay || "#B5542E"
                       : C.border;
               return (
                 <div
-                  key={`${m.rank}-${m.name}`}
+                  key={`${localRank}-${m.name}`}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -270,8 +304,8 @@ const MemberDrilldown = ({ teamName, period, onClose }) => {
                       width: 28,
                       height: 28,
                       borderRadius: "50%",
-                      background: m.rank <= 3 ? medal : C.cardBg,
-                      color: m.rank <= 3 ? "#fff" : C.muted,
+                      background: localRank <= 3 ? medal : C.cardBg,
+                      color: localRank <= 3 ? "#fff" : C.muted,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
@@ -282,7 +316,7 @@ const MemberDrilldown = ({ teamName, period, onClose }) => {
                       border: `1px solid ${C.border}`,
                     }}
                   >
-                    {m.rank <= 3 ? <FiStar size={12} /> : m.rank}
+                    {localRank <= 3 ? <FiStar size={12} /> : localRank}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div
@@ -322,7 +356,7 @@ const MemberDrilldown = ({ teamName, period, onClose }) => {
                       fontFamily: F.mono,
                       fontSize: 18,
                       fontWeight: 800,
-                      color: m.rank <= 3 ? C.primary : C.dark,
+                      color: localRank <= 3 ? C.primary : C.dark,
                       flexShrink: 0,
                     }}
                   >
