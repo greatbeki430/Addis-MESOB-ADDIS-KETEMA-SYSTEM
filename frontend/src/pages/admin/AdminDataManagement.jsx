@@ -1158,7 +1158,7 @@ const AdminDataManagement = ({ dataType }) => {
             alignItems: "center",
             gap: 16,
             boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-            zIndex: 100,
+            zIndex: 3000,
           }}
         >
           <span>{selectedItems.length} items selected</span>
