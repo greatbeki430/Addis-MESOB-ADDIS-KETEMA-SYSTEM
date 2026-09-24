@@ -207,8 +207,8 @@ const KEY_LABELS = {
   department: "Department",
   phone: "Phone",
   leader: "Leader",
+  score: "Score",
 };
-
 // ─── Helpers ────────────────────────────────────────────────────
 const formatLabel = (key) =>
   KEY_LABELS[key] ||
@@ -1898,6 +1898,96 @@ function renderModalValue(value, isMobile = false) {
           ))}
         </div>
       );
+    }
+
+    // Array of uniform objects → render as a sub-table.
+    // This is what "members", "scores", "entries", "scores[].items"
+    // actually are — a small tabular dataset, not a stack of cards.
+    // Falls back to cards for a single object (a one-row table reads
+    // worse than a card).
+    if (value.length >= 2 && value.every(isPlainObject)) {
+      const firstKeys = Object.keys(value[0]).filter(
+        (k) => !BLOCKED_FIELDS.has(k),
+      );
+      const extraKeys = Array.from(
+        new Set(
+          value.flatMap((v) =>
+            Object.keys(v).filter(
+              (k) => !BLOCKED_FIELDS.has(k) && !firstKeys.includes(k),
+            ),
+          ),
+        ),
+      );
+      const columns = [...firstKeys, ...extraKeys];
+
+      if (columns.length > 0) {
+        return (
+          <div
+            style={{
+              overflowX: "auto",
+              border: `1px solid ${C.border}`,
+              borderRadius: 10,
+              background: "#fff",
+            }}
+          >
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                fontSize: isMobile ? 11 : 12,
+              }}
+            >
+              <thead>
+                <tr style={{ background: "#F1F5F9" }}>
+                  {columns.map((k) => (
+                    <th
+                      key={k}
+                      style={{
+                        padding: isMobile ? "6px 8px" : "8px 12px",
+                        textAlign: "left",
+                        fontWeight: 700,
+                        color: C.muted,
+                        textTransform: "uppercase",
+                        fontSize: isMobile ? 9 : 10,
+                        letterSpacing: "0.04em",
+                        borderBottom: `1px solid ${C.border}`,
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {formatLabel(k)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {value.map((row, i) => (
+                  <tr
+                    key={i}
+                    style={{
+                      background: i % 2 === 0 ? "#fff" : "#FAFBFC",
+                      borderBottom: `1px solid ${C.border}55`,
+                    }}
+                  >
+                    {columns.map((k) => (
+                      <td
+                        key={k}
+                        style={{
+                          padding: isMobile ? "6px 8px" : "8px 12px",
+                          color: C.dark,
+                          verticalAlign: "top",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {formatValue(row[k])}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
     }
 
     // Array of objects → mini cards
