@@ -50,20 +50,13 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
     return () => clearTimeout(task);
   }, [load, refreshKey]);
 
-  // ─── Pluralization helpers ────────────────────────────────
-  // The translation file has both `eval`/`evals` and `team`/`teams` keys.
-  // Previously the count label always rendered the plural form, so a
-  // team with a single evaluation displayed "1 evals".
   const evalCountLabel = (count) => {
     const key = count === 1 ? "eval" : "evals";
     return `${count} ${t(`leaderboard.${key}`) || key}`;
   };
 
-  const memberCountLabel = (count) => {
-    // `members` is used for both singular and plural today; kept as-is
-    // to avoid adding a new translation key just for this.
-    return `${count} ${t("leaderboard.members") || "members"}`;
-  };
+  const memberCountLabel = (count) =>
+    `${count} ${t("leaderboard.members") || "members"}`;
 
   const scoreLabelFor = (row) => {
     if (source === "forum") {
@@ -231,11 +224,19 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {teams.map((row) => {
+          // A row is drillable whenever we have either a teamId OR a
+          // teamName. The previous check required row.teamId to be
+          // truthy, which silently disabled the click for every team
+          // whose evaluations had been saved without a `team` ObjectId
+          // reference — only the first-ranked team (which happened to
+          // have the ref) remained clickable.
+          const hasIdentifier = Boolean(row.teamId || row.teamName);
           const isDrillable =
-            canDrillDown && isAdminTier && row.teamId && !row.outsideTop;
+            canDrillDown && isAdminTier && hasIdentifier && !row.outsideTop;
+
           return (
             <LeaderboardRow
-              key={row.teamId || `${row.rank}-${row.teamName}`}
+              key={row.teamId || `rank-${row.rank}-${row.teamName}`}
               rank={row.rank}
               kind="team"
               name={row.teamName}
@@ -253,7 +254,11 @@ const TeamLeaderboard = ({ source, period, refreshKey, canDrillDown }) => {
               memberCount={row.memberCount || 0}
               onClick={
                 isDrillable
-                  ? () => setDrillTeam({ id: row.teamId, name: row.teamName })
+                  ? () =>
+                      setDrillTeam({
+                        id: row.teamId || null,
+                        name: row.teamName,
+                      })
                   : null
               }
             />
