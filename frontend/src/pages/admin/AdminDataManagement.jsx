@@ -9,6 +9,7 @@ import {
   FiDownload,
   FiEye,
   FiTrash2,
+  FiPrinter,
   FiCheck,
   FiX,
   FiAlertCircle,
@@ -29,6 +30,11 @@ import {
   FiAlignLeft,
   FiActivity,
 } from "react-icons/fi";
+
+import {
+  generateReportForRow,
+  isReportSupported,
+} from "../../utils/adminReportGenerator";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
@@ -302,6 +308,9 @@ const AdminDataManagement = ({ dataType }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, label }
   const [deleting, setDeleting] = useState(false);
+  // Tracks which row is currently being turned into a PDF so the
+  // button can show a spinner and can't be double-clicked.
+  const [generatingPdfId, setGeneratingPdfId] = useState(null);
   const abortControllerRef = useRef(null);
   const isMountedRef = useRef(true);
   const hasLoadedRef = useRef(false);
@@ -482,6 +491,26 @@ const AdminDataManagement = ({ dataType }) => {
       setDeleting(false);
     }
   }, [dataType, deleteTarget, fetchData]);
+
+  // Generates a PDF for one row. Delegates to the adminReportGenerator
+  // module, which knows how to shape each data type for its generator.
+  const handleGeneratePdf = useCallback(
+    async (item) => {
+      setGeneratingPdfId(item.id);
+      try {
+        const result = await generateReportForRow(item, dataType, {
+          language: "am",
+        });
+        if (!result.success) {
+          // eslint-disable-next-line no-alert
+          alert(result.error || "Failed to generate PDF.");
+        }
+      } finally {
+        setGeneratingPdfId(null);
+      }
+    },
+    [dataType],
+  );
 
   const renderCellValue = useCallback((item, col) => {
     const value = item[col.key];
@@ -1122,6 +1151,37 @@ const AdminDataManagement = ({ dataType }) => {
                             >
                               <FiEye size={18} />
                             </button>
+                            {isReportSupported(dataType) && (
+                              <button
+                                onClick={() => handleGeneratePdf(item)}
+                                disabled={generatingPdfId === item.id}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor:
+                                    generatingPdfId === item.id
+                                      ? "wait"
+                                      : "pointer",
+                                  fontSize: 16,
+                                  color: C.primary,
+                                  padding: 4,
+                                  borderRadius: 4,
+                                  transition: "background 0.2s",
+                                  opacity:
+                                    generatingPdfId === item.id ? 0.5 : 1,
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (generatingPdfId !== item.id)
+                                    e.currentTarget.style.background = C.bg;
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "none";
+                                }}
+                                title="Generate PDF report"
+                              >
+                                <FiPrinter size={18} />
+                              </button>
+                            )}
                             <button
                               onClick={() => requestDelete(item)}
                               style={{
