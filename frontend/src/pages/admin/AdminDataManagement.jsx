@@ -300,6 +300,8 @@ const AdminDataManagement = ({ dataType }) => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, label }
+  const [deleting, setDeleting] = useState(false);
   const abortControllerRef = useRef(null);
   const isMountedRef = useRef(true);
   const hasLoadedRef = useRef(false);
@@ -450,23 +452,36 @@ const AdminDataManagement = ({ dataType }) => {
     setShowModal(true);
   }, []);
 
-  const deleteItem = useCallback(
-    async (id) => {
-      if (window.confirm("Are you sure you want to delete this item?")) {
-        try {
-          await axios.delete(`${API_BASE_URL}/admin/data/${dataType}/${id}`, {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token")}`,
-            },
-          });
-          await fetchData();
-        } catch (error) {
-          console.error("Delete error:", error);
-        }
-      }
-    },
-    [dataType, fetchData],
-  );
+  // Opens the delete confirmation modal (does NOT delete yet)
+  const requestDelete = useCallback((item) => {
+    const label =
+      item.employee_name ||
+      item.topic ||
+      item.title ||
+      item.name ||
+      "this record";
+    setDeleteTarget({ id: item.id, label });
+  }, []);
+
+  // Performs the actual delete, then closes the modal
+  const confirmDelete = useCallback(async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await axios.delete(
+        `${API_BASE_URL}/admin/data/${dataType}/${deleteTarget.id}`,
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        },
+      );
+      setDeleteTarget(null);
+      await fetchData();
+    } catch (error) {
+      console.error("Delete error:", error);
+    } finally {
+      setDeleting(false);
+    }
+  }, [dataType, deleteTarget, fetchData]);
 
   const renderCellValue = useCallback((item, col) => {
     const value = item[col.key];
@@ -1108,7 +1123,7 @@ const AdminDataManagement = ({ dataType }) => {
                               <FiEye size={18} />
                             </button>
                             <button
-                              onClick={() => deleteItem(item.id)}
+                              onClick={() => requestDelete(item)}
                               style={{
                                 background: "none",
                                 border: "none",
@@ -1543,6 +1558,190 @@ const AdminDataManagement = ({ dataType }) => {
         to { opacity: 1; transform: translateY(0); }
       }
     `}</style>
+        </div>
+      )}
+
+      {/* ─── Delete Confirmation Modal ──────────────────────── */}
+      {deleteTarget && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.65)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 4000,
+            padding: 24,
+            animation: "fadeIn 0.2s ease",
+          }}
+          onClick={() => !deleting && setDeleteTarget(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              borderRadius: 20,
+              width: "100%",
+              maxWidth: 460,
+              overflow: "hidden",
+              boxShadow: "0 24px 72px rgba(0,0,0,0.32)",
+              animation: "slideUp 0.25s ease",
+            }}
+          >
+            {/* Header strip */}
+            <div
+              style={{
+                padding: "22px 26px 18px",
+                background: "linear-gradient(135deg, #FEF2F2, #FEE2E2)",
+                borderBottom: "1px solid #FECACA",
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 14,
+              }}
+            >
+              <div
+                style={{
+                  width: 46,
+                  height: 46,
+                  borderRadius: 14,
+                  background: "linear-gradient(135deg, #EF4444, #DC2626)",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  boxShadow: "0 6px 18px rgba(239,68,68,0.4)",
+                }}
+              >
+                <FiAlertCircle size={22} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 17,
+                    fontWeight: 700,
+                    color: "#7F1D1D",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  Delete {config.label.replace(/s$/, "")}?
+                </h3>
+                <p
+                  style={{
+                    margin: "4px 0 0",
+                    fontSize: 13,
+                    color: "#B91C1C",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "20px 26px 22px" }}>
+              <p
+                style={{
+                  margin: 0,
+                  fontSize: 14,
+                  color: C.dark,
+                  lineHeight: 1.6,
+                }}
+              >
+                You are about to permanently delete{" "}
+                <strong style={{ color: "#DC2626" }}>
+                  “{deleteTarget.label}”
+                </strong>
+                . All associated data will be removed from the system.
+              </p>
+
+              {/* Actions */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  justifyContent: "flex-end",
+                  marginTop: 24,
+                }}
+              >
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  disabled={deleting}
+                  style={{
+                    padding: "10px 20px",
+                    background: "#F1F5F9",
+                    color: "#475569",
+                    border: "1px solid #E2E8F0",
+                    borderRadius: 10,
+                    cursor: deleting ? "not-allowed" : "pointer",
+                    fontWeight: 600,
+                    fontSize: 13,
+                    opacity: deleting ? 0.6 : 1,
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!deleting) e.currentTarget.style.background = "#E2E8F0";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "#F1F5F9";
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={deleting}
+                  style={{
+                    padding: "10px 20px",
+                    background: deleting
+                      ? "#FCA5A5"
+                      : "linear-gradient(135deg, #EF4444, #DC2626)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 10,
+                    cursor: deleting ? "wait" : "pointer",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    boxShadow: deleting
+                      ? "none"
+                      : "0 6px 18px rgba(239,68,68,0.35)",
+                    transition: "all 0.15s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!deleting) {
+                      e.currentTarget.style.transform = "translateY(-1px)";
+                      e.currentTarget.style.boxShadow =
+                        "0 8px 22px rgba(239,68,68,0.5)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow =
+                      "0 6px 18px rgba(239,68,68,0.35)";
+                  }}
+                >
+                  {deleting ? (
+                    <>
+                      <FiClock size={15} />
+                      Deleting…
+                    </>
+                  ) : (
+                    <>
+                      <FiTrash2 size={15} />
+                      Delete Permanently
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
