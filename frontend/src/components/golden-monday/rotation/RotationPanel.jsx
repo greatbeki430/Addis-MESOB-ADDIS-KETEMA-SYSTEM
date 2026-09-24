@@ -74,6 +74,7 @@ export default function RotationPanel({ onRefresh }) {
   const [alreadyAssignedFor, setAlreadyAssignedFor] = useState(null);
   const [manualPickerFor, setManualPickerFor] = useState(null);
   const [posterStudioOpen, setPosterStudioOpen] = useState(false);
+  const [reassigning, setReassigning] = useState(false);
 
   // ─── Week selector state ────────────────────────────────────
   // null  = "Auto" — let useRotationData pick the target week
@@ -268,12 +269,42 @@ export default function RotationPanel({ onRefresh }) {
     }
   }, [alreadyAssignedFor, t, loadAll]);
 
-  const handleReassignFromDialog = useCallback(() => {
-    const dialogWeek =
-      alreadyAssignedFor?.weekOf || alreadyAssignedFor?.date || targetWeekOf;
+  const handleReassignFromDialog = useCallback(async () => {
+    const session = alreadyAssignedFor;
     setAlreadyAssignedFor(null);
-    setManualPickerFor({ targetWeekOf: dialogWeek });
-  }, [alreadyAssignedFor, targetWeekOf]);
+    if (!session?._id) return;
+
+    setReassigning(true);
+    try {
+      const res = await goldenMondayAPI.reassignRotation(
+        session._id,
+        "Admin requested reassignment",
+      );
+      const newSession = res.data?.session;
+      const name =
+        newSession?.presenterName ||
+        newSession?.presenter?.name ||
+        t.newPresenterFallback ||
+        "Presenter";
+      notify(
+        `${name} ${t.assignedNext || "assigned to present next"}`,
+        "success",
+      );
+      await loadAll();
+      if (onRefresh) {
+        await onRefresh({ weekOf: newSession?.weekOf || targetWeekOf });
+      }
+    } catch (err) {
+      notify(
+        err.response?.data?.message ||
+          t.assignError ||
+          "Failed to reassign presenter",
+        "error",
+      );
+    } finally {
+      setReassigning(false);
+    }
+  }, [alreadyAssignedFor, targetWeekOf, t, loadAll, onRefresh]);
 
   // ─── Manual picker ──────────────────────────────────────────
   const openManualPicker = useCallback(() => {
@@ -599,14 +630,14 @@ export default function RotationPanel({ onRefresh }) {
             {isPrivileged && (
               <button
                 onClick={handleAssignNext}
-                disabled={assigning}
+                disabled={assigning || reassigning}
                 title={
-                  assigning
+                  assigning || reassigning
                     ? t.assigning || "Assigning..."
                     : t.assignNext || "Assign Next"
                 }
                 aria-label={
-                  assigning
+                  assigning || reassigning
                     ? t.assigning || "Assigning..."
                     : t.assignNext || "Assign Next"
                 }
@@ -619,18 +650,19 @@ export default function RotationPanel({ onRefresh }) {
                   padding: "8px 18px",
                   borderRadius: 10,
                   border: "none",
-                  background: assigning
-                    ? C.border
-                    : "linear-gradient(135deg, #f5c518, #d4a017)",
-                  color: assigning ? C.muted : C.dark,
+                  background:
+                    assigning || reassigning
+                      ? C.border
+                      : "linear-gradient(135deg, #f5c518, #d4a017)",
+                  color: assigning || reassigning ? C.muted : C.dark,
                   fontWeight: 700,
                   fontSize: 12,
-                  cursor: assigning ? "not-allowed" : "pointer",
-                  opacity: assigning ? 0.6 : 1,
+                  cursor: assigning || reassigning ? "not-allowed" : "pointer",
+                  opacity: assigning || reassigning ? 0.6 : 1,
                   fontFamily: F.sans,
                 }}
               >
-                {assigning ? (
+                {assigning || reassigning ? (
                   <FiLoader
                     size={14}
                     style={{ animation: "spin 1s linear infinite" }}
@@ -639,7 +671,7 @@ export default function RotationPanel({ onRefresh }) {
                   <FiArrowRight size={14} />
                 )}
                 <span className="gm-action-label">
-                  {assigning
+                  {assigning || reassigning
                     ? t.assigning || "Assigning..."
                     : t.assignNext || "Assign Next"}
                 </span>
