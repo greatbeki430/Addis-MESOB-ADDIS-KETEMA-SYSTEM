@@ -89,6 +89,13 @@ const encodeText = (text) => {
   return String(text);
 };
 
+// Helper: header cells are short labels (ተ.ቁ, ክፍል, ዝርዝር, ስም, ሁኔታ …).
+// They must never wrap. We mark them via a sentinel so sharedDidParseCell
+// can force one line and disable linebreak for that specific cell.
+const noWrap = (label) => ({ __noWrap: true, label });
+const isNoWrap = (raw) =>
+  raw && typeof raw === "object" && raw.__noWrap === true;
+
 // ─── FORUM REPORT LABELS (language-aware) ─────────────────────
 // Amharic is the default. `lang` may be "en" or "om" to override.
 // No content auto-detection — the caller decides (see exportForumReportToPDF).
@@ -639,6 +646,9 @@ export const exportForumReportToPDF = (
       valign: "middle",
       cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 },
       minCellHeight: 5.5,
+      // Default: allow wrapping. Cells flagged as NO_WRAP override this
+      // in didParseCell below.
+      overflow: "linebreak",
     };
     const sharedBodyStyles = {
       fontSize: 8,
@@ -660,6 +670,24 @@ export const exportForumReportToPDF = (
         data.cell.text = [""];
         return;
       }
+
+      // Short header labels (ተ.ቁ, ክፍል …) must never wrap. Their cells
+      // are objects with __noWrap:true; unpack the label, force
+      // single-line overflow and let the font fall through normally.
+      if (isNoWrap(raw)) {
+        const label = raw.label;
+        data.cell.text = [String(label)];
+        data.cell.styles.overflow = "visible";
+        data.cell.styles.font = isAmharic(String(label))
+          ? doc.__hasEthiopicFont
+            ? FONT_NAMES.ethiopic
+            : "helvetica"
+          : doc.__hasLatinFont
+            ? FONT_NAMES.latin
+            : "helvetica";
+        return;
+      }
+
       const cellText = String(raw ?? "");
       if (isAmharic(cellText)) {
         data.cell.styles.font = doc.__hasEthiopicFont
@@ -788,7 +816,8 @@ export const exportForumReportToPDF = (
 
       autoTable(doc, {
         startY: yPos,
-        head: [[L.colNo, L.colSection, L.colItem]],
+        // Head cells are noWrap-wrapped so short labels stay on one line.
+        head: [[noWrap(L.colNo), noWrap(L.colSection), noWrap(L.colItem)]],
         body: contentRows,
         margin: { left: margin, right: margin, bottom: 16 },
         theme: "grid",
@@ -796,7 +825,7 @@ export const exportForumReportToPDF = (
         bodyStyles: sharedBodyStyles,
         styles: sharedStyles,
         columnStyles: {
-          0: { cellWidth: 9, halign: "center" },
+          0: { cellWidth: 12, halign: "center" }, // was 9 — too narrow for ተ.ቁ
           1: { cellWidth: 42, halign: "left" },
           2: { cellWidth: "auto", halign: "left" },
         },
@@ -826,7 +855,15 @@ export const exportForumReportToPDF = (
 
       autoTable(doc, {
         startY: yPos,
-        head: [[L.colNo, L.colName, L.colStatus, L.colReason, L.colSignature]],
+        head: [
+          [
+            noWrap(L.colNo),
+            noWrap(L.colName),
+            noWrap(L.colStatus),
+            noWrap(L.colReason),
+            noWrap(L.colSignature),
+          ],
+        ],
         body: memberRows,
         margin: { left: margin, right: margin, bottom: 16 },
         theme: "grid",
@@ -834,7 +871,7 @@ export const exportForumReportToPDF = (
         bodyStyles: sharedBodyStyles,
         styles: sharedStyles,
         columnStyles: {
-          0: { cellWidth: 9, halign: "center" },
+          0: { cellWidth: 12, halign: "center" }, // was 9 — too narrow for ተ.ቁ
           1: { cellWidth: "auto", halign: "left" },
           2: { cellWidth: 32, halign: "center" },
           3: { cellWidth: 40, halign: "left" },
