@@ -502,7 +502,6 @@ const AdminDataManagement = ({ dataType }) => {
           language: "am",
         });
         if (!result.success) {
-          // eslint-disable-next-line no-alert
           alert(result.error || "Failed to generate PDF.");
         }
       } finally {
