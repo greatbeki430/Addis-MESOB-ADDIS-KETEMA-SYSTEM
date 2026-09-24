@@ -653,7 +653,14 @@ export const goldenMondayAPI = {
   previewRotation: (weekOf) =>
     api.get("/golden-monday/rotation/preview", { params: { weekOf } }),
   getRanking: () => api.get("/golden-monday/rotation/preview"),
-  getNextPresenter: () => api.get("/golden-monday/rotation/next"),
+  // Optional weekOf pins the read to an exact week. The backend's
+  // /rotation/next handler accepts ?weekOf= and, when supplied, skips
+  // resolveTargetWeek() entirely. This is what guarantees the mini
+  // card and Spotlight look at the same session the assignment wrote.
+  getNextPresenter: (weekOf) =>
+    api.get("/golden-monday/rotation/next", {
+      params: weekOf ? { weekOf } : undefined,
+    }),
   assignRotation: (weekOf, manualPresenterId) =>
     api.post("/golden-monday/rotation/assign", { weekOf, manualPresenterId }),
 

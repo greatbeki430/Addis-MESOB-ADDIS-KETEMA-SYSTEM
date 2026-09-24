@@ -43,7 +43,7 @@ const generateParticles = () => {
 
 const PARTICLES = generateParticles();
 
-export default function PresenterSpotlight({ onRefresh, refreshKey }) {
+export default function PresenterSpotlight({ refreshKey, weekOf }) {
   const { language } = useLanguage();
   const t = goldenMondayTranslations[language] || goldenMondayTranslations.en;
 
@@ -62,6 +62,10 @@ export default function PresenterSpotlight({ onRefresh, refreshKey }) {
   const isMounted = useRef(true);
   const isInitialLoad = useRef(true);
   const sessionDateRef = useRef(null);
+  // Guards the refreshKey effect so it doesn't fire on the same
+  // render the mount effect already handled — otherwise the very
+  // first mount issues two identical GET /rotation/next calls.
+  const firstKeyRun = useRef(true);
 
   // Calculate time until next Monday
   const calculateTimeRemaining = useCallback((sessionDate) => {
@@ -86,62 +90,91 @@ export default function PresenterSpotlight({ onRefresh, refreshKey }) {
     setTimeRemaining({ days, hours, minutes, seconds });
   }, []);
 
-  // Load presenter data
-  const loadPresenter = useCallback(async () => {
-    if (!isMounted.current) return;
-    setLoading(true);
-    try {
-      const response = await goldenMondayAPI.getNextPresenter();
+  // Track the last week the parent asked us to show. Reading it via a
+  // ref (rather than closing over `weekOf` directly in the effect)
+  // means the refreshKey effect fires exactly once per bump, even
+  // when both refreshKey and weekOf change together — which is what
+  // happens right after Assign Next.
+  const weekOfRef = useRef(weekOf);
+  useEffect(() => {
+    weekOfRef.current = weekOf;
+  }, [weekOf]);
+
+  // Fetch the presenter from the backend and apply it to state.
+  //
+  // `showSpinner` is deliberately a parameter, NOT a
+  // `setLoading(true)` call at the top of this function. The effect
+  // that re-runs on `refreshKey` must NOT synchronously flip loading
+  // state inside its body — React's lint rule flags that as a
+  // cascading render ("Avoid calling setState() directly within an
+  // effect"). Silent refreshes also give the right UX: the Spotlight
+  // should not flash a spinner every time the parent bumps the key.
+  const fetchPresenter = useCallback(
+    async ({ showSpinner = false } = {}) => {
       if (!isMounted.current) return;
+      if (showSpinner) setLoading(true);
 
-      if (response.data && response.data.name) {
-        setPresenter(response.data);
+      try {
+        // Forward weekOf so the backend pins to the exact session the
+        // assignment wrote to. Without it, resolveTargetWeek() can pick
+        // a *different* (earlier) upcoming session and the Spotlight
+        // shows the wrong name — the exact bug we're fixing.
+        const response = await goldenMondayAPI.getNextPresenter(
+          weekOfRef.current,
+        );
+        if (!isMounted.current) return;
 
-        // ✅ NEW: capture the session date the backend returned so the
-        // countdown ticks against the SAME week the panel is targeting,
-        // instead of recomputing "next Monday" from the client clock.
-        sessionDateRef.current =
-          response.data.sessionDate || response.data.weekOf || null;
-        calculateTimeRemaining(sessionDateRef.current);
+        if (response.data && response.data.name) {
+          setPresenter(response.data);
 
-        if (response.data._id) {
-          try {
-            const detailRes = await goldenMondayAPI.getUserDetails(
-              response.data._id,
-            );
-            if (!isMounted.current) return;
-            if (detailRes.data && detailRes.data._id) {
-              setPresenter((prev) => ({ ...prev, ...detailRes.data }));
-            }
-          } catch (detailErr) {
-            if (detailErr.response?.status === 404) {
-              console.warn(
-                `⚠️ User ${response.data._id} not found - using base presenter data`,
+          // capture the session date the backend returned so the
+          // countdown ticks against the SAME week the panel is
+          // targeting, instead of recomputing "next Monday" from the
+          // client clock.
+          sessionDateRef.current =
+            response.data.sessionDate || response.data.weekOf || null;
+          calculateTimeRemaining(sessionDateRef.current);
+
+          if (response.data._id) {
+            try {
+              const detailRes = await goldenMondayAPI.getUserDetails(
+                response.data._id,
               );
-            } else {
-              console.warn(
-                "Could not fetch presenter user details:",
-                detailErr,
-              );
+              if (!isMounted.current) return;
+              if (detailRes.data && detailRes.data._id) {
+                setPresenter((prev) => ({ ...prev, ...detailRes.data }));
+              }
+            } catch (detailErr) {
+              if (detailErr.response?.status === 404) {
+                console.warn(
+                  `⚠️ User ${response.data._id} not found - using base presenter data`,
+                );
+              } else {
+                console.warn(
+                  "Could not fetch presenter user details:",
+                  detailErr,
+                );
+              }
             }
           }
+        } else {
+          setPresenter(null);
+          sessionDateRef.current = null;
+          calculateTimeRemaining(null);
         }
-      } else {
+      } catch (error) {
+        console.error("Failed to load presenter:", error);
         setPresenter(null);
         sessionDateRef.current = null;
         calculateTimeRemaining(null);
+      } finally {
+        if (isMounted.current && showSpinner) {
+          setLoading(false);
+        }
       }
-    } catch (error) {
-      console.error("Failed to load presenter:", error);
-      setPresenter(null);
-      sessionDateRef.current = null;
-      calculateTimeRemaining(null);
-    } finally {
-      if (isMounted.current) {
-        setLoading(false);
-      }
-    }
-  }, [calculateTimeRemaining]);
+    },
+    [calculateTimeRemaining],
+  );
 
   // Glow animation loop
   useEffect(() => {
@@ -160,9 +193,13 @@ export default function PresenterSpotlight({ onRefresh, refreshKey }) {
 
     if (isInitialLoad.current) {
       isInitialLoad.current = false;
-      loadPresenter();
+      fetchPresenter({ showSpinner: true });
+      // (weekOf is captured by fetchPresenter's closure; on first mount
+      // it's whatever the parent had, which may be undefined — the
+      // backend then does its Auto resolution, which is what we want
+      // before any assignment happens.)
 
-      // ✅ NEW: tick against the ref — loadPresenter() will fill it in
+      // tick against the ref — fetchPresenter() will fill it in
       // once the fetch resolves. Until then the ref is null and the
       // countdown safely shows zeros.
       timerRef.current = setInterval(() => {
@@ -195,9 +232,22 @@ export default function PresenterSpotlight({ onRefresh, refreshKey }) {
   // `undefined` means "first render, caller didn't opt into keys" —
   // in that case the mount effect above already loaded once, so we
   // skip here to avoid a duplicate fetch.
+  //
+  // Skip the very first run too: the mount effect fires on the same
+  // render that `refreshKey` first becomes a number (0), and calling
+  // fetchPresenter here would issue a duplicate request. Only the
+  // *next* bump should trigger a silent refetch.
   useEffect(() => {
     if (refreshKey === undefined) return;
-    loadPresenter();
+    if (firstKeyRun.current) {
+      firstKeyRun.current = false;
+      return;
+    }
+    // weekOfRef carries the latest week into fetchPresenter. Do NOT
+    // add `weekOf` to this dep list — refreshData() changes both
+    // refreshKey and weekOf on the same render, and listing both
+    // would fire this effect twice per assignment.
+    fetchPresenter({ showSpinner: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshKey]);
 

@@ -1616,6 +1616,12 @@ export default function GoldenMonday() {
   // `onRefresh` props never change identity, so identity-compare
   // effects in children never fire.
   const [dataVersion, setDataVersion] = useState(0);
+  // The week the rotation panel most recently wrote to. When it
+  // refreshes us via `refreshData({ weekOf })`, we remember it here
+  // and hand it to PresenterSpotlight so it can pin its own read to
+  // the same session. Without this, the Spotlight falls back to
+  // resolveTargetWeek() and can show a stale presenter.
+  const [pinnedWeekOf, setPinnedWeekOf] = useState(null);
 
   const [showComposer, setShowComposer] = useState(false);
   const [form, setForm] = useState({
@@ -1681,70 +1687,88 @@ export default function GoldenMonday() {
     [language],
   );
 
-  const loadAllData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [
-        upcomingRes,
-        pastRes,
-        nextPresenterRes,
-        employeesRes,
-        statsRes,
-        pillarsRes,
-      ] = await Promise.all([
-        goldenMondayAPI.getUpcomingSessions().catch(() => ({ data: [] })),
-        goldenMondayAPI
-          .getPastSessions()
-          .catch(() => ({ data: { sessions: [], pagination: {} } })),
-        goldenMondayAPI.getNextPresenter().catch(() => ({ data: null })),
-        goldenMondayAPI.getEmployees().catch(() => ({ data: [] })),
-        goldenMondayAPI.getStats().catch(() => ({ data: null })),
-        goldenMondayAPI.getPillars().catch(() => ({ data: FALLBACK_PILLARS })),
-      ]);
+  const loadAllData = useCallback(
+    async (opts = {}) => {
+      const { weekOf } = opts;
+      setLoading(true);
+      try {
+        const [
+          upcomingRes,
+          pastRes,
+          nextPresenterRes,
+          employeesRes,
+          statsRes,
+          pillarsRes,
+        ] = await Promise.all([
+          goldenMondayAPI.getUpcomingSessions().catch(() => ({ data: [] })),
+          goldenMondayAPI
+            .getPastSessions()
+            .catch(() => ({ data: { sessions: [], pagination: {} } })),
+          // Pass weekOf through when the caller has one (e.g. right
+          // after an assignment). Without it the backend's
+          // resolveTargetWeek() can pick a different session than the
+          // one we just wrote to, which is why the mini card used to
+          // keep showing the old presenter.
+          goldenMondayAPI
+            .getNextPresenter(weekOf)
+            .catch(() => ({ data: null })),
+          goldenMondayAPI.getEmployees().catch(() => ({ data: [] })),
+          goldenMondayAPI.getStats().catch(() => ({ data: null })),
+          goldenMondayAPI
+            .getPillars()
+            .catch(() => ({ data: FALLBACK_PILLARS })),
+        ]);
 
-      setUpcomingSessions(safeArray(upcomingRes?.data));
-      setPastSessions(safeArray(pastRes?.data?.sessions));
-      setNextPresenter(nextPresenterRes?.data || null);
-      setEmployees(safeArray(employeesRes?.data));
-      setStats(statsRes?.data || null);
+        setUpcomingSessions(safeArray(upcomingRes?.data));
+        setPastSessions(safeArray(pastRes?.data?.sessions));
+        setNextPresenter(nextPresenterRes?.data || null);
+        setEmployees(safeArray(employeesRes?.data));
+        setStats(statsRes?.data || null);
 
-      const pillarsData = pillarsRes?.data;
-      if (Array.isArray(pillarsData) && pillarsData.length > 0) {
-        setPillars(pillarsData);
-      } else {
-        const extracted = safeArray(pillarsData);
-        setPillars(extracted.length > 0 ? extracted : FALLBACK_PILLARS);
+        const pillarsData = pillarsRes?.data;
+        if (Array.isArray(pillarsData) && pillarsData.length > 0) {
+          setPillars(pillarsData);
+        } else {
+          const extracted = safeArray(pillarsData);
+          setPillars(extracted.length > 0 ? extracted : FALLBACK_PILLARS);
+        }
+
+        const upcoming = safeArray(upcomingRes?.data);
+        const past = safeArray(pastRes?.data?.sessions);
+        setSelectedSessionId((current) => {
+          if (current) return current;
+          if (upcoming.length > 0 && upcoming[0]?._id) return upcoming[0]._id;
+          if (past.length > 0 && past[0]?._id) return past[0]._id;
+          return current;
+        });
+      } catch (error) {
+        console.error("Failed to load Golden Monday data:", error);
+        showToast(t.error || "Failed to load data", "error");
+      } finally {
+        setLoading(false);
       }
+    },
+    [t],
+  );
 
-      const upcoming = safeArray(upcomingRes?.data);
-      const past = safeArray(pastRes?.data?.sessions);
-      setSelectedSessionId((current) => {
-        if (current) return current;
-        if (upcoming.length > 0 && upcoming[0]?._id) return upcoming[0]._id;
-        if (past.length > 0 && past[0]?._id) return past[0]._id;
-        return current;
-      });
-    } catch (error) {
-      console.error("Failed to load Golden Monday data:", error);
-      showToast(t.error || "Failed to load data", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
-  const refreshData = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await loadAllData();
-      // Bump AFTER loadAllData resolves, so any child keyed off this
-      // value re-fetches only once the parent's own data is fresh.
-      setDataVersion((v) => v + 1);
-    } catch (err) {
-      console.error("[GoldenMonday] refreshData failed:", err);
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadAllData]);
+  const refreshData = useCallback(
+    async (opts = {}) => {
+      setRefreshing(true);
+      try {
+        await loadAllData(opts);
+        // If the caller pinned a week (e.g. right after an assignment),
+        // remember it so the Spotlight reads the same session the
+        // mini card and RotationPanel just read.
+        if (opts?.weekOf) setPinnedWeekOf(opts.weekOf);
+        setDataVersion((v) => v + 1);
+      } catch (err) {
+        console.error("[GoldenMonday] refreshData failed:", err);
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    [loadAllData],
+  );
 
   useEffect(() => {
     if (activeTab === "overview") {
@@ -2555,7 +2579,10 @@ export default function GoldenMonday() {
       </section>
 
       <SectionErrorBoundary label="Presenter spotlight">
-        <PresenterSpotlight onRefresh={refreshData} refreshKey={dataVersion} />
+        <PresenterSpotlight
+          refreshKey={dataVersion}
+          weekOf={pinnedWeekOf || undefined}
+        />
       </SectionErrorBoundary>
 
       <section
