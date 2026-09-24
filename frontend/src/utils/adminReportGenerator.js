@@ -97,16 +97,39 @@ const buildForumReportInput = (row, options = {}) => {
       date: row.date || null,
       timeStart: row.timeStart || "",
       timeEnd: row.timeEnd || "",
-      present: Array.isArray(row.present)
+      present: (Array.isArray(row.present)
         ? row.present
         : Array.isArray(row.presentMembers)
           ? row.presentMembers
-          : [],
-      absent: Array.isArray(row.absent)
+          : Array.isArray(row.present_members)
+            ? row.present_members
+            : Array.isArray(row.attendees)
+              ? row.attendees
+              : []
+      )
+        .map((m) =>
+          typeof m === "string" ? m : m?.name || m?.employee_name || "",
+        )
+        .filter(Boolean),
+      absent: (Array.isArray(row.absent)
         ? row.absent
         : Array.isArray(row.absentMembers)
           ? row.absentMembers
-          : [],
+          : Array.isArray(row.absent_members)
+            ? row.absent_members
+            : Array.isArray(row.absentees)
+              ? row.absentees
+              : []
+      )
+        .map((a) =>
+          typeof a === "string"
+            ? { name: a, reason: "" }
+            : {
+                name: a?.name || a?.employee_name || "",
+                reason: a?.reason || a?.absentReason || "",
+              },
+        )
+        .filter((a) => a.name),
       prevResults: Array.isArray(row.prevResults) ? row.prevResults : [],
       topics: Array.isArray(row.topics) ? row.topics : [],
       explanation: row.explanation || "",
@@ -161,9 +184,25 @@ const buildEvaluationInput = (row, options = {}) => {
     return 0;
   };
 
-  const members = Array.isArray(row.members)
-    ? row.members
-    : Object.keys(scoresObj);
+  // The list of member names may live under any of several keys
+  // depending on how the backend shapes the response. Try each in
+  // turn, then fall back to whatever keys exist in the scores object.
+  // Never return an array of objects — the generator expects strings.
+  const normalizeMembers = (arr) =>
+    (Array.isArray(arr) ? arr : [])
+      .map((m) =>
+        typeof m === "string"
+          ? m
+          : m?.name || m?.employee_name || m?.employeeName || "",
+      )
+      .filter(Boolean);
+
+  let members = normalizeMembers(row.members);
+  if (members.length === 0) members = normalizeMembers(row.teamMembers);
+  if (members.length === 0) members = normalizeMembers(row.participants);
+  if (members.length === 0) members = normalizeMembers(row.team_members);
+  if (members.length === 0) members = normalizeMembers(row.evaluatedMembers);
+  if (members.length === 0) members = Object.keys(scoresObj);
 
   return {
     args: [
@@ -233,23 +272,30 @@ export async function generateReportForRow(row, dataType, options = {}) {
           options: opts,
         } = buildForumReportInput(row, options);
         const ok = exportForumReportToPDF(formData, t, lang, teamName, opts);
-        return ok
-          ? { success: true }
-          : {
+        // The generator returns `false` on a known failure and
+        // `undefined` in a couple of early-return paths. Anything
+        // that is not explicitly `false` is treated as success so we
+        // don't false-alarm the user when the file has in fact been
+        // saved.
+        return ok === false
+          ? {
               success: false,
               error: "Forum report PDF could not be generated.",
-            };
+            }
+          : { success: true };
       }
 
       case "evaluations": {
         const { args } = buildEvaluationInput(row, options);
         const ok = exportEvaluationReportToPDF(...args);
-        return ok
-          ? { success: true }
-          : {
+        // Same reasoning as forum-reports: treat only an explicit
+        // `false` as a failure.
+        return ok === false
+          ? {
               success: false,
               error: "Evaluation report PDF could not be generated.",
-            };
+            }
+          : { success: true };
       }
 
       default:
