@@ -561,31 +561,33 @@ export const exportForumReportToPDF = (
     let yPos = margin;
 
     // ─── Header: title ─────────────────────────────────────────
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setTextColor(26, 107, 74);
     drawMixedScriptText(doc, L.title, pageWidth / 2, yPos, {
       align: "center",
       bold: true,
     });
     doc.setTextColor(0, 0, 0);
-    yPos += 8;
+    yPos += 7;
 
     // ─── Header: subtitle ──────────────────────────────────────
-    doc.setFontSize(10);
+    // Compact — 8.5pt keeps the block 3-4mm shorter than at 10pt,
+    // which matters when the aim is "one team report per page".
+    doc.setFontSize(8.5);
     doc.setTextColor(100, 100, 100);
     drawMixedScriptText(doc, L.subtitle, pageWidth / 2, yPos, {
       align: "center",
     });
     doc.setTextColor(0, 0, 0);
-    yPos += 8;
+    yPos += 5;
 
     if (teamName) {
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       drawMixedScriptText(doc, `— ${teamName}`, pageWidth / 2, yPos, {
         align: "center",
         bold: true,
       });
-      yPos += 7;
+      yPos += 5;
     }
 
     // ─── Header: date + time line ──────────────────────────────
@@ -594,15 +596,15 @@ export const exportForumReportToPDF = (
       formData?.timeStart || formData?.timeEnd
         ? `${formData.timeStart || "—"} - ${formData.timeEnd || "—"}`
         : "—";
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     const metaLine = `${L.date}: ${dateText}    |    ${L.time}: ${timeText}`;
     drawMixedScriptText(doc, metaLine, margin, yPos);
-    yPos += 6;
+    yPos += 5;
 
     doc.setDrawColor(26, 107, 74);
     doc.setLineWidth(0.5);
     doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 8;
+    yPos += 6;
 
     // ─── Explanation block (prose above the table) ─────────────
     const { manual: manualExplanation, ai: aiExplanation } = splitExplanationAi(
@@ -616,13 +618,13 @@ export const exportForumReportToPDF = (
         yPos = margin;
       }
 
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       doc.setTextColor(26, 107, 74);
       drawMixedScriptText(doc, heading, margin, yPos, { bold: true });
       doc.setTextColor(0, 0, 0);
-      yPos += 6;
+      yPos += 5;
 
-      doc.setFontSize(9.5);
+      doc.setFontSize(8.5);
       const wrapped = doc.splitTextToSize(
         encodeText(body),
         pageWidth - margin * 2,
@@ -633,9 +635,9 @@ export const exportForumReportToPDF = (
           yPos = margin;
         }
         drawMixedScriptText(doc, line, margin, yPos);
-        yPos += 5;
+        yPos += 4;
       });
-      yPos += 4;
+      yPos += 3;
     };
 
     renderProseBlock(L.explanation, manualExplanation);
@@ -740,30 +742,50 @@ export const exportForumReportToPDF = (
       startY: yPos,
       head,
       body: rows,
-      margin: { left: margin, right: margin },
-      theme: "striped",
+      // margin.bottom reserves room for the footer rule + page text
+      // so the table can never overlap them.
+      margin: { left: margin, right: margin, bottom: 18 },
+      // "grid" instead of "striped": with rows this tight, zebra
+      // stripes read as mud and thin grid lines are clearer.
+      theme: "grid",
+      // ─── Compact density: many narrow rows per page ─────────────
+      // A forum report is mostly short lines of text (names, topics,
+      // agreements). Default padding of 3mm per side and fontSize 9
+      // pushed ~21 rows per page and spilled the rest to page 2. The
+      // numbers below fit a full 37-row report on one A4 page with
+      // room for the footer.
       headStyles: {
         fillColor: [26, 107, 74],
         textColor: [255, 255, 255],
-        fontSize: 10,
+        fontSize: 9,
         fontStyle: "bold",
         halign: "center",
         valign: "middle",
+        cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 2 },
+        minCellHeight: 6,
       },
       bodyStyles: {
-        fontSize: 9,
+        fontSize: 8.5,
         valign: "middle",
-        cellPadding: 3,
+        cellPadding: { top: 1.4, bottom: 1.4, left: 2, right: 2 },
+        minCellHeight: 6,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.1,
       },
       columnStyles: {
-        0: { cellWidth: 12, halign: "center" },
-        1: { cellWidth: 34, halign: "left" },
+        0: { cellWidth: 9, halign: "center" },
+        1: { cellWidth: 32, halign: "left" },
         2: { cellWidth: "auto", halign: "left" },
         3: { cellWidth: "auto", halign: "left" },
-        4: { cellWidth: 34, halign: "center", minCellHeight: 12 },
+        // Signature column: narrower now (34 → 26mm) so the two
+        // middle columns absorb the slack. minCellHeight down to 8
+        // so signature rows don't balloon the table.
+        4: { cellWidth: 26, halign: "center", minCellHeight: 8 },
       },
       styles: {
         overflow: "linebreak",
+        lineWidth: 0.1,
+        lineColor: [200, 200, 200],
       },
       didParseCell: (data) => {
         // Per-cell font: mixed-script safe. Every cell's own content
@@ -792,17 +814,17 @@ export const exportForumReportToPDF = (
 
         try {
           const cell = data.cell;
-          const padding = 2;
-          const maxW = cell.width - padding * 2;
-          const maxH = cell.height - padding * 2;
+          const pad = 1.5;
+          const maxW = cell.width - pad * 2;
+          const maxH = cell.height - pad * 2;
           if (maxW <= 0 || maxH <= 0) return;
 
           // Preserve aspect by scaling to fit the cell.
           doc.addImage(
             raw.__signatureImage,
             "PNG",
-            cell.x + padding,
-            cell.y + padding,
+            cell.x + pad,
+            cell.y + pad,
             maxW,
             maxH,
           );
