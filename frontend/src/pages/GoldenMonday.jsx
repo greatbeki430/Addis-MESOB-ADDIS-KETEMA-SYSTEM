@@ -1610,6 +1610,12 @@ export default function GoldenMonday() {
   const [pillars, setPillars] = useState(FALLBACK_PILLARS);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Monotonic counter bumped after every successful full reload. Child
+  // components that don't share our state (PresenterSpotlight) watch
+  // this to know when to re-fetch. Without it, useCallback-stable
+  // `onRefresh` props never change identity, so identity-compare
+  // effects in children never fire.
+  const [dataVersion, setDataVersion] = useState(0);
 
   const [showComposer, setShowComposer] = useState(false);
   const [form, setForm] = useState({
@@ -1730,6 +1736,9 @@ export default function GoldenMonday() {
     setRefreshing(true);
     try {
       await loadAllData();
+      // Bump AFTER loadAllData resolves, so any child keyed off this
+      // value re-fetches only once the parent's own data is fresh.
+      setDataVersion((v) => v + 1);
     } catch (err) {
       console.error("[GoldenMonday] refreshData failed:", err);
     } finally {
@@ -2546,7 +2555,7 @@ export default function GoldenMonday() {
       </section>
 
       <SectionErrorBoundary label="Presenter spotlight">
-        <PresenterSpotlight onRefresh={refreshData} />
+        <PresenterSpotlight onRefresh={refreshData} refreshKey={dataVersion} />
       </SectionErrorBoundary>
 
       <section
