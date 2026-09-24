@@ -89,12 +89,101 @@ const encodeText = (text) => {
   return String(text);
 };
 
-// Helper: header cells are short labels (ተ.ቁ, ክፍል, ዝርዝር, ስም, ሁኔታ …).
-// They must never wrap. We mark them via a sentinel so sharedDidParseCell
-// can force one line and disable linebreak for that specific cell.
-const noWrap = (label) => ({ __noWrap: true, label });
+// ─── MIXED-SCRIPT / HEADER-CELL INFRASTRUCTURE ──────────────
+//
+// These helpers exist because jspdf-autotable makes three independent
+// decisions about a header cell that interact badly for short Ethiopic
+// labels such as "ተ.ቁ":
+//
+//   1. It measures the label with the currently-selected font.
+//   2. If the measured width exceeds the column width, it breaks the
+//      string between the two glyph clusters (ተ. | ቁ).
+//   3. If a didParseCell hook also overrides `cell.text` and sets
+//      `overflow: "visible"`, autotable can silently suppress glyphs
+//      that its own internal layout step decided didn't fit.
+//
+// The combination we used before — forcing `text` and `overflow` —
+// was the cause of the disappearing ቁ. The correct fix is to leave the
+// text and overflow alone and instead give the cell enough physical
+// width that step (2) never triggers. That's what these helpers do.
+
+// Sentinel for "this header cell must not break mid-word".
+// We store BOTH a symbol-keyed flag and a plain boolean because
+// jspdf-autotable clones cell content internally and symbol keys can be
+// dropped while plain enumerable properties survive.
+const NO_WRAP = Symbol("no-wrap");
+const noWrap = (label) => ({
+  [NO_WRAP]: true,
+  __noWrap: true,
+  label: String(label),
+});
 const isNoWrap = (raw) =>
   raw && typeof raw === "object" && raw.__noWrap === true;
+
+// Default header font size. Hoisted so the width-measurement helper and
+// the shared head styles stay in sync — if you change one, change both.
+const HEADER_FONT_SIZE = 8.5;
+
+// Centralised font decision. Previously this ternary was inlined in
+// three places inside sharedDidParseCell; keeping it here means a new
+// script (e.g. Tigrinya, Oromo in Qubee) only needs one edit.
+function pickFontFor(doc, raw) {
+  const text = isNoWrap(raw) ? String(raw.label ?? "") : String(raw ?? "");
+  const amharic = isAmharic(text);
+  if (amharic) {
+    return doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica";
+  }
+  return doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica";
+}
+
+// Estimate the rendered width (in mm) of a header label at
+// HEADER_FONT_SIZE. Uses jsPDF's own measurement when the font is
+// available; falls back to a conservative per-character estimate for
+// Ethiopic (which is wider than Latin at the same point size).
+function measureHeaderWidth(doc, label, fontName) {
+  const text = String(label ?? "");
+  try {
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(HEADER_FONT_SIZE);
+    const w = doc.getTextWidth(text);
+    if (Number.isFinite(w) && w > 0) return w;
+  } catch {
+    // fall through to estimate
+  }
+  // Conservative fallback: Ethiopic glyphs average ~4.2mm at 8.5pt,
+  // Latin ~2.2mm. The ".", "." separator is narrow in both.
+  const isAm = isAmharic(text);
+  const perGlyph = isAm ? 4.2 : 2.2;
+  return text.length * perGlyph;
+}
+
+// Compute a safe column width for a no-wrap header cell. Never returns
+// less than `minMm` and always adds horizontal padding so the glyphs
+// aren't pinched against the cell border.
+function computeNoWrapColumnWidth(doc, label, fontName, minMm = 12) {
+  const textMm = measureHeaderWidth(doc, label, fontName);
+  const paddingMm = 3; // 1.5mm each side, slightly less than default 2+2
+  return Math.max(minMm, Math.ceil(textMm + paddingMm));
+}
+
+// Apply the shared header font logic for a cell. Extracted so both
+// Table 1 and Table 2 use the exact same rules.
+function applySharedHeaderFont(doc, data) {
+  const raw = data.cell.raw;
+  if (isNoWrap(raw)) {
+    data.cell.styles.font = pickFontFor(doc, raw);
+    // Slightly tighter padding on header cells so the glyph pair has
+    // room without us having to shrink the font.
+    data.cell.styles.cellPadding = {
+      top: 1.6,
+      bottom: 1.6,
+      left: 1,
+      right: 1,
+    };
+    return;
+  }
+  data.cell.styles.font = pickFontFor(doc, raw);
+}
 
 // ─── FORUM REPORT LABELS (language-aware) ─────────────────────
 // Amharic is the default. `lang` may be "en" or "om" to override.
@@ -515,6 +604,118 @@ const splitExplanationAi = (explanation) => {
   };
 };
 
+// ─── FORUM REPORT ROW BUILDERS ──────────────────────────────
+//
+// These were inlined inside exportForumReportToPDF. Pulled out so the
+// layout function is about layout only, and so the row-shaping logic
+// can be unit-tested without instantiating jsPDF.
+//
+// buildForumContentRows:
+//   Produces the body of Table 1. The Section label appears ONCE per
+//   block (on the first row of the block); subsequent rows of the same
+//   block carry an empty Section cell so nothing repeats.
+//
+// buildForumMemberRows:
+//   Produces the body of Table 2. Present members first (they may carry
+//   a signature image), then absent members. Signature #i is attached
+//   to present member #i.
+function buildForumContentRows(L, formData, includeAI) {
+  const rows = [];
+
+  const pushSectionBlock = (sectionLabel, entries) => {
+    const items = (entries || []).map((e) => encodeText(e)).filter(Boolean);
+    if (items.length === 0) return;
+    items.forEach((item, idx) => {
+      rows.push([
+        "", // row number filled in by caller
+        idx === 0 ? encodeText(sectionLabel) : "",
+        item,
+      ]);
+    });
+  };
+
+  const { manual: manualExplanation, ai: aiExplanation } = splitExplanationAi(
+    formData?.explanation,
+  );
+
+  if (manualExplanation) {
+    pushSectionBlock(L.explanation, [manualExplanation]);
+  }
+  if (includeAI && aiExplanation) {
+    pushSectionBlock(L.aiBlock, [aiExplanation]);
+  }
+
+  pushSectionBlock(
+    L.secPrevResults,
+    (formData?.prevResults || []).filter((r) => r && r.trim()),
+  );
+
+  pushSectionBlock(
+    L.secTopics,
+    (formData?.topics || []).filter((tp) => tp && tp.trim()),
+  );
+
+  pushSectionBlock(
+    L.secGaps,
+    (formData?.gaps || []).filter((g) => g && g.trim()),
+  );
+
+  pushSectionBlock(
+    L.secAgreements,
+    (formData?.agreements || []).filter((a) => a && a.trim()),
+  );
+
+  // Number the rows.
+  rows.forEach((row, i) => {
+    row[0] = String(i + 1);
+  });
+
+  return rows;
+}
+
+function buildForumMemberRows(L, formData) {
+  const rows = [];
+
+  const presentMembers = (formData?.present || []).filter((m) => m && m.trim());
+  const absentMembers = (formData?.absent || []).filter(
+    (i) => i?.name && i.name.trim(),
+  );
+
+  const signatureEntries = Array.isArray(formData?.signatures)
+    ? formData.signatures
+    : [];
+
+  let sigIdx = 0;
+  presentMembers.forEach((name) => {
+    const sig = signatureEntries[sigIdx];
+    const hasSig = sig && String(sig).startsWith("data:image");
+    rows.push([
+      "", // row number filled in by caller
+      encodeText(name),
+      encodeText(L.statusPresent),
+      "",
+      hasSig ? { __signatureImage: sig, __index: sigIdx + 1 } : "",
+    ]);
+    if (hasSig) sigIdx += 1;
+  });
+
+  absentMembers.forEach((entry) => {
+    rows.push([
+      "",
+      encodeText(entry.name),
+      encodeText(L.statusAbsent),
+      encodeText(entry.reason || ""),
+      "",
+    ]);
+  });
+
+  rows.forEach((row, i) => {
+    row[0] = String(i + 1);
+  });
+
+  return rows;
+}
+
 // ─── EXPORT FORUM REPORT (professional two-table layout) ────
 //
 // The forum report has two genuinely different kinds of content and
@@ -637,17 +838,20 @@ export const exportForumReportToPDF = (
     // ─── Shared table styling ──────────────────────────────────
     // Every table in this document uses the same head/body sizing so
     // the two tables read as one continuous report.
+    //
+    // NOTE: the header overflow default is "linebreak" — we rely on
+    // computed column widths (see computeNoWrapColumnWidth) rather than
+    // forcing overflow:"visible", which was the source of the missing
+    // ቁ glyph in an earlier iteration.
     const sharedHeadStyles = {
       fillColor: [26, 107, 74],
       textColor: [255, 255, 255],
-      fontSize: 8.5,
+      fontSize: HEADER_FONT_SIZE,
       fontStyle: "bold",
       halign: "center",
       valign: "middle",
       cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 },
       minCellHeight: 5.5,
-      // Default: allow wrapping. Cells flagged as NO_WRAP override this
-      // in didParseCell below.
       overflow: "linebreak",
     };
     const sharedBodyStyles = {
@@ -663,6 +867,10 @@ export const exportForumReportToPDF = (
       lineWidth: 0.1,
       lineColor: [210, 210, 210],
     };
+
+    // Central didParseCell. For header cells we only fix the font and
+    // tighten padding — we never touch text or overflow. That is the
+    // whole fix for the "ተ.ቁ wraps / ቁ disappears" bug.
     const sharedDidParseCell = (data) => {
       // Signature cells render an image, not text — leave font alone.
       const raw = data.cell.raw;
@@ -671,140 +879,24 @@ export const exportForumReportToPDF = (
         return;
       }
 
-      // Short header labels (ተ.ቁ, ክፍል …) must never wrap. Their cells
-      // are objects with __noWrap:true; unpack the label, force
-      // single-line overflow and let the font fall through normally.
-      if (isNoWrap(raw)) {
-        const label = raw.label;
-        data.cell.text = [String(label)];
-        data.cell.styles.overflow = "visible";
-        data.cell.styles.font = isAmharic(String(label))
-          ? doc.__hasEthiopicFont
-            ? FONT_NAMES.ethiopic
-            : "helvetica"
-          : doc.__hasLatinFont
-            ? FONT_NAMES.latin
-            : "helvetica";
-        return;
-      }
-
-      const cellText = String(raw ?? "");
-      if (isAmharic(cellText)) {
-        data.cell.styles.font = doc.__hasEthiopicFont
-          ? FONT_NAMES.ethiopic
-          : "helvetica";
-      } else {
-        data.cell.styles.font = doc.__hasLatinFont
-          ? FONT_NAMES.latin
-          : "helvetica";
-      }
+      // Every other cell (header or body): pick the right font. Header
+      // cells additionally get tighter padding so the width we computed
+      // for them isn't eaten by default 2+2mm gutters.
+      applySharedHeaderFont(doc, data);
     };
 
-    // ─── TABLE 1 — Session Content ──────────────────────────────
-    // Rows are built as a flat list. The section label appears on the
-    // first row of each block and is left blank for the remaining rows
-    // of the same block so nothing repeats.
-    const contentRows = [];
+    // ─── Build the two row sets ────────────────────────────────
+    const contentRows = buildForumContentRows(L, formData, includeAI);
+    const memberRows = buildForumMemberRows(L, formData);
 
-    const pushSectionBlock = (sectionLabel, entries) => {
-      const items = (entries || []).map((e) => encodeText(e)).filter(Boolean);
-      if (items.length === 0) return;
-      items.forEach((item, idx) => {
-        contentRows.push([
-          "", // row number filled in below
-          idx === 0 ? encodeText(sectionLabel) : "",
-          item,
-        ]);
-      });
-    };
-
-    // Explanation block. Split into manual + AI (AI included only if
-    // the caller wants it). Each is its own labeled block.
-    const { manual: manualExplanation, ai: aiExplanation } = splitExplanationAi(
-      formData?.explanation,
-    );
-
-    if (manualExplanation) {
-      pushSectionBlock(L.explanation, [manualExplanation]);
-    }
-    if (includeAI && aiExplanation) {
-      pushSectionBlock(L.aiBlock, [aiExplanation]);
-    }
-
-    pushSectionBlock(
-      L.secPrevResults,
-      (formData?.prevResults || []).filter((r) => r && r.trim()),
-    );
-
-    pushSectionBlock(
-      L.secTopics,
-      (formData?.topics || []).filter((tp) => tp && tp.trim()),
-    );
-
-    pushSectionBlock(
-      L.secGaps,
-      (formData?.gaps || []).filter((g) => g && g.trim()),
-    );
-
-    pushSectionBlock(
-      L.secAgreements,
-      (formData?.agreements || []).filter((a) => a && a.trim()),
-    );
-
-    // Number the content rows.
-    contentRows.forEach((row, i) => {
-      row[0] = String(i + 1);
-    });
-
-    // ─── TABLE 2 — Members & Signatures ─────────────────────────
-    // Present members first (they carry signatures), then absent
-    // members. Each member appears exactly once.
-    const memberRows = [];
-
-    const presentMembers = (formData?.present || []).filter(
-      (m) => m && m.trim(),
-    );
-    const absentMembers = (formData?.absent || []).filter(
-      (i) => i?.name && i.name.trim(),
-    );
-
-    const signatureEntries = Array.isArray(formData?.signatures)
-      ? formData.signatures
-      : [];
-
-    // Signature #i goes into present member #i. If there are fewer
-    // signatures than present members, later present members get a
-    // blank cell. If there are more, extras are dropped — the report
-    // has no place to put a signature that isn't attached to a
-    // present member.
-    let sigIdx = 0;
-    presentMembers.forEach((name) => {
-      const sig = signatureEntries[sigIdx];
-      const hasSig = sig && String(sig).startsWith("data:image");
-      memberRows.push([
-        "", // row number filled in below
-        encodeText(name),
-        encodeText(L.statusPresent),
-        "",
-        hasSig ? { __signatureImage: sig, __index: sigIdx + 1 } : "",
-      ]);
-      if (hasSig) sigIdx += 1;
-    });
-
-    absentMembers.forEach((entry) => {
-      memberRows.push([
-        "",
-        encodeText(entry.name),
-        encodeText(L.statusAbsent),
-        encodeText(entry.reason || ""),
-        "",
-      ]);
-    });
-
-    // Number the member rows.
-    memberRows.forEach((row, i) => {
-      row[0] = String(i + 1);
-    });
+    // ─── Compute per-language column widths ────────────────────
+    // ተ.ቁ needs more room than "#". Rather than hardcoding 12 or 14mm,
+    // measure the actual label with the actual font and add padding.
+    // This is what prevents the wrap without setting overflow:"visible".
+    const noFont = isAmharic(String(L.colNo))
+      ? FONT_NAMES.ethiopic
+      : FONT_NAMES.latin;
+    const noColWidth = computeNoWrapColumnWidth(doc, L.colNo, noFont, 12);
 
     // ─── Render Table 1 ─────────────────────────────────────────
     if (contentRows.length > 0) {
@@ -816,7 +908,8 @@ export const exportForumReportToPDF = (
 
       autoTable(doc, {
         startY: yPos,
-        // Head cells are noWrap-wrapped so short labels stay on one line.
+        // Head cells are noWrap-wrapped so the font logic knows to
+        // measure them with the Ethiopic face.
         head: [[noWrap(L.colNo), noWrap(L.colSection), noWrap(L.colItem)]],
         body: contentRows,
         margin: { left: margin, right: margin, bottom: 16 },
@@ -825,7 +918,7 @@ export const exportForumReportToPDF = (
         bodyStyles: sharedBodyStyles,
         styles: sharedStyles,
         columnStyles: {
-          0: { cellWidth: 12, halign: "center" }, // was 9 — too narrow for ተ.ቁ
+          0: { cellWidth: noColWidth, halign: "center" },
           1: { cellWidth: 42, halign: "left" },
           2: { cellWidth: "auto", halign: "left" },
         },
@@ -871,7 +964,7 @@ export const exportForumReportToPDF = (
         bodyStyles: sharedBodyStyles,
         styles: sharedStyles,
         columnStyles: {
-          0: { cellWidth: 12, halign: "center" }, // was 9 — too narrow for ተ.ቁ
+          0: { cellWidth: noColWidth, halign: "center" },
           1: { cellWidth: "auto", halign: "left" },
           2: { cellWidth: 32, halign: "center" },
           3: { cellWidth: 40, halign: "left" },
