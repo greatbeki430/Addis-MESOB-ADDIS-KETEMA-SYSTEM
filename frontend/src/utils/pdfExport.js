@@ -120,7 +120,7 @@ function getForumLabels(lang, t) {
     ),
     aiBlock: isAm ? "የ AI ማጠቃለያ" : isOm ? "Cuunfaa AI" : "AI Generated Summary",
 
-    // ─── Section names (row label in the table's Section column) ──
+    // ─── Section names (row label in the Section column) ────────
     secPresent: tf(
       "presentMembers",
       isAm ? "የተገኙ አባላት" : isOm ? "Miseensota Argaman" : "Present Members",
@@ -129,11 +129,9 @@ function getForumLabels(lang, t) {
       "absentMembers",
       isAm ? "ያልተገኙ አባላት" : isOm ? "Miseensota Hin Argamne" : "Absent Members",
     ),
-    // Shorter label than "ያለፈው ስብሰባ ውጤቶች". The longer form wrapped to
-    // two lines inside the 38mm Section column at 8pt, and the extra
-    // line per row was the last remaining cause of a two-page spill.
-    // "ቀዳሚ ውጤቶች" is the standard Amharic short form and fits on one
-    // line comfortably.
+    // Short form — "ያለፈው ስብሰባ ውጤቶች" wrapped inside the content
+    // table's Section column at 8pt. "ቀዳሚ ውጤቶች" is the standard
+    // short Amharic label and stays on one line.
     secPrevResults: tf(
       "prevResults",
       isAm ? "ቀዳሚ ውጤቶች" : isOm ? "Bu'aa Duraa" : "Previous Results",
@@ -155,12 +153,28 @@ function getForumLabels(lang, t) {
       isAm ? "ፊርማዎች" : isOm ? "Mallattoo" : "Signatures",
     ),
 
-    // ─── Table column headers ─────────────────────────────────────
+    // ─── Table 1 (content) column headers ──────────────────────
+    t1Title: isAm
+      ? "የስብሰባ ይዘት"
+      : isOm
+        ? "Qabiyyee Walgahii"
+        : "Session Content",
     colNo: isAm ? "ተ.ቁ" : isOm ? "Lak." : "#",
     colSection: isAm ? "ክፍል" : isOm ? "Kutaa" : "Section",
     colItem: isAm ? "ዝርዝር" : isOm ? "Ibsa" : "Item",
-    colDetail: isAm ? "ማብራሪያ" : isOm ? "Ibsa Dabalataa" : "Detail",
+
+    // ─── Table 2 (members) column headers ──────────────────────
+    t2Title: isAm
+      ? "የአባላት ሁኔታ እና ፊርማ"
+      : isOm
+        ? "Haala Miseensotaa fi Mallattoo"
+        : "Members & Signatures",
+    colName: isAm ? "ስም" : isOm ? "Maqaa" : "Name",
+    colStatus: isAm ? "ሁኔታ" : isOm ? "Haala" : "Status",
+    colReason: isAm ? "ምክንያት" : isOm ? "Sababa" : "Reason",
     colSignature: isAm ? "ፊርማ" : isOm ? "Mallattoo" : "Signature",
+    statusPresent: isAm ? "✓ የተገኙ" : isOm ? "✓ Argame" : "✓ Present",
+    statusAbsent: isAm ? "✗ ያልተገኙ" : isOm ? "✗ Hin argamne" : "✗ Absent",
 
     footer: isAm
       ? "በአዲስ መሶብ የአንድ ማዕከል አገልግሎት የተዘጋጀ"
@@ -218,7 +232,6 @@ export const exportRecognitionCertificateToPDF = (
       signature: isAm ? "ፊርማ" : isOm ? "Mallattoo" : "Signature",
     };
 
-    // ─── Border frame ──────────────────────────────────────
     doc.setDrawColor(26, 107, 74);
     doc.setLineWidth(1.5);
     doc.rect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2);
@@ -231,7 +244,6 @@ export const exportRecognitionCertificateToPDF = (
       pageHeight - margin * 2 - 6,
     );
 
-    // ─── Title ─────────────────────────────────────────────
     doc.setFontSize(28);
     doc.setTextColor(26, 107, 74);
     drawMixedScriptText(doc, L.title, pageWidth / 2, margin + 30, {
@@ -243,14 +255,12 @@ export const exportRecognitionCertificateToPDF = (
     doc.setLineWidth(1);
     doc.line(pageWidth / 2 - 40, margin + 38, pageWidth / 2 + 40, margin + 38);
 
-    // ─── Presented to ──────────────────────────────────────
     doc.setFontSize(12);
     doc.setTextColor(80, 80, 80);
     drawMixedScriptText(doc, L.presentedTo, pageWidth / 2, margin + 58, {
       align: "center",
     });
 
-    // ─── Name ──────────────────────────────────────────────
     doc.setFontSize(24);
     doc.setTextColor(30, 30, 30);
     drawMixedScriptText(doc, employeeName || "—", pageWidth / 2, margin + 78, {
@@ -262,7 +272,6 @@ export const exportRecognitionCertificateToPDF = (
     doc.setLineWidth(0.3);
     doc.line(pageWidth / 2 - 60, margin + 82, pageWidth / 2 + 60, margin + 82);
 
-    // ─── Reason ────────────────────────────────────────────
     doc.setFontSize(11);
     doc.setTextColor(80, 80, 80);
     const reasonLine = `${L.forMonth} ${month || "—"} ${L.withScore}: ${score ?? "—"}`;
@@ -270,7 +279,6 @@ export const exportRecognitionCertificateToPDF = (
       align: "center",
     });
 
-    // ─── Team ──────────────────────────────────────────────
     if (teamName) {
       doc.setFontSize(12);
       doc.setTextColor(26, 107, 74);
@@ -283,7 +291,6 @@ export const exportRecognitionCertificateToPDF = (
       );
     }
 
-    // ─── Date + Signature lines ────────────────────────────
     const lineY = pageHeight - margin - 35;
     const leftX = margin + 40;
     const rightX = pageWidth - margin - 40;
@@ -310,7 +317,6 @@ export const exportRecognitionCertificateToPDF = (
       align: "center",
     });
 
-    // ─── Save ──────────────────────────────────────────────
     const safeName = String(employeeName || "certificate").replace(
       /[^a-z0-9]/gi,
       "_",
@@ -381,7 +387,6 @@ export const exportBiWeeklyAggregateReportToPDF = (
       of: isAm ? "ከ" : isOm ? "keessaa" : "of",
     };
 
-    // ─── Title ─────────────────────────────────────────────
     doc.setFontSize(18);
     doc.setTextColor(26, 107, 74);
     drawMixedScriptText(doc, L.title, pageWidth / 2, yPos, {
@@ -420,7 +425,6 @@ export const exportBiWeeklyAggregateReportToPDF = (
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 8;
 
-    // ─── Table ─────────────────────────────────────────────
     const headers = [L.week, L.total, L.details];
     const rows = weeklyData.map((w, i) => [
       `${i + 1}`,
@@ -451,7 +455,6 @@ export const exportBiWeeklyAggregateReportToPDF = (
 
     yPos = doc.lastAutoTable?.finalY + 10 || yPos + 40;
 
-    // ─── Footer ────────────────────────────────────────────
     const pageCount = doc.internal.getNumberOfPages();
     const footerY = pageHeight - 10;
 
@@ -505,7 +508,28 @@ const splitExplanationAi = (explanation) => {
   };
 };
 
-// ─── EXPORT FORUM REPORT (unified table, Amharic-first) ─────
+// ─── EXPORT FORUM REPORT (professional two-table layout) ────
+//
+// The forum report has two genuinely different kinds of content and
+// forcing both into one table was the source of every earlier
+// iteration's problems. This version splits them:
+//
+//   • Table 1 — "Session Content". One row per item across
+//     explanation, AI block, prev results, topics, gaps, agreements.
+//     The Section label appears ONCE per block; subsequent rows of
+//     the same block carry an empty Section cell so the label is not
+//     repeated. This is the "no redundant rows" behaviour requested.
+//
+//   • Table 2 — "Members & Signatures". One row per member. Present
+//     and absent members live in the same table, distinguished by the
+//     Status column. Signature images are placed sequentially into
+//     the Signature cell of present members: signature #1 → first
+//     present member, #2 → second, etc. Absent members always get a
+//     blank Signature cell.
+//
+// Pagination is natural: Table 2 begins on page 1 if it fits under
+// Table 1, otherwise it continues on page 2. Both tables carry the
+// same head and body styling, so the split is visually seamless.
 export const exportForumReportToPDF = (
   formData,
   t,
@@ -514,7 +538,7 @@ export const exportForumReportToPDF = (
   options = {},
 ) => {
   try {
-    console.log("📄 Generating Forum Report PDF (table layout)...");
+    console.log("📄 Generating Forum Report PDF (two-table layout)...");
 
     const hasData =
       formData?.present?.some((m) => m && m.trim() !== "") ||
@@ -561,7 +585,7 @@ export const exportForumReportToPDF = (
     const margin = 15;
     let yPos = margin;
 
-    // ─── Header: title ─────────────────────────────────────────
+    // ─── Header ─────────────────────────────────────────────────
     doc.setFontSize(16);
     doc.setTextColor(26, 107, 74);
     drawMixedScriptText(doc, L.title, pageWidth / 2, yPos, {
@@ -571,9 +595,6 @@ export const exportForumReportToPDF = (
     doc.setTextColor(0, 0, 0);
     yPos += 7;
 
-    // ─── Header: subtitle ──────────────────────────────────────
-    // Compact — 8.5pt keeps the block 3-4mm shorter than at 10pt,
-    // which matters when the aim is "one team report per page".
     doc.setFontSize(8.5);
     doc.setTextColor(100, 100, 100);
     drawMixedScriptText(doc, L.subtitle, pageWidth / 2, yPos, {
@@ -591,7 +612,6 @@ export const exportForumReportToPDF = (
       yPos += 5;
     }
 
-    // ─── Header: date + time line ──────────────────────────────
     const dateText = formData?.date || new Date().toISOString().split("T")[0];
     const timeText =
       formData?.timeStart || formData?.timeEnd
@@ -607,269 +627,271 @@ export const exportForumReportToPDF = (
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 6;
 
-    // ─── Explanation block (prose above the table) ─────────────
+    // ─── Shared table styling ──────────────────────────────────
+    // Every table in this document uses the same head/body sizing so
+    // the two tables read as one continuous report.
+    const sharedHeadStyles = {
+      fillColor: [26, 107, 74],
+      textColor: [255, 255, 255],
+      fontSize: 8.5,
+      fontStyle: "bold",
+      halign: "center",
+      valign: "middle",
+      cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 },
+      minCellHeight: 5.5,
+    };
+    const sharedBodyStyles = {
+      fontSize: 8,
+      valign: "middle",
+      cellPadding: { top: 1.2, bottom: 1.2, left: 2, right: 2 },
+      minCellHeight: 5,
+      lineColor: [210, 210, 210],
+      lineWidth: 0.1,
+    };
+    const sharedStyles = {
+      overflow: "linebreak",
+      lineWidth: 0.1,
+      lineColor: [210, 210, 210],
+    };
+    const sharedDidParseCell = (data) => {
+      // Signature cells render an image, not text — leave font alone.
+      const raw = data.cell.raw;
+      if (raw && typeof raw === "object" && raw.__signatureImage) {
+        data.cell.text = [""];
+        return;
+      }
+      const cellText = String(raw ?? "");
+      if (isAmharic(cellText)) {
+        data.cell.styles.font = doc.__hasEthiopicFont
+          ? FONT_NAMES.ethiopic
+          : "helvetica";
+      } else {
+        data.cell.styles.font = doc.__hasLatinFont
+          ? FONT_NAMES.latin
+          : "helvetica";
+      }
+    };
+
+    // ─── TABLE 1 — Session Content ──────────────────────────────
+    // Rows are built as a flat list. The section label appears on the
+    // first row of each block and is left blank for the remaining rows
+    // of the same block so nothing repeats.
+    const contentRows = [];
+
+    const pushSectionBlock = (sectionLabel, entries) => {
+      const items = (entries || []).map((e) => encodeText(e)).filter(Boolean);
+      if (items.length === 0) return;
+      items.forEach((item, idx) => {
+        contentRows.push([
+          "", // row number filled in below
+          idx === 0 ? encodeText(sectionLabel) : "",
+          item,
+        ]);
+      });
+    };
+
+    // Explanation block. Split into manual + AI (AI included only if
+    // the caller wants it). Each is its own labeled block.
     const { manual: manualExplanation, ai: aiExplanation } = splitExplanationAi(
       formData?.explanation,
     );
 
-    const renderProseBlock = (heading, body) => {
-      if (!body || !body.trim()) return;
-      if (yPos > pageHeight - 40) {
+    if (manualExplanation) {
+      pushSectionBlock(L.explanation, [manualExplanation]);
+    }
+    if (includeAI && aiExplanation) {
+      pushSectionBlock(L.aiBlock, [aiExplanation]);
+    }
+
+    pushSectionBlock(
+      L.secPrevResults,
+      (formData?.prevResults || []).filter((r) => r && r.trim()),
+    );
+
+    pushSectionBlock(
+      L.secTopics,
+      (formData?.topics || []).filter((tp) => tp && tp.trim()),
+    );
+
+    pushSectionBlock(
+      L.secGaps,
+      (formData?.gaps || []).filter((g) => g && g.trim()),
+    );
+
+    pushSectionBlock(
+      L.secAgreements,
+      (formData?.agreements || []).filter((a) => a && a.trim()),
+    );
+
+    // Number the content rows.
+    contentRows.forEach((row, i) => {
+      row[0] = String(i + 1);
+    });
+
+    // ─── TABLE 2 — Members & Signatures ─────────────────────────
+    // Present members first (they carry signatures), then absent
+    // members. Each member appears exactly once.
+    const memberRows = [];
+
+    const presentMembers = (formData?.present || []).filter(
+      (m) => m && m.trim(),
+    );
+    const absentMembers = (formData?.absent || []).filter(
+      (i) => i?.name && i.name.trim(),
+    );
+
+    const signatureEntries = Array.isArray(formData?.signatures)
+      ? formData.signatures
+      : [];
+
+    // Signature #i goes into present member #i. If there are fewer
+    // signatures than present members, later present members get a
+    // blank cell. If there are more, extras are dropped — the report
+    // has no place to put a signature that isn't attached to a
+    // present member.
+    let sigIdx = 0;
+    presentMembers.forEach((name) => {
+      const sig = signatureEntries[sigIdx];
+      const hasSig = sig && String(sig).startsWith("data:image");
+      memberRows.push([
+        "", // row number filled in below
+        encodeText(name),
+        encodeText(L.statusPresent),
+        "",
+        hasSig ? { __signatureImage: sig, __index: sigIdx + 1 } : "",
+      ]);
+      if (hasSig) sigIdx += 1;
+    });
+
+    absentMembers.forEach((entry) => {
+      memberRows.push([
+        "",
+        encodeText(entry.name),
+        encodeText(L.statusAbsent),
+        encodeText(entry.reason || ""),
+        "",
+      ]);
+    });
+
+    // Number the member rows.
+    memberRows.forEach((row, i) => {
+      row[0] = String(i + 1);
+    });
+
+    // ─── Render Table 1 ─────────────────────────────────────────
+    if (contentRows.length > 0) {
+      doc.setFontSize(10);
+      doc.setTextColor(26, 107, 74);
+      drawMixedScriptText(doc, L.t1Title, margin, yPos, { bold: true });
+      doc.setTextColor(0, 0, 0);
+      yPos += 4;
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [[L.colNo, L.colSection, L.colItem]],
+        body: contentRows,
+        margin: { left: margin, right: margin, bottom: 16 },
+        theme: "grid",
+        headStyles: sharedHeadStyles,
+        bodyStyles: sharedBodyStyles,
+        styles: sharedStyles,
+        columnStyles: {
+          0: { cellWidth: 9, halign: "center" },
+          1: { cellWidth: 42, halign: "left" },
+          2: { cellWidth: "auto", halign: "left" },
+        },
+        didParseCell: sharedDidParseCell,
+      });
+
+      yPos = (doc.lastAutoTable?.finalY || yPos) + 8;
+    }
+
+    // ─── Render Table 2 ─────────────────────────────────────────
+    // If the members table doesn't have at least ~40mm of room left
+    // on the current page, start it on a fresh page. This keeps the
+    // header + first several rows together rather than stranding the
+    // header at the bottom of page 1.
+    if (memberRows.length > 0) {
+      const MIN_TABLE_HEIGHT = 40;
+      if (yPos > pageHeight - MIN_TABLE_HEIGHT - 16) {
         doc.addPage();
         yPos = margin;
       }
 
       doc.setFontSize(10);
       doc.setTextColor(26, 107, 74);
-      drawMixedScriptText(doc, heading, margin, yPos, { bold: true });
+      drawMixedScriptText(doc, L.t2Title, margin, yPos, { bold: true });
       doc.setTextColor(0, 0, 0);
-      yPos += 5;
+      yPos += 4;
 
-      doc.setFontSize(8.5);
-      const wrapped = doc.splitTextToSize(
-        encodeText(body),
-        pageWidth - margin * 2,
-      );
-      wrapped.forEach((line) => {
-        if (yPos > pageHeight - 20) {
-          doc.addPage();
-          yPos = margin;
-        }
-        drawMixedScriptText(doc, line, margin, yPos);
-        yPos += 4;
-      });
-      yPos += 3;
-    };
+      autoTable(doc, {
+        startY: yPos,
+        head: [[L.colNo, L.colName, L.colStatus, L.colReason, L.colSignature]],
+        body: memberRows,
+        margin: { left: margin, right: margin, bottom: 16 },
+        theme: "grid",
+        headStyles: sharedHeadStyles,
+        bodyStyles: sharedBodyStyles,
+        styles: sharedStyles,
+        columnStyles: {
+          0: { cellWidth: 9, halign: "center" },
+          1: { cellWidth: "auto", halign: "left" },
+          2: { cellWidth: 32, halign: "center" },
+          3: { cellWidth: 40, halign: "left" },
+          4: { cellWidth: 32, halign: "center", minCellHeight: 10 },
+        },
+        didParseCell: sharedDidParseCell,
+        didDrawCell: (data) => {
+          if (data.column.index !== 4) return;
+          const raw = data.row.raw?.[4];
+          if (!raw || typeof raw !== "object" || !raw.__signatureImage) return;
 
-    renderProseBlock(L.explanation, manualExplanation);
-    if (includeAI) {
-      renderProseBlock(L.aiBlock, aiExplanation);
-    }
-
-    // ─── Build the table rows ──────────────────────────────────
-    // Five columns, one shared shape:
-    //   # | Section | Name/Item | Detail/Reason | Signature
-    //
-    // Rows are appended in this order: present, absent, prevResults,
-    // topics, gaps, agreements, then signatures.
-    const rows = [];
-
-    const pushRows = (sectionLabel, entries, buildItem, buildDetail) => {
-      entries.forEach((entry) => {
-        rows.push([
-          "", // # filled in below
-          encodeText(sectionLabel),
-          encodeText(buildItem(entry)),
-          encodeText(buildDetail ? buildDetail(entry) : ""),
-          "", // signature cell (blank by default)
-        ]);
-      });
-    };
-
-    pushRows(
-      L.secPresent,
-      (formData?.present || []).filter((m) => m && m.trim()),
-      (name) => name,
-      null,
-    );
-
-    pushRows(
-      L.secAbsent,
-      (formData?.absent || []).filter((i) => i?.name && i.name.trim()),
-      (i) => i.name,
-      (i) => i.reason || "",
-    );
-
-    pushRows(
-      L.secPrevResults,
-      (formData?.prevResults || []).filter((r) => r && r.trim()),
-      (r) => r,
-      null,
-    );
-
-    pushRows(
-      L.secTopics,
-      (formData?.topics || []).filter((tp) => tp && tp.trim()),
-      (tp) => tp,
-      null,
-    );
-
-    pushRows(
-      L.secGaps,
-      (formData?.gaps || []).filter((g) => g && g.trim()),
-      (g) => g,
-      null,
-    );
-
-    pushRows(
-      L.secAgreements,
-      (formData?.agreements || []).filter((a) => a && a.trim()),
-      (a) => a,
-      null,
-    );
-
-    // ─── Signature rows (A-2: embedded PNG when present) ────────
-    const signatureEntries = Array.isArray(formData?.signatures)
-      ? formData.signatures
-      : [];
-
-    signatureEntries.forEach((sig, i) => {
-      // Row shape identical to the rest; the Signature cell carries
-      // an object placeholder that didDrawCell will fill with the PNG.
-      // Non-signature rows carry an empty string and never render an
-      // image.
-      rows.push([
-        "",
-        encodeText(L.secSignatures),
-        "",
-        "",
-        sig && String(sig).startsWith("data:image")
-          ? { __signatureImage: sig, __index: i + 1 }
-          : "",
-      ]);
-    });
-
-    // Fill the row numbers.
-    rows.forEach((row, i) => {
-      row[0] = String(i + 1);
-    });
-
-    // ─── The single table ──────────────────────────────────────
-    const head = [
-      [L.colNo, L.colSection, L.colItem, L.colDetail, L.colSignature],
-    ];
-
-    autoTable(doc, {
-      startY: yPos,
-      head,
-      body: rows,
-      // margin.bottom reserves room for the footer rule + page text
-      // so the table can never overlap them.
-      margin: { left: margin, right: margin, bottom: 16 },
-      // "grid" instead of "striped": with rows this tight, zebra
-      // stripes read as mud and thin grid lines are clearer.
-      theme: "grid",
-
-      // ─── Compact density: many narrow rows per page ─────────────
-      // A forum report is mostly short lines of text (names, topics,
-      // agreements). Default padding of 3mm per side and fontSize 9
-      // pushed ~21 rows per page and spilled the rest to page 2. The
-      // numbers below fit a full 37-row report on one A4 page with
-      // ~25mm of headroom.
-      headStyles: {
-        fillColor: [26, 107, 74],
-        textColor: [255, 255, 255],
-        fontSize: 8.5,
-        fontStyle: "bold",
-        halign: "center",
-        valign: "middle",
-        cellPadding: { top: 1.4, bottom: 1.4, left: 1.8, right: 1.8 },
-        minCellHeight: 5.5,
-      },
-      bodyStyles: {
-        fontSize: 8,
-        valign: "middle",
-        cellPadding: { top: 1.1, bottom: 1.1, left: 1.8, right: 1.8 },
-        minCellHeight: 5,
-        lineColor: [200, 200, 200],
-        lineWidth: 0.1,
-      },
-
-      // ─── Column widths ──────────────────────────────────────
-      // # — two digits max, 9mm is generous.
-      // Section — 38mm so the longest Amharic label ("የተስማሙባቸው ነጥቦች")
-      //   stays on one line at 8pt. Wrapping a section label was
-      //   adding ~4mm per affected row, which is what tipped the
-      //   report onto page 2.
-      // Item — auto, absorbs the remainder (~84mm).
-      // Detail — 32mm fixed; widest content is "Field assignment"
-      //   (~28mm at 8pt). It was previously auto and took half the
-      //   slack despite being empty on ~80% of rows.
-      // Signature — 26mm with minCellHeight 6; enough area for a
-      //   PNG while keeping 7 signature rows ~42mm total.
-      columnStyles: {
-        0: { cellWidth: 9, halign: "center" },
-        1: { cellWidth: 38, halign: "left" },
-        2: { cellWidth: "auto", halign: "left" },
-        3: { cellWidth: 32, halign: "left" },
-        4: { cellWidth: 26, halign: "center", minCellHeight: 6 },
-      },
-      styles: {
-        overflow: "linebreak",
-        lineWidth: 0.1,
-        lineColor: [200, 200, 200],
-      },
-      didParseCell: (data) => {
-        // Per-cell font: mixed-script safe. Every cell's own content
-        // decides whether it needs the Ethiopic or Latin family.
-        const raw = data.cell.raw;
-        if (raw && typeof raw === "object" && raw.__signatureImage) {
-          // Signature cells render an image, not text — leave font alone.
-          data.cell.text = [""];
-          return;
-        }
-        const cellText = String(raw ?? "");
-        if (isAmharic(cellText)) {
-          data.cell.styles.font = doc.__hasEthiopicFont
-            ? FONT_NAMES.ethiopic
-            : "helvetica";
-        } else {
-          data.cell.styles.font = doc.__hasLatinFont
-            ? FONT_NAMES.latin
-            : "helvetica";
-        }
-      },
-      didDrawCell: (data) => {
-        if (data.column.index !== 4) return;
-        const raw = data.row.raw?.[4];
-        if (!raw || typeof raw !== "object" || !raw.__signatureImage) return;
-
-        try {
-          const cell = data.cell;
-          const pad = 1;
-          const boxW = cell.width - pad * 2;
-          const boxH = cell.height - pad * 2;
-          if (boxW <= 0 || boxH <= 0) return;
-
-          // Preserve aspect ratio: read the PNG's natural dimensions
-          // (jsPDF exposes them via getImageProperties for already-
-          // embedded images, but for a data URL we can fall back to
-          // a typical signature-pad ratio of 4:1). Then scale down
-          // to fit the cell — never up, so a small signature doesn't
-          // get stretched.
-          let naturalW = 400;
-          let naturalH = 100;
           try {
-            const props = doc.getImageProperties?.(raw.__signatureImage);
-            if (props?.width && props?.height) {
-              naturalW = props.width;
-              naturalH = props.height;
+            const cell = data.cell;
+            const pad = 1;
+            const boxW = cell.width - pad * 2;
+            const boxH = cell.height - pad * 2;
+            if (boxW <= 0 || boxH <= 0) return;
+
+            // Read natural dimensions to preserve aspect ratio. Falls
+            // back to a 4:1 signature-pad ratio if the reader is
+            // unavailable.
+            let naturalW = 400;
+            let naturalH = 100;
+            try {
+              const props = doc.getImageProperties?.(raw.__signatureImage);
+              if (props?.width && props?.height) {
+                naturalW = props.width;
+                naturalH = props.height;
+              }
+            } catch {
+              // keep fallback
             }
-          } catch {
-            // keep fallback ratio
+
+            const scale = Math.min(boxW / naturalW, boxH / naturalH);
+            const drawW = naturalW * scale;
+            const drawH = naturalH * scale;
+
+            const drawX = cell.x + (cell.width - drawW) / 2;
+            const drawY = cell.y + (cell.height - drawH) / 2;
+
+            doc.addImage(
+              raw.__signatureImage,
+              "PNG",
+              drawX,
+              drawY,
+              drawW,
+              drawH,
+            );
+          } catch (imgErr) {
+            console.warn(
+              `Could not embed signature #${raw.__index}:`,
+              imgErr.message,
+            );
           }
-
-          const scale = Math.min(boxW / naturalW, boxH / naturalH);
-          const drawW = naturalW * scale;
-          const drawH = naturalH * scale;
-
-          // Center the image both horizontally and vertically inside
-          // the cell. Previously it was drawn left-aligned at
-          // (cell.x + pad, cell.y + pad), which made it hug the left
-          // edge of the Signature column and look like it belonged
-          // to the neighbouring cell.
-          const drawX = cell.x + (cell.width - drawW) / 2;
-          const drawY = cell.y + (cell.height - drawH) / 2;
-
-          doc.addImage(raw.__signatureImage, "PNG", drawX, drawY, drawW, drawH);
-        } catch (imgErr) {
-          console.warn(
-            `Could not embed signature #${raw.__index}:`,
-            imgErr.message,
-          );
-        }
-      },
-    });
+        },
+      });
+    }
 
     // ─── Footer with page numbers ──────────────────────────────
     const pageCount = doc.internal.getNumberOfPages();
@@ -973,7 +995,6 @@ export const exportEvaluationReportToPDF = (
     const margin = 15;
     let yPos = margin;
 
-    // ─── TITLE SECTION ─────────────────────────────────────────
     const amharicTitle = "የሥራ አፈጻጸም ሪፖርት";
     doc.setFontSize(22);
     drawMixedScriptText(doc, amharicTitle, pageWidth / 2, yPos, {
@@ -1004,7 +1025,6 @@ export const exportEvaluationReportToPDF = (
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 10;
 
-    // ─── REPORT DATE, PREPARED BY & BRANCH ──────────────────
     const now = new Date();
     const ethiopianDate = getEthiopianDate(now);
     const gregorianDate = now.toLocaleDateString("en-US", {
@@ -1028,7 +1048,6 @@ export const exportEvaluationReportToPDF = (
     doc.setTextColor(0, 0, 0);
     yPos += 10;
 
-    // ─── TABLE ────────────────────────────────────────────────
     doc.setFillColor(26, 107, 74);
     doc.setFontSize(11);
     doc.setTextColor(255, 255, 255);
@@ -1172,7 +1191,6 @@ export const exportEvaluationReportToPDF = (
 
     yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
 
-    // ─── BEST PERFORMER & STATS ──────────────────────────────
     const FOOTER_RESERVED = 24;
 
     if (bestPerformer) {
@@ -1242,7 +1260,6 @@ export const exportEvaluationReportToPDF = (
       yPos = cardY + cardH + 10;
     }
 
-    // ─── ANALYSIS & SUMMARY ───────────────────────────────────
     if (includeAINarrative && aiNarrative) {
       let cleanNarrative = aiNarrative
         .replace(/\*\*/g, "")
@@ -1312,7 +1329,6 @@ export const exportEvaluationReportToPDF = (
       }
     }
 
-    // ─── FOOTER ───────────────────────────────────────────────
     const pageCount = doc.internal.getNumberOfPages();
     const footerY = pageHeight - 14;
 
