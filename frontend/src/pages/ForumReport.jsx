@@ -947,6 +947,12 @@ export default function ForumReport({
   const [formProgress, setFormProgress] = useState(0);
   const [aiGeneratedContent, setAiGeneratedContent] = useState(null);
   const [showAIBadge, setShowAIBadge] = useState(true);
+  // Toggles whether AI-appended content (the "📝 AI Generated Summary:"
+  // block inside form.explanation) is included when exporting the PDF.
+  // Manual explanation text is always included — this only gates the
+  // AI block. Default: include, since the AI content is usually what
+  // the admin wants to export alongside everything else.
+  const [includeAIForPdf, setIncludeAIForPdf] = useState(true);
 
   const [teams, setTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
@@ -1550,10 +1556,11 @@ ${"=".repeat(50)}
     }
   };
 
-  // ─── Handle Export ──────────────────────────────────────────
   const handleExport = () => {
     try {
-      exportForumReportToPDF(form, t, currentLang, selectedTeam?.name);
+      exportForumReportToPDF(form, t, currentLang, selectedTeam?.name, {
+        includeAI: includeAIForPdf,
+      });
       showToast(
         tf("exportSuccess", "✅ Report exported successfully!"),
         "success",
@@ -2966,6 +2973,37 @@ ${"=".repeat(50)}
               borderTop: `2px solid ${C.border}`,
             }}
           >
+            {/* ✅ NEW: checkbox to include/exclude the AI-generated
+                block inside the exported PDF. Only gates the AI text;
+                the manual explanation prose is always included. */}
+            <label
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: isMobile ? "11px" : "12px",
+                color: C.muted,
+                cursor: "pointer",
+                userSelect: "none",
+                flex: isMobile ? "1 1 100%" : "0 0 auto",
+                justifyContent: isMobile ? "center" : "flex-start",
+                order: isMobile ? -1 : 0,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={includeAIForPdf}
+                onChange={(e) => setIncludeAIForPdf(e.target.checked)}
+                style={{
+                  width: 14,
+                  height: 14,
+                  accentColor: C.primary,
+                  cursor: "pointer",
+                }}
+              />
+              {tf("includeAiInPdf", "Include AI content in PDF")}
+            </label>
+
             {/* EXPORT — text on desktop, icon-only on mobile */}
             <button
               style={{
