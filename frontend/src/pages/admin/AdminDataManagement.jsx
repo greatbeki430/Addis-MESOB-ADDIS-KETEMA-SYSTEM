@@ -1345,7 +1345,7 @@ const AdminDataManagement = ({ dataType }) => {
               maxWidth: isMobile ? "100%" : "min(1100px, 94vw)",
               width: "100%",
               maxHeight: isMobile ? "100vh" : "92vh",
-              height: isMobile ? "100vh" : "auto",
+              height: isMobile ? "100vh" : "92vh",
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
