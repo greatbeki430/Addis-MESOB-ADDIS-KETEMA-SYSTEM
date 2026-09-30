@@ -145,11 +145,11 @@ const importServicesFromExcel = async (req, res) => {
   try {
     if (
       !req.user ||
-      (req.user.role !== "admin" && req.user.role !== "superadmin")
+      !["leader", "admin", "superadmin"].includes(req.user.role)
     ) {
       return res
         .status(403)
-        .json({ message: "Unauthorized: Admin access required" });
+        .json({ message: "Unauthorized: Team Leader access required" });
     }
 
     if (!req.file) {
@@ -292,11 +292,11 @@ const previewImport = async (req, res) => {
   try {
     if (
       !req.user ||
-      (req.user.role !== "admin" && req.user.role !== "superadmin")
+      !["leader", "admin", "superadmin"].includes(req.user.role)
     ) {
       return res
         .status(403)
-        .json({ message: "Unauthorized: Admin access required" });
+        .json({ message: "Unauthorized: Team Leader access required" });
     }
 
     if (!req.file) {
@@ -391,11 +391,11 @@ const addService = async (req, res) => {
   try {
     if (
       !req.user ||
-      (req.user.role !== "admin" && req.user.role !== "superadmin")
+      !["leader", "admin", "superadmin"].includes(req.user.role)
     ) {
       return res
         .status(403)
-        .json({ message: "Unauthorized: Admin access required" });
+        .json({ message: "Unauthorized: Team Leader access required" });
     }
 
     const { dept, deptEn, name, nameEn, active, stdTime, image } = req.body;
@@ -456,11 +456,11 @@ const updateService = async (req, res) => {
   try {
     if (
       !req.user ||
-      (req.user.role !== "admin" && req.user.role !== "superadmin")
+      !["leader", "admin", "superadmin"].includes(req.user.role)
     ) {
       return res
         .status(403)
-        .json({ message: "Unauthorized: Admin access required" });
+        .json({ message: "Unauthorized: Team Leader access required" });
     }
 
     const { id } = req.params;

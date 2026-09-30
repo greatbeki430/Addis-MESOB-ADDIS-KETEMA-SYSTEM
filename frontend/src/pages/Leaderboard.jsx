@@ -22,7 +22,7 @@ const Leaderboard = () => {
 
   const isAdminTier = user?.role === "admin" || user?.role === "superadmin";
   const isLeader = user?.role === "leader";
-  const canSeePeopleTab = isAdminTier || isLeader;
+  const canSeePeopleTab = true; // everyone sees the ranking; detail is redacted server-side
 
   const [tab, setTab] = useState("teams"); // "teams" | "people" | "me"
   const [teamSource, setTeamSource] = useState("evaluation"); // "evaluation" | "forum"

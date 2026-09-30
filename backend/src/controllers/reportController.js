@@ -52,9 +52,10 @@ const getReports = async (req, res) => {
     if (endDate)
       filter.createdAt = { ...filter.createdAt, $lte: new Date(endDate) };
 
-    // If user is not admin, only show their own reports
+    // Non-admins see their own reports plus their own team's reports.
     if (req.user.role !== "admin" && req.user.role !== "superadmin") {
-      filter.generatedBy = req.user._id;
+      filter.$or = [{ generatedBy: req.user._id }];
+      if (req.user.team) filter.$or.push({ team: req.user.team });
     }
 
     const reports = await Report.find(filter)
@@ -112,10 +113,15 @@ const getReportById = async (req, res) => {
     }
 
     // Check if user has access
+    const sameTeamReport =
+      report.team &&
+      req.user.team &&
+      (report.team._id || report.team).toString() === req.user.team.toString();
     if (
       req.user.role !== "admin" &&
       req.user.role !== "superadmin" &&
-      report.generatedBy._id.toString() !== req.user._id.toString()
+      report.generatedBy?._id?.toString() !== req.user._id.toString() &&
+      !sameTeamReport
     ) {
       return res
         .status(403)

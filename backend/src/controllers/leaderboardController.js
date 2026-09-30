@@ -18,6 +18,8 @@ const {
   computeMySummary,
 } = require("../services/leaderboardService");
 
+const Team = require("../models/Team");
+
 // ─── Role helpers ──────────────────────────────────────────
 const isSuperAdmin = (u) => u?.role === "superadmin";
 const isAdmin = (u) => u?.role === "admin";
@@ -41,10 +43,9 @@ const redactTeamBoardForLeader = (board, user) => {
       // Leaders see everyone's rank and score, but not the private
       // details (best-performer identity, first-submission time) for
       // teams other than their own.
-      bestPerformerName: isMine ? row.bestPerformerName : null,
-      bestPerformerScore: isMine
-        ? row.bestPerformerScore
-        : row.bestPerformerScore,
+      // Best performers are public recognition for leaders.
+      bestPerformerName: row.bestPerformerName,
+      bestPerformerScore: row.bestPerformerScore,
       firstSubmission: null,
       isMyTeam: isMine,
     };
@@ -63,6 +64,9 @@ const redactTeamBoardForEmployee = (board, user) => {
       // meaningful. No per-member details, no best-performer identity.
       averageScore:
         row.averageScore !== undefined ? row.averageScore : row.compositeScore,
+      // Employees also see who topped their OWN team.
+      bestPerformerName: isMine ? row.bestPerformerName : undefined,
+      bestPerformerScore: isMine ? row.bestPerformerScore : undefined,
       memberCount: row.memberCount ?? undefined,
       meetingsHeld: row.meetingsHeld ?? undefined,
       isMyTeam: isMine,
@@ -72,8 +76,22 @@ const redactTeamBoardForEmployee = (board, user) => {
 
 const redactPersonBoardForAdmin = (board) => board; // full data
 
-const redactPersonBoardForLeader = (board, user) => {
-  const myTeamName = user.team?.name; // may be undefined; only used as fallback
+// Employees see the ranking (rank, name, team, average) for everyone, with
+// their own teammates flagged. Per-member detail stays with leaders/admins.
+const redactPersonBoardForEmployee = (board, myTeamName) =>
+  board.map((row) => ({
+    rank: row.rank,
+    name: row.name,
+    teamName: row.teamName,
+    averageScore: row.averageScore,
+    isMyTeam: !!myTeamName && row.teamName === myTeamName,
+  }));
+
+const redactPersonBoardForLeader = (board, user, resolvedTeamName) => {
+  // req.user.team is an un-populated ObjectId, so the name has to be
+  // resolved by the caller (previously this was always undefined, which
+  // meant leaders never got full rows for their own team).
+  const myTeamName = resolvedTeamName || user.team?.name;
   return board.map((row) => {
     // Leaders see full rows for members of their own team (matched by
     // team name, which is the only team identifier PersonBoard carries).
@@ -106,12 +124,10 @@ const getTeamLeaderboard = async (req, res) => {
     } else if (source === "forum") {
       board = await computeForumTeamBoard({ from, to });
     } else {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "source must be 'evaluation' or 'forum'",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "source must be 'evaluation' or 'forum'",
+      });
     }
 
     // Apply limit AFTER redaction, so a leader sees the top N of what
@@ -170,15 +186,12 @@ const getPersonLeaderboard = async (req, res) => {
       });
     }
 
-    // Employees are not allowed to view the individual leaderboard at
-    // all — that's the same class of data as a team's per-member
-    // breakdown. Team leaders may view it, but only their own team's
-    // rows come through in full.
-    if (!isAdminTier(req.user) && !isLeader(req.user)) {
-      return res.status(403).json({
-        success: false,
-        message: "Not authorized to view individual rankings.",
-      });
+    // Everyone can see the individual ranking; how much detail comes
+    // through depends on the role (see the redactors above).
+    let myTeamName = null;
+    if (req.user.team) {
+      const teamDoc = await Team.findById(req.user.team).select("name").lean();
+      myTeamName = teamDoc?.name || null;
     }
 
     const { from, to } = resolveRange(req.query);
@@ -188,7 +201,9 @@ const getPersonLeaderboard = async (req, res) => {
 
     const visible = isAdminTier(req.user)
       ? redactPersonBoardForAdmin(board)
-      : redactPersonBoardForLeader(board, req.user);
+      : isLeader(req.user)
+        ? redactPersonBoardForLeader(board, req.user, myTeamName)
+        : redactPersonBoardForEmployee(board, myTeamName);
 
     res.json({
       success: true,

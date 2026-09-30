@@ -223,11 +223,9 @@ export const canDeleteEvaluationComment = (user, evaluation, comment) => {
 export const canExportEvaluationPDF = (user, evaluation) => {
   if (!user || !evaluation) return false;
   if (isAdminOrAbove(user)) return true;
-  if (user.role === ROLES.TEAM_LEADER) {
-    const teamId = evaluation.team?._id || evaluation.teamId || evaluation.team;
-    return isUserInTeam(user, teamId);
-  }
-  return false;
+  // Team Leaders and Employees can export their OWN team's evaluations
+  const teamId = evaluation.team?._id || evaluation.teamId || evaluation.team;
+  return isUserInTeam(user, teamId);
 };
 
 /**
@@ -307,14 +305,14 @@ export const canExportPDF = (user, report) => {
   return isOwner(user, report);
 };
 
-export const canApproveReport = (user) => isAdminOrAbove(user);
+export const canApproveReport = (user) => isLeaderOrAbove(user);
 
 // ─── FORUM REPORT PERMISSIONS ──────────────────────────────────────────
 
 export const canCreateForumReport = (user) => {
-  if (!user) return false;
-  // Team Leaders and above can create forum reports
-  return isLeaderOrAbove(user);
+  // Every team member can draft / file a forum report for their own team
+  // (the backend clamps non-admins to their own team).
+  return !!user;
 };
 
 export const canEditForumReport = (user, report) => {
@@ -343,6 +341,12 @@ export const canRequestExtension = (user, report) => {
   if (!user || !report) return false;
   if (isAdminOrAbove(user)) return true;
   if (user.role === ROLES.TEAM_LEADER) {
+    const userTeam = getUserTeamId(user);
+    const reportTeam = report.teamId || report.team?._id || report.team;
+    return userTeam?.toString() === reportTeam?.toString();
+  }
+  // Team members can request more time on their own team's report
+  if (user.role === ROLES.EMPLOYEE) {
     const userTeam = getUserTeamId(user);
     const reportTeam = report.teamId || report.team?._id || report.team;
     return userTeam?.toString() === reportTeam?.toString();
@@ -452,7 +456,7 @@ export const NAV_ITEMS = [
     id: "services",
     icon: "🔧",
     label: "Services",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     id: "gallery",
@@ -470,7 +474,7 @@ export const NAV_ITEMS = [
     id: "analytics",
     icon: "📊",
     label: "Analytics",
-    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     id: "golden-monday",
@@ -500,7 +504,7 @@ export const NAV_ITEMS = [
     id: "admin/services",
     icon: "🔧",
     label: "Service Manager",
-    roles: [ROLES.SUPER_ADMIN],
+    roles: [ROLES.TEAM_LEADER],
   },
   {
     id: "digital-attendance",
@@ -518,31 +522,31 @@ export const NAV_ITEMS = [
     id: "admin-digital-attendance",
     icon: "📱",
     label: "Digital Attendance Logs",
-    roles: [ROLES.SUPER_ADMIN],
+    roles: [ROLES.TEAM_LEADER],
   },
   {
     id: "admin-alerts",
     icon: "🔔",
     label: "Alerts & Notifications",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.TEAM_LEADER],
   },
   {
     id: "admin-evaluations",
     icon: "📝",
     label: "Manage Evaluations",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.TEAM_LEADER],
   },
   {
     id: "admin-daily-reports",
     icon: "📄",
     label: "Manage Daily Reports",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.TEAM_LEADER],
   },
   {
     id: "admin-forum-reports",
     icon: "💬",
     label: "Manage Forum Reports",
-    roles: [ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.TEAM_LEADER],
   },
   {
     id: "admin-requests",
@@ -559,6 +563,15 @@ export const getFilteredNavItems = (userRole) => {
 };
 
 // ─── GALLERY PERMISSIONS ─────────────────────────────────
-export const canManageGallery = (user) => isLeaderOrAbove(user);
-export const canDeleteGallery = (user) => isAdminOrAbove(user);
+export const canManageGallery = (user) => !!user; // everyone can upload
+export const canDeleteGallery = (user) => isLeaderOrAbove(user);
+// Contributors can always remove / edit the media they uploaded themselves
+export const canDeleteOwnGalleryItem = (user, item) =>
+  isLeaderOrAbove(user) || isOwner(user, { createdBy: item?.uploadedBy });
+
+// ─── SERVICES / ANALYTICS / LEADERBOARD ──────────────────
+export const canViewServices = (user) => !!user;
+export const canManageServices = (user) => isLeaderOrAbove(user);
+export const canViewAnalytics = (user) => !!user;
+export const canViewPeopleLeaderboard = (user) => !!user;
 export const canHardDeleteGallery = (user) => isSuperAdmin(user);

@@ -293,10 +293,14 @@ const getDocuments = async (req, res) => {
 
     // Role-based visibility
     if (req.user.role === "employee") {
-      filter.accessLevel = "employee";
-      filter.uploadedBy = req.user._id; // Employees only see their own uploads
+      // Employee-level documents are shared; anything else only if they
+      // uploaded it.
+      filter.$or = [{ accessLevel: "employee" }, { uploadedBy: req.user._id }];
     } else if (req.user.role === "leader") {
-      filter.accessLevel = { $in: ["employee", "leader"] };
+      filter.$or = [
+        { accessLevel: { $in: ["employee", "leader"] } },
+        { uploadedBy: req.user._id },
+      ];
     }
     // admin and superadmin see all
 
@@ -339,6 +343,21 @@ const getDocuments = async (req, res) => {
   }
 };
 
+// Who may open a document:
+//   admin / superadmin → everything
+//   leader             → employee + leader level
+//   employee           → employee level
+//   anyone             → documents they uploaded themselves
+const canAccessDocument = (user, doc) => {
+  if (["admin", "superadmin"].includes(user.role)) return true;
+  const uploaderId = doc.uploadedBy?._id || doc.uploadedBy;
+  if (uploaderId && uploaderId.toString() === user._id.toString()) return true;
+  if (user.role === "leader") {
+    return ["employee", "leader"].includes(doc.accessLevel);
+  }
+  return doc.accessLevel === "employee";
+};
+
 // ============================================================
 // GET /api/documents/:id
 // Auth: role-based access
@@ -353,10 +372,7 @@ const getDocumentById = async (req, res) => {
     if (!doc) return res.status(404).json({ message: "Document not found" });
 
     // Access check
-    if (
-      req.user.role === "employee" &&
-      doc.uploadedBy._id.toString() !== req.user._id.toString()
-    ) {
+    if (!canAccessDocument(req.user, doc)) {
       return res.status(403).json({ message: "Access denied" });
     }
 
@@ -383,8 +399,9 @@ const getDocumentById = async (req, res) => {
 // ============================================================
 const updateDocument = async (req, res) => {
   try {
-    if (!["admin", "superadmin"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Admin access required" });
+    const isAdminUser = ["admin", "superadmin"].includes(req.user.role);
+    if (!isAdminUser && req.user.role !== "leader") {
+      return res.status(403).json({ message: "Team Leader access required" });
     }
 
     const allowed = [
@@ -404,6 +421,23 @@ const updateDocument = async (req, res) => {
     allowed.forEach((field) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     });
+
+    if (!isAdminUser) {
+      // Leaders edit their own uploads; only admins re-classify access level.
+      delete updates.accessLevel;
+      const existing = await CRRSADocument.findOne({
+        _id: req.params.id,
+        isDeleted: false,
+      }).select("uploadedBy");
+      if (!existing) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      if (existing.uploadedBy?.toString() !== req.user._id.toString()) {
+        return res
+          .status(403)
+          .json({ message: "You can only edit documents you uploaded" });
+      }
+    }
 
     const doc = await CRRSADocument.findByIdAndUpdate(req.params.id, updates, {
       new: true,
@@ -433,8 +467,9 @@ const updateDocument = async (req, res) => {
 // ============================================================
 const addDocumentVersion = async (req, res) => {
   try {
-    if (!["admin", "superadmin"].includes(req.user.role)) {
-      return res.status(403).json({ message: "Admin access required" });
+    const isAdminUser = ["admin", "superadmin"].includes(req.user.role);
+    if (!isAdminUser && req.user.role !== "leader") {
+      return res.status(403).json({ message: "Team Leader access required" });
     }
 
     const { file, changeNote } = req.body;
@@ -442,6 +477,15 @@ const addDocumentVersion = async (req, res) => {
 
     const doc = await CRRSADocument.findById(req.params.id);
     if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    if (
+      !isAdminUser &&
+      doc.uploadedBy?.toString() !== req.user._id.toString()
+    ) {
+      return res
+        .status(403)
+        .json({ message: "You can only version documents you uploaded" });
+    }
 
     // Push old file to version history
     doc.versionHistory.push({
@@ -541,6 +585,10 @@ const downloadDocument = async (req, res) => {
     });
 
     if (!doc) return res.status(404).json({ message: "Document not found" });
+
+    if (!canAccessDocument(req.user, doc)) {
+      return res.status(403).json({ message: "Access denied" });
+    }
 
     await logAudit(doc._id, doc.referenceNumber, "download", req.user, req);
 

@@ -1,3 +1,4 @@
+// frontend/src/pages/Report.jsx
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { btn, card, C, F, inp } from "../styles/theme";
 import { meetingAPI, dailyReportAPI, reportAPI } from "../services/api";
@@ -46,7 +47,9 @@ export default function Report({ t: tProp }) {
   // Translation helper
   const tr = (key, fallback) => safeT?.report?.[key] || fallback;
 
-  const { user, isLeader, isAdmin, isSuperAdmin } = useAuth();
+  const { user, isLeader, isEmployee, isAdmin, isSuperAdmin } = useAuth();
+  // Leaders AND employees work inside their own team
+  const isTeamScoped = isLeader || isEmployee;
 
   const [reportType, setReportType] = useState("daily");
   const [period, setPeriod] = useState("monthly");
@@ -161,7 +164,7 @@ export default function Report({ t: tProp }) {
         const parsed = JSON.parse(savedTeams);
         setTeams(parsed);
 
-        if (isLeader && user) {
+        if (isTeamScoped && user) {
           const userTeamFound = parsed.find(
             (team) =>
               team.leader === user.name ||
@@ -177,7 +180,7 @@ export default function Report({ t: tProp }) {
     } catch (e) {
       console.error("Failed to load teams:", e);
     }
-  }, [isLeader, user]);
+  }, [isTeamScoped, user]);
 
   // ✅ useEffect to load initial data
   useEffect(() => {
@@ -195,7 +198,7 @@ export default function Report({ t: tProp }) {
   }, [loadTeamsAndUserTeam]);
 
   const getTeamDisplayName = () => {
-    if (isLeader && userTeam) {
+    if (isTeamScoped && userTeam) {
       return ` (${userTeam.name})`;
     }
     if (selectedTeam) {
@@ -241,7 +244,7 @@ export default function Report({ t: tProp }) {
       }
     }
 
-    if (isLeader && userTeam) {
+    if (isTeamScoped && userTeam) {
       targetTeamName = userTeam.name;
     }
 
@@ -347,7 +350,7 @@ export default function Report({ t: tProp }) {
       if (endDate) params.append("endDate", endDate);
 
       const teamId =
-        isLeader && userTeam ? userTeam.id || userTeam._id : selectedTeam;
+        isTeamScoped && userTeam ? userTeam.id || userTeam._id : selectedTeam;
       if (teamId) params.append("teamId", teamId);
 
       let responseData = [];
@@ -410,7 +413,7 @@ export default function Report({ t: tProp }) {
 
   const exportToExcel = () => {
     const teamName =
-      isLeader && userTeam ? userTeam.name : getTeamDisplayName();
+      isTeamScoped && userTeam ? userTeam.name : getTeamDisplayName();
 
     // ✅ Resolve team names in report data
     const resolvedData = {
@@ -427,7 +430,7 @@ export default function Report({ t: tProp }) {
 
   const exportToWord = () => {
     const teamName =
-      isLeader && userTeam ? userTeam.name : getTeamDisplayName();
+      isTeamScoped && userTeam ? userTeam.name : getTeamDisplayName();
 
     // ✅ Resolve team names in report data
     const resolvedData = {
@@ -444,7 +447,7 @@ export default function Report({ t: tProp }) {
 
   const exportToPDF = () => {
     const teamName =
-      isLeader && userTeam ? userTeam.name : getTeamDisplayName();
+      isTeamScoped && userTeam ? userTeam.name : getTeamDisplayName();
 
     // ✅ Resolve team names in report data
     const resolvedData = {
@@ -515,7 +518,7 @@ export default function Report({ t: tProp }) {
           <FiBarChart2 size={24} color={C.primary} />
           {tr("title", "Report Generator")}
           {getTeamDisplayName()}
-          {isLeader && userTeam && (
+          {isTeamScoped && userTeam && (
             <span style={{ fontSize: 16, color: C.primary, fontWeight: 600 }}>
               {" "}
               - {tr("myTeam", "My Team")}
@@ -682,7 +685,7 @@ export default function Report({ t: tProp }) {
         </p>
       )}
 
-      {isLeader && userTeam && (
+      {isTeamScoped && userTeam && (
         <div
           style={{
             background: `${C.primary}10`,
@@ -1294,7 +1297,7 @@ export default function Report({ t: tProp }) {
                 </div>
               )}
 
-              {isLeader && userTeam && (
+              {isTeamScoped && userTeam && (
                 <div>
                   <label
                     style={{

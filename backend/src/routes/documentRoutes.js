@@ -2,7 +2,7 @@
 
 const express = require("express");
 const router = express.Router();
-const { protect, anyRole, adminOrSuperAdmin } = require("../middleware/auth");
+const { protect, anyRole, leaderOrAdmin } = require("../middleware/auth");
 const {
   uploadDocument,
   getDocuments,
@@ -27,10 +27,10 @@ router.post("/upload", protect, anyRole, uploadDocument);
 router.get("/:id", protect, anyRole, getDocumentById);
 
 // PUT    /api/documents/:id            — update metadata (admin only)
-router.put("/:id", protect, adminOrSuperAdmin, updateDocument);
+router.put("/:id", protect, leaderOrAdmin, updateDocument);
 
 // POST   /api/documents/:id/version    — upload new version of a document
-router.post("/:id/version", protect, adminOrSuperAdmin, addDocumentVersion);
+router.post("/:id/version", protect, leaderOrAdmin, addDocumentVersion);
 
 // DELETE /api/documents/:id/flag       — soft delete (superadmin only)
 router.delete(

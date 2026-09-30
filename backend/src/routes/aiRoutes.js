@@ -27,12 +27,7 @@ const {
 router.post("/daily-insight", protect, anyRole, getDailyInsight);
 
 // POST /api/ai/evaluation-summary     — leader or admin
-router.post(
-  "/evaluation-summary",
-  protect,
-  leaderOrAdmin,
-  getEvaluationSummary,
-);
+router.post("/evaluation-summary", protect, anyRole, getEvaluationSummary);
 
 // POST /api/ai/dashboard-digest       — admin/superadmin
 router.post(
@@ -43,7 +38,7 @@ router.post(
 );
 
 // POST /api/ai/meeting-minutes        — leader or admin
-router.post("/meeting-minutes", protect, leaderOrAdmin, getMeetingMinutes);
+router.post("/meeting-minutes", protect, anyRole, getMeetingMinutes);
 
 // ─── New endpoints ────────────────────────────────────────────
 // POST /api/ai/service-recommendations — any authenticated user
@@ -57,7 +52,7 @@ router.post(
 
 // POST /api/ai/performance-trend      — leader or admin
 // Analyzes multiple daily reports to find performance patterns
-router.post("/performance-trend", protect, leaderOrAdmin, getPerformanceTrend);
+router.post("/performance-trend", protect, anyRole, getPerformanceTrend);
 
 // POST /api/ai/categorize-complaint   — any authenticated user
 // Categorizes a citizen complaint and drafts a response

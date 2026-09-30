@@ -19,6 +19,13 @@ const isAdmin = (user) => {
 // rules stay visibly identical in both places. If one is ever
 // changed, the other should be changed too, and having the check
 // in one function makes that visible at a glance.
+// Non-admins may only file reports for their OWN team.
+const violatesTeamScope = (user, teamId) => {
+  if (isAdmin(user)) return false;
+  if (!teamId) return false;
+  return !user.team || user.team.toString() !== teamId.toString();
+};
+
 const ownerAndTeamCheck = (meeting, user) => {
   const isOwner = meeting.createdBy
     ? meeting.createdBy.toString() === user._id.toString()
@@ -67,6 +74,12 @@ const createMeeting = async (req, res) => {
       teamObjectId = teamId;
     } else if (req.body.team) {
       teamObjectId = req.body.team;
+    }
+
+    if (violatesTeamScope(req.user, teamObjectId)) {
+      return res
+        .status(403)
+        .json({ message: "You can only file reports for your own team" });
     }
 
     // Clean arrays
@@ -193,6 +206,12 @@ const autoSaveMeeting = async (req, res) => {
         teamName,
       } = reportData;
 
+      if (violatesTeamScope(req.user, teamId)) {
+        return res
+          .status(403)
+          .json({ message: "You can only file reports for your own team" });
+      }
+
       meeting = await Meeting.create({
         date: date ? new Date(date) : new Date(),
         timeStart: timeStart || "",
@@ -307,8 +326,18 @@ const getMeetings = async (req, res) => {
         // e.g. they were moved between teams after submitting).
         // Express the rule as an OR so a single query returns both.
         filter.$or = [{ team: req.user.team }, { createdBy: req.user._id }];
+      } else if (userTeamId) {
+        // Team members can read their teammates' SUBMITTED reports (never
+        // their in-progress drafts), plus everything they wrote themselves.
+        filter.$or = [
+          {
+            team: req.user.team,
+            status: { $nin: ["in_progress", "auto_saved"] },
+          },
+          { createdBy: req.user._id },
+        ];
       } else {
-        // Everyone else — members and anything else below leader.
+        // No team assigned — own reports only.
         filter.createdBy = req.user._id;
       }
     }

@@ -104,6 +104,19 @@ const getEvaluationSummary = async (req, res) => {
       if (!evaluation) {
         return res.status(404).json({ message: "Evaluation not found" });
       }
+      if (
+        req.user.role !== "admin" &&
+        req.user.role !== "superadmin" &&
+        (!req.user.team ||
+          !evaluation.team ||
+          evaluation.team.toString() !== req.user.team.toString())
+      ) {
+        return res
+          .status(403)
+          .json({
+            message: "You can only summarise your own team's evaluations",
+          });
+      }
       evaluationData = evaluation.toObject();
       // Use language from request or from evaluation data
       language = req.body.language || evaluationData.language || "am";
@@ -239,7 +252,17 @@ const getPerformanceTrend = async (req, res) => {
     const { teamId, startDate, endDate } = req.body;
 
     const query = {};
-    if (teamId) query.team = teamId;
+    // Non-admins can only analyse their own team.
+    if (req.user.role !== "admin" && req.user.role !== "superadmin") {
+      if (!req.user.team) {
+        return res
+          .status(403)
+          .json({ message: "You are not assigned to a team" });
+      }
+      query.team = req.user.team;
+    } else if (teamId) {
+      query.team = teamId;
+    }
     if (startDate || endDate) {
       query.date = {};
       if (startDate) query.date.$gte = startDate;
