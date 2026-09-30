@@ -11,7 +11,11 @@ const {
   importServicesFromExcel,
   previewImport,
 } = require("../controllers/serviceController");
-const { protect, adminOrSuperAdmin } = require("../middleware/auth");
+const {
+  protect,
+  adminOrSuperAdmin,
+  leaderOrAdmin,
+} = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -70,7 +74,7 @@ router.post("/seed", protect, adminOrSuperAdmin, seedServices);
 router.post(
   "/preview-import",
   protect,
-  adminOrSuperAdmin,
+  leaderOrAdmin,
   upload.single("file"),
   previewImport,
 );
@@ -79,16 +83,16 @@ router.post(
 router.post(
   "/import-excel",
   protect,
-  adminOrSuperAdmin,
+  leaderOrAdmin,
   upload.single("file"),
   importServicesFromExcel,
 );
 
 // POST /api/services - Add single service
-router.post("/", protect, adminOrSuperAdmin, addService);
+router.post("/", protect, leaderOrAdmin, addService);
 
 // PUT /api/services/:id - Update service
-router.put("/:id", protect, adminOrSuperAdmin, updateService);
+router.put("/:id", protect, leaderOrAdmin, updateService);
 
 // DELETE /api/services/:id - Delete service
 router.delete("/:id", protect, adminOrSuperAdmin, deleteService);

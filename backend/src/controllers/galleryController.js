@@ -22,8 +22,10 @@ const {
 // ─── Role helpers ──────────────────────────────────────────
 const LEADER_TIER = new Set(["leader", "admin", "superadmin"]);
 const ADMIN_TIER = new Set(["admin", "superadmin"]);
-const canUpload = (user) => LEADER_TIER.has(user?.role);
-const canDelete = (user) => ADMIN_TIER.has(user?.role);
+// Every authenticated role may contribute media; ownership limits editing.
+const canUpload = (user) => !!user;
+// Team Leaders and above may (soft-)delete any media / album.
+const canDelete = (user) => LEADER_TIER.has(user?.role);
 const canHardDelete = (user) => user?.role === "superadmin";
 
 // ─── Access filter by role ─────────────────────────────────
@@ -164,7 +166,7 @@ const listAlbums = async (req, res) => {
 // POST /api/gallery
 const createAlbum = async (req, res) => {
   try {
-    if (!canUpload(req.user)) {
+    if (!LEADER_TIER.has(req.user?.role)) {
       return res.status(403).json({
         success: false,
         message: "Only team leaders and above can create albums.",
@@ -275,7 +277,7 @@ const getAlbum = async (req, res) => {
 // PATCH /api/gallery/:albumId
 const updateAlbum = async (req, res) => {
   try {
-    if (!canUpload(req.user)) {
+    if (!LEADER_TIER.has(req.user?.role)) {
       return res.status(403).json({
         success: false,
         message: "Only team leaders and above can update albums.",
@@ -331,7 +333,7 @@ const deleteAlbum = async (req, res) => {
     if (!canDelete(req.user)) {
       return res.status(403).json({
         success: false,
-        message: "Only admins can delete albums.",
+        message: "Only team leaders and above can delete albums.",
       });
     }
 
@@ -422,6 +424,16 @@ const finalizeItem = async (req, res) => {
         return res
           .status(404)
           .json({ success: false, message: "Album not found." });
+      }
+      if (
+        req.user.role === "employee" &&
+        album.accessLevel &&
+        album.accessLevel !== "employee"
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have access to upload into this album.",
+        });
       }
     }
 
@@ -596,11 +608,11 @@ const updateItem = async (req, res) => {
         .filter(Boolean);
     }
 
-    const item = await GalleryItem.findOneAndUpdate(
-      { _id: itemId, isDeleted: false },
-      updates,
-      { new: true },
-    );
+    const editFilter = { _id: itemId, isDeleted: false };
+    if (!LEADER_TIER.has(req.user.role)) editFilter.uploadedBy = req.user._id;
+    const item = await GalleryItem.findOneAndUpdate(editFilter, updates, {
+      new: true,
+    });
 
     if (!item) {
       return res
@@ -618,12 +630,8 @@ const updateItem = async (req, res) => {
 // DELETE /api/gallery/items/:itemId
 const deleteItem = async (req, res) => {
   try {
-    if (!canDelete(req.user)) {
-      return res.status(403).json({
-        success: false,
-        message: "Only admins can delete media.",
-      });
-    }
+    // Leaders+ may remove any media; contributors may remove their own
+    // uploads (checked once the item is loaded, below).
 
     const { itemId } = req.params;
     const hard = req.query.hard === "true";
@@ -633,6 +641,15 @@ const deleteItem = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Item not found." });
+    }
+    if (
+      !canDelete(req.user) &&
+      item.uploadedBy?.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only delete media you uploaded.",
+      });
     }
 
     if (hard) {
@@ -725,7 +742,9 @@ const aiEditItem = async (req, res) => {
         .json({ success: false, message: "Unsupported operation." });
     }
 
-    const item = await GalleryItem.findOne({ _id: itemId, isDeleted: false });
+    const ownFilter = { _id: itemId, isDeleted: false };
+    if (!LEADER_TIER.has(req.user.role)) ownFilter.uploadedBy = req.user._id;
+    const item = await GalleryItem.findOne(ownFilter);
     if (!item) {
       return res
         .status(404)
@@ -785,7 +804,9 @@ const restoreOriginal = async (req, res) => {
     }
 
     const { itemId } = req.params;
-    const item = await GalleryItem.findOne({ _id: itemId, isDeleted: false });
+    const ownFilter = { _id: itemId, isDeleted: false };
+    if (!LEADER_TIER.has(req.user.role)) ownFilter.uploadedBy = req.user._id;
+    const item = await GalleryItem.findOne(ownFilter);
 
     if (!item) {
       return res

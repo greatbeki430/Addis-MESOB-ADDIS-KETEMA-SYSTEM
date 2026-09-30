@@ -5,6 +5,10 @@ const Meeting = require("../models/Meeting");
 const User = require("../models/User");
 const mongoose = require("mongoose");
 
+// Team Leaders can act on their OWN team's records only; admins and super
+// admins are unrestricted.
+const isAdminTier = (u) => u?.role === "admin" || u?.role === "superadmin";
+
 // ─────────────────────────────────────────────────────────────
 // GET /admin/data/:dataType
 //
@@ -68,6 +72,16 @@ exports.getData = async (req, res) => {
       if (mongoose.Types.ObjectId.isValid(team)) {
         query.team = team;
       }
+    }
+
+    // Team Leaders are always clamped to their own team (overrides ?team=).
+    if (!isAdminTier(req.user)) {
+      if (!req.user.team) {
+        return res
+          .status(403)
+          .json({ success: false, error: "You are not assigned to a team" });
+      }
+      query.team = req.user.team;
     }
 
     if (startDate || endDate) {
@@ -277,26 +291,47 @@ exports.bulkAction = async (req, res) => {
           .json({ success: false, error: "Invalid data type" });
     }
 
+    // Leaders may only touch their own team's records.
+    let targetIds = validIds;
+    if (!isAdminTier(req.user)) {
+      if (!req.user.team) {
+        return res
+          .status(403)
+          .json({ success: false, error: "You are not assigned to a team" });
+      }
+      const owned = await model
+        .find({ _id: { $in: validIds }, team: req.user.team })
+        .select("_id")
+        .lean();
+      targetIds = owned.map((d) => d._id);
+      if (targetIds.length === 0) {
+        return res.status(403).json({
+          success: false,
+          error: "You can only manage your own team's records",
+        });
+      }
+    }
+
     let result;
     switch (action) {
       case "delete":
-        result = await model.deleteMany({ _id: { $in: validIds } });
+        result = await model.deleteMany({ _id: { $in: targetIds } });
         break;
       case "archive":
         result = await model.updateMany(
-          { _id: { $in: validIds } },
+          { _id: { $in: targetIds } },
           { status: "archived" },
         );
         break;
       case "approve":
         result = await model.updateMany(
-          { _id: { $in: validIds } },
+          { _id: { $in: targetIds } },
           { status: "approved" },
         );
         break;
       case "reject":
         result = await model.updateMany(
-          { _id: { $in: validIds } },
+          { _id: { $in: targetIds } },
           { status: "rejected" },
         );
         break;
@@ -338,6 +373,15 @@ exports.exportData = async (req, res) => {
         .split(",")
         .filter((id) => mongoose.Types.ObjectId.isValid(id));
       query = { _id: { $in: validIds } };
+    }
+
+    if (!isAdminTier(req.user)) {
+      if (!req.user.team) {
+        return res
+          .status(403)
+          .json({ success: false, error: "You are not assigned to a team" });
+      }
+      query.team = req.user.team;
     }
 
     switch (dataType) {
@@ -444,7 +488,16 @@ exports.deleteItem = async (req, res) => {
           .json({ success: false, error: "Invalid data type" });
     }
 
-    const result = await model.findByIdAndDelete(id);
+    const deleteFilter = { _id: id };
+    if (!isAdminTier(req.user)) {
+      if (!req.user.team) {
+        return res
+          .status(403)
+          .json({ success: false, error: "You are not assigned to a team" });
+      }
+      deleteFilter.team = req.user.team;
+    }
+    const result = await model.findOneAndDelete(deleteFilter);
     if (!result) {
       return res.status(404).json({ success: false, error: "Item not found" });
     }

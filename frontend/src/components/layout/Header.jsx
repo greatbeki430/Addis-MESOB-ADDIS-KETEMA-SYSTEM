@@ -549,7 +549,7 @@ export default function Header({ t, lang, setLang, onAddUserClick }) {
 
           {/* ✅ ── NOTIFICATION BELL ── ✅ */}
           {/* Show only for Admin and Super Admin */}
-          {(isAdmin || isSuperAdmin) && <NotificationBell />}
+          <NotificationBell />
 
           {/* ── User Avatar with Dropdown ── */}
           <div

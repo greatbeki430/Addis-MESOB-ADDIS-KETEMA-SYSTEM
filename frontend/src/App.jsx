@@ -322,18 +322,12 @@ function AuthenticatedApp() {
               />
               <Route
                 path="/services"
-                element={
-                  isAdminOrSuperAdmin ? (
-                    <Services t={t} lang={language} />
-                  ) : (
-                    <Navigate to="/dashboard" replace />
-                  )
-                }
+                element={<Services t={t} lang={language} />}
               />
               <Route
                 path="/admin/services"
                 element={
-                  isSuperAdmin ? (
+                  isLeaderOrAbove ? (
                     <AdminServiceManager t={t} />
                   ) : (
                     <Navigate to="/dashboard" replace />
@@ -381,13 +375,7 @@ function AuthenticatedApp() {
               />
               <Route
                 path="/analytics"
-                element={
-                  isLeaderOrAbove ? (
-                    <Report t={t} lang={language} />
-                  ) : (
-                    <Navigate to="/dashboard" replace />
-                  )
-                }
+                element={<Report t={t} lang={language} />}
               />
               <Route
                 path="/digital-attendance"
@@ -406,7 +394,7 @@ function AuthenticatedApp() {
               <Route
                 path="/admin-digital-attendance"
                 element={
-                  isSuperAdmin ? (
+                  isLeaderOrAbove ? (
                     <AttendanceManagement isDigitalView={true} />
                   ) : (
                     <Navigate to="/dashboard" replace />
@@ -416,7 +404,7 @@ function AuthenticatedApp() {
               <Route
                 path="/admin-alerts"
                 element={
-                  isAdminOrSuperAdmin ? (
+                  isLeaderOrAbove ? (
                     <AlertsManagement />
                   ) : (
                     <Navigate to="/dashboard" replace />
@@ -426,7 +414,7 @@ function AuthenticatedApp() {
               <Route
                 path="/admin-evaluations"
                 element={
-                  isAdminOrSuperAdmin ? (
+                  isLeaderOrAbove ? (
                     <AdminDataManagement dataType="evaluations" />
                   ) : (
                     <Navigate to="/dashboard" replace />
@@ -436,7 +424,7 @@ function AuthenticatedApp() {
               <Route
                 path="/admin-daily-reports"
                 element={
-                  isAdminOrSuperAdmin ? (
+                  isLeaderOrAbove ? (
                     <AdminDataManagement dataType="daily-reports" />
                   ) : (
                     <Navigate to="/dashboard" replace />
@@ -446,7 +434,7 @@ function AuthenticatedApp() {
               <Route
                 path="/admin-forum-reports"
                 element={
-                  isAdminOrSuperAdmin ? (
+                  isLeaderOrAbove ? (
                     <AdminDataManagement dataType="forum-reports" />
                   ) : (
                     <Navigate to="/dashboard" replace />

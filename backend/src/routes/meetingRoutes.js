@@ -55,7 +55,7 @@ router.use(protect, anyRole);
 // ─── Meeting CRUD ────────────────────────────────────────────
 
 // POST /api/meetings - Create new meeting report (leaders and above)
-router.post("/", leaderOrAdmin, createMeeting);
+router.post("/", createMeeting);
 
 // GET /api/meetings/team/:teamId - Get meetings by team
 router.get("/team/:teamId", getMeetings);
@@ -88,18 +88,18 @@ router.delete("/:id", deleteMeeting);
 
 // ─── Auto-Save Routes ────────────────────────────────────────
 // POST /api/meetings/auto-save - Auto-save meeting progress
-router.post("/auto-save", leaderOrAdmin, autoSaveMeeting);
+router.post("/auto-save", autoSaveMeeting);
 
 // ─── Lock/Unlock Routes ──────────────────────────────────────
 // POST /api/meetings/:id/lock - Lock meeting (auto-lock on expiry)
-router.post("/:id/lock", leaderOrAdmin, lockMeeting);
+router.post("/:id/lock", lockMeeting);
 
 // POST /api/meetings/:id/unlock - Unlock meeting (admin only)
 router.post("/:id/unlock", adminOrSuperAdmin, unlockMeeting);
 
 // ─── Extension Request ACTIONS ──────────────────────────────
 // POST /api/meetings/:id/request-extension - Request extension
-router.post("/:id/request-extension", leaderOrAdmin, requestExtension);
+router.post("/:id/request-extension", requestExtension);
 
 // POST /api/meetings/extension/:id/approve - Approve extension (admin)
 router.post("/extension/:id/approve", adminOrSuperAdmin, approveExtension);

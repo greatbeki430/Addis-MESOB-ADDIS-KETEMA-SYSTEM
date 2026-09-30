@@ -5,6 +5,9 @@ const User = require("../models/User");
 const Team = require("../models/Team");
 const mongoose = require("mongoose");
 
+const isAdminTierUser = (u) => u?.role === "admin" || u?.role === "superadmin";
+const leaderTeamId = (u) => (u?.team ? u.team.toString() : null);
+
 // Self-service digital attendance endpoints are open to every employee, but
 // only for their OWN record — an admin/superadmin may act on someone else's
 // behalf (e.g. manual correction).
@@ -230,6 +233,16 @@ exports.getDigitalAttendances = async (req, res) => {
     if (team && team !== "all") {
       matchStage.teamId = new mongoose.Types.ObjectId(team);
     }
+    // Team Leaders only ever see their own team's attendance.
+    if (!isAdminTierUser(req.user)) {
+      const tid = leaderTeamId(req.user);
+      if (!tid) {
+        return res
+          .status(403)
+          .json({ error: "You are not assigned to a team" });
+      }
+      matchStage.teamId = new mongoose.Types.ObjectId(tid);
+    }
     if (startDate && endDate) {
       matchStage.date = { $gte: startDate, $lte: endDate };
     }
@@ -311,6 +324,15 @@ exports.verifyDigitalAttendance = async (req, res) => {
         .json({ error: "Digital attendance record not found" });
     }
 
+    if (
+      !isAdminTierUser(req.user) &&
+      attendance.teamId?.toString() !== leaderTeamId(req.user)
+    ) {
+      return res
+        .status(403)
+        .json({ error: "You can only verify your own team's attendance" });
+    }
+
     attendance.status = status; // 'verified' or 'rejected'
     attendance.verifiedBy = req.user._id;
     attendance.verifiedAt = new Date();
@@ -352,6 +374,17 @@ exports.getAlerts = async (req, res) => {
     if (type && type !== "all") matchStage.type = type;
     if (severity && severity !== "all") matchStage.severity = severity;
 
+    // Team Leaders only see alerts raised for their own team.
+    if (!isAdminTierUser(req.user)) {
+      const tid = leaderTeamId(req.user);
+      if (!tid) {
+        return res
+          .status(403)
+          .json({ error: "You are not assigned to a team" });
+      }
+      matchStage.teamId = new mongoose.Types.ObjectId(tid);
+    }
+
     const skip = (page - 1) * limit;
 
     const [alerts, total] = await Promise.all([
@@ -392,6 +425,15 @@ exports.resolveAlert = async (req, res) => {
     const alert = await Alert.findById(id);
     if (!alert) {
       return res.status(404).json({ error: "Alert not found" });
+    }
+
+    if (
+      !isAdminTierUser(req.user) &&
+      alert.teamId?.toString() !== leaderTeamId(req.user)
+    ) {
+      return res
+        .status(403)
+        .json({ error: "You can only resolve your own team's alerts" });
     }
 
     alert.status = "resolved";
