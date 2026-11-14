@@ -1,6 +1,7 @@
 // frontend/src/pages/admin/AdminDataManagement.jsx
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useAuth } from "../../hooks/useAuth";
+import { useToast } from "../../hooks/useToast";
 import { C } from "../../styles/theme";
 import axios from "axios";
 import {
@@ -29,15 +30,27 @@ import {
   FiPenTool,
   FiAlignLeft,
   FiActivity,
+  FiLock,
+  FiUnlock,
 } from "react-icons/fi";
 
 import {
   generateReportForRow,
   isReportSupported,
 } from "../../utils/adminReportGenerator";
+import { isAdminOrAbove } from "../../utils/roles";
+import { forumReportService } from "../../services/forumReportService";
+import { forumReportTranslations } from "../../constants/translations/forumReport";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+// ─── Translation lookup (English by default; same keys exist in am/om)
+const makeT = (lang = "en") => {
+  const dict =
+    forumReportTranslations[lang]?.forum || forumReportTranslations.en.forum;
+  return (key, fallback) => dict[key] ?? fallback;
+};
 
 // ─── Column configurations (unchanged) ──────────────────────────
 const COLUMN_CONFIGS = {
@@ -185,6 +198,7 @@ const KEY_LABELS = {
   adminNotes: "Admin Notes",
   reviewedBy: "Reviewed By",
   reviewedAt: "Reviewed At",
+  completedAt: "Completed At",
   finalizedAt: "Finalized At",
   aiGeneratedContent: "AI Generated Content",
   employee_name: "Employee",
@@ -215,6 +229,7 @@ const KEY_LABELS = {
   leader: "Leader",
   score: "Score",
 };
+
 // ─── Helpers ────────────────────────────────────────────────────
 const formatLabel = (key) =>
   KEY_LABELS[key] ||
@@ -251,7 +266,6 @@ const formatValue = (value) => {
   if (isDateLike(value)) {
     const d = new Date(value);
     if (!Number.isNaN(d.getTime())) {
-      // Show date + time nicely
       const hasTime = value.includes("T");
       return d.toLocaleString("en-US", {
         year: "numeric",
@@ -279,6 +293,11 @@ const formatValue = (value) => {
 // ─── Component ──────────────────────────────────────────────────
 const AdminDataManagement = ({ dataType }) => {
   const { user } = useAuth();
+  const { showToast } = useToast();
+  const t = makeT("en");
+  const isAdmin = isAdminOrAbove(user);
+  const isForumReports = dataType === "forum-reports";
+
   // ─── Responsive viewport tracking ────────────────────────────
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   useEffect(() => {
@@ -286,6 +305,7 @@ const AdminDataManagement = ({ dataType }) => {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [pagination, setPagination] = useState({
@@ -311,6 +331,13 @@ const AdminDataManagement = ({ dataType }) => {
   // Tracks which row is currently being turned into a PDF so the
   // button can show a spinner and can't be double-clicked.
   const [generatingPdfId, setGeneratingPdfId] = useState(null);
+
+  // ─── B9: lock / unlock ────────────────────────────────────
+  // busyLockId is the row currently being locked/unlocked (spinner +
+  // disable on that button). Only meaningful for forum-reports and
+  // only for admins.
+  const [busyLockId, setBusyLockId] = useState(null);
+
   const abortControllerRef = useRef(null);
   const isMountedRef = useRef(true);
   const hasLoadedRef = useRef(false);
@@ -498,9 +525,6 @@ const AdminDataManagement = ({ dataType }) => {
     async (item) => {
       setGeneratingPdfId(item.id);
       try {
-        // Diagnostic: log the row we're about to generate from, so a
-        // field-name mismatch shows up immediately in the console
-        // instead of as a silent "PDF could not be generated".
         console.log(
           "[AdminDataManagement] generate PDF for dataType:",
           dataType,
@@ -526,131 +550,233 @@ const AdminDataManagement = ({ dataType }) => {
     [dataType],
   );
 
-  const renderCellValue = useCallback((item, col) => {
-    const value = item[col.key];
-    if (value === null || value === undefined) return "—";
+  // ─── B9: Lock / Unlock handlers ──────────────────────────
+  // Only invoked from the forum-reports rows, only for admins. Both
+  // paths go through forumReportService (POST /meetings/:id/lock and
+  // /meetings/:id/unlock), matching the backend adminOrSuperAdmin
+  // route guard. Lock requires a reason; unlock does not.
+  const isRowLocked = useCallback(
+    (item) => item.isLocked === true || item.status === "locked",
+    [],
+  );
 
-    const statusColors = {
-      pending: "#F59E0B",
-      approved: "#10B981",
-      rejected: "#EF4444",
-      completed: "#3B82F6",
-      active: "#10B981",
-      inactive: "#6B7280",
-      verified: "#10B981",
-      resolved: "#3B82F6",
-      dismissed: "#6B7280",
-      in_progress: "#8B5CF6",
-      auto_saved: "#F59E0B",
-      draft: "#6B7280",
-    };
-
-    const priorityColors = {
-      high: "#EF4444",
-      medium: "#F59E0B",
-      low: "#10B981",
-      critical: "#DC2626",
-    };
-
-    const severityColors = {
-      low: "#10B981",
-      medium: "#F59E0B",
-      high: "#EF4444",
-      critical: "#DC2626",
-    };
-
-    switch (col.type) {
-      case "status":
-        return (
-          <span
-            className="status-badge"
-            style={{
-              backgroundColor:
-                statusColors[String(value).toLowerCase()] || "#6B7280",
-              color: "#fff",
-              padding: "4px 12px",
-              borderRadius: "12px",
-              fontSize: "12px",
-              display: "inline-block",
-            }}
-          >
-            {value === "approved" || value === "verified" ? (
-              <FiCheck size={12} style={{ marginRight: 4 }} />
-            ) : value === "rejected" ? (
-              <FiX size={12} style={{ marginRight: 4 }} />
-            ) : null}
-            {value}
-          </span>
+  const handleLockRow = useCallback(
+    async (item) => {
+      if (!isAdmin || !isForumReports) return;
+      const reason = window.prompt(
+        t("adminLockReason", "Reason for locking (required):"),
+        "",
+      );
+      if (reason === null) return; // user cancelled
+      if (!reason.trim()) {
+        showToast(t("adminReasonRequired", "A reason is required."), "warning");
+        return;
+      }
+      setBusyLockId(item.id);
+      try {
+        await forumReportService.lockReport(item.id, reason.trim());
+        showToast(t("adminLockSuccess", "✅ Report locked"), "success");
+        await fetchData();
+      } catch (err) {
+        console.error("[AdminDataManagement] lock failed:", err);
+        showToast(
+          err?.response?.data?.message ||
+            t("adminReasonRequired", "Failed to lock report."),
+          "error",
         );
+      } finally {
+        setBusyLockId(null);
+      }
+    },
+    [isAdmin, isForumReports, showToast, t, fetchData],
+  );
 
-      case "score":
-        return (
-          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ fontWeight: 600 }}>{value}</span>
-            {value >= 60 && <FiStar size={14} color="#f59e0b" />}
-          </div>
+  const handleUnlockRow = useCallback(
+    async (item) => {
+      if (!isAdmin || !isForumReports) return;
+      const ok = window.confirm(
+        t("adminUnlockConfirm", "Unlock this report and allow editing again?"),
+      );
+      if (!ok) return;
+      setBusyLockId(item.id);
+      try {
+        await forumReportService.unlockReport(item.id);
+        showToast(t("adminUnlockSuccess", "✅ Report unlocked"), "success");
+        await fetchData();
+      } catch (err) {
+        console.error("[AdminDataManagement] unlock failed:", err);
+        showToast(
+          err?.response?.data?.message || "Failed to unlock report.",
+          "error",
         );
+      } finally {
+        setBusyLockId(null);
+      }
+    },
+    [isAdmin, isForumReports, showToast, t, fetchData],
+  );
 
-      case "priority":
-        return (
-          <span
-            className="priority-badge"
-            style={{
-              backgroundColor:
-                priorityColors[String(value).toLowerCase()] || "#6B7280",
-              color: "#fff",
-              padding: "4px 12px",
-              borderRadius: "12px",
-              fontSize: "12px",
-              display: "inline-block",
-            }}
-          >
-            {value === "high" || value === "critical" ? (
+  const renderCellValue = useCallback(
+    (item, col) => {
+      const value = item[col.key];
+      if (value === null || value === undefined) return "—";
+
+      const statusColors = {
+        pending: "#F59E0B",
+        approved: "#10B981",
+        rejected: "#EF4444",
+        completed: "#3B82F6",
+        active: "#10B981",
+        inactive: "#6B7280",
+        verified: "#10B981",
+        resolved: "#3B82F6",
+        dismissed: "#6B7280",
+        in_progress: "#8B5CF6",
+        auto_saved: "#F59E0B",
+        draft: "#6B7280",
+        locked: "#991B1B",
+        expired: "#B45309",
+      };
+
+      const priorityColors = {
+        high: "#EF4444",
+        medium: "#F59E0B",
+        low: "#10B981",
+        critical: "#DC2626",
+      };
+
+      const severityColors = {
+        low: "#10B981",
+        medium: "#F59E0B",
+        high: "#EF4444",
+        critical: "#DC2626",
+      };
+
+      switch (col.type) {
+        case "status":
+          return (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              <span
+                className="status-badge"
+                style={{
+                  backgroundColor:
+                    statusColors[String(value).toLowerCase()] || "#6B7280",
+                  color: "#fff",
+                  padding: "4px 12px",
+                  borderRadius: "12px",
+                  fontSize: "12px",
+                  display: "inline-block",
+                }}
+              >
+                {value === "approved" || value === "verified" ? (
+                  <FiCheck size={12} style={{ marginRight: 4 }} />
+                ) : value === "rejected" ? (
+                  <FiX size={12} style={{ marginRight: 4 }} />
+                ) : null}
+                {value}
+              </span>
+              {/* B9: inline lock indicator — forum-reports only */}
+              {isForumReports && isRowLocked(item) && (
+                <span
+                  title={item.lockedReason || ""}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 3,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: "#991B1B",
+                    background: "#FEE2E2",
+                    padding: "2px 8px",
+                    borderRadius: 999,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.04em",
+                  }}
+                >
+                  <FiLock size={10} />
+                  {t("adminLockedBadge", "Locked")}
+                </span>
+              )}
+            </div>
+          );
+
+        case "score":
+          return (
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <span style={{ fontWeight: 600 }}>{value}</span>
+              {value >= 60 && <FiStar size={14} color="#f59e0b" />}
+            </div>
+          );
+
+        case "priority":
+          return (
+            <span
+              className="priority-badge"
+              style={{
+                backgroundColor:
+                  priorityColors[String(value).toLowerCase()] || "#6B7280",
+                color: "#fff",
+                padding: "4px 12px",
+                borderRadius: "12px",
+                fontSize: "12px",
+                display: "inline-block",
+              }}
+            >
+              {value === "high" || value === "critical" ? (
+                <FiAlertCircle size={12} style={{ marginRight: 4 }} />
+              ) : null}
+              {value}
+            </span>
+          );
+
+        case "severity":
+          return (
+            <span
+              className="severity-badge"
+              style={{
+                backgroundColor:
+                  severityColors[String(value).toLowerCase()] || "#6B7280",
+                color: "#fff",
+                padding: "4px 12px",
+                borderRadius: "12px",
+                fontSize: "12px",
+                display: "inline-block",
+              }}
+            >
               <FiAlertCircle size={12} style={{ marginRight: 4 }} />
-            ) : null}
-            {value}
-          </span>
-        );
+              {value}
+            </span>
+          );
 
-      case "severity":
-        return (
-          <span
-            className="severity-badge"
-            style={{
-              backgroundColor:
-                severityColors[String(value).toLowerCase()] || "#6B7280",
-              color: "#fff",
-              padding: "4px 12px",
-              borderRadius: "12px",
-              fontSize: "12px",
-              display: "inline-block",
-            }}
-          >
-            <FiAlertCircle size={12} style={{ marginRight: 4 }} />
-            {value}
-          </span>
-        );
+        case "date":
+          return new Date(value).toLocaleDateString("en-US", {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          });
 
-      case "date":
-        return new Date(value).toLocaleDateString("en-US", {
-          year: "numeric",
-          month: "short",
-          day: "numeric",
-        });
+        case "time":
+          return new Date(value).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+          });
 
-      case "time":
-        return new Date(value).toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+        case "number":
+          return value;
 
-      case "number":
-        return value;
-
-      default:
-        return value;
-    }
-  }, []);
+        default:
+          return value;
+      }
+    },
+    [isForumReports, isRowLocked, t],
+  );
 
   const renderPagination = useCallback(() => {
     const { page, totalPages } = pagination;
@@ -750,8 +876,22 @@ const AdminDataManagement = ({ dataType }) => {
           "isAutoSave",
           "lastAutoSave",
           "autoSaveCount",
+          "completedAt",
           "finalizedAt",
           "adminNotes",
+        ],
+      },
+      {
+        title: "Lock / Extension audit",
+        icon: <FiLock size={16} />,
+        keys: [
+          "isLocked",
+          "lockedAt",
+          "lockedReason",
+          "extensionApproved",
+          "extensionExpiresAt",
+          "isResumed",
+          "resumedAt",
         ],
       },
     ],
@@ -830,7 +970,6 @@ const AdminDataManagement = ({ dataType }) => {
           return { key: k, value: item[k] };
         })
         .filter(({ value }) => {
-          // Hide empty arrays and null/undefined values
           if (value === null || value === undefined) return false;
           if (Array.isArray(value) && value.length === 0) return false;
           return true;
@@ -840,7 +979,6 @@ const AdminDataManagement = ({ dataType }) => {
       }
     });
 
-    // Remaining keys not covered by any section → "More Details"
     const leftovers = Object.keys(item)
       .filter((k) => !usedKeys.has(k) && !BLOCKED_FIELDS.has(k))
       .filter((k) => {
@@ -954,6 +1092,8 @@ const AdminDataManagement = ({ dataType }) => {
           <option value="in_progress">In Progress</option>
           <option value="auto_saved">Auto Saved</option>
           <option value="draft">Draft</option>
+          <option value="locked">Locked</option>
+          <option value="expired">Expired</option>
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
           <option value="verified">Verified</option>
@@ -1103,125 +1243,184 @@ const AdminDataManagement = ({ dataType }) => {
                       </td>
                     </tr>
                   ) : (
-                    data.map((item) => (
-                      <tr
-                        key={item.id}
-                        style={{
-                          borderBottom: `1px solid ${C.border}44`,
-                          background: selectedItems.includes(item.id)
-                            ? `${C.primary}08`
-                            : "transparent",
-                        }}
-                      >
-                        <td style={{ padding: "12px 16px" }}>
-                          <input
-                            type="checkbox"
-                            checked={selectedItems.includes(item.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedItems([...selectedItems, item.id]);
-                              } else {
-                                setSelectedItems(
-                                  selectedItems.filter((id) => id !== item.id),
-                                );
-                              }
-                            }}
-                          />
-                        </td>
-                        {config.columns.map((col) => (
-                          <td key={col.key} style={{ padding: "12px 16px" }}>
-                            {renderCellValue(item, col)}
-                          </td>
-                        ))}
-                        <td
-                          style={{ padding: "12px 16px", textAlign: "center" }}
+                    data.map((item) => {
+                      const locked = isRowLocked(item);
+                      const busy = busyLockId === item.id;
+                      return (
+                        <tr
+                          key={item.id}
+                          style={{
+                            borderBottom: `1px solid ${C.border}44`,
+                            background: selectedItems.includes(item.id)
+                              ? `${C.primary}08`
+                              : "transparent",
+                          }}
                         >
-                          <div
+                          <td style={{ padding: "12px 16px" }}>
+                            <input
+                              type="checkbox"
+                              checked={selectedItems.includes(item.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedItems([...selectedItems, item.id]);
+                                } else {
+                                  setSelectedItems(
+                                    selectedItems.filter(
+                                      (id) => id !== item.id,
+                                    ),
+                                  );
+                                }
+                              }}
+                            />
+                          </td>
+                          {config.columns.map((col) => (
+                            <td key={col.key} style={{ padding: "12px 16px" }}>
+                              {renderCellValue(item, col)}
+                            </td>
+                          ))}
+                          <td
                             style={{
-                              display: "flex",
-                              gap: 8,
-                              justifyContent: "center",
+                              padding: "12px 16px",
+                              textAlign: "center",
                             }}
                           >
-                            <button
-                              onClick={() => viewItem(item)}
+                            <div
                               style={{
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                fontSize: 16,
-                                color: C.primary,
-                                padding: 4,
-                                borderRadius: 4,
-                                transition: "background 0.2s",
+                                display: "flex",
+                                gap: 8,
+                                justifyContent: "center",
+                                alignItems: "center",
                               }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = C.bg;
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "none";
-                              }}
-                              title="View details"
                             >
-                              <FiEye size={18} />
-                            </button>
-                            {isReportSupported(dataType) && (
                               <button
-                                onClick={() => handleGeneratePdf(item)}
-                                disabled={generatingPdfId === item.id}
+                                onClick={() => viewItem(item)}
                                 style={{
                                   background: "none",
                                   border: "none",
-                                  cursor:
-                                    generatingPdfId === item.id
-                                      ? "wait"
-                                      : "pointer",
+                                  cursor: "pointer",
                                   fontSize: 16,
                                   color: C.primary,
                                   padding: 4,
                                   borderRadius: 4,
                                   transition: "background 0.2s",
-                                  opacity:
-                                    generatingPdfId === item.id ? 0.5 : 1,
                                 }}
                                 onMouseEnter={(e) => {
-                                  if (generatingPdfId !== item.id)
-                                    e.currentTarget.style.background = C.bg;
+                                  e.currentTarget.style.background = C.bg;
                                 }}
                                 onMouseLeave={(e) => {
                                   e.currentTarget.style.background = "none";
                                 }}
-                                title="Generate PDF report"
+                                title="View details"
                               >
-                                <FiPrinter size={18} />
+                                <FiEye size={18} />
                               </button>
-                            )}
-                            <button
-                              onClick={() => requestDelete(item)}
-                              style={{
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                fontSize: 16,
-                                color: "#ef4444",
-                                padding: 4,
-                                borderRadius: 4,
-                                transition: "background 0.2s",
-                              }}
-                              onMouseEnter={(e) => {
-                                e.currentTarget.style.background = "#fee2e2";
-                              }}
-                              onMouseLeave={(e) => {
-                                e.currentTarget.style.background = "none";
-                              }}
-                              title="Delete"
-                            >
-                              <FiTrash2 size={18} />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+
+                              {/* B9: Lock / Unlock — forum-reports only, admins only */}
+                              {isForumReports && isAdmin && (
+                                <button
+                                  onClick={() =>
+                                    locked
+                                      ? handleUnlockRow(item)
+                                      : handleLockRow(item)
+                                  }
+                                  disabled={busy}
+                                  style={{
+                                    background: locked ? "#FEF2F2" : "none",
+                                    border: "none",
+                                    cursor: busy ? "wait" : "pointer",
+                                    fontSize: 16,
+                                    color: locked ? "#991B1B" : "#6B7280",
+                                    padding: 4,
+                                    borderRadius: 4,
+                                    transition: "background 0.2s",
+                                    opacity: busy ? 0.5 : 1,
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!busy)
+                                      e.currentTarget.style.background = locked
+                                        ? "#FEE2E2"
+                                        : "#F1F5F9";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = locked
+                                      ? "#FEF2F2"
+                                      : "none";
+                                  }}
+                                  title={
+                                    locked
+                                      ? t("adminUnlock", "Unlock")
+                                      : t("adminLock", "Lock")
+                                  }
+                                >
+                                  {busy ? (
+                                    <FiClock size={18} />
+                                  ) : locked ? (
+                                    <FiUnlock size={18} />
+                                  ) : (
+                                    <FiLock size={18} />
+                                  )}
+                                </button>
+                              )}
+
+                              {isReportSupported(dataType) && (
+                                <button
+                                  onClick={() => handleGeneratePdf(item)}
+                                  disabled={generatingPdfId === item.id}
+                                  style={{
+                                    background: "none",
+                                    border: "none",
+                                    cursor:
+                                      generatingPdfId === item.id
+                                        ? "wait"
+                                        : "pointer",
+                                    fontSize: 16,
+                                    color: C.primary,
+                                    padding: 4,
+                                    borderRadius: 4,
+                                    transition: "background 0.2s",
+                                    opacity:
+                                      generatingPdfId === item.id ? 0.5 : 1,
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (generatingPdfId !== item.id)
+                                      e.currentTarget.style.background = C.bg;
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = "none";
+                                  }}
+                                  title="Generate PDF report"
+                                >
+                                  <FiPrinter size={18} />
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => requestDelete(item)}
+                                style={{
+                                  background: "none",
+                                  border: "none",
+                                  cursor: "pointer",
+                                  fontSize: 16,
+                                  color: "#ef4444",
+                                  padding: 4,
+                                  borderRadius: 4,
+                                  transition: "background 0.2s",
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = "#fee2e2";
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = "none";
+                                }}
+                                title="Delete"
+                              >
+                                <FiTrash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -1476,7 +1675,6 @@ const AdminDataManagement = ({ dataType }) => {
                     padding: isMobile ? "14px 14px" : "18px 22px",
                   }}
                 >
-                  {/* Section header */}
                   <div
                     style={{
                       display: "flex",
@@ -1514,7 +1712,6 @@ const AdminDataManagement = ({ dataType }) => {
                     </span>
                   </div>
 
-                  {/* Section rows */}
                   <div
                     style={{
                       display: "flex",
@@ -1664,7 +1861,6 @@ const AdminDataManagement = ({ dataType }) => {
               animation: "slideUp 0.25s ease",
             }}
           >
-            {/* Header strip */}
             <div
               style={{
                 padding: "22px 26px 18px",
@@ -1716,7 +1912,6 @@ const AdminDataManagement = ({ dataType }) => {
               </div>
             </div>
 
-            {/* Body */}
             <div style={{ padding: "20px 26px 22px" }}>
               <p
                 style={{
@@ -1733,7 +1928,6 @@ const AdminDataManagement = ({ dataType }) => {
                 . All associated data will be removed from the system.
               </p>
 
-              {/* Actions */}
               <div
                 style={{
                   display: "flex",
@@ -1841,7 +2035,6 @@ function renderModalValue(value, isMobile = false) {
     }
   }
 
-  // Image URL or base64 data URL → render as an actual <img>
   if (isImageLike(value)) {
     const isDataUrl = isImageDataUrl(value);
     return (
@@ -1870,7 +2063,6 @@ function renderModalValue(value, isMobile = false) {
             objectFit: "contain",
           }}
           onError={(e) => {
-            // If the image fails to load, replace with the raw URL text
             const parent = e.currentTarget.parentNode;
             if (parent) {
               parent.innerHTML = `<span style="color:${C.muted};font-size:12px;word-break:break-all">${value}</span>`;
@@ -1897,7 +2089,6 @@ function renderModalValue(value, isMobile = false) {
   }
 
   if (Array.isArray(value)) {
-    // Array of image strings (base64 or http) → grid of images
     if (value.every((v) => isImageLike(v))) {
       return (
         <div
@@ -1951,7 +2142,6 @@ function renderModalValue(value, isMobile = false) {
       );
     }
 
-    // Array of strings → pill list
     if (value.every((v) => typeof v === "string" || typeof v === "number")) {
       return (
         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -1974,11 +2164,6 @@ function renderModalValue(value, isMobile = false) {
       );
     }
 
-    // Array of uniform objects → render as a sub-table.
-    // This is what "members", "scores", "entries", "scores[].items"
-    // actually are — a small tabular dataset, not a stack of cards.
-    // Falls back to cards for a single object (a one-row table reads
-    // worse than a card).
     if (value.length >= 2 && value.every(isPlainObject)) {
       const firstKeys = Object.keys(value[0]).filter(
         (k) => !BLOCKED_FIELDS.has(k),
@@ -2064,7 +2249,6 @@ function renderModalValue(value, isMobile = false) {
       }
     }
 
-    // Array of objects → mini cards
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {value.map((v, i) => (
@@ -2109,7 +2293,6 @@ function renderModalValue(value, isMobile = false) {
     );
   }
 
-  // Nested object → sub rows (recurse so images render as images)
   if (isPlainObject(value)) {
     const entries = Object.entries(value).filter(
       ([k]) => !BLOCKED_FIELDS.has(k),

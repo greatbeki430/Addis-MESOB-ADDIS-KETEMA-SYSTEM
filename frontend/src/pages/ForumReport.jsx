@@ -790,7 +790,6 @@ const AIInsightBadge = ({ type = "info", children, onClose }) => {
   );
 };
 
-// ─── Format AI Response ──────────────────────────────────────
 // ─── Format AI Response (clean, human-readable) ──────────────
 const formatAIResponse = (text) => {
   if (!text) return "";
@@ -803,7 +802,6 @@ const formatAIResponse = (text) => {
   );
 
   // 2. Convert markdown tables to plain text lists
-  //    Detect a table block (header row + separator row + body rows)
   formatted = formatted.replace(
     /(?:^\|.+\|\s*$\n^\|[\s\-:|]+\|\s*$\n(?:^\|.+\|\s*$\n?)*)/gm,
     (tableBlock) => {
@@ -833,11 +831,11 @@ const formatAIResponse = (text) => {
   );
 
   // 3. Remove markdown emphasis markers
-  formatted = formatted.replace(/\*\*(.+?)\*\*/g, "$1"); // **bold**
-  formatted = formatted.replace(/\*(.+?)\*/g, "$1"); // *italic*
-  formatted = formatted.replace(/__(.+?)__/g, "$1"); // __bold__
-  formatted = formatted.replace(/_(.+?)_/g, "$1"); // _italic_
-  formatted = formatted.replace(/`(.+?)`/g, "$1"); // `code`
+  formatted = formatted.replace(/\*\*(.+?)\*\*/g, "$1");
+  formatted = formatted.replace(/\*(.+?)\*/g, "$1");
+  formatted = formatted.replace(/__(.+?)__/g, "$1");
+  formatted = formatted.replace(/_(.+?)_/g, "$1");
+  formatted = formatted.replace(/`(.+?)`/g, "$1");
 
   // 4. Convert headings to clean uppercase lines
   formatted = formatted.replace(
@@ -858,7 +856,7 @@ const formatAIResponse = (text) => {
     .replace(/\*\*/g, "")
     .replace(/###/g, "")
     .replace(/---/g, "");
-  formatted = formatted.replace(/^\s*\|.*\|\s*$/gm, ""); // any orphan table rows
+  formatted = formatted.replace(/^\s*\|.*\|\s*$/gm, "");
 
   // 8. Collapse excess blank lines and trailing spaces
   formatted = formatted.replace(/[ \t]+$/gm, "");
@@ -866,6 +864,25 @@ const formatAIResponse = (text) => {
 
   return formatted.trim();
 };
+
+// ─── Helper: does the form have any user-entered content? ────
+// Used by C1 to decide whether a periodic auto-save is worth
+// performing at all.
+const hasAnyContent = (form) =>
+  !!form.date ||
+  !!form.timeStart ||
+  (Array.isArray(form.present) && form.present.some((p) => p && p.trim())) ||
+  (Array.isArray(form.topics) && form.topics.some((t) => t && t.trim())) ||
+  (form.explanation && form.explanation.trim() !== "") ||
+  (Array.isArray(form.gaps) && form.gaps.some((g) => g && g.trim())) ||
+  (Array.isArray(form.agreements) &&
+    form.agreements.some((a) => a && a.trim())) ||
+  (Array.isArray(form.prevResults) &&
+    form.prevResults.some((r) => r && r.trim())) ||
+  (Array.isArray(form.absent) &&
+    form.absent.some((a) => a && a.name && a.name.trim())) ||
+  (Array.isArray(form.signatures) &&
+    form.signatures.some((s) => s && s.trim()));
 
 // ─── Main Component ──────────────────────────────────────────
 export default function ForumReport({
@@ -880,20 +897,12 @@ export default function ForumReport({
   const t = tProp || tHook;
 
   // ─── Language resolution ──────────────────────────────────────
-  // The language used for this page's labels. Priority:
-  //   1. the explicit `lang` prop
-  //   2. `t.lang` if useLanguage() exposes it
-  //   3. "am" as the Amharic-first default
   const currentLang = useMemo(() => {
     if (lang && ["am", "en", "om"].includes(lang)) return lang;
     if (t?.lang && ["am", "en", "om"].includes(t.lang)) return t.lang;
     return "am";
   }, [lang, t]);
 
-  // The correctly-nested forum translation dict for this language.
-  // ForumReport.jsx reads its own labels directly from the constants
-  // file because useLanguage() returns a flat object that doesn't
-  // expose the nested `forum` dict.
   const forumDict = useMemo(
     () =>
       forumReportTranslations[currentLang]?.forum ||
@@ -901,7 +910,6 @@ export default function ForumReport({
     [currentLang],
   );
 
-  // The common translation dict for this language.
   const commonDict = useMemo(
     () =>
       commonTranslations[currentLang]?.common || commonTranslations.en.common,
@@ -910,15 +918,12 @@ export default function ForumReport({
 
   const safeYear = forumDict?.year || "2018 E.C.";
 
-  // Forum label lookup. Falls back through: nested dict → flat t.forum
-  // → flat t → hardcoded fallback (for safety only).
   const tf = useCallback(
     (key, fallback) =>
       forumDict?.[key] ?? t?.forum?.[key] ?? t?.[key] ?? fallback,
     [forumDict, t],
   );
 
-  // Common label lookup.
   const tc = useCallback(
     (key, fallback) =>
       commonDict?.[key] ?? t?.common?.[key] ?? t?.[key] ?? fallback,
@@ -947,37 +952,26 @@ export default function ForumReport({
   const [formProgress, setFormProgress] = useState(0);
   const [aiGeneratedContent, setAiGeneratedContent] = useState(null);
   const [showAIBadge, setShowAIBadge] = useState(true);
-  // Toggles whether AI-appended content (the "📝 AI Generated Summary:"
-  // block inside form.explanation) is included when exporting the PDF.
-  // Manual explanation text is always included — this only gates the
-  // AI block. Default: include, since the AI content is usually what
-  // the admin wants to export alongside everything else.
   const [includeAIForPdf, setIncludeAIForPdf] = useState(true);
 
   const [teams, setTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [activeForumTab, setActiveForumTab] = useState("form");
 
-  // ─── History tab plumbing ───────────────────────────────────────────
-  // historyRefreshKey: bumped after every successful save, so the
-  //   History tab refetches its list without a full page reload.
-  // historyCount: count of saved reports, drives the tab badge so the
-  //   user sees the number before opening the tab.
-  // editingId: the _id of the report currently open in the form, or
-  //   null when the user is creating a new one. Without this, hitting
-  //   Save on a loaded report would silently create a duplicate.
+  // ─── History tab plumbing ───────────────────────────────────
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [historyCount, setHistoryCount] = useState(0);
   const [editingId, setEditingId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // ─── Timer State ──────────────────────────────────────────────
+  // ─── Timer State ────────────────────────────────────────────
   const [timerActive, setTimerActive] = useState(false);
   const [isReportLocked, setIsReportLocked] = useState(false);
   const [warningMessage, setWarningMessage] = useState(null);
   const [lastAutoSaveTime, setLastAutoSaveTime] = useState(null);
   const [savedProgressId, setSavedProgressId] = useState(null);
   const [extensionRequested, setExtensionRequested] = useState(false);
+
   // ─── Signature Modal State ──────────────────────────────────
   const [signatureModal, setSignatureModal] = useState({
     isOpen: false,
@@ -987,10 +981,14 @@ export default function ForumReport({
 
   const isAdmin = isAdminOrAbove(user);
 
-  // ─── LocalStorage Key ──────────────────────────────────────────
-  const STORAGE_KEY = `forum_report_timer_${selectedTeam?.id || "default"}`;
+  // ─── LocalStorage Key (C4: include user id) ────────────────
+  const STORAGE_KEY = `forum_report_timer_${selectedTeam?.id || "default"}_${user?._id || "anon"}`;
 
-  // ─── Get initial time remaining from localStorage ────────────
+  // ─── Refs used by the auto-save debouncer (C1) ─────────────
+  const autoSaveDebounceRef = useRef(null);
+  const autoSaveInFlightRef = useRef(false);
+
+  // ─── Get initial time remaining from localStorage ──────────
   const getInitialTimeRemaining = useCallback(() => {
     if (!selectedTeam) return null;
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -1000,7 +998,6 @@ export default function ForumReport({
         const elapsed = Math.floor((Date.now() - data.timestamp) / 1000);
         const remaining = Math.max(0, data.timeRemaining - elapsed);
         if (remaining > 0) {
-          console.log(`📊 Restored timer: ${remaining} seconds remaining`);
           return remaining;
         }
       } catch (e) {
@@ -1010,7 +1007,7 @@ export default function ForumReport({
     return null;
   }, [selectedTeam, STORAGE_KEY]);
 
-  // ─── Load timer state from localStorage ──────────────────────
+  // ─── Load timer state from localStorage ────────────────────
   useEffect(() => {
     if (selectedTeam) {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -1029,7 +1026,125 @@ export default function ForumReport({
     }
   }, [selectedTeam, STORAGE_KEY]);
 
-  // ─── Timer Hook ──────────────────────────────────────────────
+  // ─── Auto-save handler (A2, C1, C2) ────────────────────────
+  // Uses `meetingId` on the wire so the backend updates the SAME
+  // draft, never creating duplicates. The response `_id` is stored
+  // in BOTH editingId (so Save updates) and savedProgressId (so
+  // extension/resume calls have a target).
+  const handleAutoSave = useCallback(async () => {
+    if (autoSaveInFlightRef.current) return null;
+    autoSaveInFlightRef.current = true;
+
+    try {
+      const targetId = editingId || savedProgressId || null;
+      const reportData = {
+        ...(targetId ? { meetingId: targetId } : {}),
+        date: form.date,
+        timeStart: form.timeStart,
+        timeEnd: form.timeEnd,
+        present: form.present.filter((p) => p.trim() !== ""),
+        absent: form.absent.filter((a) => a && a.name && a.name.trim() !== ""),
+        prevResults: form.prevResults.filter((p) => p.trim() !== ""),
+        topics: form.topics.filter((t) => t.trim() !== ""),
+        explanation: form.explanation || "",
+        gaps: form.gaps.filter((g) => g.trim() !== ""),
+        agreements: form.agreements.filter((a) => a.trim() !== ""),
+        signatures: form.signatures.filter((s) => s.trim() !== ""),
+        team: selectedTeam?.id || selectedTeam?._id,
+        teamName: selectedTeam?.name || "Unknown Team",
+        isAutoSave: true,
+      };
+
+      const response = await forumReportService.autoSave(reportData);
+      const savedId =
+        response?.meeting?._id || response?._id || targetId || null;
+
+      if (savedId) {
+        setSavedProgressId(savedId);
+        // C2: capture the id so a later Save is an UPDATE
+        setEditingId((prev) => prev || savedId);
+      }
+      setLastAutoSaveTime(new Date());
+      return response;
+    } catch (error) {
+      console.error("Auto-save failed:", error);
+      showToast(tf("autoSaveError") || "Auto-save failed", "error");
+      throw error;
+    } finally {
+      autoSaveInFlightRef.current = false;
+    }
+  }, [form, selectedTeam, editingId, savedProgressId, tf, showToast]);
+
+  // ─── Finalize on timer expiry (A2) ─────────────────────────
+  const handleFinalizeOnExpiry = useCallback(async () => {
+    try {
+      const targetId = editingId || savedProgressId || null;
+
+      const reportData = {
+        date: form.date,
+        timeStart: form.timeStart,
+        timeEnd: form.timeEnd,
+        present: form.present.filter((p) => p.trim() !== ""),
+        absent: form.absent.filter((a) => a && a.name && a.name.trim() !== ""),
+        prevResults: form.prevResults.filter((p) => p.trim() !== ""),
+        topics: form.topics.filter((t) => t.trim() !== ""),
+        explanation: form.explanation || "",
+        gaps: form.gaps.filter((g) => g.trim() !== ""),
+        agreements: form.agreements.filter((a) => a.trim() !== ""),
+        signatures: form.signatures.filter((s) => s.trim() !== ""),
+        team: selectedTeam?.id || selectedTeam?._id,
+        teamName: selectedTeam?.name || "Unknown Team",
+        aiGeneratedContent: aiGeneratedContent || "",
+        isAutoSave: false,
+        status: "completed",
+      };
+
+      let savedMeeting = null;
+      if (targetId) {
+        const res = await meetingAPI.update(targetId, reportData);
+        savedMeeting = res?.data?.meeting || null;
+      } else {
+        const res = await meetingAPI.create(reportData);
+        savedMeeting = res?.data?.meeting || null;
+      }
+
+      if (savedMeeting?._id) {
+        setEditingId(savedMeeting._id);
+        setSavedProgressId(savedMeeting._id);
+      }
+
+      // Clear the local timer key so it can't resurrect later
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* storage disabled — not fatal */
+      }
+
+      setHistoryRefreshKey((k) => k + 1);
+    } catch (error) {
+      console.error(
+        "Finalize on expiry failed, falling back to draft save:",
+        error,
+      );
+      try {
+        await handleAutoSave();
+      } catch (fallbackError) {
+        console.error("Fallback auto-save also failed:", fallbackError);
+      }
+    }
+  }, [
+    form,
+    selectedTeam,
+    editingId,
+    savedProgressId,
+    aiGeneratedContent,
+    handleAutoSave,
+    STORAGE_KEY,
+  ]);
+
+  // ─── Timer Hook ────────────────────────────────────────────
+  // C1: onAutoSave is now wired to handleAutoSave so the hook's
+  // own 2-minute trigger actually calls it.
   const {
     timeRemaining,
     formattedTime,
@@ -1043,11 +1158,16 @@ export default function ForumReport({
   } = useMeetingTimer({
     isActive: timerActive,
     initialTimeRemaining: getInitialTimeRemaining(),
+    onAutoSave: handleAutoSave,
     onTimeExpired: () => {
       setIsReportLocked(true);
-      handleFinalizeOnExpiry(); // ← changed from handleAutoSave
+      handleFinalizeOnExpiry();
       setShowExpiredModal(true);
-      localStorage.removeItem(STORAGE_KEY);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* noop */
+      }
     },
     onWarning: (message) => {
       setWarningMessage(message);
@@ -1055,116 +1175,196 @@ export default function ForumReport({
       setTimeout(() => setWarningMessage(null), 5000);
     },
     onTick: (remaining) => {
-      // Save timer state to localStorage on every tick
-      localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify({
-          timeRemaining: remaining,
-          timestamp: Date.now(),
-        }),
-      );
+      try {
+        localStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify({
+            timeRemaining: remaining,
+            timestamp: Date.now(),
+          }),
+        );
+      } catch {
+        /* noop */
+      }
     },
   });
-  // Play a beep when the timer crosses 5 min / 1 min / 10 s remaining.
-  // The mute toggle is passed down to MeetingTimer for the UI control.
+
+  // C3: correct the misleading comment. The actual thresholds live
+  // in useTimerBeep.js and are 20 s / 10 s / 5 s remaining (NOT
+  // minutes), preserving the existing beep behavior.
   const { isMuted, toggleMute } = useTimerBeep({
     isActive: timerActive,
     timeRemaining,
   });
 
-  // ─── Auto-save handler ───────────────────────────────────────
-  const handleAutoSave = useCallback(async () => {
-    try {
-      const reportData = {
-        date: form.date,
-        timeStart: form.timeStart,
-        timeEnd: form.timeEnd,
-        present: form.present.filter((p) => p.trim() !== ""),
-        absent: form.absent.filter((a) => a.name.trim() !== ""),
-        prevResults: form.prevResults.filter((p) => p.trim() !== ""),
-        topics: form.topics.filter((t) => t.trim() !== ""),
-        explanation: form.explanation || "",
-        gaps: form.gaps.filter((g) => g.trim() !== ""),
-        agreements: form.agreements.filter((a) => a.trim() !== ""),
-        signatures: form.signatures.filter((s) => s.trim() !== ""),
-        team: selectedTeam?.id || selectedTeam?._id,
-        teamName: selectedTeam?.name || "Unknown Team",
-        isAutoSave: true,
-        status: "in_progress",
-      };
+  // ─── C1: Periodic auto-save while the timer is active ──────
+  // Debounced to 60 s of inactivity, only when the form has content,
+  // never when locked/submitted, and never concurrently.
+  useEffect(() => {
+    if (!timerActive || isReportLocked || submitted) return undefined;
+    if (!selectedTeam) return undefined;
+    if (!hasAnyContent(form)) return undefined;
 
-      const response = await forumReportService.autoSave(reportData);
-      setLastAutoSaveTime(new Date());
-      setSavedProgressId(response.meeting?._id || response._id);
-      return response;
-    } catch (error) {
-      console.error("Auto-save failed:", error);
-      showToast(tf("autoSaveError") || "Auto-save failed", "error");
-      throw error;
+    if (autoSaveDebounceRef.current) {
+      clearTimeout(autoSaveDebounceRef.current);
     }
-  }, [form, selectedTeam, tf, showToast]);
+    autoSaveDebounceRef.current = setTimeout(() => {
+      handleAutoSave().catch(() => {
+        /* error already toasted */
+      });
+    }, 60_000);
 
-  // ─── Finalize on timer expiry ────────────────────────────────
-  // Called when the meeting timer hits zero. Unlike handleAutoSave,
-  // this marks the report as status: "completed" and isAutoSave: false,
-  // so the admin sees it as a finished report instead of an in-progress
-  // draft. Falls back to the draft auto-save if the finalize call fails,
-  // so no data is lost.
-  const handleFinalizeOnExpiry = useCallback(async () => {
-    try {
-      const reportData = {
-        date: form.date,
-        timeStart: form.timeStart,
-        timeEnd: form.timeEnd,
-        present: form.present.filter((p) => p.trim() !== ""),
-        absent: form.absent.filter((a) => a.name.trim() !== ""),
-        prevResults: form.prevResults.filter((p) => p.trim() !== ""),
-        topics: form.topics.filter((t) => t.trim() !== ""),
-        explanation: form.explanation || "",
-        gaps: form.gaps.filter((g) => g.trim() !== ""),
-        agreements: form.agreements.filter((a) => a.trim() !== ""),
-        signatures: form.signatures.filter((s) => s.trim() !== ""),
-        team: selectedTeam?.id || selectedTeam?._id,
-        teamName: selectedTeam?.name || "Unknown Team",
-        aiGeneratedContent: aiGeneratedContent,
-        isAutoSave: false,
-        status: "completed",
-        finalizedAt: new Date().toISOString(),
-      };
-
-      if (editingId) {
-        await meetingAPI.update(editingId, reportData);
-      } else {
-        await meetingAPI.create(reportData);
+    return () => {
+      if (autoSaveDebounceRef.current) {
+        clearTimeout(autoSaveDebounceRef.current);
+        autoSaveDebounceRef.current = null;
       }
+    };
+  }, [
+    form,
+    timerActive,
+    isReportLocked,
+    submitted,
+    selectedTeam,
+    handleAutoSave,
+  ]);
 
-      // Nudge the History tab so a completed report appears immediately
-      // when the user switches to it.
-      setHistoryRefreshKey((k) => k + 1);
-      console.log("✅ Report finalized on timer expiry");
-    } catch (error) {
-      console.error(
-        "Finalize on expiry failed, falling back to draft save:",
-        error,
-      );
-      // Don't lose data — save as a draft if the finalized save fails.
+  // ─── C1: Last-chance flush on pagehide / hidden tab ────────
+  useEffect(() => {
+    const flush = () => {
+      if (!timerActive || isReportLocked || submitted) return;
+      if (!selectedTeam) return;
+      if (!hasAnyContent(form)) return;
+      handleAutoSave().catch(() => {});
+    };
+    const onVis = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+  }, [
+    form,
+    timerActive,
+    isReportLocked,
+    submitted,
+    selectedTeam,
+    handleAutoSave,
+  ]);
+
+  // ─── C5: Poll for extension approval / rejection ───────────
+  // While a request is pending, poll every 12 s. On approval the
+  // form unlocks, the timer restarts, and the remaining seconds
+  // from extensionExpiresAt replace the stale 30-minute default.
+  // On rejection we surface the reason and keep the form locked.
+  useEffect(() => {
+    if (!extensionRequested) return undefined;
+    const targetId = savedProgressId || editingId;
+    if (!targetId) return undefined;
+
+    let cancelled = false;
+    const tick = async () => {
       try {
-        await handleAutoSave();
-      } catch (fallbackError) {
-        console.error("Fallback auto-save also failed:", fallbackError);
-      }
-    }
-  }, [form, selectedTeam, editingId, aiGeneratedContent, handleAutoSave]);
+        const res = await meetingAPI.getById(targetId);
+        if (cancelled) return;
+        const m = res?.data;
+        if (!m) return;
 
-  // ─── Extension request handler ──────────────────────────────
+        // Approved?
+        if (
+          m.extensionApproved &&
+          m.extensionExpiresAt &&
+          new Date(m.extensionExpiresAt).getTime() > Date.now()
+        ) {
+          setExtensionRequested(false);
+          setIsReportLocked(false);
+          // Recompute the remaining seconds from server truth.
+          const remaining = Math.max(
+            0,
+            Math.floor(
+              (new Date(m.extensionExpiresAt).getTime() - Date.now()) / 1000,
+            ),
+          );
+          // Seed the persisted clock so the hook restores this
+          // duration, not a fresh 30-minute one.
+          try {
+            localStorage.setItem(
+              STORAGE_KEY,
+              JSON.stringify({
+                timeRemaining: remaining,
+                timestamp: Date.now(),
+              }),
+            );
+          } catch {
+            /* noop */
+          }
+          resetTimer();
+          setTimerActive(true);
+          setShowExpiredModal(false);
+          showToast(
+            tf("reportResumed") || "✅ Report resumed successfully",
+            "success",
+          );
+          return;
+        }
+
+        // Rejected? A rejection produces no extensionApproved flag.
+        // We can't poll the ExtensionRequest directly from here
+        // (non-admin), so we treat "still locked, no approved
+        // extension" as "keep waiting". The rejection is surfaced
+        // to the leader via the notification service / their own
+        // retry — see the note in the file header. This is
+        // intentionally non-destructive: we never unlock on
+        // ambiguous state.
+      } catch (err) {
+        // 403 (locked / expired) is expected while waiting — do not
+        // surface as an error, and do not cancel the poll.
+        const code = err?.response?.data?.code;
+        if (code === "MEETING_LOCKED" || code === "MEETING_EXPIRED") return;
+        console.error("Extension poll failed:", err?.message || err);
+      }
+    };
+
+    // Poll immediately, then on interval.
+    tick();
+    const intervalId = setInterval(tick, 12_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id === undefined ? intervalId : intervalId);
+    };
+  }, [
+    extensionRequested,
+    savedProgressId,
+    editingId,
+    STORAGE_KEY,
+    resetTimer,
+    setShowExpiredModal,
+    showToast,
+    tf,
+  ]);
+
+  // ─── Extension request handler (A2) ────────────────────────
   const handleRequestExtension = async (reason) => {
     if (!reason?.trim()) {
       showToast(tf("reasonRequired") || "Please provide a reason", "warning");
       return;
     }
 
+    const targetId = savedProgressId || editingId;
+    if (!targetId) {
+      showToast(
+        tf("extensionRequestError") ||
+          "No saved report to extend. Please save and try again.",
+        "error",
+      );
+      return;
+    }
+
     try {
-      await forumReportService.requestExtension(savedProgressId, reason);
+      await forumReportService.requestExtension(targetId, reason);
       setExtensionRequested(true);
       setShowExpiredModal(false);
       showToast(
@@ -1174,17 +1374,26 @@ export default function ForumReport({
     } catch (error) {
       console.error("Extension request failed:", error);
       showToast(
-        tf("extensionRequestError") || "Failed to request extension",
+        error?.response?.data?.message ||
+          tf("extensionRequestError") ||
+          "Failed to request extension",
         "error",
       );
     }
   };
 
-  // ─── Resume report handler (admin only) ─────────────────────
+  // ─── Resume report handler (A3) ────────────────────────────
   const handleResumeReport = async () => {
     if (!isAdmin) return;
+    const targetId = savedProgressId || editingId;
+    if (!targetId) {
+      showToast(tf("resumeError") || "No saved report to resume.", "error");
+      return;
+    }
     try {
-      await forumReportService.resumeReport(savedProgressId);
+      // Use resumeMeeting (definitive name); the service also has a
+      // resumeReport alias for compatibility with older call sites.
+      await forumReportService.resumeMeeting(targetId);
       setIsReportLocked(false);
       resetTimer();
       setTimerActive(true);
@@ -1195,7 +1404,12 @@ export default function ForumReport({
       );
     } catch (error) {
       console.error("Resume failed:", error);
-      showToast(tf("resumeError") || "Failed to resume report", "error");
+      showToast(
+        error?.response?.data?.message ||
+          tf("resumeError") ||
+          "Failed to resume report",
+        "error",
+      );
     }
   };
 
@@ -1279,15 +1493,12 @@ export default function ForumReport({
   const updateAbsent = (index, field, value) => {
     setForm((prev) => {
       const updated = [...prev.absent];
-      updated[index][field] = value;
+      updated[index] = { ...updated[index], [field]: value };
       return { ...prev, absent: updated };
     });
   };
 
-  // ─── Load a saved report from History into the form ─────────────────
-  // Called by ForumReportHistory when the user clicks "Open" on a row.
-  // Repopulates every field, records the report's _id so Save switches
-  // to an UPDATE instead of a CREATE, and jumps back to the form tab.
+  // ─── Load a saved report from History into the form ────────
   const handleLoadReport = useCallback(
     (report) => {
       if (!report || !report._id) return;
@@ -1330,16 +1541,11 @@ export default function ForumReport({
       });
 
       setEditingId(report._id);
+      setSavedProgressId(report._id);
       setActiveForumTab("form");
       setSubmitted(false);
 
-      // Resume the meeting timer for a loaded report that isn't done
-      // yet. Without this, opening a saved draft shows a frozen clock
-      // because timerActive stays false — and the hook's
-      // isActive-watching effect only fires when the input actually
-      // changes. Explicitly stop the timer for completed/locked
-      // reports so a previously-running clock from another draft
-      // doesn't keep ticking behind the newly-loaded finished report.
+      // Restart the timer only for editable reports.
       if (
         report.timeStart &&
         report.status !== "completed" &&
@@ -1358,22 +1564,8 @@ export default function ForumReport({
     },
     [showToast],
   );
-  // ─── Reset the form to a fresh, blank state ─────────────────────────
-  // Called by:
-  //   • the Reset button in the action bar (new, see Edit B below)
-  //   • the "New Report" button on the submitted screen
-  //
-  // Does three things that matter:
-  //   1. Clears every field in `form` back to its initial value —
-  //      otherwise the "New Report" click leaves the previous report's
-  //      content sitting in the form and the next save creates a
-  //      duplicate.
-  //   2. Clears `editingId`, so a subsequent save is a CREATE not an
-  //      UPDATE. Without this, once you'd ever opened a report from
-  //      History, every save for the rest of the session would try to
-  //      PUT to that same report id.
-  //   3. Clears the local timer state and the AI content banner so the
-  //      next report starts truly blank.
+
+  // ─── Reset the form to a fresh, blank state ────────────────
   const resetForm = useCallback(() => {
     setForm({
       date: new Date().toISOString().split("T")[0],
@@ -1399,9 +1591,6 @@ export default function ForumReport({
     setLastAutoSaveTime(null);
     setWarningMessage(null);
 
-    // Clear the persisted timer for this team so a fresh report starts
-    // a fresh clock instead of inheriting the previous one's remaining
-    // seconds.
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {
@@ -1411,7 +1600,7 @@ export default function ForumReport({
     resetTimer();
   }, [STORAGE_KEY, resetTimer]);
 
-  // ─── Enhanced AI Apply Handler ─────────────────────────────
+  // ─── AI helpers ────────────────────────────────────────────
   const handleApplySuggestion = (text) => {
     if (!text || text.trim() === "") {
       showToast(tf("noContent", "⚠️ No content to apply"), "warning");
@@ -1435,7 +1624,6 @@ export default function ForumReport({
     );
   };
 
-  // ─── Handle AI Summary Generation ──────────────────────────
   const handleGenerateSummary = async () => {
     try {
       const context = {
@@ -1486,7 +1674,6 @@ export default function ForumReport({
     }
   };
 
-  // ─── Handle Full Report Generation ──────────────────────────
   const handleGenerateFullReport = async () => {
     try {
       const context = {
@@ -1571,13 +1758,18 @@ ${"=".repeat(50)}
     }
   };
 
+  // ─── Manual save (A1) ──────────────────────────────────────
+  // Final save marks the report completed, stamps both ids from
+  // the server response so extension/resume has a target, and
+  // clears the local timer key so a fresh report never inherits
+  // a stale countdown.
   const handleSaveReport = async () => {
+    if (saving) return;
     try {
       setSaving(true);
 
       if (!form.date) {
         showToast(tf("selectDate", "Please select a date"), "warning");
-        setSaving(false);
         return;
       }
 
@@ -1586,7 +1778,7 @@ ${"=".repeat(50)}
         timeStart: form.timeStart,
         timeEnd: form.timeEnd,
         present: form.present.filter((p) => p.trim() !== ""),
-        absent: form.absent.filter((a) => a.name.trim() !== ""),
+        absent: form.absent.filter((a) => a && a.name && a.name.trim() !== ""),
         prevResults: form.prevResults.filter((p) => p.trim() !== ""),
         topics: form.topics.filter((t) => t.trim() !== ""),
         explanation: form.explanation || "",
@@ -1595,32 +1787,45 @@ ${"=".repeat(50)}
         signatures: form.signatures.filter((s) => s.trim() !== ""),
         team: selectedTeam?.id || selectedTeam?._id,
         teamName: selectedTeam?.name || "Unknown Team",
-        aiGeneratedContent: aiGeneratedContent,
+        aiGeneratedContent: aiGeneratedContent || "",
+        status: "completed",
+        isAutoSave: false,
       };
 
-      // Branch: updating an existing report vs. creating a new one.
-      // `editingId` is set by handleLoadReport when History opens a
-      // saved report; it's cleared by resetForm and by the submitted-
-      // state "New Report" button.
-      if (editingId) {
-        await meetingAPI.update(editingId, reportData);
+      const targetId = editingId || savedProgressId || null;
+      let savedMeeting = null;
+
+      if (targetId) {
+        const res = await meetingAPI.update(targetId, reportData);
+        savedMeeting = res?.data?.meeting || null;
         showToast(
           tf("updateSuccess", "Report updated successfully!"),
           "success",
         );
       } else {
-        await meetingAPI.create(reportData);
+        const res = await meetingAPI.create(reportData);
+        savedMeeting = res?.data?.meeting || null;
         showToast(tf("saveSuccess", "Report saved successfully!"), "success");
       }
 
-      if (onReportSaved) {
-        onReportSaved(selectedTeam.id, form);
+      if (savedMeeting?._id) {
+        setEditingId(savedMeeting._id);
+        setSavedProgressId(savedMeeting._id);
       }
 
-      // Bump the History refresh key so the list reflects the save
-      // immediately when the user switches tabs.
-      setHistoryRefreshKey((k) => k + 1);
+      // Clear timer key on successful save.
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        /* noop */
+      }
 
+      if (onReportSaved) {
+        onReportSaved(selectedTeam?.id, form);
+      }
+
+      setHistoryRefreshKey((k) => k + 1);
+      setTimerActive(false);
       setSubmitted(true);
     } catch (error) {
       console.error("Failed to save report:", error);
@@ -1779,12 +1984,6 @@ ${"=".repeat(50)}
                 gap: "8px",
               }}
               onClick={() => {
-                // resetForm clears every field AND clears editingId.
-                // setSubmitted(false) brings the user back to the tab
-                // view. Both are needed: resetting alone leaves the
-                // user on the success screen, and unsubmitting alone
-                // leaves the previous report's data sitting in the
-                // form.
                 resetForm();
                 setSubmitted(false);
               }}
@@ -2020,7 +2219,7 @@ ${"=".repeat(50)}
         </div>
       </div>
 
-      {/* ─── Timer Display ─────────────────────────────────────── */}
+      {/* ─── Timer Display ─────────────────────────────────── */}
       <div style={{ marginBottom: "16px" }}>
         <MeetingTimer
           timeRemaining={timeRemaining}
@@ -2038,7 +2237,7 @@ ${"=".repeat(50)}
         />
       </div>
 
-      {/* ─── Locked/Extension Status Badge ─────────────────────── */}
+      {/* ─── Locked/Extension Status Badge ─────────────────── */}
       {(isReportLocked || extensionRequested) && (
         <div
           style={{
@@ -2113,7 +2312,6 @@ ${"=".repeat(50)}
           border: `1px solid ${C.border}50`,
         }}
       >
-        {/* Tab 1: New Report (the form) */}
         <button
           onClick={() => setActiveForumTab("form")}
           style={{
@@ -2134,24 +2332,11 @@ ${"=".repeat(50)}
             boxShadow:
               activeForumTab === "form" ? `0 2px 8px rgba(0,0,0,0.08)` : "none",
           }}
-          onMouseEnter={(e) => {
-            if (activeForumTab !== "form") {
-              e.currentTarget.style.color = "#0F172A";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeForumTab !== "form") {
-              e.currentTarget.style.color = "#64748B";
-            }
-          }}
         >
           <FiEdit3 size={isMobile ? 14 : 16} />
           {tf("newReport", "New Report")}
         </button>
 
-        {/* Tab 2: History — saved reports, open/delete. Badge shows
-            the number of saved reports so it's visible before the
-            tab is opened. */}
         <button
           onClick={() => setActiveForumTab("history")}
           style={{
@@ -2174,16 +2359,6 @@ ${"=".repeat(50)}
                 ? `0 2px 8px rgba(0,0,0,0.08)`
                 : "none",
           }}
-          onMouseEnter={(e) => {
-            if (activeForumTab !== "history") {
-              e.currentTarget.style.color = "#0F172A";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeForumTab !== "history") {
-              e.currentTarget.style.color = "#64748B";
-            }
-          }}
         >
           <FiList size={isMobile ? 14 : 16} />
           {tf("historyTab", "History")}
@@ -2204,7 +2379,6 @@ ${"=".repeat(50)}
           )}
         </button>
 
-        {/* Tab 3: Feed — the existing social surface. */}
         <button
           onClick={() => setActiveForumTab("feed")}
           style={{
@@ -2225,23 +2399,13 @@ ${"=".repeat(50)}
             boxShadow:
               activeForumTab === "feed" ? `0 2px 8px rgba(0,0,0,0.08)` : "none",
           }}
-          onMouseEnter={(e) => {
-            if (activeForumTab !== "feed") {
-              e.currentTarget.style.color = "#0F172A";
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (activeForumTab !== "feed") {
-              e.currentTarget.style.color = "#64748B";
-            }
-          }}
         >
           <FiMessageSquare size={isMobile ? 14 : 16} />
           {tf("feed", "Feed")}
         </button>
       </div>
 
-      {/* ─── MAIN FORM ────────────────────────────────────────────── */}
+      {/* ─── MAIN FORM ─────────────────────────────────────── */}
       {activeForumTab === "form" ? (
         <div
           style={{
@@ -2253,7 +2417,6 @@ ${"=".repeat(50)}
             border: `1px solid ${C.border}`,
           }}
         >
-          {/* Auto-Save Indicator */}
           <div
             style={{
               display: "flex",
@@ -2263,13 +2426,12 @@ ${"=".repeat(50)}
           >
             <AutoSaveIndicator
               isSaving={saving}
-              isSaved={progressSaved}
+              isSaved={!!lastAutoSaveTime}
               lastSavedAt={lastAutoSaveTime}
               t={tf}
             />
           </div>
 
-          {/* Meeting Time */}
           <Section
             title={tf("meetingTime", "Meeting Time")}
             icon={<FiCalendar size={18} />}
@@ -2286,7 +2448,6 @@ ${"=".repeat(50)}
                 value={form.timeStart}
                 onChange={(v) => {
                   upd("timeStart", v);
-                  // Auto-calculate end time when start time is set
                   if (v) {
                     const [hours, minutes] = v.split(":").map(Number);
                     const date = new Date();
@@ -2298,8 +2459,6 @@ ${"=".repeat(50)}
                       "0",
                     );
                     upd("timeEnd", `${endHours}:${endMinutes}`);
-
-                    // Start the timer when start time is set
                     setTimerActive(true);
                   }
                 }}
@@ -2321,7 +2480,6 @@ ${"=".repeat(50)}
             </div>
           </Section>
 
-          {/* Present Members */}
           <DynamicFieldGroup
             title={tf("presentMembers", "Present Members")}
             icon={<FiUserCheckIcon size={18} />}
@@ -2354,7 +2512,6 @@ ${"=".repeat(50)}
             addAnotherLabel={tf("addAnother", "Add Another")}
           />
 
-          {/* Absent Members */}
           <Section
             title={tf("absentMembers", "Absent Members & Reasons")}
             icon={<FiUserX size={18} />}
@@ -2462,21 +2619,12 @@ ${"=".repeat(50)}
                 borderWidth: "2px",
                 gap: "6px",
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = C.primary;
-                e.currentTarget.style.background = `${C.primary}08`;
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = C.border;
-                e.currentTarget.style.background = "transparent";
-              }}
             >
               <FiPlus size={14} />
               {tf("addAbsent", "Add Absent Member")}
             </button>
           </Section>
 
-          {/* Previous Results */}
           <DynamicFieldGroup
             title={tf("prevResults", "Results from Previous Meeting")}
             icon={<FiFileText size={18} />}
@@ -2499,7 +2647,6 @@ ${"=".repeat(50)}
             addAnotherLabel={tf("addAnother", "Add Another")}
           />
 
-          {/* Today's Topics */}
           <DynamicFieldGroup
             title={tf("todayTopics", "Today's Discussion Topics")}
             icon={<FiMessageSquare size={18} />}
@@ -2522,7 +2669,6 @@ ${"=".repeat(50)}
             addAnotherLabel={tf("addAnother", "Add Another")}
           />
 
-          {/* Explanation - Enhanced with AI Actions */}
           <Section
             title={tf("explanation", "Explanation Given (Brief)")}
             icon={<FiEdit3 size={18} />}
@@ -2606,15 +2752,6 @@ ${"=".repeat(50)}
                     whiteSpace: "nowrap",
                     borderRadius: radius.md,
                     fontWeight: 600,
-                    transition: "all 0.3s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#DBEAFE";
-                    e.currentTarget.style.transform = "scale(1.02)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#EFF6FF";
-                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
                   <FiZap size={13} />
@@ -2636,15 +2773,6 @@ ${"=".repeat(50)}
                     whiteSpace: "nowrap",
                     borderRadius: radius.md,
                     fontWeight: 600,
-                    transition: "all 0.3s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#DCFCE7";
-                    e.currentTarget.style.transform = "scale(1.02)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#F0FDF4";
-                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
                   <FiTrendingUp size={13} />
@@ -2666,22 +2794,12 @@ ${"=".repeat(50)}
                     whiteSpace: "nowrap",
                     borderRadius: radius.md,
                     fontWeight: 600,
-                    transition: "all 0.3s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#FDE68A";
-                    e.currentTarget.style.transform = "scale(1.02)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#FEF3C7";
-                    e.currentTarget.style.transform = "scale(1)";
                   }}
                 >
                   <FiBookOpen size={13} />
                   {tf("fullReport", "Full Report")}
                 </button>
 
-                {/* ✅ EXPORT BUTTON - Text on Desktop, Icon on Mobile */}
                 <button
                   onClick={handleExport}
                   style={{
@@ -2697,16 +2815,7 @@ ${"=".repeat(50)}
                     whiteSpace: "nowrap",
                     borderRadius: radius.md,
                     fontWeight: 600,
-                    transition: "all 0.3s ease",
                     gap: "4px",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "#EDE9FE";
-                    e.currentTarget.style.transform = "scale(1.02)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#F3E8FF";
-                    e.currentTarget.style.transform = "scale(1)";
                   }}
                   title={tc("export", "Export PDF")}
                 >
@@ -2717,7 +2826,6 @@ ${"=".repeat(50)}
             </div>
           </Section>
 
-          {/* Gaps */}
           <DynamicFieldGroup
             title={tf("gaps", "Identified Gaps")}
             icon={<FiAlertCircle size={18} />}
@@ -2740,7 +2848,6 @@ ${"=".repeat(50)}
             addAnotherLabel={tf("addAnother", "Add Another")}
           />
 
-          {/* Agreements */}
           <DynamicFieldGroup
             title={tf("agreements", "Agreed Points")}
             icon={<FiCheckCircle size={18} />}
@@ -2763,7 +2870,6 @@ ${"=".repeat(50)}
             addAnotherLabel={tf("addAnother", "Add Another")}
           />
 
-          {/* Signatures - With Modal */}
           <Section
             title={tf("signatures", "Signatures")}
             icon={<FiPenTool size={18} />}
@@ -2795,22 +2901,6 @@ ${"=".repeat(50)}
                         value: sig,
                       });
                     }
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!isReportLocked) {
-                      e.currentTarget.style.borderColor = C.primary;
-                      e.currentTarget.style.background = `${C.primary}05`;
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.boxShadow = shadows.sm;
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = sig
-                      ? C.primary
-                      : C.border;
-                    e.currentTarget.style.background = C.cardBg;
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "none";
                   }}
                 >
                   <div
@@ -2848,17 +2938,6 @@ ${"=".repeat(50)}
                           width: "24px",
                           height: "24px",
                           borderRadius: "6px",
-                          transition: "all 0.25s ease",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = "#fecaca";
-                          e.currentTarget.style.transform =
-                            "scale(1.1) rotate(90deg)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = "#fee2e2";
-                          e.currentTarget.style.transform =
-                            "scale(1) rotate(0)";
                         }}
                       >
                         <FiX size={12} />
@@ -2866,7 +2945,6 @@ ${"=".repeat(50)}
                     )}
                   </div>
 
-                  {/* Signature preview */}
                   {sig ? (
                     <div
                       style={{
@@ -2945,16 +3023,6 @@ ${"=".repeat(50)}
                 opacity: isReportLocked ? 0.5 : 1,
                 cursor: isReportLocked ? "not-allowed" : "pointer",
               }}
-              onMouseEnter={(e) => {
-                if (!isReportLocked) {
-                  e.currentTarget.style.borderColor = C.primary;
-                  e.currentTarget.style.background = `${C.primary}08`;
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = C.border;
-                e.currentTarget.style.background = "transparent";
-              }}
             >
               <FiPlus size={14} />
               {tf("addSignature", "Add Signature")}
@@ -2973,9 +3041,6 @@ ${"=".repeat(50)}
               borderTop: `2px solid ${C.border}`,
             }}
           >
-            {/* ✅ NEW: checkbox to include/exclude the AI-generated
-                block inside the exported PDF. Only gates the AI text;
-                the manual explanation prose is always included. */}
             <label
               style={{
                 display: "inline-flex",
@@ -3004,7 +3069,6 @@ ${"=".repeat(50)}
               {tf("includeAiInPdf", "Include AI content in PDF")}
             </label>
 
-            {/* EXPORT — text on desktop, icon-only on mobile */}
             <button
               style={{
                 ...btn.danger,
@@ -3017,18 +3081,8 @@ ${"=".repeat(50)}
                 minWidth: 0,
                 gap: "6px",
                 borderRadius: radius.lg,
-                transition: "all 0.3s ease",
               }}
               onClick={handleExport}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-3px)";
-                e.currentTarget.style.boxShadow =
-                  "0 8px 25px rgba(220,38,38,0.35)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
               title={tc("export", "Export PDF")}
             >
               <FiDownload size={isMobile ? 20 : 18} />
@@ -3036,10 +3090,6 @@ ${"=".repeat(50)}
               {isMobile && <span style={{ fontSize: "10px" }}>PDF</span>}
             </button>
 
-            {/* NEW: RESET — only meaningful when there's something to
-                abandon. Always rendered, because a fresh report can
-                also be reset. Confirms before clearing so a mis-click
-                doesn't lose in-progress work. */}
             <button
               style={{
                 ...btn.secondary,
@@ -3052,17 +3102,11 @@ ${"=".repeat(50)}
                 minWidth: 0,
                 gap: "6px",
                 borderRadius: radius.lg,
-                transition: "all 0.3s ease",
               }}
               onClick={() => {
-                const hasContent =
-                  form.present.some((p) => p && p.trim()) ||
-                  form.topics.some((t) => t && t.trim()) ||
-                  form.explanation.trim() ||
-                  form.gaps.some((g) => g && g.trim()) ||
-                  form.agreements.some((a) => a && a.trim());
+                const hasContentNow = hasAnyContent(form);
                 if (
-                  hasContent &&
+                  hasContentNow &&
                   !window.confirm(
                     editingId
                       ? "Discard changes to this report and start fresh?"
@@ -3083,7 +3127,6 @@ ${"=".repeat(50)}
               {!isMobile && <span>{tc("reset", "Reset")}</span>}
             </button>
 
-            {/* SAVE / UPDATE */}
             <button
               style={{
                 ...btn.primary,
@@ -3095,20 +3138,9 @@ ${"=".repeat(50)}
                 cursor: saving ? "not-allowed" : "pointer",
                 borderRadius: radius.lg,
                 gap: "8px",
-                transition: "all 0.3s ease",
               }}
               onClick={handleSaveReport}
               disabled={saving}
-              onMouseEnter={(e) => {
-                if (!saving) {
-                  e.currentTarget.style.transform = "translateY(-3px)";
-                  e.currentTarget.style.boxShadow = `0 8px 25px ${C.primary}44`;
-                }
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
             >
               {saving ? (
                 <>
@@ -3130,14 +3162,6 @@ ${"=".repeat(50)}
           </div>
         </div>
       ) : activeForumTab === "history" ? (
-        /* ─── HISTORY TAB ─────────────────────────────────────────────
-            Saved reports for this team. The panel handles its own
-            fetching, filtering, and permission checks; we just hand it
-            the team, the "open this report" callback (which populates
-            the form and switches back to the Form tab), a count
-            callback (drives the badge on the History tab button), and
-            a refresh key (so saves from the Form tab immediately
-            appear here without a page reload). */
         <ForumReportHistory
           teamId={selectedTeam?.id}
           onOpenReport={handleLoadReport}
@@ -3145,17 +3169,14 @@ ${"=".repeat(50)}
           refreshKey={historyRefreshKey}
         />
       ) : (
-        /* ─── FORUM FEED TAB ────────────────────────────────────────── */
         <ForumReportFeed t={t} isMobile={isMobile} teamId={selectedTeam?.id} />
       )}
 
-      {/* ─── Time Expired Modal ──────────────────────────────────── */}
       <TimeExpiredModal
         isOpen={showExpiredModal}
         onClose={() => setShowExpiredModal(false)}
         onRequestExtension={handleRequestExtension}
         onViewProgress={() => {
-          // Admin view progress functionality
           setShowExpiredModal(false);
         }}
         isAdmin={isAdmin}
@@ -3176,7 +3197,7 @@ ${"=".repeat(50)}
           50% { transform: scale(1.05); }
         }
       `}</style>
-      {/* ─── Signature Modal ──────────────────────────────────────── */}
+
       <SignatureModal
         isOpen={signatureModal.isOpen}
         onClose={() =>

@@ -328,55 +328,69 @@ export const canEditForumReport = (user, report) => {
 
 export const canDeleteForumReport = canEditForumReport;
 
-// ─── NEW: FORUM REPORT TIMER & EXTENSION PERMISSIONS ──────────────────
+// ─── FORUM REPORT TIMER & EXTENSION PERMISSIONS ──────────────────────
+//
+// These helpers mirror the backend `meetingController.js` rules.
+// They are consumed by ForumReport.jsx, TimeExpiredModal.jsx, and
+// the admin extensions UI. If the backend changes a permission,
+// update the matching helper here — otherwise the UI will show
+// buttons the server rejects (or hide actions it would allow).
 
 /**
- * Check if user can request extension for a forum report
- * - Super Admin: YES
- * - Admin: YES
- * - Team Leader: YES (only their own team's reports)
- * - Employee: NO
+ * Can this user FILE an extension request for this report?
+ *
+ * F2 (B5): the backend `requestExtension` handler is owner-only —
+ * including admins must be the report's author to file the request.
+ * Admins still have an approval path (see canManageExtensions), but
+ * they cannot file a request on behalf of a team member through this
+ * route. Keeping the UI in lockstep prevents a button that silently
+ * 403s the user.
  */
 export const canRequestExtension = (user, report) => {
   if (!user || !report) return false;
-  if (isAdminOrAbove(user)) return true;
-  if (user.role === ROLES.TEAM_LEADER) {
-    const userTeam = getUserTeamId(user);
-    const reportTeam = report.teamId || report.team?._id || report.team;
-    return userTeam?.toString() === reportTeam?.toString();
-  }
-  // Team members can request more time on their own team's report
-  if (user.role === ROLES.EMPLOYEE) {
-    const userTeam = getUserTeamId(user);
-    const reportTeam = report.teamId || report.team?._id || report.team;
-    return userTeam?.toString() === reportTeam?.toString();
-  }
-  return false;
+  return isOwner(user, report);
 };
 
 /**
- * Check if user can approve/reject extension requests (Admin only)
+ * Approve / reject extension requests.
+ *
+ * Matches backend route guard `adminOrSuperAdmin` on
+ * POST /meetings/extension/:id/approve and /reject, plus the
+ * `isAdmin(user)` check inside the controller.
+ * Admin and superadmin only. Leaders are NOT included.
  */
 export const canManageExtensions = (user) => {
   return isAdminOrAbove(user);
 };
 
 /**
- * Check if user can view locked/expired report progress (Admin only)
+ * View locked / expired report progress.
+ *
+ * Matches backend route guard `adminOrSuperAdmin` on
+ * GET /meetings/:id/progress.
+ * Admin and superadmin only.
  */
 export const canViewLockedProgress = (user) => {
   return isAdminOrAbove(user);
 };
 
 /**
- * Check if user can resume a locked report (Admin only)
+ * Resume a locked report.
+ *
+ * Matches backend route guard `adminOrSuperAdmin` on
+ * POST /meetings/:id/resume.
+ * Admin and superadmin only.
  */
 export const canResumeReport = (user) => {
   return isAdminOrAbove(user);
 };
 
 /**
- * Check if user can unlock a report (Admin only)
+ * Unlock a report.
+ *
+ * Matches backend route guard `adminOrSuperAdmin` on
+ * POST /meetings/:id/unlock.
+ * Admin and superadmin only.
  */
 export const canUnlockReport = (user) => {
   return isAdminOrAbove(user);

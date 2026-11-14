@@ -79,7 +79,7 @@ const meetingSchema = new mongoose.Schema(
       default: "",
     },
 
-    // ─── NEW: Timer & Auto-Save Fields ────────────────────
+    // ─── Timer & Auto-Save Fields ─────────────────────────
     status: {
       type: String,
       enum: ["in_progress", "auto_saved", "completed", "expired", "locked"],
@@ -109,6 +109,25 @@ const meetingSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // ─── Lifecycle stamps ─────────────────────────────────
+    // completedAt / finalizedAt are stamped by the controller
+    // (A1 + B2) the moment status transitions to "completed",
+    // whether from createMeeting or updateMeeting.
+    completedAt: {
+      type: Date,
+      default: null,
+    },
+    finalizedAt: {
+      type: Date,
+      default: null,
+    },
+    aiGeneratedContent: {
+      type: String,
+      default: "",
+    },
+
+    // ─── Extension lifecycle ──────────────────────────────
     extensionApproved: {
       type: Boolean,
       default: false,
@@ -125,6 +144,8 @@ const meetingSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+
+    // ─── Lock state ───────────────────────────────────────
     isLocked: {
       type: Boolean,
       default: false,
@@ -137,6 +158,8 @@ const meetingSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+
+    // ─── Progress snapshot (used by resume / admin view) ──
     progressData: {
       type: mongoose.Schema.Types.Mixed,
       default: null,

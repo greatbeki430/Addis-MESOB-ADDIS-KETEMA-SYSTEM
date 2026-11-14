@@ -18,10 +18,15 @@ const DAILY_REPORT_POPULATE = [
 ];
 
 // Populate fields for forum reports
+//
+// D1: Meeting stores the team on "team" (ObjectId ref "Team").
+// There is no "teamId" field on the schema, and "present" is a
+// [String] array of member names, not a set of User refs — so the
+// previous populate of "teamId" and "present" was a silent no-op
+// that produced team: null on every forum feed item.
 const FORUM_REPORT_POPULATE = [
   { path: "createdBy", select: "name email role profilePhotoUrl" },
-  { path: "teamId", select: "name nameEn" },
-  { path: "present", select: "name email" },
+  { path: "team", select: "name nameEn" },
 ];
 
 /**
@@ -91,10 +96,14 @@ const getUnifiedFeed = async (req, res) => {
       const forumFilter = {};
 
       // Team filtering
+      // D1: Meeting stores the team on "team" — never on "teamId".
+      // Using "teamId" here broke the non-admin clamp entirely:
+      // the query would either return nothing or leak other teams
+      // depending on the query planner. The correct path is "team".
       if (team) {
-        forumFilter.teamId = team;
+        forumFilter.team = team;
       } else if (!isAdminTier(userRole)) {
-        forumFilter.teamId = userTeam;
+        forumFilter.team = userTeam;
       }
 
       // Date range
@@ -114,7 +123,9 @@ const getUnifiedFeed = async (req, res) => {
           title: "Forum Report",
           summary: doc.explanation || "No explanation provided",
           author: doc.createdBy || null,
-          team: doc.teamId || null,
+          // D1: read the real field name. The API response key stays
+          // "team" for shape-compatibility with daily_report items.
+          team: doc.team || null,
           date: doc.date || doc.createdAt,
           createdAt: doc.createdAt,
           topics: doc.topics || [],
@@ -164,11 +175,12 @@ const getUnifiedFeed = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Error fetching unified feed:", error);
+    // B8: never return error.message or error.stack to the client.
+    console.error("❌ Feed fetch failed:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch feed",
-      error: error.message,
+      code: "FEED_FETCH_FAILED",
     });
   }
 };
@@ -217,7 +229,8 @@ const getFeedItemById = async (req, res) => {
           title: "Forum Report",
           summary: doc.explanation || "No explanation provided",
           author: doc.createdBy || null,
-          team: doc.teamId || null,
+          // D1: same correction as the list transform.
+          team: doc.team || null,
           date: doc.date || doc.createdAt,
           createdAt: doc.createdAt,
           topics: doc.topics || [],
@@ -235,6 +248,7 @@ const getFeedItemById = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: "Feed item not found",
+        code: "FEED_ITEM_NOT_FOUND",
       });
     }
 
@@ -243,11 +257,11 @@ const getFeedItemById = async (req, res) => {
       data: item,
     });
   } catch (error) {
-    console.error("❌ Error fetching feed item:", error);
+    console.error("❌ Feed item fetch failed:", error.message);
     res.status(500).json({
       success: false,
       message: "Failed to fetch feed item",
-      error: error.message,
+      code: "FEED_ITEM_FETCH_FAILED",
     });
   }
 };

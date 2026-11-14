@@ -39,34 +39,119 @@ const ownerAndTeamCheck = (meeting, user) => {
   return { isOwner, sameTeam };
 };
 
+// ─── Client-controlled status whitelist (B4) ───────────────
+// Clients may only send these two. "locked"/"expired"/"auto_saved"
+// are server-controlled. Anything else is rejected.
+const CLIENT_STATUSES = new Set(["in_progress", "completed"]);
+const validateClientStatus = (status) => {
+  if (status === undefined) return null;
+  if (!CLIENT_STATUSES.has(status)) {
+    return `Invalid status "${status}". Allowed: in_progress, completed.`;
+  }
+  return null;
+};
+
+// ─── Content field whitelist (B1) ──────────────────────────
+// Only these keys may ever be written from a client-supplied body.
+// Everything else (team, createdBy, createdByName, status, isLocked,
+// extensionApproved, extensionExpiresAt, isResumed, resumedAt,
+// progressData, adminNotes, autoSaveCount, lastAutoSave, isAutoSave)
+// is server-owned. "status" is handled separately via B4 whitelist.
+const CONTENT_FIELDS = [
+  "date",
+  "timeStart",
+  "timeEnd",
+  "present",
+  "absent",
+  "prevResults",
+  "topics",
+  "explanation",
+  "gaps",
+  "agreements",
+  "signatures",
+  "teamName",
+  "aiGeneratedContent",
+];
+const pickContentFields = (body = {}) => {
+  const out = {};
+  for (const k of CONTENT_FIELDS) {
+    if (body[k] !== undefined) out[k] = body[k];
+  }
+  // date conversion is done by callers, not here
+  return out;
+};
+
+// ─── Extension window enforcement (B6) ─────────────────────
+// A non-admin may not edit a report whose approved extension has
+// already elapsed. Admins bypass this (they can always override).
+const isPastExtension = (meeting) =>
+  !!(
+    meeting.extensionApproved &&
+    meeting.extensionExpiresAt &&
+    new Date(meeting.extensionExpiresAt).getTime() < Date.now()
+  );
+
+const isCompletedOrLocked = (meeting) =>
+  meeting.status === "completed" ||
+  meeting.status === "locked" ||
+  meeting.isLocked === true;
+
+// ─── Content cleaning helper (used by create, autosave, update) ───
+// Consolidates the cleaning logic that used to be duplicated.
+const cleanContentForWrite = (raw) => {
+  const out = { ...raw };
+  if (out.date) out.date = new Date(out.date);
+  if (out.present !== undefined) {
+    out.present = Array.isArray(out.present)
+      ? out.present.filter((p) => typeof p === "string" && p.trim() !== "")
+      : [];
+  }
+  if (out.absent !== undefined) {
+    out.absent = Array.isArray(out.absent)
+      ? out.absent
+          .filter((a) => a && a.name && String(a.name).trim())
+          .map((a) => ({
+            name: String(a.name).trim(),
+            reason: String(a.reason || "").trim(),
+          }))
+      : [];
+  }
+  for (const field of [
+    "prevResults",
+    "topics",
+    "gaps",
+    "agreements",
+    "signatures",
+  ]) {
+    if (out[field] !== undefined) out[field] = cleanStringArray(out[field]);
+  }
+  return out;
+};
+
 // ─── Create Meeting ─────────────────────────────────────────
 const createMeeting = async (req, res) => {
   try {
-    console.log(
-      "📝 Creating meeting with data:",
-      JSON.stringify(req.body, null, 2),
-    );
-
     const {
       date,
-      timeStart,
-      timeEnd,
-      present,
-      absent,
-      prevResults,
-      topics,
-      explanation,
-      gaps,
-      agreements,
-      signatures,
       teamId,
       teamName,
       status = "in_progress",
       meetingDuration = 30,
     } = req.body;
 
+    // B4: reject anything outside the client whitelist
+    const statusError = validateClientStatus(status);
+    if (statusError) {
+      return res.status(400).json({
+        message: statusError,
+        code: "INVALID_STATUS",
+      });
+    }
+
     if (!date) {
-      return res.status(400).json({ message: "Date is required" });
+      return res
+        .status(400)
+        .json({ message: "Date is required", code: "DATE_REQUIRED" });
     }
 
     let teamObjectId = null;
@@ -77,54 +162,32 @@ const createMeeting = async (req, res) => {
     }
 
     if (violatesTeamScope(req.user, teamObjectId)) {
-      return res
-        .status(403)
-        .json({ message: "You can only file reports for your own team" });
+      return res.status(403).json({
+        message: "You can only file reports for your own team",
+        code: "WRONG_TEAM",
+      });
     }
 
-    // Clean arrays
-    const cleanedPrevResults = cleanStringArray(prevResults);
-    const cleanedTopics = cleanStringArray(topics);
-    const cleanedGaps = cleanStringArray(gaps);
-    const cleanedAgreements = cleanStringArray(agreements);
-    const cleanedSignatures = cleanStringArray(signatures);
-
-    // Handle present members
-    let presentIds = [];
-    if (Array.isArray(present)) {
-      presentIds = present.filter((p) => p && p.trim && p.trim() !== "");
-    }
-
-    // Handle absent members
-    let absentData = [];
-    if (Array.isArray(absent)) {
-      absentData = absent
-        .filter((a) => a && a.name && a.name.trim())
-        .map((a) => ({
-          name: a.name.trim(),
-          reason: a.reason || "",
-        }));
-    }
+    // B1: whitelist then clean
+    const content = cleanContentForWrite(pickContentFields(req.body));
 
     const meetingData = {
+      ...content,
       date: new Date(date),
-      timeStart: timeStart || "",
-      timeEnd: timeEnd || "",
-      present: presentIds,
-      absent: absentData,
-      prevResults: cleanedPrevResults,
-      topics: cleanedTopics,
-      explanation: explanation || "",
-      gaps: cleanedGaps,
-      agreements: cleanedAgreements,
-      signatures: cleanedSignatures,
       team: teamObjectId,
       teamName: teamName || "Unknown Team",
       createdBy: req.user._id,
       createdByName: req.user.name || "Unknown User",
-      status: status || "in_progress",
+      status, // already validated as in_progress | completed
       meetingDuration: meetingDuration || 30,
     };
+
+    // A1 + B2: stamp completedAt/finalizedAt when completing
+    if (status === "completed") {
+      const now = new Date();
+      meetingData.completedAt = now;
+      meetingData.finalizedAt = now;
+    }
 
     const meeting = await Meeting.create(meetingData);
 
@@ -133,10 +196,10 @@ const createMeeting = async (req, res) => {
       meeting,
     });
   } catch (error) {
-    console.error("❌ Meeting creation error:", error);
+    console.error("❌ Meeting creation error:", error.message);
     res.status(500).json({
-      message: error.message,
-      error: error.stack,
+      message: "Failed to create meeting",
+      code: "MEETING_CREATE_FAILED",
     });
   }
 };
@@ -144,107 +207,112 @@ const createMeeting = async (req, res) => {
 // ─── Auto-Save Meeting ──────────────────────────────────────
 const autoSaveMeeting = async (req, res) => {
   try {
-    const { meetingId, ...reportData } = req.body;
+    const { meetingId } = req.body;
+
+    // B1: whitelist the content fields before touching anything.
+    const content = cleanContentForWrite(pickContentFields(req.body));
+    const now = new Date();
 
     let meeting;
 
     if (meetingId) {
-      // Find existing meeting
       meeting = await Meeting.findById(meetingId);
       if (!meeting) {
-        return res.status(404).json({ message: "Meeting not found" });
+        return res
+          .status(404)
+          .json({ message: "Meeting not found", code: "MEETING_NOT_FOUND" });
       }
 
-      // Check if user owns this meeting
-      if (
-        meeting.createdBy.toString() !== req.user._id.toString() &&
-        !isAdmin(req.user)
-      ) {
-        return res.status(403).json({ message: "Not authorized" });
+      // Ownership check (unchanged from original — owner or admin only)
+      const isOwner =
+        meeting.createdBy &&
+        meeting.createdBy.toString() === req.user._id.toString();
+      if (!isOwner && !isAdmin(req.user)) {
+        return res
+          .status(403)
+          .json({ message: "Not authorized", code: "NOT_OWNER" });
       }
 
-      // Update meeting
-      Object.assign(meeting, {
-        ...reportData,
-        isAutoSave: true,
-        lastAutoSave: new Date(),
-        autoSaveCount: (meeting.autoSaveCount || 0) + 1,
-        status: "auto_saved",
-      });
+      // B1: validate team scope on the update path
+      if (violatesTeamScope(req.user, meeting.team)) {
+        return res.status(403).json({
+          message: "You can only edit reports for your own team",
+          code: "WRONG_TEAM",
+        });
+      }
 
-      // Save progress data for recovery
+      // B3: never downgrade a completed / locked report
+      if (isCompletedOrLocked(meeting)) {
+        return res.status(409).json({
+          message:
+            "This report is completed or locked; autosave is not allowed.",
+          code: "AUTOSAVE_LOCKED",
+        });
+      }
+
+      // B3: refuse autosave after an expired, unapproved timer
+      if (meeting.timeExpired && !meeting.extensionApproved) {
+        return res.status(409).json({
+          message:
+            "This report has expired; request an extension before continuing.",
+          code: "AUTOSAVE_EXPIRED",
+        });
+      }
+
+      // B6: refuse autosave after a passed approved-extension window
+      if (isPastExtension(meeting)) {
+        return res.status(409).json({
+          message: "Your extension window has elapsed.",
+          code: "EXTENSION_EXPIRED",
+        });
+      }
+
+      // Apply the whitelisted content
+      Object.assign(meeting, content);
+      meeting.isAutoSave = true;
+      meeting.lastAutoSave = now;
+      meeting.autoSaveCount = (meeting.autoSaveCount || 0) + 1;
+      // Only downgrade in_progress → auto_saved, never touch completed/locked
+      if (meeting.status === "in_progress") {
+        meeting.status = "auto_saved";
+      }
+
       meeting.progressData = {
-        date: reportData.date,
-        timeStart: reportData.timeStart,
-        timeEnd: reportData.timeEnd,
-        present: reportData.present,
-        absent: reportData.absent,
-        prevResults: reportData.prevResults,
-        topics: reportData.topics,
-        explanation: reportData.explanation,
-        gaps: reportData.gaps,
-        agreements: reportData.agreements,
-        signatures: reportData.signatures,
+        date: meeting.date,
+        timeStart: meeting.timeStart,
+        timeEnd: meeting.timeEnd,
+        present: meeting.present,
+        absent: meeting.absent,
+        prevResults: meeting.prevResults,
+        topics: meeting.topics,
+        explanation: meeting.explanation,
+        gaps: meeting.gaps,
+        agreements: meeting.agreements,
+        signatures: meeting.signatures,
       };
 
       await meeting.save();
     } else {
-      // Create new auto-save draft
-      const {
-        date,
-        timeStart,
-        timeEnd,
-        present,
-        absent,
-        prevResults,
-        topics,
-        explanation,
-        gaps,
-        agreements,
-        signatures,
-        teamId,
-        teamName,
-      } = reportData;
-
-      if (violatesTeamScope(req.user, teamId)) {
-        return res
-          .status(403)
-          .json({ message: "You can only file reports for your own team" });
+      // Create new draft
+      const teamObjectId = req.body.teamId || req.body.team || null;
+      if (violatesTeamScope(req.user, teamObjectId)) {
+        return res.status(403).json({
+          message: "You can only file reports for your own team",
+          code: "WRONG_TEAM",
+        });
       }
 
       meeting = await Meeting.create({
-        date: date ? new Date(date) : new Date(),
-        timeStart: timeStart || "",
-        timeEnd: timeEnd || "",
-        present: present || [],
-        absent: absent || [],
-        prevResults: cleanStringArray(prevResults),
-        topics: cleanStringArray(topics),
-        explanation: explanation || "",
-        gaps: cleanStringArray(gaps),
-        agreements: cleanStringArray(agreements),
-        signatures: cleanStringArray(signatures),
-        team: teamId || null,
-        teamName: teamName || "Unknown Team",
+        ...content,
+        date: content.date || now,
+        team: teamObjectId,
+        teamName: req.body.teamName || "Unknown Team",
         createdBy: req.user._id,
         createdByName: req.user.name || "Unknown User",
         status: "auto_saved",
         isAutoSave: true,
-        lastAutoSave: new Date(),
+        lastAutoSave: now,
         autoSaveCount: 1,
-        progressData: {
-          date: reportData.date,
-          timeStart: reportData.timeStart,
-          timeEnd: reportData.timeEnd,
-          present: reportData.present,
-          absent: reportData.absent,
-          prevResults: reportData.prevResults,
-          topics: reportData.topics,
-          explanation: reportData.explanation,
-          gaps: reportData.gaps,
-          agreements: reportData.agreements,
-          signatures: reportData.signatures,
-        },
       });
     }
 
@@ -254,10 +322,10 @@ const autoSaveMeeting = async (req, res) => {
       meeting,
     });
   } catch (error) {
-    console.error("❌ Auto-save error:", error);
+    console.error("❌ Auto-save error:", error.message);
     res.status(500).json({
-      message: error.message,
-      error: error.stack,
+      message: "Auto-save failed",
+      code: "AUTOSAVE_FAILED",
     });
   }
 };
@@ -277,14 +345,6 @@ const autoSaveMeeting = async (req, res) => {
 //   • status           → exact status, or "draft" for the umbrella
 //                        over the two not-yet-final statuses
 //   • isLocked         → "true" / "false"
-//
-// The previous version had a single clamp — `filter.createdBy =
-// req.user._id` for every non-admin — which silently hid teammates'
-// reports from team leaders opening History. That's the whole
-// reason a leader opens History: to see what their team submitted,
-// not just what they personally submitted. Fixed by giving leaders
-// an OR clause that widens the result set to include everything on
-// their team.
 const getMeetings = async (req, res) => {
   try {
     const { teamId, team, status, isLocked } = req.query;
@@ -324,7 +384,6 @@ const getMeetings = async (req, res) => {
         // A leader sees everything on their own team, plus any report
         // they personally authored on any other team (edge case —
         // e.g. they were moved between teams after submitting).
-        // Express the rule as an OR so a single query returns both.
         filter.$or = [{ team: req.user.team }, { createdBy: req.user._id }];
       } else if (userTeamId) {
         // Team members can read their teammates' SUBMITTED reports (never
@@ -348,8 +407,11 @@ const getMeetings = async (req, res) => {
 
     res.json(meetings);
   } catch (error) {
-    console.error("❌ Get meetings error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Get meetings error:", error.message);
+    res.status(500).json({
+      message: "Failed to load meetings",
+      code: "MEETINGS_FETCH_FAILED",
+    });
   }
 };
 
@@ -361,27 +423,36 @@ const getMeetingById = async (req, res) => {
       .populate("reviewedBy", "name email");
 
     if (!meeting) {
-      return res.status(404).json({ message: "Meeting not found" });
+      return res
+        .status(404)
+        .json({ message: "Meeting not found", code: "MEETING_NOT_FOUND" });
     }
 
     // Check access
     const isOwner =
+      meeting.createdBy &&
       meeting.createdBy._id.toString() === req.user._id.toString();
     const isAdminUser = isAdmin(req.user);
 
-    // If meeting is locked and user is not admin, only show if they are the owner
-    if (meeting.isLocked && !isAdminUser && !isOwner) {
+    // B7: same-team leaders may READ locked reports.
+    const sameTeam =
+      meeting.team && req.user.team
+        ? meeting.team.toString() === req.user.team.toString()
+        : false;
+    const isLeaderOfTeam = req.user.role === "leader" && sameTeam;
+
+    if (meeting.isLocked && !isAdminUser && !isOwner && !isLeaderOfTeam) {
       return res.status(403).json({
-        message: "This report is locked. Only the owner or admin can view it.",
-        isLocked: true,
+        message:
+          "This report is locked. Only the owner, team leader, or admin can view it.",
+        code: "MEETING_LOCKED",
       });
     }
 
-    // If meeting is expired and user is not admin, show limited data
-    if (meeting.timeExpired && !isAdminUser && !isOwner) {
+    if (meeting.timeExpired && !isAdminUser && !isOwner && !isLeaderOfTeam) {
       return res.status(403).json({
         message: "This report has expired. Contact an admin for access.",
-        isExpired: true,
+        code: "MEETING_EXPIRED",
         meeting: {
           _id: meeting._id,
           teamName: meeting.teamName,
@@ -395,8 +466,11 @@ const getMeetingById = async (req, res) => {
 
     res.json(meeting);
   } catch (error) {
-    console.error("❌ Get meeting by ID error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Get meeting by ID error:", error.message);
+    res.status(500).json({
+      message: "Failed to load meeting",
+      code: "MEETING_FETCH_FAILED",
+    });
   }
 };
 
@@ -413,15 +487,13 @@ const getMeetingById = async (req, res) => {
 // report that seven people have already signed and rewrite the
 // content underneath their signatures. The signature is the whole
 // point of the artifact — the rule has to make it impossible.
-//
-// A locked report is a hard stop for everyone but an admin, who has
-// to unlock it explicitly first (via /meetings/:id/unlock) so the
-// unlock shows up in the audit trail.
 const updateMeeting = async (req, res) => {
   try {
     const meeting = await Meeting.findById(req.params.id);
     if (!meeting) {
-      return res.status(404).json({ message: "Meeting not found" });
+      return res
+        .status(404)
+        .json({ message: "Meeting not found", code: "MEETING_NOT_FOUND" });
     }
 
     const isAdminUser = isAdmin(req.user);
@@ -463,52 +535,48 @@ const updateMeeting = async (req, res) => {
           code: "WRONG_TEAM",
         });
       }
-      return res
-        .status(403)
-        .json({ message: "Not authorized to update this report" });
+      return res.status(403).json({
+        message: "Not authorized to update this report",
+        code: "NOT_AUTHORIZED",
+      });
     }
 
     // ── Apply the update ─────────────────────────────────────
-    const updates = { ...req.body };
+    // B1: whitelist content fields
+    const content = cleanContentForWrite(pickContentFields(req.body));
 
-    // Never let the client move a report to a different team or
-    // change its ownership via a plain PUT — those are audit fields.
-    // If a future feature needs team reassignment, it should be a
-    // dedicated endpoint with its own permission check.
-    delete updates.team;
-    delete updates.createdBy;
-    delete updates.createdByName;
-
-    // Clean string arrays — same treatment as create.
-    ["prevResults", "topics", "gaps", "agreements", "signatures"].forEach(
-      (field) => {
-        if (Array.isArray(updates[field])) {
-          updates[field] = cleanStringArray(updates[field]);
-        }
-      },
-    );
-
-    // Absent members: normalize each entry to { name, reason } so a
-    // partial payload doesn't leave stale objects in the array.
-    if (Array.isArray(updates.absent)) {
-      updates.absent = updates.absent
-        .filter((a) => a && a.name && a.name.trim())
-        .map((a) => ({
-          name: a.name.trim(),
-          reason: (a.reason || "").trim(),
-        }));
+    // B4: whitelist status
+    const statusError = validateClientStatus(req.body.status);
+    if (statusError) {
+      return res
+        .status(400)
+        .json({ message: statusError, code: "INVALID_STATUS" });
     }
 
-    // Date conversion for the schedule date.
-    if (updates.date) {
-      updates.date = new Date(updates.date);
+    // B6: non-admins cannot edit after an approved extension has elapsed
+    if (!isAdminUser && isPastExtension(meeting)) {
+      return res.status(409).json({
+        message:
+          "Your extension window has elapsed. Contact an admin to resume.",
+        code: "EXTENSION_EXPIRED",
+      });
     }
 
-    // When the client marks a report complete, stamp the moment.
-    // The status transition in_progress → completed is what flips
-    // the report to read-only for regular members.
-    if (updates.status === "completed") {
-      updates.completedAt = new Date();
+    const updates = { ...content };
+
+    // A1 + B2: stamp on completion
+    if (req.body.status === "completed") {
+      const now = new Date();
+      updates.status = "completed";
+      updates.completedAt = now;
+      updates.finalizedAt = now;
+    } else if (req.body.status === "in_progress") {
+      updates.status = "in_progress";
+    }
+
+    // Accept explicit aiGeneratedContent only if provided
+    if (typeof req.body.aiGeneratedContent === "string") {
+      updates.aiGeneratedContent = req.body.aiGeneratedContent;
     }
 
     const updatedMeeting = await Meeting.findByIdAndUpdate(
@@ -522,8 +590,11 @@ const updateMeeting = async (req, res) => {
       meeting: updatedMeeting,
     });
   } catch (error) {
-    console.error("❌ Update meeting error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Update meeting error:", error.message);
+    res.status(500).json({
+      message: "Failed to update meeting",
+      code: "MEETING_UPDATE_FAILED",
+    });
   }
 };
 
@@ -534,7 +605,9 @@ const lockMeeting = async (req, res) => {
     const meeting = await Meeting.findById(req.params.id);
 
     if (!meeting) {
-      return res.status(404).json({ message: "Meeting not found" });
+      return res
+        .status(404)
+        .json({ message: "Meeting not found", code: "MEETING_NOT_FOUND" });
     }
 
     // Only owner or admin can lock
@@ -542,7 +615,9 @@ const lockMeeting = async (req, res) => {
     const isAdminUser = isAdmin(req.user);
 
     if (!isOwner && !isAdminUser) {
-      return res.status(403).json({ message: "Not authorized" });
+      return res
+        .status(403)
+        .json({ message: "Not authorized", code: "NOT_OWNER" });
     }
 
     meeting.isLocked = true;
@@ -562,8 +637,11 @@ const lockMeeting = async (req, res) => {
       meeting,
     });
   } catch (error) {
-    console.error("❌ Lock meeting error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Lock meeting error:", error.message);
+    res.status(500).json({
+      message: "Failed to lock meeting",
+      code: "MEETING_LOCK_FAILED",
+    });
   }
 };
 
@@ -571,14 +649,17 @@ const lockMeeting = async (req, res) => {
 const unlockMeeting = async (req, res) => {
   try {
     if (!isAdmin(req.user)) {
-      return res
-        .status(403)
-        .json({ message: "Only admins can unlock meetings" });
+      return res.status(403).json({
+        message: "Only admins can unlock meetings",
+        code: "INSUFFICIENT_ROLE",
+      });
     }
 
     const meeting = await Meeting.findById(req.params.id);
     if (!meeting) {
-      return res.status(404).json({ message: "Meeting not found" });
+      return res
+        .status(404)
+        .json({ message: "Meeting not found", code: "MEETING_NOT_FOUND" });
     }
 
     meeting.isLocked = false;
@@ -596,8 +677,11 @@ const unlockMeeting = async (req, res) => {
       meeting,
     });
   } catch (error) {
-    console.error("❌ Unlock meeting error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Unlock meeting error:", error.message);
+    res.status(500).json({
+      message: "Failed to unlock meeting",
+      code: "MEETING_UNLOCK_FAILED",
+    });
   }
 };
 
@@ -619,7 +703,9 @@ const deleteMeeting = async (req, res) => {
   try {
     const meeting = await Meeting.findById(req.params.id);
     if (!meeting) {
-      return res.status(404).json({ message: "Meeting not found" });
+      return res
+        .status(404)
+        .json({ message: "Meeting not found", code: "MEETING_NOT_FOUND" });
     }
 
     const isAdminUser = isAdmin(req.user);
@@ -647,49 +733,81 @@ const deleteMeeting = async (req, res) => {
           code: "WRONG_TEAM",
         });
       }
-      return res
-        .status(403)
-        .json({ message: "Not authorized to delete this report" });
+      return res.status(403).json({
+        message: "Not authorized to delete this report",
+        code: "NOT_AUTHORIZED",
+      });
     }
 
     await meeting.deleteOne();
     res.json({ message: "✅ Meeting deleted successfully" });
   } catch (error) {
-    console.error("❌ Delete meeting error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Delete meeting error:", error.message);
+    res.status(500).json({
+      message: "Failed to delete meeting",
+      code: "MEETING_DELETE_FAILED",
+    });
   }
 };
 
 // ─── Request Extension ───────────────────────────────────────
+// B5: owner-only request (documented decision). The report must be
+// completed or expired. requestedDuration is capped to [5, 30] minutes.
 const requestExtension = async (req, res) => {
   try {
-    const { reason, requestedDuration = 15 } = req.body;
+    const { reason } = req.body;
+    let requestedDuration = Number(req.body.requestedDuration ?? 15);
 
     if (!reason || !reason.trim()) {
-      return res.status(400).json({ message: "Reason is required" });
+      return res
+        .status(400)
+        .json({ message: "Reason is required", code: "REASON_REQUIRED" });
     }
+
+    // Cap
+    if (!Number.isFinite(requestedDuration)) requestedDuration = 15;
+    requestedDuration = Math.min(
+      30,
+      Math.max(5, Math.round(requestedDuration)),
+    );
 
     const meeting = await Meeting.findById(req.params.id);
     if (!meeting) {
-      return res.status(404).json({ message: "Meeting not found" });
+      return res
+        .status(404)
+        .json({ message: "Meeting not found", code: "MEETING_NOT_FOUND" });
     }
 
-    // Check if user owns this meeting
+    // Owner-only (B5 default)
     if (meeting.createdBy.toString() !== req.user._id.toString()) {
       return res.status(403).json({
-        message: "Not authorized to request extension for this meeting",
+        message: "Only the report owner can request an extension.",
+        code: "NOT_OWNER",
       });
     }
 
-    // Check if there's already a pending request
+    // Must be expired / completed
+    const eligible =
+      meeting.status === "completed" ||
+      meeting.status === "expired" ||
+      meeting.timeExpired === true;
+    if (!eligible) {
+      return res.status(409).json({
+        message:
+          "Extensions can only be requested after the meeting time has ended.",
+        code: "NOT_EXPIRED",
+      });
+    }
+
+    // No pending duplicate
     const existingRequest = await ExtensionRequest.findOne({
       meetingId: meeting._id,
       status: "pending",
     });
-
     if (existingRequest) {
       return res.status(409).json({
-        message: "You already have a pending extension request",
+        message: "You already have a pending extension request.",
+        code: "EXTENSION_PENDING",
         request: existingRequest,
       });
     }
@@ -699,7 +817,7 @@ const requestExtension = async (req, res) => {
       requestedBy: req.user._id,
       requestedByName: req.user.name || "Unknown User",
       reason: reason.trim(),
-      requestedDuration: requestedDuration || 15,
+      requestedDuration,
       status: "pending",
     });
 
@@ -709,8 +827,11 @@ const requestExtension = async (req, res) => {
       request: extensionRequest,
     });
   } catch (error) {
-    console.error("❌ Extension request error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Extension request error:", error.message);
+    res.status(500).json({
+      message: "Failed to submit extension request",
+      code: "EXTENSION_REQUEST_FAILED",
+    });
   }
 };
 
@@ -718,21 +839,26 @@ const requestExtension = async (req, res) => {
 const approveExtension = async (req, res) => {
   try {
     if (!isAdmin(req.user)) {
-      return res
-        .status(403)
-        .json({ message: "Only admins can approve extensions" });
+      return res.status(403).json({
+        message: "Only admins can approve extensions",
+        code: "INSUFFICIENT_ROLE",
+      });
     }
 
     const { adminNotes } = req.body;
 
     const extensionRequest = await ExtensionRequest.findById(req.params.id);
     if (!extensionRequest) {
-      return res.status(404).json({ message: "Extension request not found" });
+      return res.status(404).json({
+        message: "Extension request not found",
+        code: "EXTENSION_NOT_FOUND",
+      });
     }
 
     if (extensionRequest.status !== "pending") {
       return res.status(400).json({
         message: `Request is already ${extensionRequest.status}`,
+        code: "EXTENSION_NOT_PENDING",
       });
     }
 
@@ -766,8 +892,11 @@ const approveExtension = async (req, res) => {
       meeting,
     });
   } catch (error) {
-    console.error("❌ Approve extension error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Approve extension error:", error.message);
+    res.status(500).json({
+      message: "Failed to approve extension",
+      code: "EXTENSION_APPROVE_FAILED",
+    });
   }
 };
 
@@ -775,25 +904,33 @@ const approveExtension = async (req, res) => {
 const rejectExtension = async (req, res) => {
   try {
     if (!isAdmin(req.user)) {
-      return res
-        .status(403)
-        .json({ message: "Only admins can reject extensions" });
+      return res.status(403).json({
+        message: "Only admins can reject extensions",
+        code: "INSUFFICIENT_ROLE",
+      });
     }
 
     const { rejectionReason, adminNotes } = req.body;
 
     if (!rejectionReason || !rejectionReason.trim()) {
-      return res.status(400).json({ message: "Rejection reason is required" });
+      return res.status(400).json({
+        message: "Rejection reason is required",
+        code: "REJECTION_REASON_REQUIRED",
+      });
     }
 
     const extensionRequest = await ExtensionRequest.findById(req.params.id);
     if (!extensionRequest) {
-      return res.status(404).json({ message: "Extension request not found" });
+      return res.status(404).json({
+        message: "Extension request not found",
+        code: "EXTENSION_NOT_FOUND",
+      });
     }
 
     if (extensionRequest.status !== "pending") {
       return res.status(400).json({
         message: `Request is already ${extensionRequest.status}`,
+        code: "EXTENSION_NOT_PENDING",
       });
     }
 
@@ -812,8 +949,11 @@ const rejectExtension = async (req, res) => {
       request: extensionRequest,
     });
   } catch (error) {
-    console.error("❌ Reject extension error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Reject extension error:", error.message);
+    res.status(500).json({
+      message: "Failed to reject extension",
+      code: "EXTENSION_REJECT_FAILED",
+    });
   }
 };
 
@@ -821,9 +961,10 @@ const rejectExtension = async (req, res) => {
 const getExtensionRequests = async (req, res) => {
   try {
     if (!isAdmin(req.user)) {
-      return res
-        .status(403)
-        .json({ message: "Only admins can view extension requests" });
+      return res.status(403).json({
+        message: "Only admins can view extension requests",
+        code: "INSUFFICIENT_ROLE",
+      });
     }
 
     const { status } = req.query;
@@ -844,8 +985,11 @@ const getExtensionRequests = async (req, res) => {
       requests,
     });
   } catch (error) {
-    console.error("❌ Get extension requests error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Get extension requests error:", error.message);
+    res.status(500).json({
+      message: "Failed to load extension requests",
+      code: "EXTENSIONS_FETCH_FAILED",
+    });
   }
 };
 
@@ -853,14 +997,17 @@ const getExtensionRequests = async (req, res) => {
 const getMeetingProgress = async (req, res) => {
   try {
     if (!isAdmin(req.user)) {
-      return res
-        .status(403)
-        .json({ message: "Only admins can view progress data" });
+      return res.status(403).json({
+        message: "Only admins can view progress data",
+        code: "INSUFFICIENT_ROLE",
+      });
     }
 
     const meeting = await Meeting.findById(req.params.id);
     if (!meeting) {
-      return res.status(404).json({ message: "Meeting not found" });
+      return res
+        .status(404)
+        .json({ message: "Meeting not found", code: "MEETING_NOT_FOUND" });
     }
 
     res.json({
@@ -881,8 +1028,11 @@ const getMeetingProgress = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("❌ Get meeting progress error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Get meeting progress error:", error.message);
+    res.status(500).json({
+      message: "Failed to load progress",
+      code: "PROGRESS_FETCH_FAILED",
+    });
   }
 };
 
@@ -890,14 +1040,17 @@ const getMeetingProgress = async (req, res) => {
 const resumeMeeting = async (req, res) => {
   try {
     if (!isAdmin(req.user)) {
-      return res
-        .status(403)
-        .json({ message: "Only admins can resume meetings" });
+      return res.status(403).json({
+        message: "Only admins can resume meetings",
+        code: "INSUFFICIENT_ROLE",
+      });
     }
 
     const meeting = await Meeting.findById(req.params.id);
     if (!meeting) {
-      return res.status(404).json({ message: "Meeting not found" });
+      return res
+        .status(404)
+        .json({ message: "Meeting not found", code: "MEETING_NOT_FOUND" });
     }
 
     // Restore from progress data
@@ -933,8 +1086,11 @@ const resumeMeeting = async (req, res) => {
       meeting,
     });
   } catch (error) {
-    console.error("❌ Resume meeting error:", error);
-    res.status(500).json({ message: error.message });
+    console.error("❌ Resume meeting error:", error.message);
+    res.status(500).json({
+      message: "Failed to resume meeting",
+      code: "MEETING_RESUME_FAILED",
+    });
   }
 };
 
