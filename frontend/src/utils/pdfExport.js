@@ -83,7 +83,11 @@ const encodeText = (text) => {
 const HEADER_FONT_SIZE = 8.5;
 
 function pickFontFor(doc, raw) {
-  const text = String(raw ?? "");
+  // Cells that use colSpan arrive as { content, colSpan } objects, so read
+  // the text from `.content` instead of stringifying the object.
+  const text = String(
+    raw && typeof raw === "object" ? (raw.content ?? "") : (raw ?? ""),
+  );
   const amharic = isAmharic(text);
   if (amharic) {
     return doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica";
@@ -543,17 +547,33 @@ const splitExplanationAi = (explanation) => {
   };
 };
 
-// ─── FORUM REPORT ROW BUILDERS ──────────────────────────────
-function buildForumContentRows(L, formData, includeAI) {
+// ─── FORUM REPORT: SINGLE MERGED TABLE ROW BUILDER ──────────
+// ONE table, 6 columns:
+//   0 #   |  1 Section  |  2 Details / Name  |  3 Status  |  4 Reason  |  5 Signature
+//
+//   • Content rows (explanation, AI summary, previous results, topics, gaps,
+//     agreements): the "Details" cell spans columns 2–5 (colSpan: 4).
+//   • Member rows (present, then absent): name / status / reason / signature
+//     each fill their own column.
+//   • Numbering is continuous (1..N) across the whole table.
+const FORUM_TABLE_COLS = 6;
+const FORUM_SIGNATURE_COL = 5;
+
+function buildForumRows(L, formData, includeAI) {
   const rows = [];
-  const pushSectionBlock = (sectionLabel, entries) => {
+
+  // Section block with a long "details" cell merged across the right-hand columns.
+  const pushContentBlock = (sectionLabel, entries) => {
     const items = (entries || []).map((e) => encodeText(e)).filter(Boolean);
-    if (items.length === 0) return;
     items.forEach((item, idx) => {
       rows.push([
-        "", // row number filled in by caller
+        "", // row number filled in below
         idx === 0 ? encodeText(sectionLabel) : "",
-        item,
+        {
+          content: item,
+          colSpan: FORUM_TABLE_COLS - 2,
+          styles: { halign: "left" },
+        },
       ]);
     });
   };
@@ -563,41 +583,33 @@ function buildForumContentRows(L, formData, includeAI) {
   );
 
   if (manualExplanation) {
-    pushSectionBlock(L.explanation, [manualExplanation]);
+    pushContentBlock(L.explanation, [manualExplanation]);
   }
   if (includeAI && aiExplanation) {
-    pushSectionBlock(L.aiBlock, [aiExplanation]);
+    pushContentBlock(L.aiBlock, [aiExplanation]);
   }
 
-  pushSectionBlock(
+  pushContentBlock(
     L.secPrevResults,
     (formData?.prevResults || []).filter((r) => r && r.trim()),
   );
 
-  pushSectionBlock(
+  pushContentBlock(
     L.secTopics,
     (formData?.topics || []).filter((tp) => tp && tp.trim()),
   );
 
-  pushSectionBlock(
+  pushContentBlock(
     L.secGaps,
     (formData?.gaps || []).filter((g) => g && g.trim()),
   );
 
-  pushSectionBlock(
+  pushContentBlock(
     L.secAgreements,
     (formData?.agreements || []).filter((a) => a && a.trim()),
   );
 
-  rows.forEach((row, i) => {
-    row[0] = String(i + 1);
-  });
-
-  return rows;
-}
-
-function buildForumMemberRows(L, formData) {
-  const rows = [];
+  // ── Member rows (same table) ──
   const presentMembers = (formData?.present || []).filter((m) => m && m.trim());
   const absentMembers = (formData?.absent || []).filter(
     (i) => i?.name && i.name.trim(),
@@ -607,11 +619,12 @@ function buildForumMemberRows(L, formData) {
     : [];
 
   let sigIdx = 0;
-  presentMembers.forEach((name) => {
+  presentMembers.forEach((name, idx) => {
     const sig = signatureEntries[sigIdx];
     const hasSig = sig && String(sig).startsWith("data:image");
     rows.push([
-      "", // row number filled in by caller
+      "",
+      idx === 0 ? encodeText(L.secPresent) : "",
       encodeText(name),
       encodeText(L.statusPresent),
       "",
@@ -620,9 +633,10 @@ function buildForumMemberRows(L, formData) {
     if (hasSig) sigIdx += 1;
   });
 
-  absentMembers.forEach((entry) => {
+  absentMembers.forEach((entry, idx) => {
     rows.push([
       "",
+      idx === 0 ? encodeText(L.secAbsent) : "",
       encodeText(entry.name),
       encodeText(L.statusAbsent),
       encodeText(entry.reason || ""),
@@ -630,6 +644,7 @@ function buildForumMemberRows(L, formData) {
     ]);
   });
 
+  // Continuous numbering across the whole merged table.
   rows.forEach((row, i) => {
     row[0] = String(i + 1);
   });
@@ -637,7 +652,7 @@ function buildForumMemberRows(L, formData) {
   return rows;
 }
 
-// ─── EXPORT FORUM REPORT (professional two-table layout) ────
+// ─── EXPORT FORUM REPORT (ONE merged table) ─────────────────
 export const exportForumReportToPDF = (
   formData,
   t,
@@ -646,7 +661,7 @@ export const exportForumReportToPDF = (
   options = {},
 ) => {
   try {
-    console.log("📄 Generating Forum Report PDF (two-table layout)...");
+    console.log("📄 Generating Forum Report PDF (single merged table)...");
 
     const hasData =
       formData?.present?.some((m) => m && m.trim() !== "") ||
@@ -732,7 +747,7 @@ export const exportForumReportToPDF = (
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 6;
 
-    // ─── Shared table styling ──────────────────────────────────
+    // ─── Table styling ─────────────────────────────────────────
     const sharedHeadStyles = {
       fillColor: [26, 107, 74],
       textColor: [255, 255, 255],
@@ -767,122 +782,86 @@ export const exportForumReportToPDF = (
       applySharedHeaderFont(doc, data);
     };
 
-    const contentRows = buildForumContentRows(L, formData, includeAI);
-    const memberRows = buildForumMemberRows(L, formData);
+    const tableRows = buildForumRows(L, formData, includeAI);
 
     const noFont = isAmharic(String(L.colNo))
       ? FONT_NAMES.ethiopic
       : FONT_NAMES.latin;
     const noColWidth = computeNoWrapColumnWidth(doc, L.colNo, noFont, 12);
 
-    // ─── Render Table 1 ─────────────────────────────────────────
-    if (contentRows.length > 0) {
-      doc.setFontSize(10);
-      doc.setTextColor(26, 107, 74);
-      drawMixedScriptText(doc, L.t1Title, margin, yPos, { bold: true });
-      doc.setTextColor(0, 0, 0);
-      yPos += 4;
+    // Merged header label for column 2 (item text for content rows, name for member rows)
+    const detailHeader = `${L.colItem} / ${L.colName}`;
 
-      autoTable(doc, {
-        startY: yPos,
-        // Use plain strings so jspdf-autotable always renders the header.
-        head: [[L.colNo, L.colSection, L.colItem]],
-        body: contentRows,
-        margin: { left: margin, right: margin, bottom: 16 },
-        theme: "grid",
-        headStyles: sharedHeadStyles,
-        bodyStyles: sharedBodyStyles,
-        styles: sharedStyles,
-        columnStyles: {
-          0: { cellWidth: noColWidth, halign: "center" },
-          1: { cellWidth: 42, halign: "left" },
-          2: { cellWidth: "auto", halign: "left" },
-        },
-        didParseCell: sharedDidParseCell,
-      });
+    // ─── Render the ONE table ──────────────────────────────────
+    autoTable(doc, {
+      startY: yPos,
+      // Plain strings so jspdf-autotable always renders the header.
+      head: [
+        [
+          L.colNo,
+          L.colSection,
+          detailHeader,
+          L.colStatus,
+          L.colReason,
+          L.colSignature,
+        ],
+      ],
+      body: tableRows,
+      margin: { left: margin, right: margin, bottom: 16 },
+      theme: "grid",
+      headStyles: sharedHeadStyles,
+      bodyStyles: sharedBodyStyles,
+      styles: sharedStyles,
+      columnStyles: {
+        0: { cellWidth: noColWidth, halign: "center" },
+        1: { cellWidth: 34, halign: "left" },
+        2: { cellWidth: "auto", halign: "left" },
+        3: { cellWidth: 26, halign: "center" },
+        4: { cellWidth: 32, halign: "left" },
+        5: { cellWidth: 30, halign: "center", minCellHeight: 10 },
+      },
+      didParseCell: sharedDidParseCell,
+      didDrawCell: (data) => {
+        if (data.section !== "body") return;
+        if (data.column.index !== FORUM_SIGNATURE_COL) return;
+        const raw = data.row.raw?.[FORUM_SIGNATURE_COL];
+        if (!raw || typeof raw !== "object" || !raw.__signatureImage) return;
 
-      yPos = (doc.lastAutoTable?.finalY || yPos) + 8;
-    }
+        try {
+          const cell = data.cell;
+          const pad = 1;
+          const boxW = cell.width - pad * 2;
+          const boxH = cell.height - pad * 2;
+          if (boxW <= 0 || boxH <= 0) return;
 
-    // ─── Render Table 2 ─────────────────────────────────────────
-    if (memberRows.length > 0) {
-      const MIN_TABLE_HEIGHT = 40;
-      if (yPos > pageHeight - MIN_TABLE_HEIGHT - 16) {
-        doc.addPage();
-        yPos = margin;
-      }
-
-      doc.setFontSize(10);
-      doc.setTextColor(26, 107, 74);
-      drawMixedScriptText(doc, L.t2Title, margin, yPos, { bold: true });
-      doc.setTextColor(0, 0, 0);
-      yPos += 4;
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [[L.colNo, L.colName, L.colStatus, L.colReason, L.colSignature]],
-        body: memberRows,
-        margin: { left: margin, right: margin, bottom: 16 },
-        theme: "grid",
-        headStyles: sharedHeadStyles,
-        bodyStyles: sharedBodyStyles,
-        styles: sharedStyles,
-        columnStyles: {
-          0: { cellWidth: noColWidth, halign: "center" },
-          1: { cellWidth: "auto", halign: "left" },
-          2: { cellWidth: 32, halign: "center" },
-          3: { cellWidth: 40, halign: "left" },
-          4: { cellWidth: 32, halign: "center", minCellHeight: 10 },
-        },
-        didParseCell: sharedDidParseCell,
-        didDrawCell: (data) => {
-          if (data.column.index !== 4) return;
-          const raw = data.row.raw?.[4];
-          if (!raw || typeof raw !== "object" || !raw.__signatureImage) return;
-
+          let naturalW = 400;
+          let naturalH = 100;
           try {
-            const cell = data.cell;
-            const pad = 1;
-            const boxW = cell.width - pad * 2;
-            const boxH = cell.height - pad * 2;
-            if (boxW <= 0 || boxH <= 0) return;
-
-            let naturalW = 400;
-            let naturalH = 100;
-            try {
-              const props = doc.getImageProperties?.(raw.__signatureImage);
-              if (props?.width && props?.height) {
-                naturalW = props.width;
-                naturalH = props.height;
-              }
-            } catch {
-              // keep fallback
+            const props = doc.getImageProperties?.(raw.__signatureImage);
+            if (props?.width && props?.height) {
+              naturalW = props.width;
+              naturalH = props.height;
             }
-
-            const scale = Math.min(boxW / naturalW, boxH / naturalH);
-            const drawW = naturalW * scale;
-            const drawH = naturalH * scale;
-
-            const drawX = cell.x + (cell.width - drawW) / 2;
-            const drawY = cell.y + (cell.height - drawH) / 2;
-
-            doc.addImage(
-              raw.__signatureImage,
-              "PNG",
-              drawX,
-              drawY,
-              drawW,
-              drawH,
-            );
-          } catch (imgErr) {
-            console.warn(
-              `Could not embed signature #${raw.__index}:`,
-              imgErr.message,
-            );
+          } catch {
+            // keep fallback
           }
-        },
-      });
-    }
+
+          const scale = Math.min(boxW / naturalW, boxH / naturalH);
+          const drawW = naturalW * scale;
+          const drawH = naturalH * scale;
+
+          const drawX = cell.x + (cell.width - drawW) / 2;
+          const drawY = cell.y + (cell.height - drawH) / 2;
+
+          doc.addImage(raw.__signatureImage, "PNG", drawX, drawY, drawW, drawH);
+        } catch (imgErr) {
+          console.warn(
+            `Could not embed signature #${raw.__index}:`,
+            imgErr.message,
+          );
+        }
+      },
+    });
 
     // ─── Footer with page numbers ──────────────────────────────
     const pageCount = doc.internal.getNumberOfPages();
