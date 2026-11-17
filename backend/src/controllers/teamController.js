@@ -71,6 +71,47 @@ const getTeams = async (req, res) => {
   }
 };
 
+// Get ONLY the teams the signed-in user may use for the Peer Forum.
+//   • superadmin / admin → every team
+//   • leader             → the team they lead (Team.leader) and/or the team
+//                          on their profile (User.team)
+//   • employee           → 403 (Peer Forum is for Team Leaders and above)
+const getMyTeams = async (req, res) => {
+  try {
+    const role = req.user.role;
+
+    if (role === "employee") {
+      return res.status(403).json({
+        message: "Peer Forum is only available to Team Leaders and above",
+        code: "INSUFFICIENT_ROLE",
+      });
+    }
+
+    let filter = {};
+    if (role === "leader") {
+      const or = [{ leader: req.user._id }];
+      if (req.user.team) or.push({ _id: req.user.team });
+      filter = { $or: or };
+    }
+
+    const teams = await Team.find(filter)
+      .populate("leader", "name email role profilePhotoUrl")
+      .populate("members", "name email role")
+      .sort({ name: 1 });
+
+    // Self-heal: a leader who leads a team but has no team on their profile
+    // would be blocked by the meeting team-scope check, so link them now.
+    if (role === "leader" && !req.user.team && teams.length > 0) {
+      await User.updateOne({ _id: req.user._id }, { team: teams[0]._id });
+    }
+
+    res.json(teams);
+  } catch (error) {
+    console.error("Error fetching my teams:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get team by ID
 const getTeamById = async (req, res) => {
   try {
@@ -196,6 +237,7 @@ const deleteTeam = async (req, res) => {
 module.exports = {
   createTeam,
   getTeams,
+  getMyTeams,
   getTeamById,
   updateTeam,
   deleteTeam,

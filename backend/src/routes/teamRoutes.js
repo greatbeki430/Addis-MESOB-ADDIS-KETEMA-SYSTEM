@@ -3,11 +3,17 @@ const express = require("express");
 const {
   createTeam,
   getTeams,
+  getMyTeams,
   getTeamById,
   updateTeam,
   deleteTeam,
 } = require("../controllers/teamController");
-const { protect, anyRole, adminOrSuperAdmin } = require("../middleware/auth");
+const {
+  protect,
+  anyRole,
+  leaderOrAdmin,
+  adminOrSuperAdmin,
+} = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -22,6 +28,10 @@ router.use(protect);
 // is safe. Creating, editing, and deleting teams stays admin/superadmin —
 // that's a structural org-config change, not something every role needs.
 router.get("/", anyRole, getTeams);
+
+// Peer Forum team list: leaders see only their team, admins see all,
+// employees are refused. MUST stay above "/:id" so "my" is not read as an id.
+router.get("/my", leaderOrAdmin, getMyTeams);
 router.get("/:id", anyRole, getTeamById);
 
 router.post("/", adminOrSuperAdmin, createTeam);

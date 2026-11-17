@@ -309,10 +309,13 @@ export const canApproveReport = (user) => isLeaderOrAbove(user);
 
 // ─── FORUM REPORT PERMISSIONS ──────────────────────────────────────────
 
+// Peer Forum is for Team Leaders and above only (employees have no access).
+export const canAccessPeerForum = (user) => isLeaderOrAbove(user);
+
 export const canCreateForumReport = (user) => {
-  // Every team member can draft / file a forum report for their own team
-  // (the backend clamps non-admins to their own team).
-  return !!user;
+  // Team Leaders (their own team) and Admins (any team) only.
+  // The backend enforces the same rule and clamps leaders to their own team.
+  return canAccessPeerForum(user);
 };
 
 export const canEditForumReport = (user, report) => {
@@ -328,69 +331,55 @@ export const canEditForumReport = (user, report) => {
 
 export const canDeleteForumReport = canEditForumReport;
 
-// ─── FORUM REPORT TIMER & EXTENSION PERMISSIONS ──────────────────────
-//
-// These helpers mirror the backend `meetingController.js` rules.
-// They are consumed by ForumReport.jsx, TimeExpiredModal.jsx, and
-// the admin extensions UI. If the backend changes a permission,
-// update the matching helper here — otherwise the UI will show
-// buttons the server rejects (or hide actions it would allow).
+// ─── NEW: FORUM REPORT TIMER & EXTENSION PERMISSIONS ──────────────────
 
 /**
- * Can this user FILE an extension request for this report?
- *
- * F2 (B5): the backend `requestExtension` handler is owner-only —
- * including admins must be the report's author to file the request.
- * Admins still have an approval path (see canManageExtensions), but
- * they cannot file a request on behalf of a team member through this
- * route. Keeping the UI in lockstep prevents a button that silently
- * 403s the user.
+ * Check if user can request extension for a forum report
+ * - Super Admin: YES
+ * - Admin: YES
+ * - Team Leader: YES (only their own team's reports)
+ * - Employee: NO
  */
 export const canRequestExtension = (user, report) => {
   if (!user || !report) return false;
-  return isOwner(user, report);
+  if (isAdminOrAbove(user)) return true;
+  if (user.role === ROLES.TEAM_LEADER) {
+    const userTeam = getUserTeamId(user);
+    const reportTeam = report.teamId || report.team?._id || report.team;
+    return userTeam?.toString() === reportTeam?.toString();
+  }
+  // Team members can request more time on their own team's report
+  if (user.role === ROLES.EMPLOYEE) {
+    const userTeam = getUserTeamId(user);
+    const reportTeam = report.teamId || report.team?._id || report.team;
+    return userTeam?.toString() === reportTeam?.toString();
+  }
+  return false;
 };
 
 /**
- * Approve / reject extension requests.
- *
- * Matches backend route guard `adminOrSuperAdmin` on
- * POST /meetings/extension/:id/approve and /reject, plus the
- * `isAdmin(user)` check inside the controller.
- * Admin and superadmin only. Leaders are NOT included.
+ * Check if user can approve/reject extension requests (Admin only)
  */
 export const canManageExtensions = (user) => {
   return isAdminOrAbove(user);
 };
 
 /**
- * View locked / expired report progress.
- *
- * Matches backend route guard `adminOrSuperAdmin` on
- * GET /meetings/:id/progress.
- * Admin and superadmin only.
+ * Check if user can view locked/expired report progress (Admin only)
  */
 export const canViewLockedProgress = (user) => {
   return isAdminOrAbove(user);
 };
 
 /**
- * Resume a locked report.
- *
- * Matches backend route guard `adminOrSuperAdmin` on
- * POST /meetings/:id/resume.
- * Admin and superadmin only.
+ * Check if user can resume a locked report (Admin only)
  */
 export const canResumeReport = (user) => {
   return isAdminOrAbove(user);
 };
 
 /**
- * Unlock a report.
- *
- * Matches backend route guard `adminOrSuperAdmin` on
- * POST /meetings/:id/unlock.
- * Admin and superadmin only.
+ * Check if user can unlock a report (Admin only)
  */
 export const canUnlockReport = (user) => {
   return isAdminOrAbove(user);
@@ -452,7 +441,7 @@ export const NAV_ITEMS = [
     id: "forum",
     icon: "💬",
     label: "Peer Forum",
-    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     id: "evaluation",
