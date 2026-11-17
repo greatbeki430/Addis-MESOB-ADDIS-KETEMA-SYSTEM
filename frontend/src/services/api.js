@@ -233,6 +233,8 @@ export const dailyReportAPI = {
 // ============================================================
 export const teamAPI = {
   getAll: () => api.get("/teams"),
+  // Peer Forum: only the teams this user may file for (admin = all).
+  getMine: () => api.get("/teams/my"),
   getById: (id) => api.get(`/teams/${id}`),
   create: (data) => api.post("/teams", data),
   update: (id, data) => api.put(`/teams/${id}`, data),
