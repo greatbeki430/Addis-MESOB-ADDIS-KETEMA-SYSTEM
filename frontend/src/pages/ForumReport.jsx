@@ -28,7 +28,7 @@ import ForumReportFeed from "../components/ForumReportFeed";
 import ForumReportHistory from "../components/forum-report/ForumReportHistory";
 import { forumReportTranslations } from "../constants/translations/forumReport";
 import { commonTranslations } from "../constants/translations/common";
-import { isAdminOrAbove } from "../utils/roles";
+import { isAdminOrAbove, isLeaderOrAbove } from "../utils/roles";
 
 // ─── Timer Features ──────────────────────────────────────────
 import { useMeetingTimer } from "../hooks/useMeetingTimer";
@@ -1207,11 +1207,19 @@ export default function ForumReport({
 
   // ─── Load teams when no team is selected ──────────────────
   useEffect(() => {
+    // Employees have no access to Peer Forum: never request the team list.
+    if (!isLeaderOrAbove(user)) {
+      setLoadingTeams(false);
+      return;
+    }
     if (!selectedTeam) {
       const loadTeams = async () => {
         try {
           setLoadingTeams(true);
-          const response = await teamAPI.getAll();
+          // Admins pick from every team; leaders only get their own team.
+          const response = isAdmin
+            ? await teamAPI.getAll()
+            : await teamAPI.getMine();
           if (response.data && Array.isArray(response.data)) {
             const formattedTeams = response.data.map((team) => ({
               id: team._id,
@@ -1231,7 +1239,7 @@ export default function ForumReport({
       };
       loadTeams();
     }
-  }, [selectedTeam, tf]);
+  }, [selectedTeam, tf, isAdmin, user]);
 
   // ─── Calculate form progress ───────────────────────────────
   useEffect(() => {
@@ -1826,6 +1834,29 @@ ${"=".repeat(50)}
             />
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // ─── Access guard: Team Leaders and above only ─────────────
+  // (placed after every hook so hook order never changes)
+  if (!isLeaderOrAbove(user)) {
+    const msg = {
+      am: "የአቻ ፎረም ለቡድን መሪዎች እና ከዚያ በላይ ላሉ ብቻ ነው።",
+      om: "Fooramiin Hiriyaa Qajeelchitoota Garee fi isaan olii qofaaf.",
+      en: "Peer Forum is only available to Team Leaders and above.",
+    };
+    return (
+      <div
+        style={{
+          maxWidth: "600px",
+          margin: "80px auto",
+          padding: "24px",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+        <h2 style={{ margin: 0 }}>{msg[currentLang] || msg.en}</h2>
       </div>
     );
   }

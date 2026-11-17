@@ -227,7 +227,7 @@ export default function Sidebar({
   const [newTeamDepartment, setNewTeamDepartment] = useState("");
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
-  const { user, isAdminOrSuperAdmin, isLeader, isEmployee } = useAuth();
+  const { user, isAdminOrSuperAdmin, isLeader } = useAuth();
   // ✅ Golden Monday (and every other feature) now comes straight from the
   // central NAV_ITEMS role matrix in utils/roles.js — no more bolting it on
   // separately for leader-and-up only.
@@ -281,9 +281,12 @@ export default function Sidebar({
   const loadTeams = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await teamAPI.getAll();
+      // Admins see every team; leaders only get their own team (server-side).
+      const response = isAdminOrSuperAdmin
+        ? await teamAPI.getAll()
+        : await teamAPI.getMine();
       if (response.data && Array.isArray(response.data)) {
-        let formattedTeams = response.data.map((team) => ({
+        const formattedTeams = response.data.map((team) => ({
           id: team._id,
           name: team.name,
           description: team.department || "",
@@ -295,39 +298,18 @@ export default function Sidebar({
           reports: [],
           department: team.department,
         }));
-        if ((isEmployee || isLeader) && user) {
-          const userTeam = formattedTeams.find(
-            (team) =>
-              team.members?.includes(user.name) ||
-              team.members?.includes(user._id) ||
-              team.leader === user.name ||
-              team.leader === user._id,
-          );
-          formattedTeams = userTeam ? [userTeam] : [];
-        }
         setTeams(formattedTeams);
       }
     } catch (error) {
       console.error("❌ Failed to load teams:", error);
+      // Offline cache is only trusted for admins. Non-admins must never see
+      // a cached list of other teams, so they get an empty list instead.
       const savedTeams = localStorage.getItem("forumTeams");
-      if (savedTeams) {
-        let parsedTeams = JSON.parse(savedTeams);
-        if ((isEmployee || isLeader) && user) {
-          const userTeam = parsedTeams.find(
-            (team) =>
-              team.members?.includes(user.name) ||
-              team.members?.includes(user._id) ||
-              team.leader === user.name ||
-              team.leader === user._id,
-          );
-          parsedTeams = userTeam ? [userTeam] : [];
-        }
-        setTeams(parsedTeams);
-      }
+      setTeams(isAdminOrSuperAdmin && savedTeams ? JSON.parse(savedTeams) : []);
     } finally {
       setLoading(false);
     }
-  }, [isEmployee, isLeader, user]);
+  }, [isAdminOrSuperAdmin]);
 
   useEffect(() => {
     loadTeams();
@@ -716,7 +698,7 @@ export default function Sidebar({
                         textAlign: "center",
                       }}
                     >
-                      {isEmployee || isLeader
+                      {isLeader
                         ? forumT.noTeamsAssigned ||
                           "You are not assigned to any team"
                         : forumT.noTeamsYetShort || "No teams yet"}
@@ -780,8 +762,7 @@ export default function Sidebar({
                           ? team.name.substring(0, 12) + "…"
                           : team.name}
                       </span>
-                      {(isEmployee || isLeader) &&
-                        team.members?.includes(user?.name) && (
+                      {isLeader && (
                           <span
                             style={{
                               marginLeft: "auto",

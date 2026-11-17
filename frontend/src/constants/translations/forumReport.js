@@ -1,5 +1,11 @@
 // frontend/src/constants/translations/forumReport.js
 // Forum Report page translations - COMPLETE with all keys
+//
+// Coverage audit (D3): every `tf()` call in ForumReport.jsx,
+// ForumReportHistory.jsx, MeetingTimer.jsx, TimeExpiredModal.jsx,
+// RequestExtensionModal.jsx, SignatureModal.jsx, SignatureCanvas.jsx,
+// AutoSaveIndicator.jsx, and every `t.*` call in the admin Extensions
+// tab (ForumReportManagement.jsx) resolves to a key present below.
 
 export const forumReportTranslations = {
   en: {
@@ -41,6 +47,17 @@ export const forumReportTranslations = {
 
       // ─── Standing Agendas ─────────────────────────────────────
       standingAgendas: "📋 Standing Agendas",
+      // 7 items — kept in sync with the Amharic wording that
+      // ForumReport.jsx originally hard-coded as STANDING_AGENDAS_AM.
+      agendas: [
+        "Establishing good governance in the institution",
+        "Fighting maladministration",
+        "Streamlining regular service delivery",
+        "Working to the QMS standard",
+        "Weekly exemplary work",
+        "Problems encountered",
+        "How they were resolved",
+      ],
 
       // ─── Explanation ──────────────────────────────────────────
       explanation: "📝 Explanation Given (Brief)",
@@ -66,8 +83,9 @@ export const forumReportTranslations = {
 
       // ─── Buttons ──────────────────────────────────────────────
       save: "💾 Save Report",
+      updateReport: "💾 Update Report",
       newReport: "📄 New Report",
-      addTeam: "➕ Add Team",
+      addTeam: " Add Team",
       createFirstTeam: "Create First Team",
       openReport: "Open Report",
       backToTeams: "← Back to Teams",
@@ -108,9 +126,12 @@ export const forumReportTranslations = {
       fullReportError: "❌ Failed to generate full report",
       saving: "Saving...",
       saveSuccess: "✅ Report saved successfully!",
+      updateSuccess: "✅ Report updated successfully!",
       saveError: "Failed to save report. Please try again.",
       selectDate: "Please select a date",
       fillFields: "Please fill in all required fields",
+      autoSaveReady: "Auto-save ready",
+      autoSaveError: "Auto-save failed",
 
       // ─── AI Features ──────────────────────────────────────────
       generateSummary: "🤖 AI Writing Assistant",
@@ -132,6 +153,60 @@ export const forumReportTranslations = {
       // ─── Feed ──────────────────────────────────────────────────
       feed: "Feed",
 
+      // ─── Extension & Lock flow ────────────────────────────────
+      reportLocked: "🔒 This report is locked. Please contact an admin.",
+      extensionPending: "⏳ Extension request pending admin approval.",
+      extensionRequested: "✅ Extension request submitted to admin",
+      extensionRequestError: "Failed to request extension",
+      reportResumed: "✅ Report resumed successfully",
+      resumeError: "Failed to resume report",
+      reasonRequired: "Please provide a reason",
+
+      // ─── TimeExpiredModal ─────────────────────────────────────
+      timeExpiredTitle: "⏰ Meeting Time Expired!",
+      timeExpiredMessage:
+        "Your 30-minute meeting time has ended. Your progress has been auto-saved and is now only visible to Admins and Super Admins.",
+      progressSavedMessage:
+        "✅ Your progress has been automatically saved to the system.",
+      adminOnlyMessage:
+        "🔒 Only Admins and Super Admins can view your saved progress.",
+      reasonLabel: "Reason for extension:",
+      requestExtension: "Request Extension",
+      submitRequest: "Submit Extension Request",
+      viewSavedProgress: "View Saved Progress",
+      cancel: "Cancel",
+      close: "Close",
+
+      // ─── RequestExtensionModal ────────────────────────────────
+      extensionRequestTitle: "Request Time Extension",
+      extensionRequestMessage:
+        "Your meeting time has expired. Request additional time from an admin by providing a reason below.",
+      extensionInfo:
+        "Your request will be sent to an admin for approval. You will be notified once a decision is made.",
+      durationLabel: "Additional time needed:",
+      teamLabel: "Team",
+      submitting: "Submitting...",
+      submittedSuccess: "✅ Request Sent!",
+      adminNotification:
+        "🔔 An admin will review your request and notify you of their decision.",
+
+      // ─── Signature Modal ──────────────────────────────────────
+      signatureModalTitle: "Sign Your Report",
+      drawSignature: "Draw",
+      typeSignature: "Type",
+      drawing: "Drawing...",
+      signed: "✓ Signed",
+      signatureRecorded: "✓ Recorded",
+      signatureVerified: "Signature verified",
+      drawOrTypeSignature: "Draw or type your signature",
+      readOnly: "Read only",
+      touchToSign: "Touch to sign",
+      clickToSign: "Click and drag to sign",
+      typeNameToSign: "Type your name below",
+      confirm: "Confirm",
+      signatureVerificationNotice:
+        "Your signature will be attached to this report.",
+
       // ─── Misc ──────────────────────────────────────────────────
       notAssigned: "Not assigned",
       time: "Time",
@@ -140,8 +215,52 @@ export const forumReportTranslations = {
       historyTab: "History",
       addFirst: "Add First",
       addAnother: "Add Another",
+
+      // ─── Admin: Extensions tab ────────────────────────────────
+      extensionsTab: "Extensions",
+      extensionRequestsTitle: "Extension Requests",
+      extensionRequestStatusPending: "Pending",
+      extensionRequestStatusApproved: "Approved",
+      extensionRequestStatusRejected: "Rejected",
+      extensionRequestedBy: "Requested by",
+      extensionTeam: "Team",
+      extensionRequestedMinutes: "Requested minutes",
+      extensionRequestedAt: "Requested",
+      extensionReason: "Reason",
+      extensionAdminNotes: "Admin notes",
+      extensionApprove: "Approve",
+      extensionReject: "Reject",
+      extensionApproveSuccess: "✅ Extension approved",
+      extensionRejectSuccess: "Extension rejected",
+      extensionRejectError: "Failed to reject",
+      extensionNoRequests: "No extension requests in this filter.",
+      extensionFilterPending: "Pending",
+      extensionFilterApproved: "Approved",
+      extensionFilterRejected: "Rejected",
+      extensionFilterAll: "All",
+      extensionLoading: "Loading extension requests...",
+      extensionRejectReasonLabel: "Rejection reason (required):",
+      extensionRejectReasonRequired: "Rejection reason is required.",
+      extensionApproveNoteLabel: "Approval note (optional):",
+      extensionRequestedForMeeting: "Report",
+      extensionPendingBadge: "pending",
+      extensionRefresh: "Refresh",
+
+      // ─── Admin: Lock / Unlock (B9) ────────────────────────────
+      adminLock: "Lock",
+      adminUnlock: "Unlock",
+      adminLockReason: "Reason for locking (required):",
+      adminLockConfirm:
+        "Lock this report? The owner will not be able to edit it.",
+      adminUnlockConfirm: "Unlock this report and allow editing again?",
+      adminLockSuccess: "✅ Report locked",
+      adminUnlockSuccess: "✅ Report unlocked",
+      adminLockedBadge: "Locked",
+      adminUnlockedBadge: "Unlocked",
+      adminReasonRequired: "A reason is required.",
     },
   },
+
   am: {
     forum: {
       // ─── Page Header ──────────────────────────────────────────
@@ -180,6 +299,17 @@ export const forumReportTranslations = {
 
       // ─── Standing Agendas ─────────────────────────────────────
       standingAgendas: "📋 ቋሚ አጀንዳዎች",
+      // Preserved verbatim from the original STANDING_AGENDAS_AM
+      // constant in ForumReport.jsx — do not paraphrase.
+      agendas: [
+        "በተቋሙ መልካም አስተዳደር ማስፈን በተመለከተ",
+        "በተቋሙ ብልሹ አሰራር ከመታገል አንጻር",
+        "መደበኛ አገልግሎት አሰጣጥን ከማሳለጥ አንጻር",
+        "QMS ስታንዳርድ በመስራት",
+        "ሳምንታዊ አብነታዊ ስራዎች",
+        "ያጋጠሙ ችግሮች",
+        "የተፈታበት አግባብ",
+      ],
 
       // ─── Explanation ──────────────────────────────────────────
       explanation: "📝 የተሰጠ ማብራሪያ (በአጭሩ)",
@@ -205,6 +335,7 @@ export const forumReportTranslations = {
 
       // ─── Buttons ──────────────────────────────────────────────
       save: "ሪፖርቱን አስቀምጥ",
+      updateReport: "ሪፖርቱን አዘምን",
       newReport: "አዲስ ሪፖርት",
       addTeam: "ቡድን ጨምር",
       createFirstTeam: "የመጀመሪያ ቡድን ፍጠር",
@@ -245,9 +376,12 @@ export const forumReportTranslations = {
       fullReportError: "❌ ሙሉ ሪፖርት ማዘጋጀት አልተቻለም",
       saving: "በማስቀመጥ ላይ...",
       saveSuccess: "✅ ሪፖርቱ በተሳካ ሁኔታ ተቀምጧል!",
+      updateSuccess: "✅ ሪፖርቱ በተሳካ ሁኔታ ተዘምኗል!",
       saveError: "ሪፖርቱን ማስቀመጥ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       selectDate: "እባክዎ ቀን ይምረጡ",
       fillFields: "እባክዎ ሁሉንም አስፈላጊ መስኮች ይሙሉ",
+      autoSaveReady: "ራስ-ሰር ማስቀመጥ ዝግጁ ነው",
+      autoSaveError: "ራስ-ሰር ማስቀመጥ አልተሳካም",
 
       // ─── AI Features ──────────────────────────────────────────
       generateSummary: "🤖 የAI ጽሑፍ ረዳት",
@@ -269,6 +403,55 @@ export const forumReportTranslations = {
       // ─── Feed ──────────────────────────────────────────────────
       feed: "መጋቢ",
 
+      // ─── Extension & Lock flow ────────────────────────────────
+      reportLocked: "🔒 ይህ ሪፖርት ተቆልፏል። እባክዎ አስተዳዳሪን ያግኙ።",
+      extensionPending: "⏳ የጊዜ ማራዘሚያ ጥያቄ በአስተዳዳሪ ማጽደቅ በመጠበቅ ላይ።",
+      extensionRequested: "✅ የጊዜ ማራዘሚያ ጥያቄ ለአስተዳዳሪ ተልኳል",
+      extensionRequestError: "የጊዜ ማራዘሚያ ጥያቄ ማስገባት አልተቻለም",
+      reportResumed: "✅ ሪፖርቱ በተሳካ ሁኔታ ተቀጥሏል",
+      resumeError: "ሪፖርቱን ማስቀጠል አልተቻለም",
+      reasonRequired: "እባክዎ ምክንያት ያስገቡ",
+
+      // ─── TimeExpiredModal ─────────────────────────────────────
+      timeExpiredTitle: "⏰ የስብሰባ ጊዜ አልቋል!",
+      timeExpiredMessage:
+        "የ30 ደቂቃ ስብሰባ ጊዜዎ አልቋል። ሂደትዎ በራስ-ሰር ተቀምጧል እና አሁን ለአስተዳዳሪዎች ብቻ ይታያል።",
+      progressSavedMessage: "✅ ሂደትዎ በራስ-ሰር በስርዓቱ ተቀምጧል።",
+      adminOnlyMessage: "🔒 የተቀመጠውን ሂደትዎን ማየት የሚችሉት አስተዳዳሪዎች ብቻ ናቸው።",
+      reasonLabel: "የማራዘሚያ ምክንያት:",
+      requestExtension: "ጊዜ ማራዘም ጠይቅ",
+      submitRequest: "የማራዘሚያ ጥያቄ አስገባ",
+      viewSavedProgress: "የተቀመጠ ሂደት ይመልከቱ",
+      cancel: "ሰርዝ",
+      close: "ዝጋ",
+
+      // ─── RequestExtensionModal ────────────────────────────────
+      extensionRequestTitle: "የጊዜ ማራዘሚያ ጠይቅ",
+      extensionRequestMessage:
+        "የስብሰባ ጊዜዎ አልቋል። ከታች ምክንያት በመስጠት ከአስተዳዳሪ ተጨማሪ ጊዜ ይጠይቁ።",
+      extensionInfo: "ጥያቄዎ ለአስተዳዳሪ ማጽደቅ ይላካል። ውሳኔ ከተደረገ በኋላ ይነገርዎታል።",
+      durationLabel: "የሚያስፈልግ ተጨማሪ ጊዜ:",
+      teamLabel: "ቡድን",
+      submitting: "በማስገባት ላይ...",
+      submittedSuccess: "✅ ጥያቄ ተልኳል!",
+      adminNotification: "🔔 አስተዳዳሪ ጥያቄዎን ይገመግማል እና ውሳኔውን ያሳውቅዎታል።",
+
+      // ─── Signature Modal ──────────────────────────────────────
+      signatureModalTitle: "ሪፖርትዎን ይፈርሙ",
+      drawSignature: "ይሳሉ",
+      typeSignature: "ይተይቡ",
+      drawing: "በመሳል ላይ...",
+      signed: "✓ ተፈርሟል",
+      signatureRecorded: "✓ ተመዝግቧል",
+      signatureVerified: "ፊርማ ተረጋግጧል",
+      drawOrTypeSignature: "ፊርማዎን ይሳሉ ወይም ይተይቡ",
+      readOnly: "ለንባብ ብቻ",
+      touchToSign: "ለመፈረም ይንኩ",
+      clickToSign: "ለመፈረም ጠቅ ያድርጉና ይጎትቱ",
+      typeNameToSign: "ስምዎን ከታች ይተይቡ",
+      confirm: "አረጋግጥ",
+      signatureVerificationNotice: "ፊርማዎ ከዚህ ሪፖርት ጋር ይያያዛል።",
+
       // ─── Misc ──────────────────────────────────────────────────
       notAssigned: "አልተመደበም",
       time: "ሰዓት",
@@ -277,8 +460,51 @@ export const forumReportTranslations = {
       historyTab: "ታሪክ",
       addFirst: "መጀመሪያውን ጨምር",
       addAnother: "ሌላ ጨምር",
+
+      // ─── Admin: Extensions tab ────────────────────────────────
+      extensionsTab: "ማራዘሚያዎች",
+      extensionRequestsTitle: "የጊዜ ማራዘሚያ ጥያቄዎች",
+      extensionRequestStatusPending: "በመጠባበቅ ላይ",
+      extensionRequestStatusApproved: "ተፈቅዷል",
+      extensionRequestStatusRejected: "ተከልክሏል",
+      extensionRequestedBy: "የጠየቀው በ",
+      extensionTeam: "ቡድን",
+      extensionRequestedMinutes: "የተጠየቀ ደቂቃ",
+      extensionRequestedAt: "የተጠየቀበት",
+      extensionReason: "ምክንያት",
+      extensionAdminNotes: "የአስተዳዳሪ ማስታወሻ",
+      extensionApprove: "ፍቀድ",
+      extensionReject: "አትፍቀድ",
+      extensionApproveSuccess: "✅ ማራዘሚያ ተፈቅዷል",
+      extensionRejectSuccess: "ማራዘሚያ ተከልክሏል",
+      extensionRejectError: "ማራዘሚያ ማክልከል አልተቻለም",
+      extensionNoRequests: "በዚህ ማጣሪያ ውስጥ ምንም ጥያቄ የለም።",
+      extensionFilterPending: "በመጠባበቅ ላይ",
+      extensionFilterApproved: "ተፈቅዷል",
+      extensionFilterRejected: "ተከልክሏል",
+      extensionFilterAll: "ሁሉም",
+      extensionLoading: "የማራዘሚያ ጥያቄዎችን በመጫን ላይ...",
+      extensionRejectReasonLabel: "የማክልከል ምክንያት (የግዴታ):",
+      extensionRejectReasonRequired: "የማክልከል ምክንያት ያስፈልጋል።",
+      extensionApproveNoteLabel: "የማጽደቅ ማስታወሻ (አማራጭ):",
+      extensionRequestedForMeeting: "ሪፖርት",
+      extensionPendingBadge: "በመጠባበቅ",
+      extensionRefresh: "አድስ",
+
+      // ─── Admin: Lock / Unlock (B9) ────────────────────────────
+      adminLock: "ቆልፍ",
+      adminUnlock: "ክፈት",
+      adminLockReason: "የመቆለፍ ምክንያት (የግዴታ):",
+      adminLockConfirm: "ይህን ሪፖርት ይቆልፉ? ባለቤቱ ማሻሻል አይችልም።",
+      adminUnlockConfirm: "ይህን ሪፖርት ይክፈቱና እንደገና ማሻሻል ይፍቀዱ?",
+      adminLockSuccess: "✅ ሪፖርቱ ተቆልፏል",
+      adminUnlockSuccess: "✅ ሪፖርቱ ተከፍቷል",
+      adminLockedBadge: "ተቆልፏል",
+      adminUnlockedBadge: "ተከፍቷል",
+      adminReasonRequired: "ምክንያት ያስፈልጋል።",
     },
   },
+
   om: {
     forum: {
       // ─── Page Header ──────────────────────────────────────────
@@ -319,6 +545,16 @@ export const forumReportTranslations = {
 
       // ─── Standing Agendas ─────────────────────────────────────
       standingAgendas: "📋 Ajandaa Dhaabbataa",
+      // Oromoo wording aligned to the 7-item Amharic list.
+      agendas: [
+        "Bulchiinsa gaarii dhaabbata keessatti mirkaneessuu",
+        "Badaa bulchiinsaa loluu",
+        "Tajaajila yeroo yeroon kennamu salphisuun",
+        "Sadarkaa QMS irratti hojjechuu",
+        "Hojii fakkeenyaa torbanii",
+        "Rakkoolee mudatan",
+        "Akkamitti furaman",
+      ],
 
       // ─── Explanation ──────────────────────────────────────────
       explanation: "📝 Ibsa Kenname (Gabaabaa)",
@@ -345,6 +581,7 @@ export const forumReportTranslations = {
 
       // ─── Buttons ──────────────────────────────────────────────
       save: "💾 Gabaasa Olkaayi",
+      updateReport: "💾 Gabaasa Haaromsi",
       newReport: "📄 Gabaasa Haaraa",
       addTeam: "➕ Garee Dabali",
       createFirstTeam: "Garee Jalqabaa Uumi",
@@ -386,9 +623,12 @@ export const forumReportTranslations = {
       fullReportError: "❌ Gabaasa guutuu uumuu hin dandeenye",
       saving: "Olkaayaa jira...",
       saveSuccess: "✅ Gabaasni milkiin olkaayame!",
+      updateSuccess: "✅ Gabaasni milkiin haaromfame!",
       saveError: "Gabaasa olkaa'uun hin dandeenye. Maaloo irra deebi'ii yaali.",
       selectDate: "Maaloo guyyaa filadhu",
       fillFields: "Maaloo dirree barbaachisoo hunda guuti",
+      autoSaveReady: "Olkaa'uun ofumaa qophiidha",
+      autoSaveError: "Olkaa'uun ofumaa hin milkoofne",
 
       // ─── AI Features ──────────────────────────────────────────
       generateSummary: "🤖 Gargaaraa Barreessaa AI",
@@ -410,6 +650,61 @@ export const forumReportTranslations = {
       // ─── Feed ──────────────────────────────────────────────────
       feed: "Soorata",
 
+      // ─── Extension & Lock flow ────────────────────────────────
+      reportLocked: "🔒 Gabaasni kun cufaa jira. Maaloo bulchaa quunnamaa.",
+      extensionPending:
+        "⏳ Gaaffiin yeroo dheereffannaa eeyyama bulchaa eegaa jira.",
+      extensionRequested: "✅ Gaaffiin yeroo dheereffannaa bulchaaf ergameera",
+      extensionRequestError:
+        "Gaaffii yeroo dheereffannaa galchuun hin dandeenye",
+      reportResumed: "✅ Gabaasni milkiin irra deebi'ee jalqabameera",
+      resumeError: "Gabaasa irra deebi'ee jalqabuun hin dandeenye",
+      reasonRequired: "Maaloo sababa galchi",
+
+      // ─── TimeExpiredModal ─────────────────────────────────────
+      timeExpiredTitle: "⏰ Yeroon Walgahii Xumurameera!",
+      timeExpiredMessage:
+        "Yeroon walgahii daqiiqaa 30 kee xumurameera. Adeemsi kee ofumaan olkaayameera, amma bulchtootaaf qofa mul'ata.",
+      progressSavedMessage:
+        "✅ Adeemsi kee ofumaan sirna keessatti olkaayameera.",
+      adminOnlyMessage:
+        "🔒 Adeemsa olkaa'ame kee kan ilaalan bulchtoonni qofa.",
+      reasonLabel: "Sababa yeroo dheereffannaa:",
+      requestExtension: "Yeroo Dheereffachuu Gaafadhu",
+      submitRequest: "Gaaffii Yeroo Dheereffannaa Galchi",
+      viewSavedProgress: "Adeemsa Olkaa'ame Ilaali",
+      cancel: "Haqi",
+      close: "Cufi",
+
+      // ─── RequestExtensionModal ────────────────────────────────
+      extensionRequestTitle: "Yeroo Dheereffachuu Gaafadhu",
+      extensionRequestMessage:
+        "Yeroon walgahii kee xumurameera. Sababa gadii kennuun bulchaa irraa yeroo dabalataa gaafadhu.",
+      extensionInfo:
+        "Gaaffiin kee bulchaaf eeyyamamuuf ni ergama. Murtiin yeroo kennamu siif himama.",
+      durationLabel: "Yeroo dabalataa barbaachisu:",
+      teamLabel: "Garee",
+      submitting: "Galchaa jira...",
+      submittedSuccess: "✅ Gaaffiin ergameera!",
+      adminNotification:
+        "🔔 Bulchaan gaaffii kee gamaaggamee murtii isaa siif ni beeksisa.",
+
+      // ─── Signature Modal ──────────────────────────────────────
+      signatureModalTitle: "Gabaasa Kee Mallatteessi",
+      drawSignature: "Suuraa",
+      typeSignature: "Barreessi",
+      drawing: "Suuraa jira...",
+      signed: "✓ Mallatteeffameera",
+      signatureRecorded: "✓ Galmeeffameera",
+      signatureVerified: "Mallattoon mirkanaa'eera",
+      drawOrTypeSignature: "Mallattoo kee suuraa ykn barreessi",
+      readOnly: "Dubbisuuf qofa",
+      touchToSign: "Mallatteessuuf tuqi",
+      clickToSign: "Mallatteessuuf cuqaasii harkisi",
+      typeNameToSign: "Maqaa kee gadii barreessi",
+      confirm: "Mirkaneessi",
+      signatureVerificationNotice: "Mallattoon kee gabaasa kanaan walqabata.",
+
       // ─── Misc ──────────────────────────────────────────────────
       notAssigned: "Hin ramadamne",
       time: "Yeroo",
@@ -418,6 +713,50 @@ export const forumReportTranslations = {
       historyTab: "Seenaa",
       addFirst: "Isa Jalqabaa Dabali",
       addAnother: "Kan Biraa Dabali",
+
+      // ─── Admin: Extensions tab ────────────────────────────────
+      extensionsTab: "Yeroo Dheereffannaa",
+      extensionRequestsTitle: "Gaaffiiwwan Yeroo Dheereffannaa",
+      extensionRequestStatusPending: "Eegaa jira",
+      extensionRequestStatusApproved: "Eeyyamameera",
+      extensionRequestStatusRejected: "Kufeera",
+      extensionRequestedBy: "Kan gaafate",
+      extensionTeam: "Garee",
+      extensionRequestedMinutes: "Daqiiqaa gaafatame",
+      extensionRequestedAt: "Yeroo gaafatame",
+      extensionReason: "Sababa",
+      extensionAdminNotes: "Yaada bulchaa",
+      extensionApprove: "Eeyyami",
+      extensionReject: "Kufi",
+      extensionApproveSuccess: "✅ Yeroon dheereffannaa eeyyamameera",
+      extensionRejectSuccess: "Yeroon dheereffannaa kufeera",
+      extensionRejectError: "Yeroo dheereffannaa kufuu hin dandeenye",
+      extensionNoRequests: "Gaaffiin calaltamuu kana keessatti hin jiru.",
+      extensionFilterPending: "Eegaa jira",
+      extensionFilterApproved: "Eeyyamameera",
+      extensionFilterRejected: "Kufeera",
+      extensionFilterAll: "Hunda",
+      extensionLoading: "Gaaffiiwwan yeroo dheereffannaa fe'aa jira...",
+      extensionRejectReasonLabel: "Sababa kufaatii (dirqama):",
+      extensionRejectReasonRequired: "Sababni kufaatii barbaachisa.",
+      extensionApproveNoteLabel: "Yaada eeyyamaa (filannoo):",
+      extensionRequestedForMeeting: "Gabaasa",
+      extensionPendingBadge: "eegaa jira",
+      extensionRefresh: "Haaromsi",
+
+      // ─── Admin: Lock / Unlock (B9) ────────────────────────────
+      adminLock: "Cufi",
+      adminUnlock: "Bani",
+      adminLockReason: "Sababa cufuuf (dirqama):",
+      adminLockConfirm:
+        "Gabaasa kana cufuu barbaadda? Abbootiin isaa gulaaluu hin danda'u.",
+      adminUnlockConfirm:
+        "Gabaasa kana bantee gulaaluu irra deebi'ee hayyamuu barbaadda?",
+      adminLockSuccess: "✅ Gabaasni cufameera",
+      adminUnlockSuccess: "✅ Gabaasni banameera",
+      adminLockedBadge: "Cufaa",
+      adminUnlockedBadge: "Banaa",
+      adminReasonRequired: "Sababni barbaachisa.",
     },
   },
 };

@@ -309,10 +309,13 @@ export const canApproveReport = (user) => isLeaderOrAbove(user);
 
 // ─── FORUM REPORT PERMISSIONS ──────────────────────────────────────────
 
+// Peer Forum is for Team Leaders and above only (employees have no access).
+export const canAccessPeerForum = (user) => isLeaderOrAbove(user);
+
 export const canCreateForumReport = (user) => {
-  // Every team member can draft / file a forum report for their own team
-  // (the backend clamps non-admins to their own team).
-  return !!user;
+  // Team Leaders (their own team) and Admins (any team) only.
+  // The backend enforces the same rule and clamps leaders to their own team.
+  return canAccessPeerForum(user);
 };
 
 export const canEditForumReport = (user, report) => {
@@ -438,7 +441,7 @@ export const NAV_ITEMS = [
     id: "forum",
     icon: "💬",
     label: "Peer Forum",
-    roles: [ROLES.EMPLOYEE, ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
+    roles: [ROLES.TEAM_LEADER, ROLES.ADMIN, ROLES.SUPER_ADMIN],
   },
   {
     id: "evaluation",

@@ -55,7 +55,7 @@ router.use(protect, anyRole);
 // ─── Meeting CRUD ────────────────────────────────────────────
 
 // POST /api/meetings - Create new meeting report (leaders and above)
-router.post("/", createMeeting);
+router.post("/", leaderOrAdmin, createMeeting);
 
 // GET /api/meetings/team/:teamId - Get meetings by team
 router.get("/team/:teamId", getMeetings);
@@ -79,27 +79,27 @@ router.get("/:id", getMeetingById);
 // here in middleware would require loading the meeting first,
 // which the controller already does, so the check lives there
 // to avoid a double fetch.
-router.put("/:id", updateMeeting);
+router.put("/:id", leaderOrAdmin, updateMeeting);
 
 // DELETE /api/meetings/:id
 // Same pattern as PUT above — no middleware guard, permission
 // enforced in the controller.
-router.delete("/:id", deleteMeeting);
+router.delete("/:id", leaderOrAdmin, deleteMeeting);
 
 // ─── Auto-Save Routes ────────────────────────────────────────
 // POST /api/meetings/auto-save - Auto-save meeting progress
-router.post("/auto-save", autoSaveMeeting);
+router.post("/auto-save", leaderOrAdmin, autoSaveMeeting);
 
 // ─── Lock/Unlock Routes ──────────────────────────────────────
 // POST /api/meetings/:id/lock - Lock meeting (auto-lock on expiry)
-router.post("/:id/lock", lockMeeting);
+router.post("/:id/lock", leaderOrAdmin, lockMeeting);
 
 // POST /api/meetings/:id/unlock - Unlock meeting (admin only)
 router.post("/:id/unlock", adminOrSuperAdmin, unlockMeeting);
 
 // ─── Extension Request ACTIONS ──────────────────────────────
 // POST /api/meetings/:id/request-extension - Request extension
-router.post("/:id/request-extension", requestExtension);
+router.post("/:id/request-extension", leaderOrAdmin, requestExtension);
 
 // POST /api/meetings/extension/:id/approve - Approve extension (admin)
 router.post("/extension/:id/approve", adminOrSuperAdmin, approveExtension);

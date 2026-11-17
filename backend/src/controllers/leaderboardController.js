@@ -1,289 +1,481 @@
-// backend/src/controllers/leaderboardController.js
-// HTTP layer for the four leaderboards. All ranking math lives in
-// leaderboardService — this file only:
-//   1. Parses + validates query params (from, to, source, limit)
-//   2. Calls the right service function
-//   3. Redacts fields per role BEFORE responding
+// backend/src/services/leaderboardService.js
+// Computes the four leaderboards:
+//   • Evaluation — Teams       (average of member totals per team)
+//   • Evaluation — People      (individual evaluation totals, all teams)
+//   • Forum      — Teams       (composite: meetings + attendance + completeness)
+//   • Forum      — People      (participation count from report authorship)
 //
-// Redaction is server-side on purpose. If we sent everything and relied
-// on the client to hide sensitive fields, an employee could open devtools
-// and read every team's per-member scores. Doing it here means the data
-// literally never leaves the server for viewers who shouldn't see it.
+// All functions return PLAIN data (no Mongoose docs), sorted per the
+// agreed tiebreaker order. No role filtering happens here — that's the
+// controller's job. This keeps the ranking math testable in isolation.
 
-const {
+const mongoose = require("mongoose");
+const Evaluation = require("../models/Evaluation");
+const Meeting = require("../models/Meeting");
+const Team = require("../models/Team");
+const User = require("../models/User");
+
+// ─── Period helpers ────────────────────────────────────────
+// Every board is computed over a closed-open date range
+// [from, to). Passing `from` and `to` in explicitly keeps the service
+// deterministic and testable; the controller derives them from query
+// params (defaults to the current calendar month).
+//
+// Both defaults produce UTC midnight. That matters because:
+//   • The frontend sends bare YYYY-MM-DD strings, which
+//     parseDateParam below interprets as UTC midnight.
+//   • Using server-local midnight (new Date(y, m, 1)) would shift the
+//     window by the server's UTC offset, so a user who picked "This
+//     Month" would get a different range than the same user who sent
+//     no period at all. Keeping both paths on UTC means they always
+//     match, and a document created at 23:00 EAT on the last day of
+//     a month lands inside the month it belongs to in Addis.
+
+const startOfMonth = (d = new Date()) =>
+  new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1, 0, 0, 0, 0));
+
+const startOfNextMonth = (d = new Date()) =>
+  new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+
+// Parse a "YYYY-MM-DD" string as UTC midnight of that calendar day.
+// `new Date("2026-09-01")` already does this per spec, but being explicit
+// avoids surprises if a caller ever sends a full ISO timestamp. Anything
+// that already contains time information (T or Z) is trusted as-is.
+const parseDateParam = (value, fallback) => {
+  if (!value) return fallback;
+  if (typeof value === "string" && /[TZ]/.test(value)) {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) throw new Error("Invalid date range");
+    return d;
+  }
+  const d = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(d.getTime())) throw new Error("Invalid date range");
+  return d;
+};
+
+const resolveRange = ({ from, to } = {}) => {
+  const fromDate = parseDateParam(from, startOfMonth());
+  const toDate = parseDateParam(to, startOfNextMonth());
+  if (toDate <= fromDate) {
+    throw new Error("Invalid date range: to must be after from");
+  }
+  return { from: fromDate, to: toDate };
+};
+
+// ─── Criteria constant — kept in sync with frontend/constants/criteria.js
+// Only used for completeness scoring in the forum board. Not authoritative;
+// the evaluation board reads totals straight off the saved evaluation.
+const CRITERIA_ITEM_COUNT = 15;
+
+// ─── Evaluation — Teams ────────────────────────────────────
+// A team's score is the average of every member total across every
+// evaluation submitted for that team in the period. Ranks are 1-based,
+// ties broken by best-performer score, then team size, then submission
+// time, then alphabetical.
+const computeEvaluationTeamBoard = async ({ from, to, teamFilter = null }) => {
+  const matchStage = {
+    createdAt: { $gte: from, $lt: to },
+  };
+  if (teamFilter) matchStage.team = new mongoose.Types.ObjectId(teamFilter);
+
+  const rows = await Evaluation.aggregate([
+    { $match: matchStage },
+    {
+      $project: {
+        team: 1,
+        teamName: 1,
+        totalScores: 1,
+        bestPerformer: 1,
+        createdAt: 1,
+        members: 1,
+      },
+    },
+  ]);
+
+  const teamMap = new Map();
+
+  for (const ev of rows) {
+    const teamId = ev.team ? ev.team.toString() : `no-team:${ev.teamName}`;
+    if (!teamMap.has(teamId)) {
+      teamMap.set(teamId, {
+        teamId: ev.team ? ev.team.toString() : null,
+        teamName: ev.teamName || "Untitled Team",
+        membersSeen: new Set(),
+        memberTotals: new Map(),
+        bestPerformerScore: -1,
+        bestPerformerName: null,
+        firstSubmission: ev.createdAt,
+        evaluationCount: 0,
+        memberCount: 0,
+      });
+    }
+    const bucket = teamMap.get(teamId);
+    bucket.evaluationCount += 1;
+    if (ev.createdAt < bucket.firstSubmission) {
+      bucket.firstSubmission = ev.createdAt;
+    }
+
+    const totals = Array.isArray(ev.totalScores) ? ev.totalScores : [];
+    for (const row of totals) {
+      const name = row?.name;
+      if (!name) continue;
+      const value = Number(row.total) || 0;
+      if (!bucket.memberTotals.has(name)) {
+        bucket.memberTotals.set(name, []);
+      }
+      bucket.memberTotals.get(name).push(value);
+      bucket.membersSeen.add(name);
+      if (value > bucket.bestPerformerScore) {
+        bucket.bestPerformerScore = value;
+        bucket.bestPerformerName = name;
+      }
+    }
+  }
+
+  const teams = [];
+  for (const [, bucket] of teamMap) {
+    let sum = 0;
+    let count = 0;
+    for (const [, arr] of bucket.memberTotals) {
+      const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+      sum += avg;
+      count += 1;
+    }
+    const averageScore = count > 0 ? sum / count : 0;
+    teams.push({
+      teamId: bucket.teamId,
+      teamName: bucket.teamName,
+      averageScore: Math.round(averageScore * 10) / 10,
+      bestPerformerName: bucket.bestPerformerName,
+      bestPerformerScore:
+        bucket.bestPerformerScore >= 0 ? bucket.bestPerformerScore : 0,
+      memberCount: bucket.membersSeen.size,
+      evaluationCount: bucket.evaluationCount,
+      firstSubmission: bucket.firstSubmission,
+    });
+  }
+
+  teams.sort((a, b) => {
+    if (b.averageScore !== a.averageScore)
+      return b.averageScore - a.averageScore;
+    if (b.bestPerformerScore !== a.bestPerformerScore)
+      return b.bestPerformerScore - a.bestPerformerScore;
+    if (b.memberCount !== a.memberCount) return b.memberCount - a.memberCount;
+    const tA = a.firstSubmission ? new Date(a.firstSubmission).getTime() : 0;
+    const tB = b.firstSubmission ? new Date(b.firstSubmission).getTime() : 0;
+    if (tA !== tB) return tA - tB;
+    return a.teamName.localeCompare(b.teamName);
+  });
+
+  return teams.map((t, i) => ({ ...t, rank: i + 1 }));
+};
+
+// ─── Evaluation — People ───────────────────────────────────
+const computeEvaluationPersonBoard = async ({
+  from,
+  to,
+  teamFilter = null,
+}) => {
+  const matchStage = { createdAt: { $gte: from, $lt: to } };
+  if (teamFilter) matchStage.team = new mongoose.Types.ObjectId(teamFilter);
+
+  const rows = await Evaluation.aggregate([
+    { $match: matchStage },
+    {
+      $project: {
+        teamName: 1,
+        totalScores: 1,
+        createdAt: 1,
+      },
+    },
+  ]);
+
+  const personMap = new Map();
+  for (const ev of rows) {
+    const totals = Array.isArray(ev.totalScores) ? ev.totalScores : [];
+    for (const row of totals) {
+      const name = row?.name;
+      if (!name) continue;
+      const value = Number(row.total) || 0;
+      if (!personMap.has(name)) {
+        personMap.set(name, {
+          name,
+          teamName: ev.teamName || "Untitled Team",
+          scores: [],
+          firstSeen: ev.createdAt,
+        });
+      }
+      const p = personMap.get(name);
+      p.scores.push(value);
+      p.teamName = ev.teamName || p.teamName;
+      if (ev.createdAt < p.firstSeen) p.firstSeen = ev.createdAt;
+    }
+  }
+
+  const people = [];
+  for (const [, p] of personMap) {
+    const avg = p.scores.reduce((a, b) => a + b, 0) / p.scores.length;
+    const best = Math.max(...p.scores);
+    people.push({
+      name: p.name,
+      teamName: p.teamName,
+      averageScore: Math.round(avg * 10) / 10,
+      bestScore: best,
+      evaluationCount: p.scores.length,
+      firstSeen: p.firstSeen,
+    });
+  }
+
+  people.sort((a, b) => {
+    if (b.averageScore !== a.averageScore)
+      return b.averageScore - a.averageScore;
+    if (b.bestScore !== a.bestScore) return b.bestScore - a.bestScore;
+    if (b.evaluationCount !== a.evaluationCount)
+      return b.evaluationCount - a.evaluationCount;
+    const tA = a.firstSeen ? new Date(a.firstSeen).getTime() : 0;
+    const tB = b.firstSeen ? new Date(b.firstSeen).getTime() : 0;
+    if (tA !== tB) return tA - tB;
+    return a.name.localeCompare(b.name);
+  });
+
+  return people.map((p, i) => ({ ...p, rank: i + 1 }));
+};
+
+// ─── Forum — Teams ─────────────────────────────────────────
+// Composite score per team:
+//   0.4 × meetings held (normalized against the busiest team)
+//   0.3 × average attendance rate (present count / team size)
+//   0.3 × average form completeness
+// Everything scaled to 0–100.
+//
+// D2 rules (defaults agreed with the brief):
+//   • Only status === "completed" counts. Drafts (in_progress,
+//     auto_saved) are excluded from meetingsHeld, attendance, and
+//     completeness. This is a deliberate product decision: a report
+//     that was never finalized should not earn a team points on a
+//     leaderboard it did not submit to.
+//   • The "absent" completeness section counts as filled when
+//     absent.length > 0 OR present.length >= team size. A team with
+//     perfect attendance and no absences keeps the full 1/8 — the
+//     original code penalized exactly the case the leaderboard was
+//     supposed to reward.
+//   • The 40/30/30 weighting is unchanged. Tiebreakers are unchanged
+//     (compositeScore → meetingsHeld → attendanceRate →
+//     firstSubmission → teamName).
+const computeForumTeamBoard = async ({ from, to, teamFilter = null }) => {
+  const matchStage = {
+    date: { $gte: from, $lt: to },
+    // D2: only finalized reports count.
+    status: "completed",
+  };
+  if (teamFilter) matchStage.team = new mongoose.Types.ObjectId(teamFilter);
+
+  const rows = await Meeting.aggregate([
+    { $match: matchStage },
+    {
+      $project: {
+        team: 1,
+        teamName: 1,
+        present: 1,
+        absent: 1,
+        prevResults: 1,
+        topics: 1,
+        explanation: 1,
+        gaps: 1,
+        agreements: 1,
+        signatures: 1,
+        createdAt: 1,
+      },
+    },
+  ]);
+
+  // D2: build the team-size map BEFORE the row loop so completeness
+  // can consult it while scoring each report. The previous code built
+  // this map after the loop, so a report's absent section could never
+  // be scored against present.length vs team size.
+  const teamIds = [...new Set(rows.map((r) => r.team).filter(Boolean))];
+  const teamDocs = await Team.find({ _id: { $in: teamIds } })
+    .select("_id members")
+    .lean();
+  const teamSizeById = new Map(
+    teamDocs.map((t) => [t._id.toString(), (t.members || []).length || 1]),
+  );
+
+  const teamMap = new Map();
+  for (const m of rows) {
+    const teamId = m.team ? m.team.toString() : `no-team:${m.teamName}`;
+    if (!teamMap.has(teamId)) {
+      teamMap.set(teamId, {
+        teamId: m.team ? m.team.toString() : null,
+        teamName: m.teamName || "Untitled Team",
+        meetings: 0,
+        attendeesSum: 0,
+        attendeesMax: 0,
+        completenessSum: 0,
+        firstSubmission: m.createdAt,
+      });
+    }
+    const b = teamMap.get(teamId);
+    b.meetings += 1;
+
+    const presentCount = Array.isArray(m.present) ? m.present.length : 0;
+    b.attendeesSum += presentCount;
+    if (presentCount > b.attendeesMax) b.attendeesMax = presentCount;
+
+    const teamSize = teamSizeById.get(teamId) || 0;
+    const absentCount = Array.isArray(m.absent) ? m.absent.length : 0;
+
+    let filled = 0;
+    if (presentCount > 0) filled += 1;
+    // D2: absent section fills if there are absences, OR if everyone
+    // on the team showed up (present count meets/exceeds team size).
+    // This eliminates the previous false penalty for perfect attendance.
+    if (absentCount > 0 || (teamSize > 0 && presentCount >= teamSize))
+      filled += 1;
+    if (Array.isArray(m.prevResults) && m.prevResults.length > 0) filled += 1;
+    if (Array.isArray(m.topics) && m.topics.length > 0) filled += 1;
+    if (m.explanation && m.explanation.trim().length > 0) filled += 1;
+    if (Array.isArray(m.gaps) && m.gaps.length > 0) filled += 1;
+    if (Array.isArray(m.agreements) && m.agreements.length > 0) filled += 1;
+    if (Array.isArray(m.signatures) && m.signatures.length > 0) filled += 1;
+    b.completenessSum += Math.min(filled / 8, 1);
+
+    if (m.createdAt < b.firstSubmission) b.firstSubmission = m.createdAt;
+  }
+
+  const maxMeetings = Math.max(
+    1,
+    ...[...teamMap.values()].map((b) => b.meetings),
+  );
+
+  const teams = [];
+  for (const [teamId, b] of teamMap) {
+    const teamSize = teamSizeById.get(teamId) || b.attendeesMax || 1;
+    const attendanceRate =
+      b.meetings > 0
+        ? Math.min(1, b.attendeesSum / (b.meetings * teamSize))
+        : 0;
+    const completeness = b.meetings > 0 ? b.completenessSum / b.meetings : 0;
+    const meetingsNorm = b.meetings / maxMeetings;
+
+    // Weights are unchanged: 40 / 30 / 30.
+    const composite =
+      Math.round(
+        (0.4 * meetingsNorm + 0.3 * attendanceRate + 0.3 * completeness) * 1000,
+      ) / 10;
+
+    teams.push({
+      teamId: b.teamId,
+      teamName: b.teamName,
+      meetingsHeld: b.meetings,
+      averageAttendees:
+        b.meetings > 0
+          ? Math.round((b.attendeesSum / b.meetings) * 10) / 10
+          : 0,
+      attendanceRate: Math.round(attendanceRate * 1000) / 10,
+      completenessScore: Math.round(completeness * 1000) / 10,
+      compositeScore: composite,
+      firstSubmission: b.firstSubmission,
+    });
+  }
+
+  teams.sort((a, b) => {
+    if (b.compositeScore !== a.compositeScore)
+      return b.compositeScore - a.compositeScore;
+    if (b.meetingsHeld !== a.meetingsHeld)
+      return b.meetingsHeld - a.meetingsHeld;
+    if (b.attendanceRate !== a.attendanceRate)
+      return b.attendanceRate - a.attendanceRate;
+    const tA = a.firstSubmission ? new Date(a.firstSubmission).getTime() : 0;
+    const tB = b.firstSubmission ? new Date(b.firstSubmission).getTime() : 0;
+    if (tA !== tB) return tA - tB;
+    return a.teamName.localeCompare(b.teamName);
+  });
+
+  return teams.map((t, i) => ({ ...t, rank: i + 1 }));
+};
+
+// ─── Self-service summary ──────────────────────────────────
+const computeMySummary = async ({ userId, from, to }) => {
+  const user = await User.findById(userId).select("name team").lean();
+  if (!user) return null;
+
+  const myEvals = await Evaluation.find({
+    createdAt: { $gte: from, $lt: to },
+    "totalScores.name": user.name,
+  })
+    .select("totalScores teamName")
+    .lean();
+
+  const myScores = [];
+  for (const ev of myEvals) {
+    const row = (ev.totalScores || []).find((r) => r.name === user.name);
+    if (row) myScores.push(Number(row.total) || 0);
+  }
+  const myAverage =
+    myScores.length > 0
+      ? Math.round(
+          (myScores.reduce((a, b) => a + b, 0) / myScores.length) * 10,
+        ) / 10
+      : null;
+  const myBest = myScores.length > 0 ? Math.max(...myScores) : null;
+
+  const meetingsWithMe = await Meeting.find({
+    date: { $gte: from, $lt: to },
+    $or: [{ present: user.name }, { createdByName: user.name }],
+  })
+    .select("present createdByName")
+    .lean();
+
+  const forumMeetingsAttended = meetingsWithMe.length;
+  const forumMeetingsLed = meetingsWithMe.filter(
+    (m) => m.createdByName === user.name,
+  ).length;
+
+  let teamRank = null;
+  let teamBoardSize = null;
+  let teamName = null;
+  let teamAverageScore = null;
+
+  if (user.team) {
+    const board = await computeEvaluationTeamBoard({ from, to });
+    teamBoardSize = board.length;
+    const idx = board.findIndex((t) => t.teamId === user.team.toString());
+    if (idx !== -1) {
+      teamRank = idx + 1;
+      teamName = board[idx].teamName;
+      teamAverageScore = board[idx].averageScore;
+    }
+  }
+
+  return {
+    user: {
+      id: user._id.toString(),
+      name: user.name,
+      teamId: user.team ? user.team.toString() : null,
+      teamName,
+    },
+    evaluation: {
+      averageScore: myAverage,
+      bestScore: myBest,
+      evaluationCount: myScores.length,
+    },
+    forum: {
+      meetingsAttended: forumMeetingsAttended,
+      meetingsLed: forumMeetingsLed,
+    },
+    team: {
+      rank: teamRank,
+      boardSize: teamBoardSize,
+      averageScore: teamAverageScore,
+    },
+  };
+};
+
+module.exports = {
   resolveRange,
   computeEvaluationTeamBoard,
   computeEvaluationPersonBoard,
   computeForumTeamBoard,
   computeMySummary,
-} = require("../services/leaderboardService");
-
-const Team = require("../models/Team");
-
-// ─── Role helpers ──────────────────────────────────────────
-const isSuperAdmin = (u) => u?.role === "superadmin";
-const isAdmin = (u) => u?.role === "admin";
-const isAdminTier = (u) => isSuperAdmin(u) || isAdmin(u);
-const isLeader = (u) => u?.role === "leader";
-
-// ─── Redactors ─────────────────────────────────────────────
-// Each redactor takes the full board and returns what the caller is
-// allowed to see. Field names in the response stay the same across
-// roles so the frontend doesn't have to branch on shape — it just sees
-// null where a field is not permitted, and the UI omits those cells.
-
-const redactTeamBoardForAdmin = (board) => board; // full data
-
-const redactTeamBoardForLeader = (board, user) => {
-  const myTeamId = user.team ? user.team.toString() : null;
-  return board.map((row) => {
-    const isMine = row.teamId && row.teamId === myTeamId;
-    return {
-      ...row,
-      // Leaders see everyone's rank and score, but not the private
-      // details (best-performer identity, first-submission time) for
-      // teams other than their own.
-      // Best performers are public recognition for leaders.
-      bestPerformerName: row.bestPerformerName,
-      bestPerformerScore: row.bestPerformerScore,
-      firstSubmission: null,
-      isMyTeam: isMine,
-    };
-  });
-};
-
-const redactTeamBoardForEmployee = (board, user) => {
-  const myTeamId = user.team ? user.team.toString() : null;
-  return board.map((row) => {
-    const isMine = row.teamId && row.teamId === myTeamId;
-    return {
-      rank: row.rank,
-      teamId: row.teamId,
-      teamName: row.teamName,
-      // Public metric only — the headline number that makes the board
-      // meaningful. No per-member details, no best-performer identity.
-      averageScore:
-        row.averageScore !== undefined ? row.averageScore : row.compositeScore,
-      // Employees also see who topped their OWN team.
-      bestPerformerName: isMine ? row.bestPerformerName : undefined,
-      bestPerformerScore: isMine ? row.bestPerformerScore : undefined,
-      memberCount: row.memberCount ?? undefined,
-      meetingsHeld: row.meetingsHeld ?? undefined,
-      isMyTeam: isMine,
-    };
-  });
-};
-
-const redactPersonBoardForAdmin = (board) => board; // full data
-
-// Employees see the ranking (rank, name, team, average) for everyone, with
-// their own teammates flagged. Per-member detail stays with leaders/admins.
-const redactPersonBoardForEmployee = (board, myTeamName) =>
-  board.map((row) => ({
-    rank: row.rank,
-    name: row.name,
-    teamName: row.teamName,
-    averageScore: row.averageScore,
-    isMyTeam: !!myTeamName && row.teamName === myTeamName,
-  }));
-
-const redactPersonBoardForLeader = (board, user, resolvedTeamName) => {
-  // req.user.team is an un-populated ObjectId, so the name has to be
-  // resolved by the caller (previously this was always undefined, which
-  // meant leaders never got full rows for their own team).
-  const myTeamName = resolvedTeamName || user.team?.name;
-  return board.map((row) => {
-    // Leaders see full rows for members of their own team (matched by
-    // team name, which is the only team identifier PersonBoard carries).
-    // Everyone else gets a stripped row: name + score + rank only.
-    const isMine = myTeamName && row.teamName === myTeamName;
-    return isMine
-      ? { ...row, isMyTeam: true }
-      : {
-          rank: row.rank,
-          name: row.name,
-          teamName: row.teamName,
-          averageScore: row.averageScore,
-          isMyTeam: false,
-        };
-  });
-};
-
-// ─── Handlers ──────────────────────────────────────────────
-
-// GET /api/leaderboard/teams?source=evaluation|forum&from&to&limit
-const getTeamLeaderboard = async (req, res) => {
-  try {
-    const { source = "evaluation" } = req.query;
-    const { from, to } = resolveRange(req.query);
-    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
-
-    let board;
-    if (source === "evaluation") {
-      board = await computeEvaluationTeamBoard({ from, to });
-    } else if (source === "forum") {
-      board = await computeForumTeamBoard({ from, to });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "source must be 'evaluation' or 'forum'",
-      });
-    }
-
-    // Apply limit AFTER redaction, so a leader sees the top N of what
-    // they're allowed to see (their own team may be rank 47 of 50).
-    let visible;
-    if (isAdminTier(req.user)) {
-      visible = redactTeamBoardForAdmin(board);
-    } else if (isLeader(req.user)) {
-      visible = redactTeamBoardForLeader(board, req.user);
-    } else {
-      visible = redactTeamBoardForEmployee(board, req.user);
-    }
-
-    // Always include the caller's own team row, even if it's outside the
-    // limit — the UI highlights it, and hiding it would be confusing.
-    const myTeamId = req.user.team ? req.user.team.toString() : null;
-    const myRow = myTeamId
-      ? visible.find((r) => r.teamId === myTeamId) || null
-      : null;
-
-    const trimmed = visible.slice(0, limit);
-
-    // If my team's row got cut off by the limit, append it at the end
-    // with a flag so the client can render it in a "your team" strip.
-    if (myRow && !trimmed.find((r) => r.teamId === myTeamId)) {
-      trimmed.push({ ...myRow, outsideTop: true });
-    }
-
-    res.json({
-      success: true,
-      source,
-      period: { from: from.toISOString(), to: to.toISOString() },
-      viewerRole: req.user.role,
-      teams: trimmed,
-      totalTeams: visible.length,
-    });
-  } catch (error) {
-    console.error("getTeamLeaderboard error:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// GET /api/leaderboard/people?source=evaluation&from&to&limit
-// Currently only the evaluation source produces a person board. The
-// `source` param is accepted for symmetry with the teams board and for
-// the day we add forum-person tracking.
-const getPersonLeaderboard = async (req, res) => {
-  try {
-    const { source = "evaluation" } = req.query;
-
-    if (source !== "evaluation") {
-      return res.status(400).json({
-        success: false,
-        message:
-          "The individual leaderboard is only available for source=evaluation today.",
-      });
-    }
-
-    // Everyone can see the individual ranking; how much detail comes
-    // through depends on the role (see the redactors above).
-    let myTeamName = null;
-    if (req.user.team) {
-      const teamDoc = await Team.findById(req.user.team).select("name").lean();
-      myTeamName = teamDoc?.name || null;
-    }
-
-    const { from, to } = resolveRange(req.query);
-    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 200);
-
-    const board = await computeEvaluationPersonBoard({ from, to });
-
-    const visible = isAdminTier(req.user)
-      ? redactPersonBoardForAdmin(board)
-      : isLeader(req.user)
-        ? redactPersonBoardForLeader(board, req.user, myTeamName)
-        : redactPersonBoardForEmployee(board, myTeamName);
-
-    res.json({
-      success: true,
-      source,
-      period: { from: from.toISOString(), to: to.toISOString() },
-      viewerRole: req.user.role,
-      people: visible.slice(0, limit),
-      totalPeople: visible.length,
-    });
-  } catch (error) {
-    console.error("getPersonLeaderboard error:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// GET /api/leaderboard/celebration
-// One tiny payload for the Dashboard banner. Returns just the top team
-// for the current month, no per-member detail. Public to every role.
-const getCelebration = async (req, res) => {
-  try {
-    const { from, to } = resolveRange(); // locked to current month for the banner
-    const board = await computeEvaluationTeamBoard({ from, to });
-    const top = board[0] || null;
-
-    res.json({
-      success: true,
-      period: { from: from.toISOString(), to: to.toISOString() },
-      topTeam: top
-        ? {
-            teamId: top.teamId,
-            teamName: top.teamName,
-            averageScore: top.averageScore,
-            memberCount: top.memberCount,
-          }
-        : null,
-      runnerUp: board[1]
-        ? {
-            teamId: board[1].teamId,
-            teamName: board[1].teamName,
-            averageScore: board[1].averageScore,
-          }
-        : null,
-    });
-  } catch (error) {
-    console.error("getCelebration error:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-// GET /api/leaderboard/me
-// Self-service. Any authenticated user can call it. Returns their own
-// scores + team position, never anyone else's.
-const getMyPerformance = async (req, res) => {
-  try {
-    const { from, to } = resolveRange(req.query);
-    const summary = await computeMySummary({
-      userId: req.user._id,
-      from,
-      to,
-    });
-    if (!summary) {
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found." });
-    }
-
-    res.json({
-      success: true,
-      period: { from: from.toISOString(), to: to.toISOString() },
-      ...summary,
-    });
-  } catch (error) {
-    console.error("getMyPerformance error:", error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-module.exports = {
-  getTeamLeaderboard,
-  getPersonLeaderboard,
-  getCelebration,
-  getMyPerformance,
 };

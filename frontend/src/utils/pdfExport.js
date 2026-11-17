@@ -6,15 +6,6 @@
 //   • exportEvaluationReportToPDF         — mixed-script safe, Amharic-first
 //   • exportRecognitionCertificateToPDF   — mixed-script safe, Amharic-first
 //   • exportBiWeeklyAggregateReportToPDF  — mixed-script safe, Amharic-first
-//
-// RULE OF THUMB (see dailyReport.js / goldenMondayReport.js for the same
-// pattern): every visible string goes through drawMixedScriptText(), every
-// document calls loadFonts() once after creation, and table cells switch
-// fonts per-cell in didParseCell.
-//
-// drawMixedScriptText is imported from ./pdf/pdfHelpers — the shared
-// implementation used by dailyReport.js, goldenMondayReport.js and
-// reportExport.js. Do NOT define a second copy here.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import jsPDF from "jspdf";
@@ -83,52 +74,20 @@ const getEthiopianDate = (date = new Date()) => {
   return `${monthName} ${day} ቀን ${year} ዓ.ም`;
 };
 
-// Helper: Ensure text is properly encoded for PDF
 const encodeText = (text) => {
   if (!text) return "";
   return String(text);
 };
 
 // ─── MIXED-SCRIPT / HEADER-CELL INFRASTRUCTURE ──────────────
-//
-// These helpers exist because jspdf-autotable makes three independent
-// decisions about a header cell that interact badly for short Ethiopic
-// labels such as "ተ.ቁ":
-//
-//   1. It measures the label with the currently-selected font.
-//   2. If the measured width exceeds the column width, it breaks the
-//      string between the two glyph clusters (ተ. | ቁ).
-//   3. If a didParseCell hook also overrides `cell.text` and sets
-//      `overflow: "visible"`, autotable can silently suppress glyphs
-//      that its own internal layout step decided didn't fit.
-//
-// The combination we used before — forcing `text` and `overflow` —
-// was the cause of the disappearing ቁ. The correct fix is to leave the
-// text and overflow alone and instead give the cell enough physical
-// width that step (2) never triggers. That's what these helpers do.
-
-// Sentinel for "this header cell must not break mid-word".
-// We store BOTH a symbol-keyed flag and a plain boolean because
-// jspdf-autotable clones cell content internally and symbol keys can be
-// dropped while plain enumerable properties survive.
-const NO_WRAP = Symbol("no-wrap");
-const noWrap = (label) => ({
-  [NO_WRAP]: true,
-  __noWrap: true,
-  label: String(label),
-});
-const isNoWrap = (raw) =>
-  raw && typeof raw === "object" && raw.__noWrap === true;
-
-// Default header font size. Hoisted so the width-measurement helper and
-// the shared head styles stay in sync — if you change one, change both.
 const HEADER_FONT_SIZE = 8.5;
 
-// Centralised font decision. Previously this ternary was inlined in
-// three places inside sharedDidParseCell; keeping it here means a new
-// script (e.g. Tigrinya, Oromo in Qubee) only needs one edit.
 function pickFontFor(doc, raw) {
-  const text = isNoWrap(raw) ? String(raw.label ?? "") : String(raw ?? "");
+  // Cells that use colSpan arrive as { content, colSpan } objects, so read
+  // the text from `.content` instead of stringifying the object.
+  const text = String(
+    raw && typeof raw === "object" ? (raw.content ?? "") : (raw ?? ""),
+  );
   const amharic = isAmharic(text);
   if (amharic) {
     return doc.__hasEthiopicFont ? FONT_NAMES.ethiopic : "helvetica";
@@ -136,10 +95,6 @@ function pickFontFor(doc, raw) {
   return doc.__hasLatinFont ? FONT_NAMES.latin : "helvetica";
 }
 
-// Estimate the rendered width (in mm) of a header label at
-// HEADER_FONT_SIZE. Uses jsPDF's own measurement when the font is
-// available; falls back to a conservative per-character estimate for
-// Ethiopic (which is wider than Latin at the same point size).
 function measureHeaderWidth(doc, label, fontName) {
   const text = String(label ?? "");
   try {
@@ -150,136 +105,128 @@ function measureHeaderWidth(doc, label, fontName) {
   } catch {
     // fall through to estimate
   }
-  // Conservative fallback: Ethiopic glyphs average ~4.2mm at 8.5pt,
-  // Latin ~2.2mm. The ".", "." separator is narrow in both.
   const isAm = isAmharic(text);
   const perGlyph = isAm ? 4.2 : 2.2;
   return text.length * perGlyph;
 }
 
-// Compute a safe column width for a no-wrap header cell. Never returns
-// less than `minMm` and always adds horizontal padding so the glyphs
-// aren't pinched against the cell border.
 function computeNoWrapColumnWidth(doc, label, fontName, minMm = 12) {
   const textMm = measureHeaderWidth(doc, label, fontName);
-  const paddingMm = 3; // 1.5mm each side, slightly less than default 2+2
+  const paddingMm = 3;
   return Math.max(minMm, Math.ceil(textMm + paddingMm));
 }
 
-// Apply the shared header font logic for a cell. Extracted so both
-// Table 1 and Table 2 use the exact same rules.
 function applySharedHeaderFont(doc, data) {
   const raw = data.cell.raw;
-  if (isNoWrap(raw)) {
-    data.cell.styles.font = pickFontFor(doc, raw);
-    // Slightly tighter padding on header cells so the glyph pair has
-    // room without us having to shrink the font.
-    data.cell.styles.cellPadding = {
-      top: 1.6,
-      bottom: 1.6,
-      left: 1,
-      right: 1,
-    };
+  // Signature cells render an image, not text — leave font alone.
+  if (raw && typeof raw === "object" && raw.__signatureImage) {
+    data.cell.text = [""];
     return;
   }
   data.cell.styles.font = pickFontFor(doc, raw);
+  // Slightly tighter padding on header cells so the glyph pair has room.
+  data.cell.styles.cellPadding = {
+    top: 1.6,
+    bottom: 1.6,
+    left: 1,
+    right: 1,
+  };
 }
 
-// ─── FORUM REPORT LABELS (language-aware) ─────────────────────
-// Amharic is the default. `lang` may be "en" or "om" to override.
-// No content auto-detection — the caller decides (see exportForumReportToPDF).
+// ─── FORUM REPORT LABELS (HARDCODED AMHARIC) ─────────────────
+// This guarantees the PDF is ALWAYS in Amharic, regardless of what
+// is passed in `t`. If you ever want to support en/om again, you
+// can expand this object.
+const AM_LABELS = {
+  title: "የአቻ ፎረም ሪፖርት",
+  subtitle: "በአዲስ አበባ ከተማ አስተዳደር አዲስ መሶብ · አዲስ ከተማ ማዕከል",
+  date: "ቀን",
+  time: "ሰዓት",
+  team: "ቡድን",
+  explanation: "ማብራሪያ",
+  aiBlock: "የ AI ማጠቃለያ",
+  secPresent: "የተገኙ አባላት",
+  secAbsent: "ያልተገኙ አባላት",
+  secPrevResults: "ቀዳሚ ውጤቶች",
+  secTopics: "የእለቱ ርዕሶች",
+  secGaps: "የታዩ ክፍተቶች",
+  secAgreements: "የተስማሙባቸው ነጥቦች",
+  secSignatures: "ፊርማዎች",
+  t1Title: "የስብሰባ ይዘት",
+  colNo: "ተ.ቁ",
+  colSection: "ክፍል",
+  colItem: "ዝርዝር",
+  t2Title: "የአባላት ሁኔታ እና ፊርማ",
+  colName: "ስም",
+  colStatus: "ሁኔታ",
+  colReason: "ምክንያት",
+  colSignature: "ፊርማ",
+  statusPresent: "✓ የተገኙ",
+  statusAbsent: "✗ ያልተገኙ",
+  footer: "በአዲስ መሶብ የአንድ ማዕከል አገልግሎት የተዘጋጀ",
+  page: "ገጽ",
+  of: "ከ",
+};
+
 function getForumLabels(lang, t) {
-  const tf = (key, fallback) => t?.forum?.[key] || fallback;
+  // Default strictly to Amharic for the forum report
+  if (lang === "en" || lang === "om") {
+    const tf = (key, fallback) => t?.forum?.[key] || fallback;
+    const isOm = lang === "om";
+    return {
+      title: tf("title", isOm ? "Gabaasa Fooraamii" : "Peer Forum Report"),
+      subtitle: tf(
+        "subtitle",
+        isOm
+          ? "Bulchiinsa Magaalaa Finfinnee · Addis MESOB"
+          : "Addis Ababa City Admin",
+      ),
+      date: tf("date", isOm ? "Guyyaa" : "Date"),
+      time: isOm ? "Yeroo" : "Time",
+      team: isOm ? "Garee" : "Team",
+      explanation: tf("explanation", isOm ? "Ibsa" : "Explanation"),
+      aiBlock: isOm ? "Cuunfaa AI" : "AI Summary",
+      secPresent: tf(
+        "presentMembers",
+        isOm ? "Miseensota Argaman" : "Present Members",
+      ),
+      secAbsent: tf(
+        "absentMembers",
+        isOm ? "Miseensota Hin Argamne" : "Absent Members",
+      ),
+      secPrevResults: tf(
+        "prevResults",
+        isOm ? "Bu'aa Duraa" : "Previous Results",
+      ),
+      secTopics: tf(
+        "todayTopics",
+        isOm ? "Mata-duree Marii" : "Discussion Topics",
+      ),
+      secGaps: tf("gaps", isOm ? "Hanqinaalee" : "Identified Gaps"),
+      secAgreements: tf(
+        "agreements",
+        isOm ? "Qabxii Walii Galame" : "Agreed Points",
+      ),
+      secSignatures: tf("signatures", isOm ? "Mallattoo" : "Signatures"),
+      t1Title: isOm ? "Qabiyyee Walgahii" : "Session Content",
+      colNo: isOm ? "Lak." : "#",
+      colSection: isOm ? "Kutaa" : "Section",
+      colItem: isOm ? "Ibsa" : "Item",
+      t2Title: isOm ? "Haala Miseensotaa" : "Members & Signatures",
+      colName: isOm ? "Maqaa" : "Name",
+      colStatus: isOm ? "Haala" : "Status",
+      colReason: isOm ? "Sababa" : "Reason",
+      colSignature: isOm ? "Mallattoo" : "Signature",
+      statusPresent: isOm ? "✓ Argame" : "✓ Present",
+      statusAbsent: isOm ? "✗ Hin argamne" : "✗ Absent",
+      footer: isOm ? "A-MESOB Wiirtuu Tajaajila" : "Generated by Addis MESOB",
+      page: isOm ? "Fuula" : "Page",
+      of: isOm ? "keessaa" : "of",
+    };
+  }
 
-  const isAm = lang === "am";
-  const isOm = lang === "om";
-
-  return {
-    title: tf(
-      "title",
-      isAm ? "የአቻ ፎረም ሪፖርት" : isOm ? "Gabaasa Fooraamii" : "Peer Forum Report",
-    ),
-    subtitle: tf(
-      "subtitle",
-      isAm
-        ? "በአዲስ አበባ ከተማ አስተዳደር አዲስ መሶብ · አዲስ ከተማ ማዕከል"
-        : isOm
-          ? "Bulchiinsa Magaalaa Finfinnee · Addis MESOB · Addis Ketema"
-          : "Addis Ababa City Admin · Addis MESOB · Addis Ketema Center",
-    ),
-    date: tf("date", isAm ? "ቀን" : isOm ? "Guyyaa" : "Date"),
-    time: isAm ? "ሰዓት" : isOm ? "Yeroo" : "Time",
-    team: isAm ? "ቡድን" : isOm ? "Garee" : "Team",
-    explanation: tf(
-      "explanation",
-      isAm ? "ማብራሪያ" : isOm ? "Ibsa" : "Explanation",
-    ),
-    aiBlock: isAm ? "የ AI ማጠቃለያ" : isOm ? "Cuunfaa AI" : "AI Generated Summary",
-
-    // ─── Section names (row label in the Section column) ────────
-    secPresent: tf(
-      "presentMembers",
-      isAm ? "የተገኙ አባላት" : isOm ? "Miseensota Argaman" : "Present Members",
-    ),
-    secAbsent: tf(
-      "absentMembers",
-      isAm ? "ያልተገኙ አባላት" : isOm ? "Miseensota Hin Argamne" : "Absent Members",
-    ),
-    // Short form — "ያለፈው ስብሰባ ውጤቶች" wrapped inside the content
-    // table's Section column at 8pt. "ቀዳሚ ውጤቶች" is the standard
-    // short Amharic label and stays on one line.
-    secPrevResults: tf(
-      "prevResults",
-      isAm ? "ቀዳሚ ውጤቶች" : isOm ? "Bu'aa Duraa" : "Previous Results",
-    ),
-    secTopics: tf(
-      "todayTopics",
-      isAm ? "የእለቱ ርዕሶች" : isOm ? "Mata-duree Marii" : "Discussion Topics",
-    ),
-    secGaps: tf(
-      "gaps",
-      isAm ? "የታዩ ክፍተቶች" : isOm ? "Hanqinaalee" : "Identified Gaps",
-    ),
-    secAgreements: tf(
-      "agreements",
-      isAm ? "የተስማሙባቸው ነጥቦች" : isOm ? "Qabxii Walii Galame" : "Agreed Points",
-    ),
-    secSignatures: tf(
-      "signatures",
-      isAm ? "ፊርማዎች" : isOm ? "Mallattoo" : "Signatures",
-    ),
-
-    // ─── Table 1 (content) column headers ──────────────────────
-    t1Title: isAm
-      ? "የስብሰባ ይዘት"
-      : isOm
-        ? "Qabiyyee Walgahii"
-        : "Session Content",
-    colNo: isAm ? "ተ.ቁ" : isOm ? "Lak." : "#",
-    colSection: isAm ? "ክፍል" : isOm ? "Kutaa" : "Section",
-    colItem: isAm ? "ዝርዝር" : isOm ? "Ibsa" : "Item",
-
-    // ─── Table 2 (members) column headers ──────────────────────
-    t2Title: isAm
-      ? "የአባላት ሁኔታ እና ፊርማ"
-      : isOm
-        ? "Haala Miseensotaa fi Mallattoo"
-        : "Members & Signatures",
-    colName: isAm ? "ስም" : isOm ? "Maqaa" : "Name",
-    colStatus: isAm ? "ሁኔታ" : isOm ? "Haala" : "Status",
-    colReason: isAm ? "ምክንያት" : isOm ? "Sababa" : "Reason",
-    colSignature: isAm ? "ፊርማ" : isOm ? "Mallattoo" : "Signature",
-    statusPresent: isAm ? "✓ የተገኙ" : isOm ? "✓ Argame" : "✓ Present",
-    statusAbsent: isAm ? "✗ ያልተገኙ" : isOm ? "✗ Hin argamne" : "✗ Absent",
-
-    footer: isAm
-      ? "በአዲስ መሶብ የአንድ ማዕከል አገልግሎት የተዘጋጀ"
-      : isOm
-        ? "A-MESOB Wiirtuu Tajaajila Iddoo Tokkoo"
-        : "Generated by Addis MESOB One-Stop Service Center",
-    page: isAm ? "ገጽ" : isOm ? "Fuula" : "Page",
-    of: isAm ? "ከ" : isOm ? "keessaa" : "of",
-  };
+  // Default to the hardcoded Amharic dictionary
+  return AM_LABELS;
 }
 
 // ─── EXPORT RECOGNITION CERTIFICATE ────────────────────────
@@ -588,12 +535,8 @@ export const exportBiWeeklyAggregateReportToPDF = (
 };
 
 // ─── FORUM REPORT PDF CONSTANTS ─────────────────────────────
-// The exact substring the ForumReport page prefixes AI-appended text
-// with (see handleApplySuggestion in ForumReport.jsx). Keep in sync.
 const AI_MARKER = "📝 AI Generated Summary:";
 
-// Split explanation into (manual text, ai text). If the marker is not
-// present, ai text is empty and manual is the whole thing.
 const splitExplanationAi = (explanation) => {
   const raw = String(explanation || "");
   const idx = raw.indexOf(AI_MARKER);
@@ -604,32 +547,33 @@ const splitExplanationAi = (explanation) => {
   };
 };
 
-// ─── FORUM REPORT ROW BUILDERS ──────────────────────────────
+// ─── FORUM REPORT: SINGLE MERGED TABLE ROW BUILDER ──────────
+// ONE table, 6 columns:
+//   0 #   |  1 Section  |  2 Details / Name  |  3 Status  |  4 Reason  |  5 Signature
 //
-// These were inlined inside exportForumReportToPDF. Pulled out so the
-// layout function is about layout only, and so the row-shaping logic
-// can be unit-tested without instantiating jsPDF.
-//
-// buildForumContentRows:
-//   Produces the body of Table 1. The Section label appears ONCE per
-//   block (on the first row of the block); subsequent rows of the same
-//   block carry an empty Section cell so nothing repeats.
-//
-// buildForumMemberRows:
-//   Produces the body of Table 2. Present members first (they may carry
-//   a signature image), then absent members. Signature #i is attached
-//   to present member #i.
-function buildForumContentRows(L, formData, includeAI) {
+//   • Content rows (explanation, AI summary, previous results, topics, gaps,
+//     agreements): the "Details" cell spans columns 2–5 (colSpan: 4).
+//   • Member rows (present, then absent): name / status / reason / signature
+//     each fill their own column.
+//   • Numbering is continuous (1..N) across the whole table.
+const FORUM_TABLE_COLS = 6;
+const FORUM_SIGNATURE_COL = 5;
+
+function buildForumRows(L, formData, includeAI) {
   const rows = [];
 
-  const pushSectionBlock = (sectionLabel, entries) => {
+  // Section block with a long "details" cell merged across the right-hand columns.
+  const pushContentBlock = (sectionLabel, entries) => {
     const items = (entries || []).map((e) => encodeText(e)).filter(Boolean);
-    if (items.length === 0) return;
     items.forEach((item, idx) => {
       rows.push([
-        "", // row number filled in by caller
+        "", // row number filled in below
         idx === 0 ? encodeText(sectionLabel) : "",
-        item,
+        {
+          content: item,
+          colSpan: FORUM_TABLE_COLS - 2,
+          styles: { halign: "left" },
+        },
       ]);
     });
   };
@@ -639,58 +583,48 @@ function buildForumContentRows(L, formData, includeAI) {
   );
 
   if (manualExplanation) {
-    pushSectionBlock(L.explanation, [manualExplanation]);
+    pushContentBlock(L.explanation, [manualExplanation]);
   }
   if (includeAI && aiExplanation) {
-    pushSectionBlock(L.aiBlock, [aiExplanation]);
+    pushContentBlock(L.aiBlock, [aiExplanation]);
   }
 
-  pushSectionBlock(
+  pushContentBlock(
     L.secPrevResults,
     (formData?.prevResults || []).filter((r) => r && r.trim()),
   );
 
-  pushSectionBlock(
+  pushContentBlock(
     L.secTopics,
     (formData?.topics || []).filter((tp) => tp && tp.trim()),
   );
 
-  pushSectionBlock(
+  pushContentBlock(
     L.secGaps,
     (formData?.gaps || []).filter((g) => g && g.trim()),
   );
 
-  pushSectionBlock(
+  pushContentBlock(
     L.secAgreements,
     (formData?.agreements || []).filter((a) => a && a.trim()),
   );
 
-  // Number the rows.
-  rows.forEach((row, i) => {
-    row[0] = String(i + 1);
-  });
-
-  return rows;
-}
-
-function buildForumMemberRows(L, formData) {
-  const rows = [];
-
+  // ── Member rows (same table) ──
   const presentMembers = (formData?.present || []).filter((m) => m && m.trim());
   const absentMembers = (formData?.absent || []).filter(
     (i) => i?.name && i.name.trim(),
   );
-
   const signatureEntries = Array.isArray(formData?.signatures)
     ? formData.signatures
     : [];
 
   let sigIdx = 0;
-  presentMembers.forEach((name) => {
+  presentMembers.forEach((name, idx) => {
     const sig = signatureEntries[sigIdx];
     const hasSig = sig && String(sig).startsWith("data:image");
     rows.push([
-      "", // row number filled in by caller
+      "",
+      idx === 0 ? encodeText(L.secPresent) : "",
       encodeText(name),
       encodeText(L.statusPresent),
       "",
@@ -699,9 +633,10 @@ function buildForumMemberRows(L, formData) {
     if (hasSig) sigIdx += 1;
   });
 
-  absentMembers.forEach((entry) => {
+  absentMembers.forEach((entry, idx) => {
     rows.push([
       "",
+      idx === 0 ? encodeText(L.secAbsent) : "",
       encodeText(entry.name),
       encodeText(L.statusAbsent),
       encodeText(entry.reason || ""),
@@ -709,6 +644,7 @@ function buildForumMemberRows(L, formData) {
     ]);
   });
 
+  // Continuous numbering across the whole merged table.
   rows.forEach((row, i) => {
     row[0] = String(i + 1);
   });
@@ -716,28 +652,7 @@ function buildForumMemberRows(L, formData) {
   return rows;
 }
 
-// ─── EXPORT FORUM REPORT (professional two-table layout) ────
-//
-// The forum report has two genuinely different kinds of content and
-// forcing both into one table was the source of every earlier
-// iteration's problems. This version splits them:
-//
-//   • Table 1 — "Session Content". One row per item across
-//     explanation, AI block, prev results, topics, gaps, agreements.
-//     The Section label appears ONCE per block; subsequent rows of
-//     the same block carry an empty Section cell so the label is not
-//     repeated. This is the "no redundant rows" behaviour requested.
-//
-//   • Table 2 — "Members & Signatures". One row per member. Present
-//     and absent members live in the same table, distinguished by the
-//     Status column. Signature images are placed sequentially into
-//     the Signature cell of present members: signature #1 → first
-//     present member, #2 → second, etc. Absent members always get a
-//     blank Signature cell.
-//
-// Pagination is natural: Table 2 begins on page 1 if it fits under
-// Table 1, otherwise it continues on page 2. Both tables carry the
-// same head and body styling, so the split is visually seamless.
+// ─── EXPORT FORUM REPORT (ONE merged table) ─────────────────
 export const exportForumReportToPDF = (
   formData,
   t,
@@ -746,7 +661,7 @@ export const exportForumReportToPDF = (
   options = {},
 ) => {
   try {
-    console.log("📄 Generating Forum Report PDF (two-table layout)...");
+    console.log("📄 Generating Forum Report PDF (single merged table)...");
 
     const hasData =
       formData?.present?.some((m) => m && m.trim() !== "") ||
@@ -762,16 +677,13 @@ export const exportForumReportToPDF = (
       return false;
     }
 
-    // ─── Language: Amharic default, override only via options.language ──
+    // Force Amharic unless explicitly overridden in options
     const reportLang = ["am", "en", "om"].includes(options?.language)
       ? options.language
-      : ["am", "en", "om"].includes(lang)
-        ? lang
-        : "am";
+      : "am";
 
     const L = getForumLabels(reportLang, t);
-
-    const includeAI = options?.includeAI !== false; // default true
+    const includeAI = options?.includeAI !== false;
 
     const doc = new jsPDF({
       orientation: "portrait",
@@ -835,14 +747,7 @@ export const exportForumReportToPDF = (
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 6;
 
-    // ─── Shared table styling ──────────────────────────────────
-    // Every table in this document uses the same head/body sizing so
-    // the two tables read as one continuous report.
-    //
-    // NOTE: the header overflow default is "linebreak" — we rely on
-    // computed column widths (see computeNoWrapColumnWidth) rather than
-    // forcing overflow:"visible", which was the source of the missing
-    // ቁ glyph in an earlier iteration.
+    // ─── Table styling ─────────────────────────────────────────
     const sharedHeadStyles = {
       fillColor: [26, 107, 74],
       textColor: [255, 255, 255],
@@ -868,160 +773,95 @@ export const exportForumReportToPDF = (
       lineColor: [210, 210, 210],
     };
 
-    // Central didParseCell. For header cells we only fix the font and
-    // tighten padding — we never touch text or overflow. That is the
-    // whole fix for the "ተ.ቁ wraps / ቁ disappears" bug.
     const sharedDidParseCell = (data) => {
-      // Signature cells render an image, not text — leave font alone.
       const raw = data.cell.raw;
       if (raw && typeof raw === "object" && raw.__signatureImage) {
         data.cell.text = [""];
         return;
       }
-
-      // Every other cell (header or body): pick the right font. Header
-      // cells additionally get tighter padding so the width we computed
-      // for them isn't eaten by default 2+2mm gutters.
       applySharedHeaderFont(doc, data);
     };
 
-    // ─── Build the two row sets ────────────────────────────────
-    const contentRows = buildForumContentRows(L, formData, includeAI);
-    const memberRows = buildForumMemberRows(L, formData);
+    const tableRows = buildForumRows(L, formData, includeAI);
 
-    // ─── Compute per-language column widths ────────────────────
-    // ተ.ቁ needs more room than "#". Rather than hardcoding 12 or 14mm,
-    // measure the actual label with the actual font and add padding.
-    // This is what prevents the wrap without setting overflow:"visible".
     const noFont = isAmharic(String(L.colNo))
       ? FONT_NAMES.ethiopic
       : FONT_NAMES.latin;
     const noColWidth = computeNoWrapColumnWidth(doc, L.colNo, noFont, 12);
 
-    // ─── Render Table 1 ─────────────────────────────────────────
-    if (contentRows.length > 0) {
-      doc.setFontSize(10);
-      doc.setTextColor(26, 107, 74);
-      drawMixedScriptText(doc, L.t1Title, margin, yPos, { bold: true });
-      doc.setTextColor(0, 0, 0);
-      yPos += 4;
+    // Merged header label for column 2 (item text for content rows, name for member rows)
+    const detailHeader = `${L.colItem} / ${L.colName}`;
 
-      autoTable(doc, {
-        startY: yPos,
-        // Head cells are noWrap-wrapped so the font logic knows to
-        // measure them with the Ethiopic face.
-        head: [[noWrap(L.colNo), noWrap(L.colSection), noWrap(L.colItem)]],
-        body: contentRows,
-        margin: { left: margin, right: margin, bottom: 16 },
-        theme: "grid",
-        headStyles: sharedHeadStyles,
-        bodyStyles: sharedBodyStyles,
-        styles: sharedStyles,
-        columnStyles: {
-          0: { cellWidth: noColWidth, halign: "center" },
-          1: { cellWidth: 42, halign: "left" },
-          2: { cellWidth: "auto", halign: "left" },
-        },
-        didParseCell: sharedDidParseCell,
-      });
-
-      yPos = (doc.lastAutoTable?.finalY || yPos) + 8;
-    }
-
-    // ─── Render Table 2 ─────────────────────────────────────────
-    // If the members table doesn't have at least ~40mm of room left
-    // on the current page, start it on a fresh page. This keeps the
-    // header + first several rows together rather than stranding the
-    // header at the bottom of page 1.
-    if (memberRows.length > 0) {
-      const MIN_TABLE_HEIGHT = 40;
-      if (yPos > pageHeight - MIN_TABLE_HEIGHT - 16) {
-        doc.addPage();
-        yPos = margin;
-      }
-
-      doc.setFontSize(10);
-      doc.setTextColor(26, 107, 74);
-      drawMixedScriptText(doc, L.t2Title, margin, yPos, { bold: true });
-      doc.setTextColor(0, 0, 0);
-      yPos += 4;
-
-      autoTable(doc, {
-        startY: yPos,
-        head: [
-          [
-            noWrap(L.colNo),
-            noWrap(L.colName),
-            noWrap(L.colStatus),
-            noWrap(L.colReason),
-            noWrap(L.colSignature),
-          ],
+    // ─── Render the ONE table ──────────────────────────────────
+    autoTable(doc, {
+      startY: yPos,
+      // Plain strings so jspdf-autotable always renders the header.
+      head: [
+        [
+          L.colNo,
+          L.colSection,
+          detailHeader,
+          L.colStatus,
+          L.colReason,
+          L.colSignature,
         ],
-        body: memberRows,
-        margin: { left: margin, right: margin, bottom: 16 },
-        theme: "grid",
-        headStyles: sharedHeadStyles,
-        bodyStyles: sharedBodyStyles,
-        styles: sharedStyles,
-        columnStyles: {
-          0: { cellWidth: noColWidth, halign: "center" },
-          1: { cellWidth: "auto", halign: "left" },
-          2: { cellWidth: 32, halign: "center" },
-          3: { cellWidth: 40, halign: "left" },
-          4: { cellWidth: 32, halign: "center", minCellHeight: 10 },
-        },
-        didParseCell: sharedDidParseCell,
-        didDrawCell: (data) => {
-          if (data.column.index !== 4) return;
-          const raw = data.row.raw?.[4];
-          if (!raw || typeof raw !== "object" || !raw.__signatureImage) return;
+      ],
+      body: tableRows,
+      margin: { left: margin, right: margin, bottom: 16 },
+      theme: "grid",
+      headStyles: sharedHeadStyles,
+      bodyStyles: sharedBodyStyles,
+      styles: sharedStyles,
+      columnStyles: {
+        0: { cellWidth: noColWidth, halign: "center" },
+        1: { cellWidth: 34, halign: "left" },
+        2: { cellWidth: "auto", halign: "left" },
+        3: { cellWidth: 26, halign: "center" },
+        4: { cellWidth: 32, halign: "left" },
+        5: { cellWidth: 30, halign: "center", minCellHeight: 10 },
+      },
+      didParseCell: sharedDidParseCell,
+      didDrawCell: (data) => {
+        if (data.section !== "body") return;
+        if (data.column.index !== FORUM_SIGNATURE_COL) return;
+        const raw = data.row.raw?.[FORUM_SIGNATURE_COL];
+        if (!raw || typeof raw !== "object" || !raw.__signatureImage) return;
 
+        try {
+          const cell = data.cell;
+          const pad = 1;
+          const boxW = cell.width - pad * 2;
+          const boxH = cell.height - pad * 2;
+          if (boxW <= 0 || boxH <= 0) return;
+
+          let naturalW = 400;
+          let naturalH = 100;
           try {
-            const cell = data.cell;
-            const pad = 1;
-            const boxW = cell.width - pad * 2;
-            const boxH = cell.height - pad * 2;
-            if (boxW <= 0 || boxH <= 0) return;
-
-            // Read natural dimensions to preserve aspect ratio. Falls
-            // back to a 4:1 signature-pad ratio if the reader is
-            // unavailable.
-            let naturalW = 400;
-            let naturalH = 100;
-            try {
-              const props = doc.getImageProperties?.(raw.__signatureImage);
-              if (props?.width && props?.height) {
-                naturalW = props.width;
-                naturalH = props.height;
-              }
-            } catch {
-              // keep fallback
+            const props = doc.getImageProperties?.(raw.__signatureImage);
+            if (props?.width && props?.height) {
+              naturalW = props.width;
+              naturalH = props.height;
             }
-
-            const scale = Math.min(boxW / naturalW, boxH / naturalH);
-            const drawW = naturalW * scale;
-            const drawH = naturalH * scale;
-
-            const drawX = cell.x + (cell.width - drawW) / 2;
-            const drawY = cell.y + (cell.height - drawH) / 2;
-
-            doc.addImage(
-              raw.__signatureImage,
-              "PNG",
-              drawX,
-              drawY,
-              drawW,
-              drawH,
-            );
-          } catch (imgErr) {
-            console.warn(
-              `Could not embed signature #${raw.__index}:`,
-              imgErr.message,
-            );
+          } catch {
+            // keep fallback
           }
-        },
-      });
-    }
+
+          const scale = Math.min(boxW / naturalW, boxH / naturalH);
+          const drawW = naturalW * scale;
+          const drawH = naturalH * scale;
+
+          const drawX = cell.x + (cell.width - drawW) / 2;
+          const drawY = cell.y + (cell.height - drawH) / 2;
+
+          doc.addImage(raw.__signatureImage, "PNG", drawX, drawY, drawW, drawH);
+        } catch (imgErr) {
+          console.warn(
+            `Could not embed signature #${raw.__index}:`,
+            imgErr.message,
+          );
+        }
+      },
+    });
 
     // ─── Footer with page numbers ──────────────────────────────
     const pageCount = doc.internal.getNumberOfPages();
@@ -1062,11 +902,6 @@ export const exportForumReportToPDF = (
 };
 
 // ─── EXPORT DAILY REPORT ─────────────────────────────────────
-// Delegates to the canonical, mixed-script safe implementation in
-// ./pdf/reports/dailyReport.js. This shim exists so older call sites
-// (which import `exportDailyReportToPDF` from this file) keep working.
-// The dailyReport generator is Amharic-first, uses drawMixedScriptText
-// everywhere, and supports all three languages via options.language.
 export const exportDailyReportToPDF = async (rows, date, t, options = {}) => {
   try {
     console.log("📄 Generating Daily Report PDF (delegating)...");
@@ -1076,9 +911,6 @@ export const exportDailyReportToPDF = async (rows, date, t, options = {}) => {
       return false;
     }
 
-    // Pass `t` through as-is; dailyReport.js reads labels from its own
-    // internal LABELS table (already Amharic-first) and uses `options.language`
-    // to pick the language. We forward whatever the caller gave us.
     await generateDailyReportPDF(rows, date, t, options);
 
     showSuccessToast("📄 Daily Report PDF generated successfully!");

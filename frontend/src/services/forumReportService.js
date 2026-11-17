@@ -167,12 +167,31 @@ export const forumReportService = {
   },
 
   // ─── Resume meeting (admin only) ──────────────────────────
+  // Used by admin pages (ForumReportManagement, AdminDataManagement,
+  // ForumReportHistory's admin-only flows).
   resumeMeeting: async (meetingId) => {
     try {
       const response = await api.post(`/meetings/${meetingId}/resume`);
       return response.data;
     } catch (error) {
       console.error("Resume meeting failed:", error);
+      throw error;
+    }
+  },
+
+  // ─── A3 FIX: alias used by ForumReport.jsx ────────────────
+  // ForumReport.jsx's `handleResumeReport` calls
+  // `forumReportService.resumeReport(id)`. The original service
+  // only exposed `resumeMeeting`. Both hit
+  // POST /api/meetings/:id/resume; they are interchangeable.
+  // Keeping both names avoids touching the ~4 call sites that
+  // already reference `resumeMeeting`.
+  resumeReport: async (meetingId) => {
+    try {
+      const response = await api.post(`/meetings/${meetingId}/resume`);
+      return response.data;
+    } catch (error) {
+      console.error("Resume report failed:", error);
       throw error;
     }
   },
