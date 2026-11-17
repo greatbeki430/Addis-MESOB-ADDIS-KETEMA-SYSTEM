@@ -10,10 +10,11 @@
     "generate-fonts": "node scripts/generateFontBase64.js",
     "seed": "node src/scripts/seedServices.js",
     "import-excel": "node src/scripts/importServicesFromExcel.js",
-    "fix-index": "node src/scripts/fixTextIndex.js"
+    "fix-index": "node src/scripts/fixTextIndex.js",
+    "check:routes": "node src/scripts/checkRoutes.js"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": "20.x",
     "npm": ">=9.0.0"
   },
   "dependencies": {

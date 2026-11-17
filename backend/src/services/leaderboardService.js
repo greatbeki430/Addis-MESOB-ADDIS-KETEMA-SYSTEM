@@ -67,6 +67,15 @@ const resolveRange = ({ from, to } = {}) => {
 // the evaluation board reads totals straight off the saved evaluation.
 const CRITERIA_ITEM_COUNT = 15;
 
+// ─── Forum board: which reports count? ─────────────────────
+// false → every report that is not "expired" or "locked" counts
+//         (drafts included). Safe while the page's Save button does not
+//         yet mark reports as "completed".
+// true  → ONLY reports with status "completed" count. Switch this on once
+//         Save Report reliably sets status "completed" (check a saved
+//         report in History: its badge must say Completed, not Draft).
+const FORUM_COUNT_ONLY_COMPLETED = false;
+
 // ─── Evaluation — Teams ────────────────────────────────────
 // A team's score is the average of every member total across every
 // evaluation submitted for that team in the period. Ranks are 1-based,
@@ -250,7 +259,9 @@ const computeEvaluationPersonBoard = async ({
 const computeForumTeamBoard = async ({ from, to, teamFilter = null }) => {
   const matchStage = {
     date: { $gte: from, $lt: to },
-    status: { $nin: ["expired", "locked"] },
+    status: FORUM_COUNT_ONLY_COMPLETED
+      ? "completed"
+      : { $nin: ["expired", "locked"] },
   };
   if (teamFilter) matchStage.team = new mongoose.Types.ObjectId(teamFilter);
 
@@ -302,9 +313,17 @@ const computeForumTeamBoard = async ({ from, to, teamFilter = null }) => {
     b.attendeesSum += presentCount;
     if (presentCount > b.attendeesMax) b.attendeesMax = presentCount;
 
+    // The team size is known before this loop, so the "absent" section can
+    // be scored fairly: it counts as filled when there are absences OR when
+    // everyone on the team attended (nothing to list). Perfect attendance
+    // must not lose 1/8 of the completeness score.
+    const teamSize = teamSizeById.get(teamId) || 0;
+    const absentCount = Array.isArray(m.absent) ? m.absent.length : 0;
+
     let filled = 0;
     if (presentCount > 0) filled += 1;
-    if (Array.isArray(m.absent) && m.absent.length > 0) filled += 1;
+    if (absentCount > 0 || (teamSize > 0 && presentCount >= teamSize))
+      filled += 1;
     if (Array.isArray(m.prevResults) && m.prevResults.length > 0) filled += 1;
     if (Array.isArray(m.topics) && m.topics.length > 0) filled += 1;
     if (m.explanation && m.explanation.trim().length > 0) filled += 1;
