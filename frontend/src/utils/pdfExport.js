@@ -15,6 +15,7 @@ import { loadFonts, FONT_NAMES } from "./pdf/fontLoader";
 import { isAmharic } from "./pdf/language";
 import { drawMixedScriptText } from "./pdf/pdfHelpers";
 import { generateDailyReportPDF } from "./pdf/reports/dailyReport";
+import { formatEthiopianDate } from "./ethiopianDate"; // ✅ Imported for E.C. date
 
 // ─── ETHIOPIAN CALENDAR HELPERS ─────────────────────────────
 const ETHIOPIAN_MONTHS_AM = [
@@ -712,14 +713,16 @@ export const exportForumReportToPDF = (
       yPos += 5;
     }
 
+    // ✅ Ethiopian Calendar Conversion
     const dateText = formData?.date || new Date().toISOString().split("T")[0];
+    const ethDateText = formatEthiopianDate(dateText, "am");
     const timeText =
       formData?.timeStart || formData?.timeEnd
         ? `${formatTime(formData.timeStart)} - ${formatTime(formData.timeEnd)}`
         : "___ - ___";
 
     doc.setFontSize(9);
-    const metaLine = `${L.date}: ${dateText}    |    ${L.time}: ${timeText}`;
+    const metaLine = `${L.date}: ${ethDateText} (${dateText})    |    ${L.time}: ${timeText}`;
     drawMixedScriptText(doc, metaLine, margin, yPos);
     yPos += 5;
 
@@ -817,12 +820,13 @@ export const exportForumReportToPDF = (
           doc.line(x + width, y, x + width, y + height); // right
 
           // ✅ 2. ERASE INNER HORIZONTAL LINES FOR MERGED CELLS
+          let isRowSpanned = false;
           if (
             data.section === "body" &&
             (data.column.index === 0 || data.column.index === 1)
           ) {
             const raw = data.cell.raw;
-            const isRowSpanned =
+            isRowSpanned =
               raw && typeof raw === "object" && raw.rowSpan && raw.rowSpan > 1;
 
             if (isRowSpanned) {
