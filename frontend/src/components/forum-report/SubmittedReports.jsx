@@ -182,7 +182,8 @@ export default function SubmittedReports({ tf, t, lang }) {
   const rep = open?.report;
 
   return (
-    <div style={{ marginTop: 36 }}>
+    <div>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div
         style={{
           display: "flex",
@@ -314,7 +315,17 @@ export default function SubmittedReports({ tf, t, lang }) {
           </div>
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            maxHeight: "calc(100vh - 330px)",
+            minHeight: 200,
+            overflowY: "auto",
+            padding: "2px 6px 8px 2px",
+          }}
+        >
           {filtered.map((r) => (
             <div
               key={r._id}

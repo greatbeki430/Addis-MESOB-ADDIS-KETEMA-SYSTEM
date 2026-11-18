@@ -144,61 +144,56 @@ const TeamSelector = ({
   );
 
   return (
-    <div
-      style={{
-        maxWidth: "700px",
-        margin: "0 auto",
-        padding: "clamp(24px, 5vw, 48px)",
-        animation: "fadeInUp 0.6s ease",
-      }}
-    >
+    <div style={{ animation: "fadeInUp 0.6s ease" }}>
       <div
         style={{
-          textAlign: "center",
-          marginBottom: "clamp(28px, 5vw, 40px)",
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          marginBottom: 18,
         }}
       >
         <div
           style={{
-            width: "clamp(60px, 10vw, 90px)",
-            height: "clamp(60px, 10vw, 90px)",
-            background: `linear-gradient(145deg, ${C.primary}20, ${C.primary}08)`,
-            borderRadius: "50%",
+            width: 48,
+            height: 48,
+            background: `linear-gradient(145deg, ${C.primary}22, ${C.primary}08)`,
+            borderRadius: 14,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            margin: "0 auto 18px",
-            fontSize: "clamp(32px, 8vw, 48px)",
-            boxShadow: `0 8px 32px ${C.primary}22`,
+            flexShrink: 0,
+            boxShadow: `0 6px 20px ${C.primary}22`,
           }}
         >
-          <FiMessageSquare size={36} color={C.primary} />
+          <FiMessageSquare size={24} color={C.primary} />
         </div>
-        <h2
-          style={{
-            fontSize: FONT_SIZES.h1,
-            fontWeight: 800,
-            color: C.dark,
-            fontFamily: F.serif,
-            marginBottom: 8,
-            letterSpacing: "-0.02em",
-          }}
-        >
-          {t.selectTeamPrompt || "Select a Team"}
-        </h2>
-        <p
-          style={{
-            fontSize: FONT_SIZES.body,
-            color: C.muted,
-            fontFamily: F.sans,
-            maxWidth: "500px",
-            margin: "0 auto",
-            lineHeight: 1.6,
-          }}
-        >
-          {t.selectTeamHelper ||
-            "Choose a team from the list below to start or view their forum report"}
-        </p>
+        <div style={{ minWidth: 0 }}>
+          <h2
+            style={{
+              fontSize: FONT_SIZES.h2,
+              fontWeight: 800,
+              color: C.dark,
+              fontFamily: F.serif,
+              margin: 0,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            {t.selectTeamPrompt || "Select a Team"}
+          </h2>
+          <p
+            style={{
+              fontSize: FONT_SIZES.small,
+              color: C.muted,
+              fontFamily: F.sans,
+              margin: "2px 0 0",
+              lineHeight: 1.5,
+            }}
+          >
+            {t.selectTeamHelper ||
+              "Choose a team to start or view their forum report"}
+          </p>
+        </div>
       </div>
 
       <div style={{ position: "relative", marginBottom: 20 }}>
@@ -281,8 +276,12 @@ const TeamSelector = ({
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-            gap: 14,
+            gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
+            gap: 12,
+            maxHeight: "calc(100vh - 330px)",
+            minHeight: 200,
+            overflowY: "auto",
+            padding: "4px 6px 8px 2px",
           }}
         >
           {filteredTeams.map((team) => (
@@ -2898,20 +2897,46 @@ ${"=".repeat(50)}
 
   // ─── No team selected: team list + Submitted Reports ───────
   if (!selectedTeam) {
+    // Two panels side by side (stack on narrow screens via auto-fit grid).
+    const panel = {
+      background: "linear-gradient(180deg, #ffffff, #fafbff)",
+      border: `1px solid ${C.border}`,
+      borderRadius: 20,
+      padding: "clamp(16px, 2.5vw, 28px)",
+      boxShadow: shadows.md,
+      minWidth: 0,
+    };
     return (
-      <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
-        <TeamSelector
-          teams={teams}
-          selectedTeam={selectedTeam}
-          setSelectedTeam={setSelectedTeam}
-          lang={currentLang}
-          loading={loadingTeams}
-        />
+      <div
+        style={{
+          maxWidth: "1320px",
+          margin: "0 auto",
+          padding: "clamp(12px, 3vw, 28px)",
+          display: "grid",
+          gridTemplateColumns:
+            "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
+          gap: "clamp(14px, 2.5vw, 28px)",
+          alignItems: "start",
+        }}
+      >
         <div
           style={{
-            maxWidth: 700,
-            margin: "0 auto",
-            padding: "0 clamp(24px, 5vw, 48px) 48px",
+            ...panel,
+            borderTop: `4px solid ${C.primary}`,
+          }}
+        >
+          <TeamSelector
+            teams={teams}
+            selectedTeam={selectedTeam}
+            setSelectedTeam={setSelectedTeam}
+            lang={currentLang}
+            loading={loadingTeams}
+          />
+        </div>
+        <div
+          style={{
+            ...panel,
+            borderTop: `4px solid ${C.gold || C.primary}`,
           }}
         >
           <SubmittedReports tf={tf} t={t} lang={currentLang} />
