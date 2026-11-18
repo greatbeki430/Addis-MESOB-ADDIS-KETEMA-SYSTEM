@@ -90,8 +90,6 @@ const formatTime = (timeStr) => {
 const HEADER_FONT_SIZE = 8.5;
 
 function pickFontFor(doc, raw) {
-  // Cells that use colSpan arrive as { content, colSpan } objects, so read
-  // the text from `.content` instead of stringifying the object.
   const text = String(
     raw && typeof raw === "object" ? (raw.content ?? "") : (raw ?? ""),
   );
@@ -124,11 +122,10 @@ function computeNoWrapColumnWidth(doc, label, fontName, minMm = 12) {
 }
 
 function applySharedHeaderFont(doc, data) {
-  if (!data?.cell || !data.cell.styles) return; // ✅ guard
+  if (!data?.cell || !data.cell.styles) return;
 
   const raw = data.cell.raw;
 
-  // Signature cells render an image, not text — leave font alone.
   if (raw && typeof raw === "object" && raw.__signatureImage) {
     data.cell.text = [""];
     return;
@@ -138,7 +135,6 @@ function applySharedHeaderFont(doc, data) {
     return;
   }
 
-  // ✅ use plural `.styles` only — `.style` is undefined in autotable
   const font = pickFontFor(doc, raw);
   data.cell.styles.font = font;
   data.cell.styles.cellPadding = {
@@ -150,9 +146,6 @@ function applySharedHeaderFont(doc, data) {
 }
 
 // ─── FORUM REPORT LABELS (HARDCODED AMHARIC) ─────────────────
-// This guarantees the PDF is ALWAYS in Amharic, regardless of what
-// is passed in `t`. If you ever want to support en/om again, you
-// can expand this object.
 const AM_LABELS = {
   title: "የአቻ ፎረም ሪፖርት",
   subtitle: "በአዲስ አበባ ከተማ አስተዳደር አዲስ መሶብ · አዲስ ከተማ ማዕከል",
@@ -185,7 +178,6 @@ const AM_LABELS = {
 };
 
 function getForumLabels(lang, t) {
-  // Default strictly to Amharic for the forum report
   if (lang === "en" || lang === "om") {
     const tf = (key, fallback) => t?.forum?.[key] || fallback;
     const isOm = lang === "om";
@@ -240,8 +232,6 @@ function getForumLabels(lang, t) {
       of: isOm ? "keessaa" : "of",
     };
   }
-
-  // Default to the hardcoded Amharic dictionary
   return AM_LABELS;
 }
 
@@ -259,16 +249,12 @@ export const exportRecognitionCertificateToPDF = (
       unit: "mm",
       format: "a4",
     });
-
     loadFonts(doc);
-
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 20;
-
     const isAm = lang === "am";
     const isOm = lang === "om";
-
     const L = {
       title: isAm
         ? "የእውቅና ሰርተፍኬት"
@@ -294,7 +280,6 @@ export const exportRecognitionCertificateToPDF = (
     doc.setDrawColor(26, 107, 74);
     doc.setLineWidth(1.5);
     doc.rect(margin, margin, pageWidth - margin * 2, pageHeight - margin * 2);
-
     doc.setLineWidth(0.5);
     doc.rect(
       margin + 3,
@@ -372,16 +357,13 @@ export const exportRecognitionCertificateToPDF = (
       day: "numeric",
     });
     doc.setFontSize(8);
-    drawMixedScriptText(doc, gregDate, leftX, lineY - 3, {
-      align: "center",
-    });
+    drawMixedScriptText(doc, gregDate, leftX, lineY - 3, { align: "center" });
 
     const safeName = String(employeeName || "certificate").replace(
       /[^a-z0-9]/gi,
       "_",
     );
     doc.save(`certificate_${safeName}.pdf`);
-
     showSuccessToast("📄 Certificate PDF generated successfully!");
     return true;
   } catch (error) {
@@ -404,23 +386,18 @@ export const exportBiWeeklyAggregateReportToPDF = (
       showErrorToast("No data to export.");
       return false;
     }
-
     const doc = new jsPDF({
       orientation: "portrait",
       unit: "mm",
       format: "a4",
     });
-
     loadFonts(doc);
-
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
     let yPos = margin;
-
     const isAm = lang === "am";
     const isOm = lang === "om";
-
     const L = {
       title: isAm
         ? "የሁለት ሳምንት ሪፖርት"
@@ -454,7 +431,6 @@ export const exportBiWeeklyAggregateReportToPDF = (
     });
     doc.setTextColor(0, 0, 0);
     yPos += 8;
-
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
     drawMixedScriptText(doc, L.subtitle, pageWidth / 2, yPos, {
@@ -471,7 +447,6 @@ export const exportBiWeeklyAggregateReportToPDF = (
       });
       yPos += 7;
     }
-
     const periodText = `${L.period}: ${startDate || "—"} — ${endDate || "—"}`;
     doc.setFontSize(10);
     drawMixedScriptText(doc, periodText, pageWidth / 2, yPos, {
@@ -514,7 +489,6 @@ export const exportBiWeeklyAggregateReportToPDF = (
     });
 
     yPos = doc.lastAutoTable?.finalY + 10 || yPos + 40;
-
     const pageCount = doc.internal.getNumberOfPages();
     const footerY = pageHeight - 10;
 
@@ -523,7 +497,6 @@ export const exportBiWeeklyAggregateReportToPDF = (
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.3);
       doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
-
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
       drawMixedScriptText(doc, L.footer, pageWidth / 2, footerY, {
@@ -541,7 +514,6 @@ export const exportBiWeeklyAggregateReportToPDF = (
 
     const safeStart = String(startDate || "start").replace(/\//g, "-");
     doc.save(`biweekly_report_${safeStart}.pdf`);
-
     showSuccessToast("📄 Bi-Weekly Report PDF generated successfully!");
     return true;
   } catch (error) {
@@ -553,7 +525,6 @@ export const exportBiWeeklyAggregateReportToPDF = (
 
 // ─── FORUM REPORT PDF CONSTANTS ─────────────────────────────
 const AI_MARKER = "📝 AI Generated Summary:";
-
 const splitExplanationAi = (explanation) => {
   const raw = String(explanation || "");
   const idx = raw.indexOf(AI_MARKER);
@@ -564,35 +535,24 @@ const splitExplanationAi = (explanation) => {
   };
 };
 
-// ─── FORUM REPORT: SINGLE MERGED TABLE ROW BUILDER ──────────
-// ONE table, 6 columns:
-//   0 #   |  1 Section  |  2 Details / Name  |  3 Status  |  4 Reason  |  5 Signature
-//
-//   • Content rows (explanation, AI summary, previous results, topics, gaps,
-//     agreements): the "Details" cell spans columns 2–5 (colSpan: 4).
-//   • Member rows (present, then absent): name / status / reason / signature
-//     each fill their own column.
-//   • Numbering is continuous (1..N) across the whole table.
 const FORUM_TABLE_COLS = 6;
 const FORUM_SIGNATURE_COL = 5;
 
 function buildForumRows(L, formData, includeAI) {
   const rows = [];
-  let sectionNumber = 1; // ✅ Increments only per section
+  let sectionNumber = 1;
 
-  // Helper to push a block with rowSpan for the first 2 columns
   const pushContentBlock = (sectionLabel, entries) => {
     const items = (entries || []).map((e) => encodeText(e)).filter(Boolean);
     if (items.length === 0) return;
-
     const rowCount = items.length;
 
     items.forEach((item, idx) => {
       rows.push([
-        idx === 0 ? String(sectionNumber) : "", // No. only on first row
+        idx === 0 ? String(sectionNumber) : "",
         idx === 0
           ? { content: encodeText(sectionLabel), rowSpan: rowCount }
-          : "", // RowSpan Section
+          : "",
         {
           content: item,
           colSpan: FORUM_TABLE_COLS - 2,
@@ -606,35 +566,25 @@ function buildForumRows(L, formData, includeAI) {
   const { manual: manualExplanation, ai: aiExplanation } = splitExplanationAi(
     formData?.explanation,
   );
-
-  if (manualExplanation) {
-    pushContentBlock(L.explanation, [manualExplanation]);
-  }
-  if (includeAI && aiExplanation) {
-    pushContentBlock(L.aiBlock, [aiExplanation]);
-  }
-
+  if (manualExplanation) pushContentBlock(L.explanation, [manualExplanation]);
+  if (includeAI && aiExplanation) pushContentBlock(L.aiBlock, [aiExplanation]);
   pushContentBlock(
     L.secPrevResults,
     (formData?.prevResults || []).filter((r) => r && r.trim()),
   );
-
   pushContentBlock(
     L.secTopics,
     (formData?.topics || []).filter((tp) => tp && tp.trim()),
   );
-
   pushContentBlock(
     L.secGaps,
     (formData?.gaps || []).filter((g) => g && g.trim()),
   );
-
   pushContentBlock(
     L.secAgreements,
     (formData?.agreements || []).filter((a) => a && a.trim()),
   );
 
-  // ── Member rows ──
   const presentMembers = (formData?.present || []).filter((m) => m && m.trim());
   const absentMembers = (formData?.absent || []).filter(
     (i) => i?.name && i.name.trim(),
@@ -643,7 +593,6 @@ function buildForumRows(L, formData, includeAI) {
     ? formData.signatures
     : [];
 
-  // Present members block
   if (presentMembers.length > 0) {
     const rowCount = presentMembers.length;
     let sigIdx = 0;
@@ -667,7 +616,6 @@ function buildForumRows(L, formData, includeAI) {
     sectionNumber++;
   }
 
-  // Absent members block
   if (absentMembers.length > 0) {
     const rowCount = absentMembers.length;
     absentMembers.forEach((entry, idx) => {
@@ -684,11 +632,10 @@ function buildForumRows(L, formData, includeAI) {
     });
     sectionNumber++;
   }
-
   return rows;
 }
 
-// ─── EXPORT FORUM REPORT (ONE merged table) ─────────────────
+// ─── EXPORT FORUM REPORT ─────────────────
 export const exportForumReportToPDF = (
   formData,
   t,
@@ -713,11 +660,9 @@ export const exportForumReportToPDF = (
       return false;
     }
 
-    // Force Amharic unless explicitly overridden in options
     const reportLang = ["am", "en", "om"].includes(options?.language)
       ? options.language
       : "am";
-
     const L = getForumLabels(reportLang, t);
     const includeAI = options?.includeAI !== false;
 
@@ -726,7 +671,6 @@ export const exportForumReportToPDF = (
       unit: "mm",
       format: "a4",
     });
-
     doc.setProperties({
       title: options?.title || L.title,
       author: options?.author || teamName || "A-MESOB",
@@ -769,13 +713,10 @@ export const exportForumReportToPDF = (
     }
 
     const dateText = formData?.date || new Date().toISOString().split("T")[0];
-
-    // ── RESTORE 3: time display via formatTime (renders "___" when unset) ──
     const timeText =
       formData?.timeStart || formData?.timeEnd
         ? `${formatTime(formData.timeStart)} - ${formatTime(formData.timeEnd)}`
         : "___ - ___";
-    // ── end RESTORE 3 (usage)
 
     doc.setFontSize(9);
     const metaLine = `${L.date}: ${dateText}    |    ${L.time}: ${timeText}`;
@@ -814,8 +755,8 @@ export const exportForumReportToPDF = (
     };
 
     const sharedDidParseCell = (data) => {
-      if (!data?.cell || !data.cell.styles) return; // ✅ guard
-
+      if (!data?.cell || !data.cell.styles) return;
+      data.cell.styles.valign = "middle"; // ✅ Fixes text alignment in rowSpanned cells
       const raw = data.cell.raw;
       if (
         raw &&
@@ -829,19 +770,15 @@ export const exportForumReportToPDF = (
     };
 
     const tableRows = buildForumRows(L, formData, includeAI);
-
     const noFont = isAmharic(String(L.colNo))
       ? FONT_NAMES.ethiopic
       : FONT_NAMES.latin;
     const noColWidth = computeNoWrapColumnWidth(doc, L.colNo, noFont, 12);
-
-    // Merged header label for column 2 (item text for content rows, name for member rows)
     const detailHeader = `${L.colItem} / ${L.colName}`;
 
     // ─── Render the ONE table ──────────────────────────────────
     autoTable(doc, {
       startY: yPos,
-      // Plain strings so jspdf-autotable always renders the header.
       head: [
         [
           L.colNo,
@@ -854,7 +791,7 @@ export const exportForumReportToPDF = (
       ],
       body: tableRows,
       margin: { left: margin, right: margin, bottom: 16 },
-      theme: "grid",
+      theme: "plain", // ✅ Custom borders to handle rowSpan perfectly
       headStyles: sharedHeadStyles,
       bodyStyles: sharedBodyStyles,
       styles: sharedStyles,
@@ -868,40 +805,40 @@ export const exportForumReportToPDF = (
       },
       didParseCell: sharedDidParseCell,
       didDrawCell: (data) => {
-        // ✅ ERASE HORIZONTAL BORDERS FOR MERGED CELLS (Cols 0 & 1)
-        if (
-          data.section === "body" &&
-          (data.column.index === 0 || data.column.index === 1)
-        ) {
-          const raw = data.cell.raw;
-          const isRowSpanned =
-            raw && typeof raw === "object" && raw.rowSpan && raw.rowSpan > 1;
+        // ✅ 1. DRAW CUSTOM BORDERS
+        if (data.section === "body" || data.section === "head") {
+          doc.setDrawColor(210, 210, 210);
+          doc.setLineWidth(0.1);
+          const { x, y, width, height } = data.cell;
 
-          if (isRowSpanned) {
-            // Erase the bottom line of the merged cell
-            doc.setDrawColor(255, 255, 255);
-            doc.setLineWidth(0.5);
-            doc.line(
-              data.cell.x,
-              data.cell.y + data.cell.height,
-              data.cell.x + data.cell.width,
-              data.cell.y + data.cell.height,
-            );
+          doc.line(x, y, x + width, y); // top
+          doc.line(x, y + height, x + width, y + height); // bottom
+          doc.line(x, y, x, y + height); // left
+          doc.line(x + width, y, x + width, y + height); // right
 
-            // Redraw the right border of the merged cell so it connects properly
-            doc.setDrawColor(210, 210, 210);
-            doc.setLineWidth(0.1);
-            doc.line(
-              data.cell.x + data.cell.width,
-              data.cell.y,
-              data.cell.x + data.cell.width,
-              data.cell.y + data.cell.height,
-            );
+          // ✅ 2. ERASE INNER HORIZONTAL LINES FOR MERGED CELLS
+          if (
+            data.section === "body" &&
+            (data.column.index === 0 || data.column.index === 1)
+          ) {
+            const raw = data.cell.raw;
+            const isRowSpanned =
+              raw && typeof raw === "object" && raw.rowSpan && raw.rowSpan > 1;
+
+            if (isRowSpanned) {
+              doc.setDrawColor(255, 255, 255); // White to erase
+              doc.setLineWidth(0.5);
+              doc.line(x + 0.1, y + height, x + width - 0.1, y + height);
+            }
           }
-          // If it's not the spanned cell, but an empty cell below it, erase its bottom line too
-          if (!isRowSpanned && data.cell.raw === "") {
+
+          // Erase empty cell bottom borders under merged blocks
+          if (
+            data.section === "body" &&
+            !isRowSpanned &&
+            data.cell.raw === ""
+          ) {
             const rowData = data.row.raw;
-            // Check if the first cell of this row block has a rowSpan
             if (
               rowData[0] === "" ||
               (rowData[1] &&
@@ -910,17 +847,12 @@ export const exportForumReportToPDF = (
             ) {
               doc.setDrawColor(255, 255, 255);
               doc.setLineWidth(0.5);
-              doc.line(
-                data.cell.x,
-                data.cell.y + data.cell.height,
-                data.cell.x + data.cell.width,
-                data.cell.y + data.cell.height,
-              );
+              doc.line(x + 0.1, y + height, x + width - 0.1, y + height);
             }
           }
         }
 
-        // --- Existing signature logic below ---
+        // ✅ 3. SIGNATURE LOGIC
         if (data.section !== "body") return;
         if (data.column.index !== FORUM_SIGNATURE_COL) return;
         const raw = data.row.raw?.[FORUM_SIGNATURE_COL];
@@ -958,14 +890,11 @@ export const exportForumReportToPDF = (
               naturalW = props.width;
               naturalH = props.height;
             }
-          } catch {
-            // keep fallback
-          }
+          } catch {}
 
           const scale = Math.min(boxW / naturalW, boxH / naturalH);
           const drawW = naturalW * scale;
           const drawH = naturalH * scale;
-
           const drawX = cell.x + (cell.width - drawW) / 2;
           const drawY = cell.y + (cell.height - drawH) / 2;
 
@@ -991,13 +920,8 @@ export const exportForumReportToPDF = (
 
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
-
-      // ── RESTORE 1: include Ethiopian date in the footer ──
       const footerLeft = `Generated by Addis MESOB One-Stop Service Center · ${getEthiopianDate()}`;
-      drawMixedScriptText(doc, footerLeft, margin, footerY, {
-        align: "left",
-      });
-      // ── end RESTORE 1
+      drawMixedScriptText(doc, footerLeft, margin, footerY, { align: "left" });
 
       drawMixedScriptText(
         doc,
@@ -1026,14 +950,11 @@ export const exportForumReportToPDF = (
 export const exportDailyReportToPDF = async (rows, date, t, options = {}) => {
   try {
     console.log("📄 Generating Daily Report PDF (delegating)...");
-
     if (!rows || rows.length === 0) {
       showErrorToast("No data to export. Please add some data first.");
       return false;
     }
-
     await generateDailyReportPDF(rows, date, t, options);
-
     showSuccessToast("📄 Daily Report PDF generated successfully!");
     return true;
   } catch (error) {
@@ -1059,7 +980,6 @@ export const exportEvaluationReportToPDF = (
 ) => {
   try {
     console.log("📄 Generating Evaluation Report PDF...");
-
     if (!members || members.length === 0) {
       showErrorToast("No members to evaluate. Please add some members first.");
       return false;
@@ -1070,9 +990,7 @@ export const exportEvaluationReportToPDF = (
       unit: "mm",
       format: "a4",
     });
-
     loadFonts(doc);
-
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
@@ -1166,6 +1084,7 @@ export const exportEvaluationReportToPDF = (
         : comment
           ? "📝 አስተያየት"
           : "⏳ በመጠበቅ ላይ";
+
       return [
         idx + 1,
         encodeText(m.name),
@@ -1205,7 +1124,7 @@ export const exportEvaluationReportToPDF = (
       rowHeight: 16,
       styles: { font: FONT_NAMES.ethiopic, overflow: "linebreak" },
       didParseCell: (cellData) => {
-        if (!cellData?.cell || !cellData.cell.styles) return; // ✅ guard
+        if (!cellData?.cell || !cellData.cell.styles) return;
         const raw =
           typeof cellData.cell.raw === "string" ? cellData.cell.raw : "";
         cellData.cell.styles.font = isAmharic(raw)
@@ -1274,7 +1193,6 @@ export const exportEvaluationReportToPDF = (
     });
 
     yPos = doc.lastAutoTable?.finalY + 12 || yPos + 20;
-
     const FOOTER_RESERVED = 24;
 
     if (bestPerformer) {
@@ -1285,7 +1203,6 @@ export const exportEvaluationReportToPDF = (
                 sortedMembers.length,
             )
           : 0;
-
       const cardH = 26;
       if (yPos + cardH > pageHeight - FOOTER_RESERVED) {
         doc.addPage();
@@ -1339,7 +1256,6 @@ export const exportEvaluationReportToPDF = (
         cardY + 19,
         { align: "right" },
       );
-
       doc.setTextColor(0, 0, 0);
       yPos = cardY + cardH + 10;
     }
@@ -1353,7 +1269,6 @@ export const exportEvaluationReportToPDF = (
         .replace(/\/\d+\/points\//g, "")
         .replace(/\s{2,}/g, " ")
         .trim();
-
       cleanNarrative = encodeText(cleanNarrative);
 
       doc.setFont(FONT_NAMES.ethiopic, "normal");
@@ -1378,6 +1293,7 @@ export const exportEvaluationReportToPDF = (
       drawMixedScriptText(doc, "Performance Analysis Summary", margin, yPos);
       doc.setTextColor(0, 0, 0);
       yPos += 10;
+
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.3);
       doc.line(margin, yPos, pageWidth - margin, yPos);
@@ -1421,7 +1337,6 @@ export const exportEvaluationReportToPDF = (
       doc.setDrawColor(200, 200, 200);
       doc.setLineWidth(0.3);
       doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
-
       doc.setFontSize(8);
       doc.setTextColor(100, 100, 100);
 
