@@ -10,6 +10,7 @@
 // only chooses which query to send.
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { meetingAPI } from "../../services/api";
 import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
@@ -417,173 +418,181 @@ export default function SubmittedReports({ tf, t, lang }) {
         </div>
       )}
 
-      {open && (
-        <div
-          onClick={() => setOpen(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(13,26,94,0.6)",
-            zIndex: 1000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 16,
-          }}
-        >
+      {open &&
+        createPortal(
           <div
-            onClick={(e) => e.stopPropagation()}
+            onClick={() => setOpen(null)}
             style={{
-              background: "#fff",
-              borderRadius: radius.xl,
-              width: "100%",
-              maxWidth: 680,
-              maxHeight: "88vh",
-              overflowY: "auto",
-              padding: 22,
+              position: "fixed",
+              inset: 0,
+              background: "rgba(13,26,94,0.6)",
+              zIndex: 9999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: 16,
             }}
           >
             <div
+              onClick={(e) => e.stopPropagation()}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                marginBottom: 12,
+                background: "#fff",
+                borderRadius: radius.xl,
+                width: "100%",
+                maxWidth: 680,
+                maxHeight: "88vh",
+                overflowY: "auto",
+                padding: 22,
               }}
             >
-              <h3
+              <div
                 style={{
-                  margin: 0,
-                  flex: 1,
-                  fontFamily: F.serif,
-                  color: C.dark,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 12,
                 }}
               >
-                {rep?.teamName}
-              </h3>
-              {!open.loading && (
-                <button
-                  onClick={() => exportPdf(rep)}
+                <h3
                   style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 5,
-                    border: `1px solid ${C.border}`,
-                    background: "#fff",
-                    borderRadius: 8,
-                    padding: "6px 12px",
-                    fontSize: 12,
-                    fontWeight: 700,
+                    margin: 0,
+                    flex: 1,
+                    fontFamily: F.serif,
+                    color: C.dark,
+                  }}
+                >
+                  {rep?.teamName}
+                </h3>
+                {!open.loading && (
+                  <button
+                    onClick={() => exportPdf(rep)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      border: `1px solid ${C.border}`,
+                      background: "#fff",
+                      borderRadius: 8,
+                      padding: "6px 12px",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <FiDownload size={13} /> PDF
+                  </button>
+                )}
+                <button
+                  onClick={() => setOpen(null)}
+                  aria-label="Close"
+                  style={{
+                    border: "none",
+                    background: "transparent",
                     cursor: "pointer",
                   }}
                 >
-                  <FiDownload size={13} /> PDF
+                  <FiX size={18} />
                 </button>
-              )}
-              <button
-                onClick={() => setOpen(null)}
-                aria-label="Close"
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  cursor: "pointer",
-                }}
-              >
-                <FiX size={18} />
-              </button>
-            </div>
-            {open.loading ? (
-              <div style={{ textAlign: "center", padding: 30 }}>
-                <FiLoader
-                  size={22}
-                  style={{ animation: "spin 1s linear infinite" }}
-                />
               </div>
-            ) : (
-              <>
-                <div style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}>
-                  {fmt(rep.date)} · {rep.timeStart || "—"}–{rep.timeEnd || "—"}{" "}
-                  · {rep.createdByName || rep.createdBy?.name || "—"}
+              {open.loading ? (
+                <div style={{ textAlign: "center", padding: 30 }}>
+                  <FiLoader
+                    size={22}
+                    style={{ animation: "spin 1s linear infinite" }}
+                  />
                 </div>
-                <Block
-                  title={tf("presentMembers", "Present Members")}
-                  items={rep.present}
-                />
-                <Block
-                  title={tf("absentMembers", "Absent Members & Reasons")}
-                  items={(rep.absent || []).map(
-                    (a) => `${a.name}${a.reason ? ` — ${a.reason}` : ""}`,
-                  )}
-                />
-                <Block
-                  title={tf("prevResults", "Results from Previous Meeting")}
-                  items={rep.prevResults}
-                />
-                <Block
-                  title={tf("todayTopics", "Today's Discussion Topics")}
-                  items={rep.topics}
-                />
-                <Block
-                  title={tf("explanation", "Explanation Given (Brief)")}
-                  items={rep.explanation}
-                />
-                <Block title={tf("gaps", "Identified Gaps")} items={rep.gaps} />
-                <Block
-                  title={tf("agreements", "Agreed Points")}
-                  items={rep.agreements}
-                />
-                {(rep.signatureData || []).length > 0 && (
-                  <div>
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        fontSize: 12,
-                        color: C.primary,
-                        marginBottom: 6,
-                      }}
-                    >
-                      {tf("signatures", "Signatures")}
-                    </div>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns:
-                          "repeat(auto-fill, minmax(150px, 1fr))",
-                        gap: 8,
-                      }}
-                    >
-                      {rep.signatureData.map((s) => (
-                        <div
-                          key={s.key}
-                          style={{
-                            border: `1px solid ${C.border}`,
-                            borderRadius: 8,
-                            padding: 6,
-                            textAlign: "center",
-                          }}
-                        >
-                          <img
-                            src={s.image}
-                            alt={s.name}
-                            style={{
-                              width: "100%",
-                              height: 44,
-                              objectFit: "contain",
-                            }}
-                          />
-                          <div style={{ fontSize: 11, fontWeight: 600 }}>
-                            {s.name}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+              ) : (
+                <>
+                  <div
+                    style={{ fontSize: 12, color: C.muted, marginBottom: 14 }}
+                  >
+                    {fmt(rep.date)} · {rep.timeStart || "—"}–
+                    {rep.timeEnd || "—"} ·{" "}
+                    {rep.createdByName || rep.createdBy?.name || "—"}
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      )}
+                  <Block
+                    title={tf("presentMembers", "Present Members")}
+                    items={rep.present}
+                  />
+                  <Block
+                    title={tf("absentMembers", "Absent Members & Reasons")}
+                    items={(rep.absent || []).map(
+                      (a) => `${a.name}${a.reason ? ` — ${a.reason}` : ""}`,
+                    )}
+                  />
+                  <Block
+                    title={tf("prevResults", "Results from Previous Meeting")}
+                    items={rep.prevResults}
+                  />
+                  <Block
+                    title={tf("todayTopics", "Today's Discussion Topics")}
+                    items={rep.topics}
+                  />
+                  <Block
+                    title={tf("explanation", "Explanation Given (Brief)")}
+                    items={rep.explanation}
+                  />
+                  <Block
+                    title={tf("gaps", "Identified Gaps")}
+                    items={rep.gaps}
+                  />
+                  <Block
+                    title={tf("agreements", "Agreed Points")}
+                    items={rep.agreements}
+                  />
+                  {(rep.signatureData || []).length > 0 && (
+                    <div>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: 12,
+                          color: C.primary,
+                          marginBottom: 6,
+                        }}
+                      >
+                        {tf("signatures", "Signatures")}
+                      </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns:
+                            "repeat(auto-fill, minmax(150px, 1fr))",
+                          gap: 8,
+                        }}
+                      >
+                        {rep.signatureData.map((s) => (
+                          <div
+                            key={s.key}
+                            style={{
+                              border: `1px solid ${C.border}`,
+                              borderRadius: 8,
+                              padding: 6,
+                              textAlign: "center",
+                            }}
+                          >
+                            <img
+                              src={s.image}
+                              alt={s.name}
+                              style={{
+                                width: "100%",
+                                height: 44,
+                                objectFit: "contain",
+                              }}
+                            />
+                            <div style={{ fontSize: 11, fontWeight: 600 }}>
+                              {s.name}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
