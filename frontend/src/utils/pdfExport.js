@@ -543,23 +543,37 @@ function buildForumRows(L, formData, includeAI) {
   const rows = [];
   let sectionNumber = 1;
 
+  // IMPORTANT: with rowSpan, jspdf-autotable already reserves the spanned
+  // columns in the following rows, so those rows must NOT repeat "" placeholders
+  // for columns 0/1 (that used to shift every cell one column to the right).
   const pushContentBlock = (sectionLabel, entries) => {
     const items = (entries || []).map((e) => encodeText(e)).filter(Boolean);
     if (items.length === 0) return;
     const rowCount = items.length;
 
     items.forEach((item, idx) => {
-      rows.push([
-        idx === 0 ? String(sectionNumber) : "",
-        idx === 0
-          ? { content: encodeText(sectionLabel), rowSpan: rowCount }
-          : "",
-        {
-          content: item,
-          colSpan: FORUM_TABLE_COLS - 2,
-          styles: { halign: "left" },
-        },
-      ]);
+      const detail = {
+        content: item,
+        colSpan: FORUM_TABLE_COLS - 2,
+        styles: { halign: "left" },
+      };
+      if (idx === 0) {
+        rows.push([
+          {
+            content: String(sectionNumber),
+            rowSpan: rowCount,
+            styles: { halign: "center" },
+          },
+          {
+            content: encodeText(sectionLabel),
+            rowSpan: rowCount,
+            styles: { halign: "left" },
+          },
+          detail,
+        ]);
+      } else {
+        rows.push([detail]);
+      }
     });
     sectionNumber++;
   };
@@ -600,18 +614,32 @@ function buildForumRows(L, formData, includeAI) {
     presentMembers.forEach((name, idx) => {
       const sig = signatureEntries[sigIdx];
       const hasSig = sig && String(sig).startsWith("data:image");
-      rows.push([
-        idx === 0 ? String(sectionNumber) : "",
-        idx === 0
-          ? { content: encodeText(L.secPresent), rowSpan: rowCount }
-          : "",
+      const sigCell = hasSig
+        ? { content: "", __signatureImage: sig, __index: sigIdx + 1 }
+        : { content: "", __signatureBlank: true, __name: name };
+      const memberCells = [
         encodeText(name),
         encodeText(L.statusPresent),
         "",
-        hasSig
-          ? { __signatureImage: sig, __index: sigIdx + 1 }
-          : { __signatureBlank: true, __name: name },
-      ]);
+        sigCell,
+      ];
+      if (idx === 0) {
+        rows.push([
+          {
+            content: String(sectionNumber),
+            rowSpan: rowCount,
+            styles: { halign: "center" },
+          },
+          {
+            content: encodeText(L.secPresent),
+            rowSpan: rowCount,
+            styles: { halign: "left" },
+          },
+          ...memberCells,
+        ]);
+      } else {
+        rows.push(memberCells);
+      }
       if (hasSig) sigIdx += 1;
     });
     sectionNumber++;
@@ -620,16 +648,29 @@ function buildForumRows(L, formData, includeAI) {
   if (absentMembers.length > 0) {
     const rowCount = absentMembers.length;
     absentMembers.forEach((entry, idx) => {
-      rows.push([
-        idx === 0 ? String(sectionNumber) : "",
-        idx === 0
-          ? { content: encodeText(L.secAbsent), rowSpan: rowCount }
-          : "",
+      const memberCells = [
         encodeText(entry.name),
         encodeText(L.statusAbsent),
         encodeText(entry.reason || ""),
         "",
-      ]);
+      ];
+      if (idx === 0) {
+        rows.push([
+          {
+            content: String(sectionNumber),
+            rowSpan: rowCount,
+            styles: { halign: "center" },
+          },
+          {
+            content: encodeText(L.secAbsent),
+            rowSpan: rowCount,
+            styles: { halign: "left" },
+          },
+          ...memberCells,
+        ]);
+      } else {
+        rows.push(memberCells);
+      }
     });
     sectionNumber++;
   }
@@ -748,13 +789,13 @@ export const exportForumReportToPDF = (
       valign: "middle",
       cellPadding: { top: 1.2, bottom: 1.2, left: 2, right: 2 },
       minCellHeight: 5,
-      lineColor: [210, 210, 210],
-      lineWidth: 0.1,
+      fillColor: [255, 255, 255],
+      textColor: [0, 0, 0],
     };
     const sharedStyles = {
       overflow: "linebreak",
-      lineWidth: 0.1,
-      lineColor: [210, 210, 210],
+      lineWidth: 0.15,
+      lineColor: [170, 170, 170],
     };
 
     const sharedDidParseCell = (data) => {
@@ -794,7 +835,10 @@ export const exportForumReportToPDF = (
       ],
       body: tableRows,
       margin: { left: margin, right: margin, bottom: 16 },
-      theme: "plain", // ✅ Custom borders to handle rowSpan perfectly
+      // "grid" draws every border itself and treats a rowSpan cell as ONE box,
+      // so merged No./Section cells get no inner lines and close at the bottom
+      // automatically (also across page breaks). No manual line drawing needed.
+      theme: "grid",
       headStyles: sharedHeadStyles,
       bodyStyles: sharedBodyStyles,
       styles: sharedStyles,
@@ -808,58 +852,11 @@ export const exportForumReportToPDF = (
       },
       didParseCell: sharedDidParseCell,
       didDrawCell: (data) => {
-        // ✅ 1. DRAW CUSTOM BORDERS
-        if (data.section === "body" || data.section === "head") {
-          doc.setDrawColor(210, 210, 210);
-          doc.setLineWidth(0.1);
-          const { x, y, width, height } = data.cell;
-
-          doc.line(x, y, x + width, y); // top
-          doc.line(x, y + height, x + width, y + height); // bottom
-          doc.line(x, y, x, y + height); // left
-          doc.line(x + width, y, x + width, y + height); // right
-
-          // ✅ 2. ERASE INNER HORIZONTAL LINES FOR MERGED CELLS
-          let isRowSpanned = false;
-          if (
-            data.section === "body" &&
-            (data.column.index === 0 || data.column.index === 1)
-          ) {
-            const raw = data.cell.raw;
-            isRowSpanned =
-              raw && typeof raw === "object" && raw.rowSpan && raw.rowSpan > 1;
-
-            if (isRowSpanned) {
-              doc.setDrawColor(255, 255, 255); // White to erase
-              doc.setLineWidth(0.5);
-              doc.line(x + 0.1, y + height, x + width - 0.1, y + height);
-            }
-          }
-
-          // Erase empty cell bottom borders under merged blocks
-          if (
-            data.section === "body" &&
-            !isRowSpanned &&
-            data.cell.raw === ""
-          ) {
-            const rowData = data.row.raw;
-            if (
-              rowData[0] === "" ||
-              (rowData[1] &&
-                typeof rowData[1] === "object" &&
-                rowData[1].rowSpan)
-            ) {
-              doc.setDrawColor(255, 255, 255);
-              doc.setLineWidth(0.5);
-              doc.line(x + 0.1, y + height, x + width - 0.1, y + height);
-            }
-          }
-        }
-
         // ✅ 3. SIGNATURE LOGIC
         if (data.section !== "body") return;
         if (data.column.index !== FORUM_SIGNATURE_COL) return;
-        const raw = data.row.raw?.[FORUM_SIGNATURE_COL];
+        if (data.cell.colSpan > 1) return;
+        const raw = data.cell.raw;
 
         if (raw && typeof raw === "object" && raw.__signatureBlank) {
           try {
