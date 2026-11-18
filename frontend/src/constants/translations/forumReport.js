@@ -46,7 +46,10 @@ export const forumReportTranslations = {
       topicPlaceholder: "Discussion topic",
 
       // ─── Standing Agendas ─────────────────────────────────────
-      standingAgendas: "📋 Standing Agendas",
+      // ── RESTORE 1: keep the trailing colon that StandingAgendasPanel
+      //    and the pre-merge PDF expected. ──
+      standingAgendas: "📋 Standing Agendas:",
+      // ── end RESTORE 1
       // 7 items — kept in sync with the Amharic wording that
       // ForumReport.jsx originally hard-coded as STANDING_AGENDAS_AM.
       agendas: [
@@ -298,7 +301,9 @@ export const forumReportTranslations = {
       topicPlaceholder: "የውይይት ርዕስ",
 
       // ─── Standing Agendas ─────────────────────────────────────
-      standingAgendas: "📋 ቋሚ አጀንዳዎች",
+      // ── RESTORE 2: keep the Ethiopian colon (፡) that the panel used. ──
+      standingAgendas: "📋 ቋሚ አጀንዳዎች፡",
+      // ── end RESTORE 2
       // Preserved verbatim from the original STANDING_AGENDAS_AM
       // constant in ForumReport.jsx — do not paraphrase.
       agendas: [
@@ -352,8 +357,10 @@ export const forumReportTranslations = {
       yourTeam: "ቡድንህ",
       selectTeamToReport: "ሪፖርት ለመሙላት ቡድን ይምረጡ",
       noTeamsYet: "እስካሁን ምንም ቡድን አልተፈጠረም። አዲስ ቡድን ለመፍጠር ቁልፉን ይጫኑ።",
-      selectTeamPrompt: "ቡድን ምረጥ",
-      selectTeamHelper: "ሪፖርት ለመጀመር ከዚህ በታች ቡድን ይምረጡ",
+      // ── RESTORE 3: original richer Amharic wording (the sidebar hint). ──
+      selectTeamPrompt: "ሪፖርት ለመጀመር ከጎን ባር ላይ ቡድን ይምረጡ",
+      selectTeamHelper: "በጎን ባር ላይ 'አቻ ፎረም' ን ጠቅ ያድርጉ፣ ከዚያ ቡድን ይምረጡ",
+      // ── end RESTORE 3
       loadingTeams: "ቡድኖችን በመጫን ላይ...",
       noTeamsAssigned: "ለምንም ቡድን አልተመደቡም",
       noTeamsYetShort: "እስካሁን ምንም ቡድን የለም",
@@ -544,7 +551,9 @@ export const forumReportTranslations = {
       topicPlaceholder: "Mata-duree marii",
 
       // ─── Standing Agendas ─────────────────────────────────────
-      standingAgendas: "📋 Ajandaa Dhaabbataa",
+      // ── RESTORE 4: keep the trailing colon. ──
+      standingAgendas: "📋 Ajandaa Dhaabbataa:",
+      // ── end RESTORE 4
       // Oromoo wording aligned to the 7-item Amharic list.
       agendas: [
         "Bulchiinsa gaarii dhaabbata keessatti mirkaneessuu",
@@ -599,8 +608,11 @@ export const forumReportTranslations = {
       selectTeamToReport: "Garee gabaasa uumuuf ykn ilaaluuf filadhu",
       noTeamsYet:
         "Gareen uumame hin jiru. Garee kee isa jalqabaa uumuu mallattoo armaan gadii cuqaasi.",
-      selectTeamPrompt: "Garee Filadhu",
-      selectTeamHelper: "Gabaasa jalqabuuf garee filadhu",
+      // ── RESTORE 3: original richer Oromo wording (the sidebar hint). ──
+      selectTeamPrompt: "Gabaasa jalqabuuf garee filadhu",
+      selectTeamHelper:
+        "'Fooraamii Hiriyyaa' sidebaar irratti cuqaasi, ergasii garee filadhu",
+      // ── end RESTORE 3
       loadingTeams: "Gareewwan fe'aa jira...",
       noTeamsAssigned: "Garee kamiifuu hin ramadamne",
       noTeamsYetShort: "Gareen hin jiru",

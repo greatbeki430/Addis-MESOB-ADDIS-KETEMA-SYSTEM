@@ -19,7 +19,7 @@ const meetingSchema = new mongoose.Schema(
 
     // ─── Attendees ────────────────────────────────────────
     present: {
-      type: [String],
+      type: [String], // names; ObjectIds tolerated for backward compat
       default: [],
     },
     absent: {
@@ -27,6 +27,41 @@ const meetingSchema = new mongoose.Schema(
         {
           name: { type: String, default: "" },
           reason: { type: String, default: "" },
+        },
+      ],
+      default: [],
+    },
+
+    // ─── Structured attendance (NEW — synced roster or manual) ──
+    // `present` / `absent` above remain the plain name lists every
+    // existing reader (feed, admin, PDF) already consumes.
+    attendanceMode: {
+      type: String,
+      enum: ["sync", "manual"],
+      default: "manual",
+    },
+    attendance: {
+      type: [
+        {
+          member: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            default: null,
+          },
+          name: { type: String, default: "" },
+          role: { type: String, default: "member" }, // leader | member
+          source: {
+            type: String,
+            enum: ["synced", "manual"],
+            default: "manual",
+          },
+          status: {
+            type: String,
+            enum: ["present", "absent"],
+            default: "present",
+          },
+          reason: { type: String, default: "" },
+          _id: false,
         },
       ],
       default: [],
@@ -55,6 +90,26 @@ const meetingSchema = new mongoose.Schema(
     },
     signatures: {
       type: [String],
+      default: [],
+    },
+
+    // ─── Drawn signatures (NEW — one per present signer) ──
+    // `signatures` above keeps the signer names for older readers.
+    signatureData: {
+      type: [
+        {
+          key: { type: String, default: "" },
+          member: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "User",
+            default: null,
+          },
+          name: { type: String, default: "" },
+          role: { type: String, default: "member" },
+          image: { type: String, default: "" },
+          _id: false,
+        },
+      ],
       default: [],
     },
 
@@ -98,7 +153,7 @@ const meetingSchema = new mongoose.Schema(
       default: 0,
     },
     meetingDuration: {
-      type: Number, // in minutes
+      type: Number, // minutes
       default: 30,
     },
     timeExpired: {
@@ -111,9 +166,6 @@ const meetingSchema = new mongoose.Schema(
     },
 
     // ─── Lifecycle stamps ─────────────────────────────────
-    // completedAt / finalizedAt are stamped by the controller
-    // (A1 + B2) the moment status transitions to "completed",
-    // whether from createMeeting or updateMeeting.
     completedAt: {
       type: Date,
       default: null,
@@ -159,7 +211,7 @@ const meetingSchema = new mongoose.Schema(
       default: "",
     },
 
-    // ─── Progress snapshot (used by resume / admin view) ──
+    // ─── Progress snapshot ────────────────────────────────
     progressData: {
       type: mongoose.Schema.Types.Mixed,
       default: null,
@@ -185,7 +237,7 @@ const meetingSchema = new mongoose.Schema(
   },
 );
 
-// ─── Indexes ───────────────────────────────────────────────
+// ─── Indexes (union of both versions) ─────────────────────
 meetingSchema.index({ date: -1, team: 1 });
 meetingSchema.index({ createdAt: -1 });
 meetingSchema.index({ teamName: 1 });

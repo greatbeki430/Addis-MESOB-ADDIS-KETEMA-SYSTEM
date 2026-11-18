@@ -51,12 +51,65 @@ const validateClientStatus = (status) => {
   return null;
 };
 
+// ─── PATCH 1: Sanitizers for the structured attendance / signature ─────
+// These match the shape produced by
+// frontend/src/utils/forumReportHelpers.js
+// (deriveAttendance / alignSignatures). Unknown / malformed entries are
+// dropped so a hostile or buggy client cannot poison the array.
+const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+const MAX_SIGNATURE_CHARS = 700 * 1024; // ~500 KB of image per signature
+
+const cleanAttendance = (arr) => {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter((a) => a && typeof a.name === "string" && a.name.trim())
+    .map((a) => {
+      const status = a.status === "absent" ? "absent" : "present";
+      return {
+        member: OBJECT_ID.test(a.member || "") ? a.member : null,
+        name: a.name.trim(),
+        role: a.role === "leader" ? "leader" : "member",
+        source: a.source === "synced" ? "synced" : "manual",
+        status,
+        reason:
+          status === "absent" && typeof a.reason === "string"
+            ? a.reason.trim()
+            : "",
+      };
+    });
+};
+
+const cleanSignatureData = (arr) => {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .filter(
+      (s) =>
+        s &&
+        typeof s.name === "string" &&
+        s.name.trim() &&
+        typeof s.image === "string" &&
+        s.image.startsWith("data:image/") &&
+        s.image.length <= MAX_SIGNATURE_CHARS,
+    )
+    .map((s) => ({
+      key: typeof s.key === "string" ? s.key.slice(0, 200) : "",
+      member: OBJECT_ID.test(s.member || "") ? s.member : null,
+      name: s.name.trim(),
+      role: s.role === "leader" ? "leader" : "member",
+      image: s.image,
+    }));
+};
+// ── end PATCH 1
+
 // ─── Content field whitelist (B1) ──────────────────────────
 // Only these keys may ever be written from a client-supplied body.
 // Everything else (team, createdBy, createdByName, status, isLocked,
 // extensionApproved, extensionExpiresAt, isResumed, resumedAt,
 // progressData, adminNotes, autoSaveCount, lastAutoSave, isAutoSave)
 // is server-owned. "status" is handled separately via B4 whitelist.
+//
+// ── PATCH 4a: three new fields appended so autoSaveMeeting can
+//    persist them via cleanContentForWrite. ──
 const CONTENT_FIELDS = [
   "date",
   "timeStart",
@@ -71,6 +124,9 @@ const CONTENT_FIELDS = [
   "signatures",
   "teamName",
   "aiGeneratedContent",
+  "attendanceMode", // PATCH 4a
+  "attendance", // PATCH 4a
+  "signatureData", // PATCH 4a
 ];
 const pickContentFields = (body = {}) => {
   const out = {};
@@ -125,6 +181,22 @@ const cleanContentForWrite = (raw) => {
   ]) {
     if (out[field] !== undefined) out[field] = cleanStringArray(out[field]);
   }
+
+  // ── PATCH 4b: sanitize the three new structured fields here so
+  //    both autoSaveMeeting and updateMeeting pick them up
+  //    automatically. Sanitizers are idempotent, so also applying
+  //    them inline in createMeeting / updateMeeting is harmless. ──
+  if (out.attendanceMode !== undefined) {
+    out.attendanceMode = out.attendanceMode === "sync" ? "sync" : "manual";
+  }
+  if (out.attendance !== undefined) {
+    out.attendance = cleanAttendance(out.attendance);
+  }
+  if (out.signatureData !== undefined) {
+    out.signatureData = cleanSignatureData(out.signatureData);
+  }
+  // ── end PATCH 4b
+
   return out;
 };
 
@@ -171,6 +243,9 @@ const createMeeting = async (req, res) => {
     // B1: whitelist then clean
     const content = cleanContentForWrite(pickContentFields(req.body));
 
+    // ── PATCH 2: createMeeting builds meetingData inline (does not
+    //    use cleanContentForWrite alone), so explicitly carry over
+    //    the three structured fields from the whitelisted `content`. ──
     const meetingData = {
       ...content,
       date: new Date(date),
@@ -180,7 +255,20 @@ const createMeeting = async (req, res) => {
       createdByName: req.user.name || "Unknown User",
       status, // already validated as in_progress | completed
       meetingDuration: meetingDuration || 30,
+      attendanceMode:
+        req.body.attendanceMode === "sync"
+          ? "sync"
+          : content.attendanceMode || "manual",
+      attendance:
+        req.body.attendance !== undefined
+          ? cleanAttendance(req.body.attendance)
+          : content.attendance || [],
+      signatureData:
+        req.body.signatureData !== undefined
+          ? cleanSignatureData(req.body.signatureData)
+          : content.signatureData || [],
     };
+    // ── end PATCH 2
 
     // A1 + B2: stamp completedAt/finalizedAt when completing
     if (status === "completed") {
@@ -188,6 +276,37 @@ const createMeeting = async (req, res) => {
       meetingData.completedAt = now;
       meetingData.finalizedAt = now;
     }
+
+    // ── PATCH 2b: when the client finalizes on timer expiry, it also
+    //    sends timeExpired / isLocked / lockedAt / lockedReason and
+    //    the finalizedAt stamp. Persist those so admin "expired"
+    //    filters keep working even when this path is a CREATE
+    //    (no prior draft existed). Validate defensively — client
+    //    cannot set these arbitrarily except when status is
+    //    completed, which is already whitelisted. ──
+    if (status === "completed") {
+      const now = new Date();
+      if (req.body.timeExpired === true) {
+        meetingData.timeExpired = true;
+        meetingData.timeExpiredAt = req.body.timeExpiredAt
+          ? new Date(req.body.timeExpiredAt)
+          : now;
+      }
+      if (req.body.isLocked === true) {
+        meetingData.isLocked = true;
+        meetingData.lockedAt = req.body.lockedAt
+          ? new Date(req.body.lockedAt)
+          : now;
+        if (typeof req.body.lockedReason === "string") {
+          meetingData.lockedReason = req.body.lockedReason.slice(0, 500);
+        }
+      }
+      if (req.body.finalizedAt) {
+        const fa = new Date(req.body.finalizedAt);
+        if (!Number.isNaN(fa.getTime())) meetingData.finalizedAt = fa;
+      }
+    }
+    // ── end PATCH 2b
 
     const meeting = await Meeting.create(meetingData);
 
@@ -210,6 +329,7 @@ const autoSaveMeeting = async (req, res) => {
     const { meetingId } = req.body;
 
     // B1: whitelist the content fields before touching anything.
+    // PATCH 4a + 4b make this include the three structured fields.
     const content = cleanContentForWrite(pickContentFields(req.body));
     const now = new Date();
 
@@ -277,6 +397,8 @@ const autoSaveMeeting = async (req, res) => {
         meeting.status = "auto_saved";
       }
 
+      // ── PATCH 5: progress snapshot must include the structured
+      //    fields so resumeMeeting can fully restore them. ──
       meeting.progressData = {
         date: meeting.date,
         timeStart: meeting.timeStart,
@@ -289,7 +411,11 @@ const autoSaveMeeting = async (req, res) => {
         gaps: meeting.gaps,
         agreements: meeting.agreements,
         signatures: meeting.signatures,
+        attendanceMode: meeting.attendanceMode, // PATCH 5
+        attendance: meeting.attendance, // PATCH 5
+        signatureData: meeting.signatureData, // PATCH 5
       };
+      // ── end PATCH 5
 
       await meeting.save();
     } else {
@@ -543,6 +669,7 @@ const updateMeeting = async (req, res) => {
 
     // ── Apply the update ─────────────────────────────────────
     // B1: whitelist content fields
+    // PATCH 4a + 4b make this include the three structured fields.
     const content = cleanContentForWrite(pickContentFields(req.body));
 
     // B4: whitelist status
@@ -564,12 +691,51 @@ const updateMeeting = async (req, res) => {
 
     const updates = { ...content };
 
+    // ── PATCH 3: explicitly carry over the three structured fields
+    //    even if cleanContentForWrite were ever changed to skip them.
+    //    Sanitizers are idempotent so this is safe alongside 4b. ──
+    if (req.body.attendanceMode !== undefined) {
+      updates.attendanceMode =
+        req.body.attendanceMode === "sync" ? "sync" : "manual";
+    }
+    if (req.body.attendance !== undefined) {
+      updates.attendance = cleanAttendance(req.body.attendance);
+    }
+    if (req.body.signatureData !== undefined) {
+      updates.signatureData = cleanSignatureData(req.body.signatureData);
+    }
+    // ── end PATCH 3
+
     // A1 + B2: stamp on completion
     if (req.body.status === "completed") {
       const now = new Date();
       updates.status = "completed";
       updates.completedAt = now;
       updates.finalizedAt = now;
+
+      // ── PATCH 3b: on timer-expiry finalization, also persist the
+      //    lock/expiry audit trail. Only honored when status is
+      //    completed (already whitelisted). ──
+      if (req.body.timeExpired === true) {
+        updates.timeExpired = true;
+        updates.timeExpiredAt = req.body.timeExpiredAt
+          ? new Date(req.body.timeExpiredAt)
+          : now;
+      }
+      if (req.body.isLocked === true) {
+        updates.isLocked = true;
+        updates.lockedAt = req.body.lockedAt
+          ? new Date(req.body.lockedAt)
+          : now;
+        if (typeof req.body.lockedReason === "string") {
+          updates.lockedReason = req.body.lockedReason.slice(0, 500);
+        }
+      }
+      if (req.body.finalizedAt) {
+        const fa = new Date(req.body.finalizedAt);
+        if (!Number.isNaN(fa.getTime())) updates.finalizedAt = fa;
+      }
+      // ── end PATCH 3b
     } else if (req.body.status === "in_progress") {
       updates.status = "in_progress";
     }
@@ -1025,6 +1191,13 @@ const getMeetingProgress = async (req, res) => {
         createdByName: meeting.createdByName,
         createdAt: meeting.createdAt,
         updatedAt: meeting.updatedAt,
+        // ── PATCH 6: expose the structured fields so the admin
+        //    "View Saved Progress" modal can show the synced roster
+        //    and drawn signatures. ──
+        attendanceMode: meeting.attendanceMode,
+        attendance: meeting.attendance,
+        signatureData: meeting.signatureData,
+        // ── end PATCH 6
       },
     });
   } catch (error) {
@@ -1067,6 +1240,14 @@ const resumeMeeting = async (req, res) => {
       meeting.gaps = cleanStringArray(progress.gaps);
       meeting.agreements = cleanStringArray(progress.agreements);
       meeting.signatures = cleanStringArray(progress.signatures);
+
+      // ── PATCH 5 (resume side): restore the three structured fields
+      //    from the snapshot so roster + signatures come back. ──
+      meeting.attendanceMode =
+        progress.attendanceMode === "sync" ? "sync" : "manual";
+      meeting.attendance = cleanAttendance(progress.attendance);
+      meeting.signatureData = cleanSignatureData(progress.signatureData);
+      // ── end PATCH 5 (resume side)
     }
 
     meeting.isLocked = false;
