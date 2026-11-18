@@ -4,8 +4,9 @@
 // Coverage audit (D3): every `tf()` call in ForumReport.jsx,
 // ForumReportHistory.jsx, MeetingTimer.jsx, TimeExpiredModal.jsx,
 // RequestExtensionModal.jsx, SignatureModal.jsx, SignatureCanvas.jsx,
-// AutoSaveIndicator.jsx, and every `t.*` call in the admin Extensions
-// tab (ForumReportManagement.jsx) resolves to a key present below.
+// AutoSaveIndicator.jsx, SubmittedReports.jsx, and every `t.*` call in the
+// admin Extensions tab (ForumReportManagement.jsx) resolves to a key
+// present below.
 
 export const forumReportTranslations = {
   en: {
@@ -117,6 +118,16 @@ export const forumReportTranslations = {
       teamDescription: "Team Description",
       teamLeader: "Team Leader",
 
+      // ─── Submitted Reports (landing page) ─────────────────────
+      submittedReportsTitle: "Submitted Reports",
+      submittedEmpty: "No submitted reports yet.",
+      viewReport: "View",
+      submittedLoadError: "Failed to load submitted reports",
+      submittedOpenError: "Failed to open report",
+      submittedSearch: "Search by team, leader, or topic…",
+      allTeams: "All teams",
+      submittedBy: "by",
+
       // ─── Status Messages ──────────────────────────────────────
       saved: "✅ Report Saved!",
       savedSub: "Peer Forum report completed successfully.",
@@ -133,6 +144,8 @@ export const forumReportTranslations = {
       saveError: "Failed to save report. Please try again.",
       selectDate: "Please select a date",
       fillFields: "Please fill in all required fields",
+      emptyReport:
+        "Cannot submit an empty report. Fill in at least one topic, explanation, gap, or agreement.",
       autoSaveReady: "Auto-save ready",
       autoSaveError: "Auto-save failed",
 
@@ -371,6 +384,16 @@ export const forumReportTranslations = {
       teamDescription: "የቡድን መግለጫ",
       teamLeader: "የቡድን መሪ",
 
+      // ─── Submitted Reports (landing page) ─────────────────────
+      submittedReportsTitle: "የተላኩ ሪፖርቶች",
+      submittedEmpty: "እስካሁን የተላከ ሪፖርት የለም።",
+      viewReport: "ይመልከቱ",
+      submittedLoadError: "የተላኩ ሪፖርቶችን መጫን አልተቻለም",
+      submittedOpenError: "ሪፖርቱን መክፈት አልተቻለም",
+      submittedSearch: "በቡድን፣ በመሪ ወይም በርዕስ ፈልግ…",
+      allTeams: "ሁሉም ቡድኖች",
+      submittedBy: "በ",
+
       // ─── Status Messages ──────────────────────────────────────
       saved: "✅ ሪፖርቱ ተሞልቷል!",
       savedSub: "የአቻ ፎረም ሪፖርት በተሳካ ሁኔታ ተጠናቋል።",
@@ -387,6 +410,8 @@ export const forumReportTranslations = {
       saveError: "ሪፖርቱን ማስቀመጥ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       selectDate: "እባክዎ ቀን ይምረጡ",
       fillFields: "እባክዎ ሁሉንም አስፈላጊ መስኮች ይሙሉ",
+      emptyReport:
+        "ባዶ ሪፖርት ማስገባት አይቻልም። ቢያንስ አንድ ርዕስ፣ ማብራሪያ፣ ክፍተት ወይም ስምምነት ይሙሉ።",
       autoSaveReady: "ራስ-ሰር ማስቀመጥ ዝግጁ ነው",
       autoSaveError: "ራስ-ሰር ማስቀመጥ አልተሳካም",
 
@@ -623,6 +648,16 @@ export const forumReportTranslations = {
       teamDescription: "Ibsa Garee",
       teamLeader: "Hoogganaa Garee",
 
+      // ─── Submitted Reports (landing page) ─────────────────────
+      submittedReportsTitle: "Gabaasawwan Ergaman",
+      submittedEmpty: "Gabaasni ergame hin jiru.",
+      viewReport: "Ilaali",
+      submittedLoadError: "Gabaasawwan ergaman fe'uun hin danda'amne",
+      submittedOpenError: "Gabaasa banuun hin danda'amne",
+      submittedSearch: "Garee, hoogganaa ykn mata-dureen barbaadi…",
+      allTeams: "Gareewwan hunda",
+      submittedBy: "kan",
+
       // ─── Status Messages ──────────────────────────────────────
       saved: "✅ Gabaasni Olkaayameera!",
       savedSub: "Gabaasni Fooraamii Hiriyyaa milkiin xumurameera.",
@@ -639,15 +674,17 @@ export const forumReportTranslations = {
       saveError: "Gabaasa olkaa'uun hin dandeenye. Maaloo irra deebi'ii yaali.",
       selectDate: "Maaloo guyyaa filadhu",
       fillFields: "Maaloo dirree barbaachisoo hunda guuti",
+      emptyReport:
+        "Gabaasa duwwaa galchuun hin danda'amu. Yoo xiqqaate mata-duree, ibsa, hanqina ykn walii galtee guuti.",
       autoSaveReady: "Olkaa'uun ofumaa qophiidha",
       autoSaveError: "Olkaa'uun ofumaa hin milkoofne",
 
       // ─── AI Features ──────────────────────────────────────────
-      generateSummary: "🤖 Gargaaraa Barreessaa AI",
-      summarize: "📝 Gabaabi",
-      fullReport: "📋 Gabaasa Guutuu",
+      generateSummary: "Gargaaraa Barreessaa AI",
+      summarize: "Gabaabi",
+      fullReport: "Gabaasa Guutuu",
       aiActions: "Gochaa AI:",
-      aiSummaryLabel: "🤖 Yaada Walgahii AI",
+      aiSummaryLabel: "Yaada Walgahii AI",
       aiContentApplied: "Waan AI uume hojiirra oole",
       aiApplied: "✅ Yaanni AI ibsa irratti hojiirra oole!",
       noContent: "Waan hojiirra oolchu hin jiru",

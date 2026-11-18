@@ -200,6 +200,28 @@ const cleanContentForWrite = (raw) => {
   return out;
 };
 
+// ─── Empty-report guard ─────────────────────────────────────
+// A report counts as "empty" when it has no topic, previous result,
+// explanation, gap or agreement. Attendance alone does not count,
+// because the synced roster defaults everyone to Present.
+const hasReportContent = (r = {}) => {
+  const hasText = (a) =>
+    Array.isArray(a) && a.some((x) => typeof x === "string" && x.trim());
+  return (
+    hasText(r.topics) ||
+    hasText(r.prevResults) ||
+    hasText(r.gaps) ||
+    hasText(r.agreements) ||
+    (typeof r.explanation === "string" && r.explanation.trim().length > 0)
+  );
+};
+
+const EMPTY_REPORT_RESPONSE = {
+  message:
+    "Cannot submit an empty report. Fill in at least one topic, explanation, gap, or agreement.",
+  code: "EMPTY_REPORT",
+};
+
 // ─── Create Meeting ─────────────────────────────────────────
 const createMeeting = async (req, res) => {
   try {
@@ -242,6 +264,11 @@ const createMeeting = async (req, res) => {
 
     // B1: whitelist then clean
     const content = cleanContentForWrite(pickContentFields(req.body));
+
+    // Reject empty submissions
+    if (status === "completed" && !hasReportContent(content)) {
+      return res.status(400).json(EMPTY_REPORT_RESPONSE);
+    }
 
     // ── PATCH 2: createMeeting builds meetingData inline (does not
     //    use cleanContentForWrite alone), so explicitly carry over
@@ -419,6 +446,11 @@ const autoSaveMeeting = async (req, res) => {
 
       await meeting.save();
     } else {
+      // Do not create blank drafts (e.g. from the pagehide flush)
+      if (!hasReportContent(content)) {
+        return res.json({ success: true, skipped: true, meeting: null });
+      }
+
       // Create new draft
       const teamObjectId = req.body.teamId || req.body.team || null;
       if (violatesTeamScope(req.user, teamObjectId)) {
@@ -467,24 +499,29 @@ const autoSaveMeeting = async (req, res) => {
 //   • Everyone else    → their own reports only
 //
 // Query params:
-//   • teamId or team   → narrow to a single team
+//   • :teamId (route), teamId or team (query) → narrow to a single team
 //   • status           → exact status, or "draft" for the umbrella
 //                        over the two not-yet-final statuses
+//   • submitted=true   → only completed (submitted) reports
+//   • mine=true        → only reports the caller created
 //   • isLocked         → "true" / "false"
 const getMeetings = async (req, res) => {
   try {
-    const { teamId, team, status, isLocked } = req.query;
+    const { teamId, team, status, isLocked, mine, submitted } = req.query;
 
     const filter = {};
 
     // ── Team filter (narrowing) ─────────────────────────────
-    const requestedTeamId = teamId || team;
+    // Also honour GET /meetings/team/:teamId (param was ignored before).
+    const requestedTeamId = req.params.teamId || teamId || team;
     if (requestedTeamId) {
       filter.team = requestedTeamId;
     }
 
     // ── Status filter ───────────────────────────────────────
-    if (status && status !== "all") {
+    if (submitted === "true") {
+      filter.status = "completed";
+    } else if (status && status !== "all") {
       if (status === "draft") {
         // "Draft" is a UI-level umbrella over the two not-yet-final
         // statuses. The model keeps them apart because the timer
@@ -493,6 +530,11 @@ const getMeetings = async (req, res) => {
       } else {
         filter.status = status;
       }
+    }
+
+    // ── Only my own reports ─────────────────────────────────
+    if (mine === "true") {
+      filter.createdBy = req.user._id;
     }
 
     // ── Locked filter ───────────────────────────────────────
@@ -527,9 +569,17 @@ const getMeetings = async (req, res) => {
       }
     }
 
-    const meetings = await Meeting.find(filter)
-      .populate("createdBy", "name email")
-      .sort({ updatedAt: -1, date: -1 });
+    let query = Meeting.find(filter).populate("createdBy", "name email");
+    if (submitted === "true") {
+      // Keep the list light: signature images load when a report is opened.
+      query = query
+        .select("-signatureData -progressData -aiGeneratedContent")
+        .sort({ completedAt: -1, updatedAt: -1 });
+    } else {
+      query = query.sort({ updatedAt: -1, date: -1 });
+    }
+
+    const meetings = await query;
 
     res.json(meetings);
   } catch (error) {
@@ -678,6 +728,15 @@ const updateMeeting = async (req, res) => {
       return res
         .status(400)
         .json({ message: statusError, code: "INVALID_STATUS" });
+    }
+
+    // Reject empty submissions (checked against the merged result so a
+    // partial update of an existing report is still judged correctly)
+    if (req.body.status === "completed") {
+      const merged = { ...meeting.toObject(), ...content };
+      if (!hasReportContent(merged)) {
+        return res.status(400).json(EMPTY_REPORT_RESPONSE);
+      }
     }
 
     // B6: non-admins cannot edit after an approved extension has elapsed

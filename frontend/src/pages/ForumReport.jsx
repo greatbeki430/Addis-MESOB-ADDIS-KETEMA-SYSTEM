@@ -4,6 +4,17 @@
 // Unified: original timer/history/extension/edit features + synced roster/
 // auto-translate/signature cards, plus bug fixes for autosave, extension poll,
 // timer-key collision, and signature map loading.
+//
+// Latest changes:
+//  • Present/Absent buttons: removed `require()` inside render (broken under
+//    Vite/ESM) and made the roster loader immune to identity changes of
+//    `tf` / `showToast` / `selectedTeam`, so the roster is no longer wiped
+//    back to "all present" by unrelated re-renders.
+//  • Empty reports are rejected (save button + timer-expiry finalize).
+//  • Saving now sends status "completed" so the report counts as SUBMITTED.
+//  • The first Peer Forum page (team list) now also shows Submitted Reports.
+//  • Team leaders are no longer auto-redirected into their team form, so
+//    they land on the team list + Submitted Reports first.
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
@@ -29,6 +40,7 @@ import { useLanguage } from "../hooks/useLanguage";
 import { useAuth } from "../hooks/useAuth";
 import ForumReportFeed from "../components/ForumReportFeed";
 import ForumReportHistory from "../components/forum-report/ForumReportHistory";
+import SubmittedReports from "../components/forum-report/SubmittedReports";
 import { forumReportTranslations } from "../constants/translations/forumReport";
 import { commonTranslations } from "../constants/translations/common";
 import { isAdminOrAbove, isLeaderOrAbove } from "../utils/roles";
@@ -85,6 +97,8 @@ import {
   FiList,
   FiGlobe,
   FiRotateCcw,
+  FiStar,
+  FiUser,
 } from "react-icons/fi";
 
 // ─── FONT SIZES ──────────────────────────────────────────────
@@ -95,6 +109,15 @@ const FONT_SIZES = {
   body: "clamp(12px, 2.8vw, 15px)",
   small: "clamp(10px, 2.2vw, 13px)",
 };
+
+// ─── Empty-report guard ──────────────────────────────────────
+// A report is "empty" when it has no topic, previous result, explanation,
+// gap or agreement. Attendance alone does not count (the synced roster
+// defaults everyone to Present). The backend enforces the same rule.
+const hasReportContent = (f) =>
+  [f.topics, f.prevResults, f.gaps, f.agreements].some(
+    (a) => Array.isArray(a) && a.some((x) => x && x.trim()),
+  ) || !!(f.explanation && f.explanation.trim());
 
 // ─── Helper: Get translations based on language ─────────────
 const getTranslations = (lang) => {
@@ -896,6 +919,25 @@ const AttendanceModeToggle = ({ mode, onChange, tf }) => {
   );
 };
 
+// Two tiny icon wrappers (plain ES imports — `require()` does not exist in
+// Vite's ESM build and made the roster rows crash/dead on render).
+const FiStarIcon = () => <FiStar size={14} />;
+const FiUserIcon = () => <FiUser size={14} />;
+
+const segStyle = (active, color) => ({
+  border: "none",
+  padding: "6px 12px",
+  fontSize: 11,
+  fontWeight: 700,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  background: active ? color : "transparent",
+  color: active ? "#fff" : "#64748B",
+  transition: "all 0.15s",
+});
+
 // ─── Attendance: synced roster with Present / Absent toggles ─
 const AttendanceRoster = ({
   roster,
@@ -1057,6 +1099,7 @@ const AttendanceRoster = ({
             : r.role === "leader"
               ? [tf("attLeaderBadge", "Team Leader"), "#FEF3C7", "#92400E"]
               : [tf("attMemberBadge", "Member"), "#E0E7FF", C.primary];
+          const initial = (r.name || "?").trim().charAt(0).toUpperCase();
           return (
             <div
               key={r.id}
@@ -1093,8 +1136,8 @@ const AttendanceRoster = ({
                 >
                   {r.role === "leader" && !isManual ? (
                     <FiStarIcon />
-                  ) : (r.name || "?").trim().charAt(0).toUpperCase() ? (
-                    (r.name || "?").trim().charAt(0).toUpperCase()
+                  ) : initial ? (
+                    initial
                   ) : (
                     <FiUserIcon />
                   )}
@@ -1230,34 +1273,6 @@ const AttendanceRoster = ({
       </button>
     </div>
   );
-};
-
-const segStyle = (active, color) => ({
-  border: "none",
-  padding: "6px 12px",
-  fontSize: 11,
-  fontWeight: 700,
-  cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  gap: 4,
-  background: active ? color : "transparent",
-  color: active ? "#fff" : "#64748B",
-  transition: "all 0.15s",
-});
-
-// Two tiny icon wrappers so the roster badge uses the right icon
-// without pulling a name that collides with the Lucide-style imports.
-const FiStarIcon = () => {
-  // React-icons/fi doesn't expose FiStar by default in this file's
-  // existing import list — import here instead of adding to the top
-  // block to keep the diff small.
-  const Star = require("react-icons/fi").FiStar;
-  return <Star size={14} />;
-};
-const FiUserIcon = () => {
-  const User = require("react-icons/fi").FiUser;
-  return <User size={14} />;
 };
 
 // ─── Signature cards: one per present member (synced mode) ───
@@ -1402,6 +1417,16 @@ const SignatureCards = ({ signers, signatureMap, absentNames, onSign, tf }) => {
 };
 
 // ─── Auto-translate status line (under a field) ──────────────
+const trStatusStyle = (color) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  marginTop: 4,
+  fontSize: "10px",
+  fontWeight: 600,
+  color,
+});
+
 const TranslateStatus = ({ id, translating, originals, onRevert, tf }) => {
   if (translating[id]) {
     return (
@@ -1441,16 +1466,6 @@ const TranslateStatus = ({ id, translating, originals, onRevert, tf }) => {
   }
   return null;
 };
-
-const trStatusStyle = (color) => ({
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  marginTop: 4,
-  fontSize: "10px",
-  fontWeight: 600,
-  color,
-});
 
 // ─── Main Component ──────────────────────────────────────────
 export default function ForumReport({
@@ -1712,6 +1727,9 @@ export default function ForumReport({
   // ─── Finalize on timer expiry ────────────────────────────────
   const handleFinalizeOnExpiry = useCallback(async () => {
     try {
+      // Never turn a blank form into a completed (submitted) report.
+      if (!hasReportContent(form)) return;
+
       const reportData = {
         date: form.date,
         timeStart: form.timeStart,
@@ -1896,6 +1914,9 @@ export default function ForumReport({
   }, []);
 
   // ─── Load teams when no team is selected ──────────────────
+  // NOTE: Team Leaders are intentionally NOT auto-redirected into their
+  // team's form any more. They land on this team list + "Submitted Reports"
+  // first, then click their team to start a report.
   useEffect(() => {
     if (!isLeaderOrAbove(user)) {
       setLoadingTeams(false);
@@ -1919,21 +1940,6 @@ export default function ForumReport({
               department: team.department,
             }));
             setTeams(formattedTeams);
-
-            // A logged-in Team Leader goes straight to the team they lead.
-            if (
-              !autoSelectedRef.current &&
-              user?.role === "leader" &&
-              user?._id
-            ) {
-              const mine = formattedTeams.find(
-                (tm) => tm.leaderId && String(tm.leaderId) === String(user._id),
-              );
-              if (mine) {
-                autoSelectedRef.current = true;
-                setSelectedTeam?.(mine);
-              }
-            }
           }
         } catch (error) {
           console.error("Failed to load teams:", error);
@@ -1943,7 +1949,7 @@ export default function ForumReport({
       };
       loadTeams();
     }
-  }, [selectedTeam, tf, isAdmin, user, setSelectedTeam]);
+  }, [selectedTeam, tf, isAdmin, user]);
 
   // ─── Form progress ──────────────────────────────────────────
   useEffect(() => {
@@ -2011,6 +2017,20 @@ export default function ForumReport({
   }, []);
 
   // ─── Sync roster from team ──────────────────────────────────
+  // The latest `tf` / `showToast` / `selectedTeam` are kept in refs so
+  // `loadRoster` has a STABLE identity. Previously it depended on them
+  // directly; whenever any of them changed identity on a re-render the
+  // effect below ran `setRoster([])` + reload, resetting every row to
+  // "present" — which made the Present/Absent buttons look dead.
+  const tfRef = useRef(tf);
+  const toastRef = useRef(showToast);
+  const teamRef = useRef(selectedTeam);
+  useEffect(() => {
+    tfRef.current = tf;
+    toastRef.current = showToast;
+    teamRef.current = selectedTeam;
+  });
+
   const teamId = selectedTeam?.id || selectedTeam?._id;
 
   const loadRoster = useCallback(
@@ -2022,11 +2042,14 @@ export default function ForumReport({
         const res = await teamAPI.getById(teamId);
         setRoster((prev) => buildRoster(res.data, prev));
         if (announce) {
-          showToast(tf("attResynced", "✅ Team roster synced"), "success");
+          toastRef.current(
+            tfRef.current("attResynced", "✅ Team roster synced"),
+            "success",
+          );
         }
       } catch (error) {
         console.error("Failed to sync team members:", error);
-        const fallback = selectedTeam?.members;
+        const fallback = teamRef.current?.members;
         if (Array.isArray(fallback) && fallback.length > 0) {
           setRoster((prev) => buildRoster({ members: fallback }, prev));
         } else {
@@ -2036,10 +2059,10 @@ export default function ForumReport({
         setLoadingRoster(false);
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [teamId, selectedTeam, tf, showToast],
+    [teamId],
   );
 
+  // Reset + reload ONLY when the team actually changes.
   useEffect(() => {
     if (!teamId) return;
     setRoster([]);
@@ -2593,6 +2616,19 @@ ${"=".repeat(50)}
         return;
       }
 
+      // Reject empty reports (backend enforces the same rule).
+      if (!hasReportContent(form)) {
+        showToast(
+          tf(
+            "emptyReport",
+            "Cannot submit an empty report. Fill in at least one topic, explanation, gap, or agreement.",
+          ),
+          "warning",
+        );
+        setSaving(false);
+        return;
+      }
+
       const signatureData =
         aligned.signedCount > 0
           ? aligned.signatureData
@@ -2624,6 +2660,9 @@ ${"=".repeat(50)}
         team: selectedTeam?.id || selectedTeam?._id,
         teamName: selectedTeam?.name || "Unknown Team",
         aiGeneratedContent: aiGeneratedContent,
+        // Saving = submitting. Without this the report stays a draft and
+        // never appears under "Submitted Reports".
+        status: "completed",
       };
 
       if (editingId) {
@@ -2857,7 +2896,7 @@ ${"=".repeat(50)}
     );
   }
 
-  // ─── No team selected ──────────────────────────────────────
+  // ─── No team selected: team list + Submitted Reports ───────
   if (!selectedTeam) {
     return (
       <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
@@ -2868,6 +2907,15 @@ ${"=".repeat(50)}
           lang={currentLang}
           loading={loadingTeams}
         />
+        <div
+          style={{
+            maxWidth: 700,
+            margin: "0 auto",
+            padding: "0 clamp(24px, 5vw, 48px) 48px",
+          }}
+        >
+          <SubmittedReports tf={tf} t={t} lang={currentLang} />
+        </div>
       </div>
     );
   }
