@@ -124,15 +124,23 @@ function computeNoWrapColumnWidth(doc, label, fontName, minMm = 12) {
 }
 
 function applySharedHeaderFont(doc, data) {
+  if (!data?.cell || !data.cell.styles) return; // ✅ guard
+
   const raw = data.cell.raw;
+
   // Signature cells render an image, not text — leave font alone.
   if (raw && typeof raw === "object" && raw.__signatureImage) {
     data.cell.text = [""];
     return;
   }
-  data.cell.style.font = pickFontFor(doc, raw);
-  // Slightly tighter padding on header cells so the glyph pair has room.
-  data.cell.styles.font = pickFontFor(doc, raw);
+  if (raw && typeof raw === "object" && raw.__signatureBlank) {
+    data.cell.text = [""];
+    return;
+  }
+
+  // ✅ use plural `.styles` only — `.style` is undefined in autotable
+  const font = pickFontFor(doc, raw);
+  data.cell.styles.font = font;
   data.cell.styles.cellPadding = {
     top: 1.6,
     bottom: 1.6,
@@ -497,6 +505,7 @@ export const exportBiWeeklyAggregateReportToPDF = (
       },
       bodyStyles: { fontSize: 9 },
       didParseCell: (cellData) => {
+        if (!cellData?.cell || !cellData.cell.styles) return;
         const raw = String(cellData.cell.raw ?? "");
         cellData.cell.styles.font = isAmharic(raw)
           ? FONT_NAMES.ethiopic
@@ -795,12 +804,14 @@ export const exportForumReportToPDF = (
     };
 
     const sharedDidParseCell = (data) => {
+      if (!data?.cell || !data.cell.styles) return; // ✅ guard
+
       const raw = data.cell.raw;
-      if (raw && typeof raw === "object" && raw.__signatureImage) {
-        data.cell.text = [""];
-        return;
-      }
-      if (raw && typeof raw === "object" && raw.__signatureBlank) {
+      if (
+        raw &&
+        typeof raw === "object" &&
+        (raw.__signatureImage || raw.__signatureBlank)
+      ) {
         data.cell.text = [""];
         return;
       }
@@ -1134,6 +1145,7 @@ export const exportEvaluationReportToPDF = (
       rowHeight: 16,
       styles: { font: FONT_NAMES.ethiopic, overflow: "linebreak" },
       didParseCell: (cellData) => {
+        if (!cellData?.cell || !cellData.cell.styles) return; // ✅ guard
         const raw =
           typeof cellData.cell.raw === "string" ? cellData.cell.raw : "";
         cellData.cell.styles.font = isAmharic(raw)
