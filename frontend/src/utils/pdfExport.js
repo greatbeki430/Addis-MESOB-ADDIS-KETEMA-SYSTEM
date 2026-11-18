@@ -578,14 +578,21 @@ const FORUM_SIGNATURE_COL = 5;
 
 function buildForumRows(L, formData, includeAI) {
   const rows = [];
+  let sectionNumber = 1; // ✅ Increments only per section
 
-  // Section block with a long "details" cell merged across the right-hand columns.
+  // Helper to push a block with rowSpan for the first 2 columns
   const pushContentBlock = (sectionLabel, entries) => {
     const items = (entries || []).map((e) => encodeText(e)).filter(Boolean);
+    if (items.length === 0) return;
+
+    const rowCount = items.length;
+
     items.forEach((item, idx) => {
       rows.push([
-        "", // row number filled in below
-        idx === 0 ? encodeText(sectionLabel) : "",
+        idx === 0 ? String(sectionNumber) : "", // No. only on first row
+        idx === 0
+          ? { content: encodeText(sectionLabel), rowSpan: rowCount }
+          : "", // RowSpan Section
         {
           content: item,
           colSpan: FORUM_TABLE_COLS - 2,
@@ -593,6 +600,7 @@ function buildForumRows(L, formData, includeAI) {
         },
       ]);
     });
+    sectionNumber++;
   };
 
   const { manual: manualExplanation, ai: aiExplanation } = splitExplanationAi(
@@ -626,7 +634,7 @@ function buildForumRows(L, formData, includeAI) {
     (formData?.agreements || []).filter((a) => a && a.trim()),
   );
 
-  // ── Member rows (same table) ──
+  // ── Member rows ──
   const presentMembers = (formData?.present || []).filter((m) => m && m.trim());
   const absentMembers = (formData?.absent || []).filter(
     (i) => i?.name && i.name.trim(),
@@ -635,45 +643,47 @@ function buildForumRows(L, formData, includeAI) {
     ? formData.signatures
     : [];
 
-  // ── RESTORE 2: keep the signature cell "visible as a blank line" when
-  //    a present member hasn't signed yet, so the printed sheet can be
-  //    signed on paper. Rather than pushing empty strings, push a
-  //    { __signatureBlank: true } marker and render a dotted line in
-  //    didDrawCell below. Names are preserved via the row's name column
-  //    (they come from presentMembers in the same order). ──
-  let sigIdx = 0;
-  presentMembers.forEach((name, idx) => {
-    const sig = signatureEntries[sigIdx];
-    const hasSig = sig && String(sig).startsWith("data:image");
-    rows.push([
-      "",
-      idx === 0 ? encodeText(L.secPresent) : "",
-      encodeText(name),
-      encodeText(L.statusPresent),
-      "",
-      hasSig
-        ? { __signatureImage: sig, __index: sigIdx + 1 }
-        : { __signatureBlank: true, __name: name },
-    ]);
-    if (hasSig) sigIdx += 1;
-  });
-  // ── end RESTORE 2 (present)
+  // Present members block
+  if (presentMembers.length > 0) {
+    const rowCount = presentMembers.length;
+    let sigIdx = 0;
+    presentMembers.forEach((name, idx) => {
+      const sig = signatureEntries[sigIdx];
+      const hasSig = sig && String(sig).startsWith("data:image");
+      rows.push([
+        idx === 0 ? String(sectionNumber) : "",
+        idx === 0
+          ? { content: encodeText(L.secPresent), rowSpan: rowCount }
+          : "",
+        encodeText(name),
+        encodeText(L.statusPresent),
+        "",
+        hasSig
+          ? { __signatureImage: sig, __index: sigIdx + 1 }
+          : { __signatureBlank: true, __name: name },
+      ]);
+      if (hasSig) sigIdx += 1;
+    });
+    sectionNumber++;
+  }
 
-  absentMembers.forEach((entry, idx) => {
-    rows.push([
-      "",
-      idx === 0 ? encodeText(L.secAbsent) : "",
-      encodeText(entry.name),
-      encodeText(L.statusAbsent),
-      encodeText(entry.reason || ""),
-      "",
-    ]);
-  });
-
-  // Continuous numbering across the whole merged table.
-  rows.forEach((row, i) => {
-    row[0] = String(i + 1);
-  });
+  // Absent members block
+  if (absentMembers.length > 0) {
+    const rowCount = absentMembers.length;
+    absentMembers.forEach((entry, idx) => {
+      rows.push([
+        idx === 0 ? String(sectionNumber) : "",
+        idx === 0
+          ? { content: encodeText(L.secAbsent), rowSpan: rowCount }
+          : "",
+        encodeText(entry.name),
+        encodeText(L.statusAbsent),
+        encodeText(entry.reason || ""),
+        "",
+      ]);
+    });
+    sectionNumber++;
+  }
 
   return rows;
 }
@@ -858,12 +868,63 @@ export const exportForumReportToPDF = (
       },
       didParseCell: sharedDidParseCell,
       didDrawCell: (data) => {
+        // ✅ ERASE HORIZONTAL BORDERS FOR MERGED CELLS (Cols 0 & 1)
+        if (
+          data.section === "body" &&
+          (data.column.index === 0 || data.column.index === 1)
+        ) {
+          const raw = data.cell.raw;
+          const isRowSpanned =
+            raw && typeof raw === "object" && raw.rowSpan && raw.rowSpan > 1;
+
+          if (isRowSpanned) {
+            // Erase the bottom line of the merged cell
+            doc.setDrawColor(255, 255, 255);
+            doc.setLineWidth(0.5);
+            doc.line(
+              data.cell.x,
+              data.cell.y + data.cell.height,
+              data.cell.x + data.cell.width,
+              data.cell.y + data.cell.height,
+            );
+
+            // Redraw the right border of the merged cell so it connects properly
+            doc.setDrawColor(210, 210, 210);
+            doc.setLineWidth(0.1);
+            doc.line(
+              data.cell.x + data.cell.width,
+              data.cell.y,
+              data.cell.x + data.cell.width,
+              data.cell.y + data.cell.height,
+            );
+          }
+          // If it's not the spanned cell, but an empty cell below it, erase its bottom line too
+          if (!isRowSpanned && data.cell.raw === "") {
+            const rowData = data.row.raw;
+            // Check if the first cell of this row block has a rowSpan
+            if (
+              rowData[0] === "" ||
+              (rowData[1] &&
+                typeof rowData[1] === "object" &&
+                rowData[1].rowSpan)
+            ) {
+              doc.setDrawColor(255, 255, 255);
+              doc.setLineWidth(0.5);
+              doc.line(
+                data.cell.x,
+                data.cell.y + data.cell.height,
+                data.cell.x + data.cell.width,
+                data.cell.y + data.cell.height,
+              );
+            }
+          }
+        }
+
+        // --- Existing signature logic below ---
         if (data.section !== "body") return;
         if (data.column.index !== FORUM_SIGNATURE_COL) return;
         const raw = data.row.raw?.[FORUM_SIGNATURE_COL];
 
-        // ── RESTORE 2: draw a dotted "signature line" in empty signature
-        //    cells of present members who haven't signed yet. ──
         if (raw && typeof raw === "object" && raw.__signatureBlank) {
           try {
             const cell = data.cell;
@@ -879,7 +940,6 @@ export const exportForumReportToPDF = (
           }
           return;
         }
-        // ── end RESTORE 2
 
         if (!raw || typeof raw !== "object" || !raw.__signatureImage) return;
 
