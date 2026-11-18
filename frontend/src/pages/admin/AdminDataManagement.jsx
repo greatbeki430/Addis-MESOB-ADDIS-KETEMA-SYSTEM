@@ -1525,15 +1525,16 @@ const AdminDataManagement = ({ dataType }) => {
         <div
           style={{
             position: "fixed",
-            inset: 0,
+            inset: 0, // ✅ Anchors it to all 4 sides of the viewport
             background: "rgba(15, 23, 42, 0.6)",
             backdropFilter: "blur(6px)",
             display: "flex",
-            alignItems: isMobile ? "stretch" : "center",
+            alignItems: "center",
             justifyContent: "center",
-            zIndex: 200,
+            zIndex: 9999, // ✅ Forces it above the sidebar/navbar
             padding: isMobile ? 0 : 24,
             animation: "fadeIn 0.2s ease",
+            overflow: "hidden", // ✅ Stops the wrapper from scrolling
           }}
           onClick={() => setShowModal(false)}
         >
@@ -1543,8 +1544,8 @@ const AdminDataManagement = ({ dataType }) => {
               borderRadius: isMobile ? 0 : 20,
               maxWidth: isMobile ? "100%" : "min(1100px, 94vw)",
               width: "100%",
-              maxHeight: isMobile ? "100vh" : "92vh",
-              height: isMobile ? "100vh" : "92vh",
+              maxHeight: "90vh", // ✅ Restricts height
+              height: "auto", // ✅ Shrinks to content size
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
