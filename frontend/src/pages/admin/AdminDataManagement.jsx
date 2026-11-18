@@ -1,5 +1,6 @@
 // frontend/src/pages/admin/AdminDataManagement.jsx
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom"; // ✅ Added for bulletproof modals
 import { useAuth } from "../../hooks/useAuth";
 import { useToast } from "../../hooks/useToast";
 import { C } from "../../styles/theme";
@@ -551,10 +552,6 @@ const AdminDataManagement = ({ dataType }) => {
   );
 
   // ─── B9: Lock / Unlock handlers ──────────────────────────
-  // Only invoked from the forum-reports rows, only for admins. Both
-  // paths go through forumReportService (POST /meetings/:id/lock and
-  // /meetings/:id/unlock), matching the backend adminOrSuperAdmin
-  // route guard. Lock requires a reason; unlock does not.
   const isRowLocked = useCallback(
     (item) => item.isLocked === true || item.status === "locked",
     [],
@@ -1315,7 +1312,6 @@ const AdminDataManagement = ({ dataType }) => {
                                 <FiEye size={18} />
                               </button>
 
-                              {/* B9: Lock / Unlock — forum-reports only, admins only */}
                               {isForumReports && isAdmin && (
                                 <button
                                   onClick={() =>
@@ -1521,498 +1517,510 @@ const AdminDataManagement = ({ dataType }) => {
       )}
 
       {/* ─── View Modal (responsive, roomy) ──────────────────────── */}
-      {showModal && selectedItem && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0, // ✅ Anchors it to all 4 sides of the viewport
-            background: "rgba(15, 23, 42, 0.6)",
-            backdropFilter: "blur(6px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 9999, // ✅ Forces it above the sidebar/navbar
-            padding: isMobile ? 0 : 24,
-            animation: "fadeIn 0.2s ease",
-            overflow: "hidden", // ✅ Stops the wrapper from scrolling
-          }}
-          onClick={() => setShowModal(false)}
-        >
+      {showModal &&
+        selectedItem &&
+        createPortal(
           <div
             style={{
-              background: C.white,
-              borderRadius: isMobile ? 0 : 20,
-              maxWidth: isMobile ? "100%" : "min(1100px, 94vw)",
-              width: "100%",
-              maxHeight: "90vh", // ✅ Restricts height
-              height: "auto", // ✅ Shrinks to content size
-              overflow: "hidden",
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(15, 23, 42, 0.6)",
+              backdropFilter: "blur(6px)",
               display: "flex",
-              flexDirection: "column",
-              boxShadow: isMobile ? "none" : "0 24px 72px rgba(0,0,0,0.28)",
-              animation: "slideUp 0.25s ease",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 99999, // ✅ Ensures it overlays absolutely everything
+              padding: isMobile ? 0 : 24,
+              animation: "fadeIn 0.2s ease",
+              overflow: "hidden",
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={() => setShowModal(false)}
           >
-            {/* ── Header (sticky) ── */}
             <div
               style={{
-                padding: isMobile ? "14px 18px" : "20px 32px",
-                borderBottom: `1px solid ${C.border}`,
+                background: C.white,
+                borderRadius: isMobile ? 0 : 20,
+                maxWidth: isMobile ? "100%" : "min(1100px, 94vw)",
+                width: "100%",
+                maxHeight: isMobile ? "100%" : "90vh", // ✅ Prevents vertical overflow
+                height: isMobile ? "100%" : "auto", // ✅ Shrinks to fit content
                 display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                background: `linear-gradient(135deg, ${C.primary}12, ${C.primary}04)`,
-                flexShrink: 0,
+                flexDirection: "column",
+                boxShadow: isMobile ? "none" : "0 24px 72px rgba(0,0,0,0.28)",
+                animation: "slideUp 0.25s ease",
               }}
+              onClick={(e) => e.stopPropagation()}
             >
+              {/* ── Header (sticky) ── */}
               <div
                 style={{
+                  padding: isMobile ? "14px 18px" : "20px 32px",
+                  borderBottom: `1px solid ${C.border}`,
                   display: "flex",
                   alignItems: "center",
-                  gap: isMobile ? 10 : 14,
-                  minWidth: 0,
-                  flex: 1,
+                  justifyContent: "space-between",
+                  gap: 12,
+                  background: `linear-gradient(135deg, ${C.primary}12, ${C.primary}04)`,
+                  flexShrink: 0, // ✅ Prevents header from squishing
                 }}
               >
                 <div
                   style={{
-                    width: isMobile ? 36 : 48,
-                    height: isMobile ? 36 : 48,
-                    borderRadius: isMobile ? 10 : 14,
-                    background: `linear-gradient(135deg, ${C.primary}, ${C.primary}dd)`,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: isMobile ? 10 : 14,
+                    minWidth: 0,
+                    flex: 1,
+                  }}
+                >
+                  <div
+                    style={{
+                      width: isMobile ? 36 : 48,
+                      height: isMobile ? 36 : 48,
+                      borderRadius: isMobile ? 10 : 14,
+                      background: `linear-gradient(135deg, ${C.primary}, ${C.primary}dd)`,
+                      color: "#fff",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      flexShrink: 0,
+                      boxShadow: `0 4px 16px ${C.primary}44`,
+                    }}
+                  >
+                    {config.icon}
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <h2
+                      style={{
+                        margin: 0,
+                        fontSize: isMobile ? 16 : 20,
+                        color: C.dark,
+                        fontFamily: "inherit",
+                        fontWeight: 700,
+                        lineHeight: 1.2,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {config.label} Details
+                    </h2>
+                    <p
+                      style={{
+                        margin: "2px 0 0",
+                        fontSize: isMobile ? 11 : 13,
+                        color: C.muted,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Full record view — sensitive fields hidden
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowModal(false)}
+                  aria-label="Close"
+                  style={{
+                    background: "rgba(0,0,0,0.06)",
+                    border: "none",
+                    width: isMobile ? 34 : 38,
+                    height: isMobile ? 34 : 38,
+                    borderRadius: 10,
+                    cursor: "pointer",
+                    color: C.muted,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    transition: "all 0.2s ease",
+                    flexShrink: 0,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(0,0,0,0.12)";
+                    e.currentTarget.style.color = C.dark;
+                    e.currentTarget.style.transform = "scale(1.05)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(0,0,0,0.06)";
+                    e.currentTarget.style.color = C.muted;
+                    e.currentTarget.style.transform = "scale(1)";
+                  }}
+                >
+                  <FiX size={isMobile ? 18 : 20} />
+                </button>
+              </div>
+
+              {/* ── Body (Scrollable) ── */}
+              <div
+                style={{
+                  padding: isMobile ? "16px 16px 24px" : "28px 32px",
+                  overflowY: "auto", // ✅ Enables scrolling inside
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: isMobile ? 18 : 24,
+                  flex: 1, // ✅ Takes up remaining space and scrolls
+                  WebkitOverflowScrolling: "touch",
+                }}
+              >
+                {buildSections(selectedItem, dataType).map((section, sIdx) => (
+                  <div
+                    key={sIdx}
+                    style={{
+                      background: "#FAFBFC",
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 14,
+                      padding: isMobile ? "14px 14px" : "18px 22px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        marginBottom: isMobile ? 12 : 16,
+                        paddingBottom: 10,
+                        borderBottom: `2px solid ${C.primary}22`,
+                      }}
+                    >
+                      <span
+                        style={{
+                          color: C.primary,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          background: `${C.primary}15`,
+                        }}
+                      >
+                        {section.icon}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: isMobile ? 12 : 13,
+                          fontWeight: 800,
+                          color: C.primary,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.06em",
+                        }}
+                      >
+                        {section.title}
+                      </span>
+                    </div>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: isMobile ? 12 : 10,
+                      }}
+                    >
+                      {section.rows.map((row, rIdx) => (
+                        <div
+                          key={rIdx}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: isMobile ? "1fr" : "180px 1fr",
+                            gap: isMobile ? 4 : 16,
+                            padding: isMobile ? "8px 10px" : "10px 14px",
+                            background: "#fff",
+                            borderRadius: 10,
+                            border: `1px solid ${C.border}66`,
+                            alignItems: "flex-start",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: isMobile ? 10 : 11,
+                              fontWeight: 700,
+                              color: C.muted,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.05em",
+                              paddingTop: isMobile ? 0 : 2,
+                            }}
+                          >
+                            {formatLabel(row.key)}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: isMobile ? 13 : 14,
+                              color: C.dark,
+                              wordBreak: "break-word",
+                              lineHeight: 1.6,
+                              minWidth: 0,
+                            }}
+                          >
+                            {renderModalValue(row.value, isMobile)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {buildSections(selectedItem, dataType).length === 0 && (
+                  <div
+                    style={{
+                      textAlign: "center",
+                      padding: "60px 20px",
+                      color: C.muted,
+                    }}
+                  >
+                    <FiInfo
+                      size={40}
+                      style={{ marginBottom: 12, opacity: 0.5 }}
+                    />
+                    <p>No displayable fields in this record.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Footer (sticky) ── */}
+              <div
+                style={{
+                  padding: isMobile ? "12px 16px" : "16px 32px",
+                  borderTop: `1px solid ${C.border}`,
+                  background: "#FAFBFC",
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 8,
+                  flexShrink: 0, // ✅ Prevents footer from squishing
+                }}
+              >
+                <button
+                  onClick={() => setShowModal(false)}
+                  style={{
+                    padding: isMobile ? "10px 20px" : "10px 24px",
+                    background: C.primary,
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: 10,
+                    cursor: "pointer",
+                    fontWeight: 700,
+                    fontSize: isMobile ? 13 : 14,
+                    width: isMobile ? "100%" : "auto",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                    e.currentTarget.style.boxShadow = `0 6px 20px ${C.primary}44`;
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.transform = "translateY(0)";
+                    e.currentTarget.style.boxShadow = "none";
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body, // ✅ Renders directly to body, out of layout
+        )}
+
+      {/* ─── Delete Confirmation Modal ──────────────────────── */}
+      {deleteTarget &&
+        createPortal(
+          <div
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: "rgba(15, 23, 42, 0.65)",
+              backdropFilter: "blur(6px)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 99999,
+              padding: 24,
+              animation: "fadeIn 0.2s ease",
+            }}
+            onClick={() => !deleting && setDeleteTarget(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "#fff",
+                borderRadius: 20,
+                width: "100%",
+                maxWidth: 460,
+                overflow: "hidden",
+                boxShadow: "0 24px 72px rgba(0,0,0,0.32)",
+                animation: "slideUp 0.25s ease",
+              }}
+            >
+              <div
+                style={{
+                  padding: "22px 26px 18px",
+                  background: "linear-gradient(135deg, #FEF2F2, #FEE2E2)",
+                  borderBottom: "1px solid #FECACA",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 14,
+                }}
+              >
+                <div
+                  style={{
+                    width: 46,
+                    height: 46,
+                    borderRadius: 14,
+                    background: "linear-gradient(135deg, #EF4444, #DC2626)",
                     color: "#fff",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
                     flexShrink: 0,
-                    boxShadow: `0 4px 16px ${C.primary}44`,
+                    boxShadow: "0 6px 18px rgba(239,68,68,0.4)",
                   }}
                 >
-                  {config.icon}
+                  <FiAlertCircle size={22} />
                 </div>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <h2
+                  <h3
                     style={{
                       margin: 0,
-                      fontSize: isMobile ? 16 : 20,
-                      color: C.dark,
-                      fontFamily: "inherit",
+                      fontSize: 17,
                       fontWeight: 700,
-                      lineHeight: 1.2,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      color: "#7F1D1D",
+                      lineHeight: 1.3,
                     }}
                   >
-                    {config.label} Details
-                  </h2>
+                    Delete {config.label.replace(/s$/, "")}?
+                  </h3>
                   <p
                     style={{
-                      margin: "2px 0 0",
-                      fontSize: isMobile ? 11 : 13,
-                      color: C.muted,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
+                      margin: "4px 0 0",
+                      fontSize: 13,
+                      color: "#B91C1C",
+                      lineHeight: 1.5,
                     }}
                   >
-                    Full record view — sensitive fields hidden
+                    This action cannot be undone.
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowModal(false)}
-                aria-label="Close"
-                style={{
-                  background: "rgba(0,0,0,0.06)",
-                  border: "none",
-                  width: isMobile ? 34 : 38,
-                  height: isMobile ? 34 : 38,
-                  borderRadius: 10,
-                  cursor: "pointer",
-                  color: C.muted,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  transition: "all 0.2s ease",
-                  flexShrink: 0,
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "rgba(0,0,0,0.12)";
-                  e.currentTarget.style.color = C.dark;
-                  e.currentTarget.style.transform = "scale(1.05)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "rgba(0,0,0,0.06)";
-                  e.currentTarget.style.color = C.muted;
-                  e.currentTarget.style.transform = "scale(1)";
-                }}
-              >
-                <FiX size={isMobile ? 18 : 20} />
-              </button>
-            </div>
 
-            {/* ── Body ── */}
-            <div
-              style={{
-                padding: isMobile ? "16px 16px 24px" : "28px 32px",
-                overflowY: "auto",
-                overflowX: "hidden",
-                display: "flex",
-                flexDirection: "column",
-                gap: isMobile ? 18 : 24,
-                WebkitOverflowScrolling: "touch",
-              }}
-            >
-              {buildSections(selectedItem, dataType).map((section, sIdx) => (
-                <div
-                  key={sIdx}
-                  style={{
-                    background: "#FAFBFC",
-                    border: `1px solid ${C.border}`,
-                    borderRadius: 14,
-                    padding: isMobile ? "14px 14px" : "18px 22px",
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      marginBottom: isMobile ? 12 : 16,
-                      paddingBottom: 10,
-                      borderBottom: `2px solid ${C.primary}22`,
-                    }}
-                  >
-                    <span
-                      style={{
-                        color: C.primary,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 28,
-                        height: 28,
-                        borderRadius: 8,
-                        background: `${C.primary}15`,
-                      }}
-                    >
-                      {section.icon}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: isMobile ? 12 : 13,
-                        fontWeight: 800,
-                        color: C.primary,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.06em",
-                      }}
-                    >
-                      {section.title}
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: isMobile ? 12 : 10,
-                    }}
-                  >
-                    {section.rows.map((row, rIdx) => (
-                      <div
-                        key={rIdx}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: isMobile ? "1fr" : "180px 1fr",
-                          gap: isMobile ? 4 : 16,
-                          padding: isMobile ? "8px 10px" : "10px 14px",
-                          background: "#fff",
-                          borderRadius: 10,
-                          border: `1px solid ${C.border}66`,
-                          alignItems: "flex-start",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: isMobile ? 10 : 11,
-                            fontWeight: 700,
-                            color: C.muted,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                            paddingTop: isMobile ? 0 : 2,
-                          }}
-                        >
-                          {formatLabel(row.key)}
-                        </div>
-                        <div
-                          style={{
-                            fontSize: isMobile ? 13 : 14,
-                            color: C.dark,
-                            wordBreak: "break-word",
-                            lineHeight: 1.6,
-                            minWidth: 0,
-                          }}
-                        >
-                          {renderModalValue(row.value, isMobile)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-
-              {buildSections(selectedItem, dataType).length === 0 && (
-                <div
-                  style={{
-                    textAlign: "center",
-                    padding: "60px 20px",
-                    color: C.muted,
-                  }}
-                >
-                  <FiInfo
-                    size={40}
-                    style={{ marginBottom: 12, opacity: 0.5 }}
-                  />
-                  <p>No displayable fields in this record.</p>
-                </div>
-              )}
-            </div>
-
-            {/* ── Footer (sticky) ── */}
-            <div
-              style={{
-                padding: isMobile ? "12px 16px" : "16px 32px",
-                borderTop: `1px solid ${C.border}`,
-                background: "#FAFBFC",
-                display: "flex",
-                justifyContent: "flex-end",
-                gap: 8,
-                flexShrink: 0,
-              }}
-            >
-              <button
-                onClick={() => setShowModal(false)}
-                style={{
-                  padding: isMobile ? "10px 20px" : "10px 24px",
-                  background: C.primary,
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 10,
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: isMobile ? 13 : 14,
-                  width: isMobile ? "100%" : "auto",
-                  transition: "all 0.2s ease",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = "translateY(-1px)";
-                  e.currentTarget.style.boxShadow = `0 6px 20px ${C.primary}44`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = "translateY(0)";
-                  e.currentTarget.style.boxShadow = "none";
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-
-          <style>{`
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-      }
-      @keyframes slideUp {
-        from { opacity: 0; transform: translateY(20px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-    `}</style>
-        </div>
-      )}
-
-      {/* ─── Delete Confirmation Modal ──────────────────────── */}
-      {deleteTarget && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.65)",
-            backdropFilter: "blur(6px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 4000,
-            padding: 24,
-            animation: "fadeIn 0.2s ease",
-          }}
-          onClick={() => !deleting && setDeleteTarget(null)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: "#fff",
-              borderRadius: 20,
-              width: "100%",
-              maxWidth: 460,
-              overflow: "hidden",
-              boxShadow: "0 24px 72px rgba(0,0,0,0.32)",
-              animation: "slideUp 0.25s ease",
-            }}
-          >
-            <div
-              style={{
-                padding: "22px 26px 18px",
-                background: "linear-gradient(135deg, #FEF2F2, #FEE2E2)",
-                borderBottom: "1px solid #FECACA",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 14,
-              }}
-            >
-              <div
-                style={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: 14,
-                  background: "linear-gradient(135deg, #EF4444, #DC2626)",
-                  color: "#fff",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                  boxShadow: "0 6px 18px rgba(239,68,68,0.4)",
-                }}
-              >
-                <FiAlertCircle size={22} />
-              </div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: 17,
-                    fontWeight: 700,
-                    color: "#7F1D1D",
-                    lineHeight: 1.3,
-                  }}
-                >
-                  Delete {config.label.replace(/s$/, "")}?
-                </h3>
+              <div style={{ padding: "20px 26px 22px" }}>
                 <p
                   style={{
-                    margin: "4px 0 0",
-                    fontSize: 13,
-                    color: "#B91C1C",
-                    lineHeight: 1.5,
+                    margin: 0,
+                    fontSize: 14,
+                    color: C.dark,
+                    lineHeight: 1.6,
                   }}
                 >
-                  This action cannot be undone.
+                  You are about to permanently delete{" "}
+                  <strong style={{ color: "#DC2626" }}>
+                    “{deleteTarget.label}”
+                  </strong>
+                  . All associated data will be removed from the system.
                 </p>
-              </div>
-            </div>
 
-            <div style={{ padding: "20px 26px 22px" }}>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 14,
-                  color: C.dark,
-                  lineHeight: 1.6,
-                }}
-              >
-                You are about to permanently delete{" "}
-                <strong style={{ color: "#DC2626" }}>
-                  “{deleteTarget.label}”
-                </strong>
-                . All associated data will be removed from the system.
-              </p>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  justifyContent: "flex-end",
-                  marginTop: 24,
-                }}
-              >
-                <button
-                  onClick={() => setDeleteTarget(null)}
-                  disabled={deleting}
+                <div
                   style={{
-                    padding: "10px 20px",
-                    background: "#F1F5F9",
-                    color: "#475569",
-                    border: "1px solid #E2E8F0",
-                    borderRadius: 10,
-                    cursor: deleting ? "not-allowed" : "pointer",
-                    fontWeight: 600,
-                    fontSize: 13,
-                    opacity: deleting ? 0.6 : 1,
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!deleting) e.currentTarget.style.background = "#E2E8F0";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "#F1F5F9";
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDelete}
-                  disabled={deleting}
-                  style={{
-                    padding: "10px 20px",
-                    background: deleting
-                      ? "#FCA5A5"
-                      : "linear-gradient(135deg, #EF4444, #DC2626)",
-                    color: "#fff",
-                    border: "none",
-                    borderRadius: 10,
-                    cursor: deleting ? "wait" : "pointer",
-                    fontWeight: 700,
-                    fontSize: 13,
                     display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    boxShadow: deleting
-                      ? "none"
-                      : "0 6px 18px rgba(239,68,68,0.35)",
-                    transition: "all 0.15s",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (!deleting) {
-                      e.currentTarget.style.transform = "translateY(-1px)";
-                      e.currentTarget.style.boxShadow =
-                        "0 8px 22px rgba(239,68,68,0.5)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow =
-                      "0 6px 18px rgba(239,68,68,0.35)";
+                    gap: 10,
+                    justifyContent: "flex-end",
+                    marginTop: 24,
                   }}
                 >
-                  {deleting ? (
-                    <>
-                      <FiClock size={15} />
-                      Deleting…
-                    </>
-                  ) : (
-                    <>
-                      <FiTrash2 size={15} />
-                      Delete Permanently
-                    </>
-                  )}
-                </button>
+                  <button
+                    onClick={() => setDeleteTarget(null)}
+                    disabled={deleting}
+                    style={{
+                      padding: "10px 20px",
+                      background: "#F1F5F9",
+                      color: "#475569",
+                      border: "1px solid #E2E8F0",
+                      borderRadius: 10,
+                      cursor: deleting ? "not-allowed" : "pointer",
+                      fontWeight: 600,
+                      fontSize: 13,
+                      opacity: deleting ? 0.6 : 1,
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!deleting)
+                        e.currentTarget.style.background = "#E2E8F0";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "#F1F5F9";
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmDelete}
+                    disabled={deleting}
+                    style={{
+                      padding: "10px 20px",
+                      background: deleting
+                        ? "#FCA5A5"
+                        : "linear-gradient(135deg, #EF4444, #DC2626)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 10,
+                      cursor: deleting ? "wait" : "pointer",
+                      fontWeight: 700,
+                      fontSize: 13,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      boxShadow: deleting
+                        ? "none"
+                        : "0 6px 18px rgba(239,68,68,0.35)",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!deleting) {
+                        e.currentTarget.style.transform = "translateY(-1px)";
+                        e.currentTarget.style.boxShadow =
+                          "0 8px 22px rgba(239,68,68,0.5)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow =
+                        "0 6px 18px rgba(239,68,68,0.35)";
+                    }}
+                  >
+                    {deleting ? (
+                      <>
+                        <FiClock size={15} />
+                        Deleting…
+                      </>
+                    ) : (
+                      <>
+                        <FiTrash2 size={15} />
+                        Delete Permanently
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
+
+      {/* ─── Modal Animations ─── */}
+      <style>{`
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes slideUp {
+          from { opacity: 0; transform: translateY(20px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 };
