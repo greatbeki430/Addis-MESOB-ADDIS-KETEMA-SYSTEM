@@ -1,7 +1,8 @@
 // frontend/src/utils/pdfExport.js
 // ─────────────────────────────────────────────────────────────────────────────
 // Canonical PDF export entry points.
-//   • exportForumReportToPDF              — mixed-script safe, Amharic-first
+//   • exportForumReportToPDF              — mixed-script safe, Amharic-first,
+//                                           ALWAYS fits on ONE page
 //   • exportDailyReportToPDF              — delegates to ./pdf/reports/dailyReport.js
 //   • exportEvaluationReportToPDF         — mixed-script safe, Amharic-first
 //   • exportRecognitionCertificateToPDF   — mixed-script safe, Amharic-first
@@ -80,12 +81,28 @@ const encodeText = (text) => {
   return String(text);
 };
 
-// ── RESTORE 3: formatTime helper (from original; used by forum header) ──
+// ── formatTime helper (used by forum header) ──
 const formatTime = (timeStr) => {
   if (!timeStr) return "___";
   return timeStr;
 };
-// ── end RESTORE 3
+
+// ─── TEXT CLEANING HELPERS (used by forum report) ───────────
+// Removes invisible characters (zero-width space, BOM, NBSP, tabs…) that pass
+// `.trim()` but render as blank rows, and collapses repeated spaces.
+const sanitizeText = (s) =>
+  String(s ?? "")
+    .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+    .replace(/[\u00A0\t\r]/g, " ")
+    .split("\n")
+    .map((l) => l.replace(/ {2,}/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+
+const clip = (s, max) =>
+  !Number.isFinite(max) || s.length <= max
+    ? s
+    : s.slice(0, Math.max(0, max - 3)).trimEnd() + "...";
 
 // ─── MIXED-SCRIPT / HEADER-CELL INFRASTRUCTURE ──────────────
 const HEADER_FONT_SIZE = 8.5;
@@ -116,6 +133,7 @@ function measureHeaderWidth(doc, label, fontName) {
   return text.length * perGlyph;
 }
 
+// (kept for other callers; no longer used by the forum report)
 function computeNoWrapColumnWidth(doc, label, fontName, minMm = 12) {
   const textMm = measureHeaderWidth(doc, label, fontName);
   const paddingMm = 3;
@@ -154,7 +172,8 @@ const AM_LABELS = {
   time: "ሰዓት",
   team: "ቡድን",
   explanation: "ማብራሪያ",
-  aiBlock: "የ AI ማጠቃለያ",
+  // Pure-Amharic label (no Latin letters) so the Ethiopic font draws it fully.
+  aiBlock: "የኤአይ ማጠቃለያ",
   secPresent: "የተገኙ አባላት",
   secAbsent: "ያልተገኙ አባላት",
   secPrevResults: "ቀዳሚ ውጤቶች",
@@ -539,7 +558,59 @@ const splitExplanationAi = (explanation) => {
 const FORUM_TABLE_COLS = 6;
 const FORUM_SIGNATURE_COL = 5;
 
-function buildForumRows(L, formData, includeAI) {
+// Tightness levels, least tight → tightest. The exporter binary-searches for
+// the first level that yields exactly ONE page.
+//   aiMax:   Infinity = full AI text, number = clip to N chars, 0 = drop block
+//   itemMax: clip every content item to N chars (last-resort levels only)
+const FIT_LEVELS = [
+  { font: 8, head: 8.5, padV: 1.2, padH: 2, sigH: 10, hdr: 1, aiMax: Infinity },
+  {
+    font: 7.5,
+    head: 8,
+    padV: 0.9,
+    padH: 1.8,
+    sigH: 9,
+    hdr: 0.9,
+    aiMax: Infinity,
+  },
+  {
+    font: 7,
+    head: 7.5,
+    padV: 0.7,
+    padH: 1.6,
+    sigH: 8,
+    hdr: 0.8,
+    aiMax: Infinity,
+  },
+  { font: 7, head: 7.5, padV: 0.7, padH: 1.6, sigH: 8, hdr: 0.8, aiMax: 500 },
+  { font: 6.5, head: 7, padV: 0.5, padH: 1.4, sigH: 7, hdr: 0.7, aiMax: 400 },
+  { font: 6, head: 6.5, padV: 0.4, padH: 1.2, sigH: 6.5, hdr: 0.6, aiMax: 0 },
+  { font: 5.5, head: 6, padV: 0.3, padH: 1, sigH: 6, hdr: 0.55, aiMax: 0 },
+  { font: 5, head: 5.5, padV: 0.25, padH: 1, sigH: 5.5, hdr: 0.5, aiMax: 0 },
+  {
+    font: 4.5,
+    head: 5,
+    padV: 0.2,
+    padH: 0.8,
+    sigH: 5,
+    hdr: 0.5,
+    aiMax: 0,
+    itemMax: 140,
+  },
+  {
+    font: 4,
+    head: 4.5,
+    padV: 0.15,
+    padH: 0.6,
+    sigH: 4.5,
+    hdr: 0.45,
+    aiMax: 0,
+    itemMax: 80,
+  },
+];
+
+function buildForumRows(L, formData, opts = {}) {
+  const { includeAI = true, aiMax = Infinity, itemMax = Infinity } = opts;
   const rows = [];
   let sectionNumber = 1;
 
@@ -547,7 +618,9 @@ function buildForumRows(L, formData, includeAI) {
   // columns in the following rows, so those rows must NOT repeat "" placeholders
   // for columns 0/1 (that used to shift every cell one column to the right).
   const pushContentBlock = (sectionLabel, entries) => {
-    const items = (entries || []).map((e) => encodeText(e)).filter(Boolean);
+    const items = (entries || [])
+      .map((e) => clip(sanitizeText(encodeText(e)), itemMax))
+      .filter(Boolean);
     if (items.length === 0) return;
     const rowCount = items.length;
 
@@ -578,32 +651,40 @@ function buildForumRows(L, formData, includeAI) {
     sectionNumber++;
   };
 
-  const { manual: manualExplanation, ai: aiExplanation } = splitExplanationAi(
-    formData?.explanation,
-  );
+  const { manual, ai } = splitExplanationAi(formData?.explanation);
+  const manualExplanation = sanitizeText(manual);
+  const aiExplanation = sanitizeText(ai);
   if (manualExplanation) pushContentBlock(L.explanation, [manualExplanation]);
-  if (includeAI && aiExplanation) pushContentBlock(L.aiBlock, [aiExplanation]);
+  if (includeAI && aiMax > 0 && aiExplanation) {
+    pushContentBlock(L.aiBlock, [clip(aiExplanation, aiMax)]);
+  }
   pushContentBlock(
     L.secPrevResults,
-    (formData?.prevResults || []).filter((r) => r && r.trim()),
+    (formData?.prevResults || []).filter((r) => r && sanitizeText(r)),
   );
   pushContentBlock(
     L.secTopics,
-    (formData?.topics || []).filter((tp) => tp && tp.trim()),
+    (formData?.topics || []).filter((tp) => tp && sanitizeText(tp)),
   );
   pushContentBlock(
     L.secGaps,
-    (formData?.gaps || []).filter((g) => g && g.trim()),
+    (formData?.gaps || []).filter((g) => g && sanitizeText(g)),
   );
   pushContentBlock(
     L.secAgreements,
-    (formData?.agreements || []).filter((a) => a && a.trim()),
+    (formData?.agreements || []).filter((a) => a && sanitizeText(a)),
   );
 
-  const presentMembers = (formData?.present || []).filter((m) => m && m.trim());
-  const absentMembers = (formData?.absent || []).filter(
-    (i) => i?.name && i.name.trim(),
-  );
+  const presentMembers = (formData?.present || [])
+    .map(sanitizeText)
+    .filter(Boolean);
+  const absentMembers = (formData?.absent || [])
+    .map((i) => ({
+      ...i,
+      name: sanitizeText(i?.name),
+      reason: sanitizeText(i?.reason),
+    }))
+    .filter((i) => i.name);
   const signatureEntries = Array.isArray(formData?.signatures)
     ? formData.signatures
     : [];
@@ -677,7 +758,7 @@ function buildForumRows(L, formData, includeAI) {
   return rows;
 }
 
-// ─── EXPORT FORUM REPORT ─────────────────
+// ─── EXPORT FORUM REPORT (ALWAYS ONE PAGE) ──────────────────
 export const exportForumReportToPDF = (
   formData,
   t,
@@ -686,7 +767,7 @@ export const exportForumReportToPDF = (
   options = {},
 ) => {
   try {
-    console.log("📄 Generating Forum Report PDF (single merged table)...");
+    console.log("📄 Generating Forum Report PDF (single page, fit-to-page)...");
 
     const hasData =
       formData?.present?.some((m) => m && m.trim() !== "") ||
@@ -707,52 +788,7 @@ export const exportForumReportToPDF = (
       : "am";
     const L = getForumLabels(reportLang, t);
     const includeAI = options?.includeAI !== false;
-
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: "a4",
-    });
-    doc.setProperties({
-      title: options?.title || L.title,
-      author: options?.author || teamName || "A-MESOB",
-      subject: options?.subject || L.subtitle,
-      keywords: options?.keywords || "forum, report, meeting",
-    });
-
-    loadFonts(doc);
-
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
-    let yPos = margin;
-
-    // ─── Header ─────────────────────────────────────────────────
-    doc.setFontSize(16);
-    doc.setTextColor(26, 107, 74);
-    drawMixedScriptText(doc, L.title, pageWidth / 2, yPos, {
-      align: "center",
-      bold: true,
-    });
-    doc.setTextColor(0, 0, 0);
-    yPos += 7;
-
-    doc.setFontSize(8.5);
-    doc.setTextColor(100, 100, 100);
-    drawMixedScriptText(doc, L.subtitle, pageWidth / 2, yPos, {
-      align: "center",
-    });
-    doc.setTextColor(0, 0, 0);
-    yPos += 5;
-
-    if (teamName) {
-      doc.setFontSize(10);
-      drawMixedScriptText(doc, `— ${teamName}`, pageWidth / 2, yPos, {
-        align: "center",
-        bold: true,
-      });
-      yPos += 5;
-    }
 
     // ✅ Ethiopian Calendar Conversion
     const dateText = formData?.date || new Date().toISOString().split("T")[0];
@@ -762,178 +798,274 @@ export const exportForumReportToPDF = (
         ? `${formatTime(formData.timeStart)} - ${formatTime(formData.timeEnd)}`
         : "___ - ___";
 
-    doc.setFontSize(9);
-    const metaLine = `${L.date}: ${ethDateText} (${dateText})    |    ${L.time}: ${timeText}`;
-    drawMixedScriptText(doc, metaLine, margin, yPos);
-    yPos += 5;
+    // ── Build the whole page at a given tightness level ──
+    const buildDoc = (lv) => {
+      const doc = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+      });
+      doc.setProperties({
+        title: options?.title || L.title,
+        author: options?.author || teamName || "A-MESOB",
+        subject: options?.subject || L.subtitle,
+        keywords: options?.keywords || "forum, report, meeting",
+      });
 
-    doc.setDrawColor(26, 107, 74);
-    doc.setLineWidth(0.5);
-    doc.line(margin, yPos, pageWidth - margin, yPos);
-    yPos += 6;
+      loadFonts(doc);
 
-    // ─── Table styling ─────────────────────────────────────────
-    const sharedHeadStyles = {
-      fillColor: [26, 107, 74],
-      textColor: [255, 255, 255],
-      fontSize: HEADER_FONT_SIZE,
-      fontStyle: "bold",
-      halign: "center",
-      valign: "middle",
-      cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 },
-      minCellHeight: 5.5,
-      overflow: "linebreak",
-    };
-    const sharedBodyStyles = {
-      fontSize: 8,
-      valign: "middle",
-      cellPadding: { top: 1.2, bottom: 1.2, left: 2, right: 2 },
-      minCellHeight: 5,
-      fillColor: [255, 255, 255],
-      textColor: [0, 0, 0],
-    };
-    const sharedStyles = {
-      overflow: "linebreak",
-      lineWidth: 0.15,
-      lineColor: [170, 170, 170],
-    };
+      const pageWidth = doc.internal.pageSize.getWidth();
+      let y = margin;
 
-    const sharedDidParseCell = (data) => {
-      if (!data?.cell || !data.cell.styles) return;
-      data.cell.styles.valign = "middle"; // ✅ Fixes text alignment in rowSpanned cells
-      const raw = data.cell.raw;
-      if (
-        raw &&
-        typeof raw === "object" &&
-        (raw.__signatureImage || raw.__signatureBlank)
-      ) {
-        data.cell.text = [""];
-        return;
+      // ─── Header ───
+      doc.setFontSize(16);
+      doc.setTextColor(26, 107, 74);
+      drawMixedScriptText(doc, L.title, pageWidth / 2, y, {
+        align: "center",
+        bold: true,
+      });
+      doc.setTextColor(0, 0, 0);
+      y += 7 * lv.hdr;
+
+      doc.setFontSize(8.5);
+      doc.setTextColor(100, 100, 100);
+      drawMixedScriptText(doc, L.subtitle, pageWidth / 2, y, {
+        align: "center",
+      });
+      doc.setTextColor(0, 0, 0);
+      y += 5 * lv.hdr;
+
+      if (teamName) {
+        doc.setFontSize(10);
+        drawMixedScriptText(doc, `— ${teamName}`, pageWidth / 2, y, {
+          align: "center",
+          bold: true,
+        });
+        y += 5 * lv.hdr;
       }
-      applySharedHeaderFont(doc, data);
-    };
 
-    const tableRows = buildForumRows(L, formData, includeAI);
-    const noFont = isAmharic(String(L.colNo))
-      ? FONT_NAMES.ethiopic
-      : FONT_NAMES.latin;
-    const noColWidth = computeNoWrapColumnWidth(doc, L.colNo, noFont, 12);
-    const detailHeader = `${L.colItem} / ${L.colName}`;
+      doc.setFontSize(9);
+      const metaLine = `${L.date}: ${ethDateText} (${dateText})    |    ${L.time}: ${timeText}`;
+      drawMixedScriptText(doc, metaLine, margin, y);
+      y += 4 * lv.hdr + 1;
 
-    // ─── Render the ONE table ──────────────────────────────────
-    autoTable(doc, {
-      startY: yPos,
-      head: [
-        [
-          L.colNo,
-          L.colSection,
-          detailHeader,
-          L.colStatus,
-          L.colReason,
-          L.colSignature,
+      doc.setDrawColor(26, 107, 74);
+      doc.setLineWidth(0.5);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 4 * lv.hdr + 1;
+
+      const tableRows = buildForumRows(L, formData, {
+        includeAI,
+        aiMax: lv.aiMax,
+        itemMax: lv.itemMax ?? Infinity,
+      });
+
+      autoTable(doc, {
+        startY: y,
+        head: [
+          [
+            L.colNo,
+            L.colSection,
+            `${L.colItem} / ${L.colName}`,
+            L.colStatus,
+            L.colReason,
+            L.colSignature,
+          ],
         ],
-      ],
-      body: tableRows,
-      margin: { left: margin, right: margin, bottom: 16 },
-      // "grid" draws every border itself and treats a rowSpan cell as ONE box,
-      // so merged No./Section cells get no inner lines and close at the bottom
-      // automatically (also across page breaks). No manual line drawing needed.
-      theme: "grid",
-      headStyles: sharedHeadStyles,
-      bodyStyles: sharedBodyStyles,
-      styles: sharedStyles,
-      columnStyles: {
-        0: { cellWidth: noColWidth, halign: "center" },
-        1: { cellWidth: 34, halign: "left" },
-        2: { cellWidth: "auto", halign: "left" },
-        3: { cellWidth: 26, halign: "center" },
-        4: { cellWidth: 32, halign: "left" },
-        5: { cellWidth: 30, halign: "center", minCellHeight: 10 },
-      },
-      didParseCell: sharedDidParseCell,
-      didDrawCell: (data) => {
-        // ✅ 3. SIGNATURE LOGIC
-        if (data.section !== "body") return;
-        if (data.column.index !== FORUM_SIGNATURE_COL) return;
-        if (data.cell.colSpan > 1) return;
-        const raw = data.cell.raw;
+        body: tableRows,
+        margin: { left: margin, right: margin, bottom: 14 },
+        // "grid" treats a rowSpan cell as ONE box, so merged No./Section cells
+        // get no inner lines and close at the bottom automatically.
+        theme: "grid",
+        headStyles: {
+          fillColor: [26, 107, 74],
+          textColor: [255, 255, 255],
+          fontSize: lv.head,
+          fontStyle: "bold",
+          halign: "center",
+          valign: "middle",
+          cellPadding: {
+            top: lv.padV + 0.4,
+            bottom: lv.padV + 0.4,
+            left: lv.padH,
+            right: lv.padH,
+          },
+          minCellHeight: 0,
+          overflow: "linebreak",
+        },
+        bodyStyles: {
+          fontSize: lv.font,
+          valign: "middle",
+          cellPadding: {
+            top: lv.padV,
+            bottom: lv.padV,
+            left: lv.padH,
+            right: lv.padH,
+          },
+          minCellHeight: 0,
+          fillColor: [255, 255, 255],
+          textColor: [0, 0, 0],
+        },
+        styles: {
+          overflow: "linebreak",
+          lineWidth: 0.15,
+          lineColor: [170, 170, 170],
+        },
+        columnStyles: {
+          0: { cellWidth: "wrap", minCellWidth: 12, halign: "center" }, // never clips "ተ.ቁ"
+          1: { cellWidth: 30, halign: "left" },
+          2: { cellWidth: "auto", halign: "left" },
+          3: { cellWidth: 22, halign: "center" },
+          4: { cellWidth: 30, halign: "left" },
+          5: { cellWidth: 30, halign: "center" },
+        },
+        didParseCell: (data) => {
+          if (!data?.cell?.styles) return;
+          data.cell.styles.valign = "middle"; // ✅ centres text in rowSpanned cells
+          const raw = data.cell.raw;
+          if (
+            raw &&
+            typeof raw === "object" &&
+            (raw.__signatureImage || raw.__signatureBlank)
+          ) {
+            data.cell.text = [""];
+            data.cell.styles.minCellHeight = lv.sigH; // only signature rows get extra height
+            return;
+          }
+          applySharedHeaderFont(doc, data);
+          // applySharedHeaderFont resets padding; re-apply the level padding
+          data.cell.styles.cellPadding = {
+            top: lv.padV,
+            bottom: lv.padV,
+            left: lv.padH,
+            right: lv.padH,
+          };
+        },
+        didDrawCell: (data) => {
+          // ✅ SIGNATURE LOGIC
+          if (data.section !== "body") return;
+          if (data.column.index !== FORUM_SIGNATURE_COL) return;
+          if (data.cell.colSpan > 1) return;
+          const raw = data.cell.raw;
 
-        if (raw && typeof raw === "object" && raw.__signatureBlank) {
+          if (raw && typeof raw === "object" && raw.__signatureBlank) {
+            try {
+              const cell = data.cell;
+              const pad = 1;
+              const lineY = cell.y + cell.height - pad - 1.5;
+              const leftX = cell.x + pad + 1;
+              const rightX = cell.x + cell.width - pad - 1;
+              doc.setDrawColor(120, 120, 120);
+              doc.setLineWidth(0.15);
+              doc.line(leftX, lineY, rightX, lineY);
+            } catch (lineErr) {
+              console.warn("Could not draw signature blank:", lineErr.message);
+            }
+            return;
+          }
+
+          if (!raw || typeof raw !== "object" || !raw.__signatureImage) return;
+
           try {
             const cell = data.cell;
             const pad = 1;
-            const lineY = cell.y + cell.height - pad - 1.5;
-            const leftX = cell.x + pad + 1;
-            const rightX = cell.x + cell.width - pad - 1;
-            doc.setDrawColor(120, 120, 120);
-            doc.setLineWidth(0.15);
-            doc.line(leftX, lineY, rightX, lineY);
-          } catch (lineErr) {
-            console.warn("Could not draw signature blank:", lineErr.message);
+            const boxW = cell.width - pad * 2;
+            const boxH = cell.height - pad * 2;
+            if (boxW <= 0 || boxH <= 0) return;
+
+            let naturalW = 400;
+            let naturalH = 100;
+            try {
+              const props = doc.getImageProperties?.(raw.__signatureImage);
+              if (props?.width && props?.height) {
+                naturalW = props.width;
+                naturalH = props.height;
+              }
+            } catch {}
+
+            const scale = Math.min(boxW / naturalW, boxH / naturalH);
+            const drawW = naturalW * scale;
+            const drawH = naturalH * scale;
+            const drawX = cell.x + (cell.width - drawW) / 2;
+            const drawY = cell.y + (cell.height - drawH) / 2;
+
+            doc.addImage(
+              raw.__signatureImage,
+              "PNG",
+              drawX,
+              drawY,
+              drawW,
+              drawH,
+            );
+          } catch (imgErr) {
+            console.warn(
+              `Could not embed signature #${raw.__index}:`,
+              imgErr.message,
+            );
           }
-          return;
-        }
+        },
+      });
 
-        if (!raw || typeof raw !== "object" || !raw.__signatureImage) return;
+      return doc;
+    };
 
-        try {
-          const cell = data.cell;
-          const pad = 1;
-          const boxW = cell.width - pad * 2;
-          const boxH = cell.height - pad * 2;
-          if (boxW <= 0 || boxH <= 0) return;
-
-          let naturalW = 400;
-          let naturalH = 100;
-          try {
-            const props = doc.getImageProperties?.(raw.__signatureImage);
-            if (props?.width && props?.height) {
-              naturalW = props.width;
-              naturalH = props.height;
-            }
-          } catch {}
-
-          const scale = Math.min(boxW / naturalW, boxH / naturalH);
-          const drawW = naturalW * scale;
-          const drawH = naturalH * scale;
-          const drawX = cell.x + (cell.width - drawW) / 2;
-          const drawY = cell.y + (cell.height - drawH) / 2;
-
-          doc.addImage(raw.__signatureImage, "PNG", drawX, drawY, drawW, drawH);
-        } catch (imgErr) {
-          console.warn(
-            `Could not embed signature #${raw.__index}:`,
-            imgErr.message,
-          );
-        }
-      },
-    });
-
-    // ─── Footer with page numbers ──────────────────────────────
-    const pageCount = doc.internal.getNumberOfPages();
-    const footerY = pageHeight - 10;
-
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.3);
-      doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
-
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      const footerLeft = `Generated by Addis MESOB One-Stop Service Center · ${getEthiopianDate()}`;
-      drawMixedScriptText(doc, footerLeft, margin, footerY, { align: "left" });
-
-      drawMixedScriptText(
-        doc,
-        `${L.page} ${i} ${L.of} ${pageCount}`,
-        pageWidth - margin,
-        footerY,
-        { align: "right" },
-      );
-      doc.setTextColor(0, 0, 0);
+    // ── Find the least-tight level that fits on ONE page (binary search) ──
+    let lo = 0;
+    let hi = FIT_LEVELS.length - 1;
+    let best = null;
+    let bestIdx = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const d = buildDoc(FIT_LEVELS[mid]);
+      if (d.getNumberOfPages() === 1) {
+        best = d;
+        bestIdx = mid;
+        hi = mid - 1;
+      } else {
+        lo = mid + 1;
+      }
     }
 
+    // ── Last resort: guarantee a single page even for absurd content ──
+    let clippedLast = false;
+    if (!best) {
+      best = buildDoc(FIT_LEVELS[FIT_LEVELS.length - 1]);
+      while (best.getNumberOfPages() > 1) {
+        best.deletePage(best.getNumberOfPages());
+      }
+      clippedLast = true;
+    }
+    console.log(
+      `📄 Forum report fitted on 1 page at level ${bestIdx >= 0 ? bestIdx : "last-resort"}`,
+    );
+
+    // ── Footer (single page) ──
+    const doc = best;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const footerY = doc.internal.pageSize.getHeight() - 8;
+    doc.setPage(1);
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.3);
+    doc.line(margin, footerY - 4, pageWidth - margin, footerY - 4);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    drawMixedScriptText(
+      doc,
+      `Generated by Addis MESOB One-Stop Service Center · ${ethDateText}`,
+      margin,
+      footerY,
+      { align: "left" },
+    );
+    drawMixedScriptText(
+      doc,
+      `${L.page} 1 ${L.of} 1`,
+      pageWidth - margin,
+      footerY,
+      { align: "right" },
+    );
+    doc.setTextColor(0, 0, 0);
+
+    // ── Save ──
     const safeDate = String(dateText).replace(/\//g, "-");
     // File name starts with the team name (first letter capitalised).
     // Only characters that are illegal in file names are removed, so
@@ -948,7 +1080,13 @@ export const exportForumReportToPDF = (
     doc.save(`${teamPart}_Forum_Report_${safeDate}.pdf`);
 
     console.log("✅ Forum Report PDF generated successfully!");
-    showSuccessToast("📄 Forum Report PDF generated successfully!");
+    if (clippedLast) {
+      showErrorToast(
+        "⚠️ Content was too long for one page; the lowest rows were cut.",
+      );
+    } else {
+      showSuccessToast("📄 Forum Report PDF generated successfully!");
+    }
     return true;
   } catch (error) {
     console.error("❌ Forum Report PDF Error:", error);
