@@ -6,15 +6,20 @@
 // timer-key collision, and signature map loading.
 //
 // Latest changes:
+//  • PENDING vs COMPLETED reports. A started report is saved as PENDING
+//    (autosave, "Save as Pending", or a timer expiry with fields missing).
+//    Only a COMPLETE report (every required field filled and every present
+//    member signed) can be submitted, and only then does it appear under
+//    "Completed Reports". Pending reports show under "Pending Reports" on the
+//    first page, with a Continue button.
+//  • Autosave now sends the report id (no more duplicate drafts) and the
+//    structured attendance / signatures (sync mode was losing them).
+//  • Opening a saved report restores the synced roster + signatures.
 //  • Present/Absent buttons: removed `require()` inside render (broken under
 //    Vite/ESM) and made the roster loader immune to identity changes of
-//    `tf` / `showToast` / `selectedTeam`, so the roster is no longer wiped
-//    back to "all present" by unrelated re-renders.
-//  • Empty reports are rejected (save button + timer-expiry finalize).
-//  • Saving now sends status "completed" so the report counts as SUBMITTED.
-//  • The first Peer Forum page (team list) now also shows Submitted Reports.
-//  • Team leaders are no longer auto-redirected into their team form, so
-//    they land on the team list + Submitted Reports first.
+//    `tf` / `showToast` / `selectedTeam`.
+//  • Team leaders are not auto-redirected into their team form, so they land
+//    on the team list + Reports first.
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
@@ -54,15 +59,18 @@ import { forumReportService } from "../services/forumReportService";
 import SignatureModal from "../components/forum-report/SignatureModal";
 import { useTimerBeep } from "../hooks/useTimerBeep";
 
-// ─── Synced Roster + Auto-translate helpers (new) ───────────
+// ─── Synced Roster + Auto-translate + Completeness helpers ──
 import {
   buildRoster,
   newManualMember,
   setRosterStatus,
   setAllRosterStatus,
+  attendanceToRoster,
   deriveAttendance,
   getSigners,
   alignSignatures,
+  getMissingFields,
+  REQUIRED_FIELDS,
   needsAmharicTranslation,
   cleanTranslation,
 } from "../utils/forumReportHelpers";
@@ -118,6 +126,19 @@ const hasReportContent = (f) =>
   [f.topics, f.prevResults, f.gaps, f.agreements].some(
     (a) => Array.isArray(a) && a.some((x) => x && x.trim()),
   ) || !!(f.explanation && f.explanation.trim());
+
+// English fallbacks for the "what is still missing" labels
+// (translated via the miss_<key> entries in the translations file).
+const MISSING_DEFAULTS = {
+  date: "Date",
+  timeStart: "Start time",
+  present: "At least one present member",
+  topics: "At least one discussion topic",
+  explanation: "Explanation",
+  gaps: "At least one identified gap",
+  agreements: "At least one agreed point",
+  signatures: "Signatures of all present members",
+};
 
 // ─── Helper: Get translations based on language ─────────────
 const getTranslations = (lang) => {
@@ -1466,6 +1487,112 @@ const TranslateStatus = ({ id, translating, originals, onRevert, tf }) => {
   return null;
 };
 
+// ─── Completeness panel: what is still missing before submit ─
+const CompletenessPanel = ({ missing, tf }) => {
+  const total = REQUIRED_FIELDS.length;
+  const done = total - missing.length;
+  const ready = missing.length === 0;
+  const pct = Math.round((done / total) * 100);
+  const accent = ready ? "#15803D" : "#B45309";
+
+  return (
+    <div
+      style={{
+        marginTop: "clamp(20px, 3vw, 28px)",
+        padding: "12px 14px",
+        borderRadius: radius.lg,
+        background: ready ? "#F0FDF4" : "#FFFBEB",
+        border: `1.5px solid ${ready ? "#86EFAC" : "#FDE68A"}`,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 8,
+          flexWrap: "wrap",
+        }}
+      >
+        {ready ? (
+          <FiCheckCircle size={16} color={accent} />
+        ) : (
+          <FiClock size={16} color={accent} />
+        )}
+        <strong style={{ fontSize: 13, color: accent }}>
+          {tf("completenessTitle", "Report completeness")}
+        </strong>
+        <span
+          style={{
+            background: accent,
+            color: "#fff",
+            fontSize: 10,
+            fontWeight: 700,
+            padding: "1px 9px",
+            borderRadius: radius.pill,
+          }}
+        >
+          {done}/{total}
+        </span>
+        <div
+          style={{
+            flex: "1 1 120px",
+            height: 5,
+            background: "#E5E7EB",
+            borderRadius: radius.pill,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              width: `${pct}%`,
+              height: "100%",
+              background: accent,
+              transition: "width 0.4s ease",
+            }}
+          />
+        </div>
+      </div>
+
+      {ready ? (
+        <div style={{ fontSize: 12, color: "#166534" }}>
+          {tf(
+            "completenessReady",
+            "All required fields are filled. You can submit the report.",
+          )}
+        </div>
+      ) : (
+        <>
+          <div style={{ fontSize: 12, color: "#92400E", marginBottom: 6 }}>
+            {tf(
+              "completenessMissing",
+              "Still missing before this report can be submitted:",
+            )}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {missing.map((key) => (
+              <span
+                key={key}
+                style={{
+                  background: "#FEF3C7",
+                  color: "#92400E",
+                  border: "1px solid #FDE68A",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "2px 10px",
+                  borderRadius: radius.pill,
+                }}
+              >
+                {tf(`miss_${key}`, MISSING_DEFAULTS[key] || key)}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 // ─── Main Component ──────────────────────────────────────────
 export default function ForumReport({
   t: tProp,
@@ -1540,6 +1667,8 @@ export default function ForumReport({
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
   const [historyCount, setHistoryCount] = useState(0);
   const [editingId, setEditingId] = useState(null);
+  // Status of the report that was opened from History / Pending (null = new)
+  const [loadedStatus, setLoadedStatus] = useState(null);
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < 768 : false,
   );
@@ -1582,6 +1711,94 @@ export default function ForumReport({
   // Refs for callback freshness inside useMeetingTimer.onTimeExpired
   const editingIdRef = useRef(editingId);
   const savedProgressIdRef = useRef(savedProgressId);
+  const finalizeRef = useRef(null);
+  // Set when a pending report is continued from the first page, so the
+  // team-change effect does not wipe the roster / signatures just restored.
+  const skipRosterResetRef = useRef(false);
+
+  // ─── Derived: attendance, signers, signatures, completeness ──
+  // (declared early so the autosave / finalize callbacks below can use them)
+  const attendance = useMemo(
+    () =>
+      deriveAttendance({
+        mode: attendanceMode,
+        roster,
+        manualPresent: form.present,
+        manualAbsent: form.absent,
+      }),
+    [attendanceMode, roster, form.present, form.absent],
+  );
+
+  const signers = useMemo(
+    () =>
+      getSigners({
+        mode: attendanceMode,
+        roster,
+        manualPresent: form.present,
+      }),
+    [attendanceMode, roster, form.present],
+  );
+
+  const aligned = useMemo(
+    () => alignSignatures(signatureMap, signers),
+    [signatureMap, signers],
+  );
+
+  // What is still missing before this report may be submitted as COMPLETED.
+  const missingFields = useMemo(
+    () =>
+      getMissingFields({
+        mode: attendanceMode,
+        form,
+        presentNames: attendance.presentNames,
+        signers,
+        aligned,
+      }),
+    [attendanceMode, form, attendance.presentNames, signers, aligned],
+  );
+
+  // The payload shared by autosave, timer-expiry finalize and the Save buttons.
+  const buildReportPayload = useCallback(() => {
+    const signatureData =
+      aligned.signedCount > 0
+        ? aligned.signatureData
+        : form.signatures
+            .filter((s) => s && s.trim())
+            .map((img, i) => ({
+              key: `name:${attendance.presentNames[i] || `slot-${i}`}`,
+              member: null,
+              name: attendance.presentNames[i] || `Slot ${i + 1}`,
+              role: "member",
+              image: img,
+            }));
+
+    return {
+      date: form.date,
+      timeStart: form.timeStart,
+      timeEnd: form.timeEnd,
+      present: attendance.presentNames,
+      absent: attendance.absent,
+      attendanceMode,
+      attendance: attendance.attendance,
+      prevResults: form.prevResults.filter((p) => p.trim() !== ""),
+      topics: form.topics.filter((x) => x.trim() !== ""),
+      explanation: form.explanation || "",
+      gaps: form.gaps.filter((g) => g.trim() !== ""),
+      agreements: form.agreements.filter((a) => a.trim() !== ""),
+      signatures: signatureData.map((s) => s.image),
+      signatureData,
+      team: selectedTeam?.id || selectedTeam?._id,
+      teamName: selectedTeam?.name || "Unknown Team",
+      aiGeneratedContent,
+    };
+  }, [
+    form,
+    attendance,
+    aligned,
+    attendanceMode,
+    selectedTeam,
+    aiGeneratedContent,
+  ]);
 
   const isAdmin = isAdminOrAbove(user);
 
@@ -1664,7 +1881,7 @@ export default function ForumReport({
     initialTimeRemaining: getInitialTimeRemaining(),
     onTimeExpired: () => {
       setIsReportLocked(true);
-      handleFinalizeOnExpiry();
+      finalizeRef.current?.();
       setShowExpiredModal(true);
       localStorage.removeItem(STORAGE_KEY);
     },
@@ -1690,23 +1907,16 @@ export default function ForumReport({
   });
 
   // ─── Auto-save handler ───────────────────────────────────────
+  // Auto-save only ever produces a PENDING report on the server. It sends
+  // the report id so repeated saves update ONE report instead of creating a
+  // new draft every time, plus the structured attendance / signatures.
   const handleAutoSave = useCallback(async () => {
     if (isReportLocked) return null;
     try {
       const reportData = {
-        date: form.date,
-        timeStart: form.timeStart,
-        timeEnd: form.timeEnd,
-        present: form.present.filter((p) => p.trim() !== ""),
-        absent: form.absent.filter((a) => a.name.trim() !== ""),
-        prevResults: form.prevResults.filter((p) => p.trim() !== ""),
-        topics: form.topics.filter((t) => t.trim() !== ""),
-        explanation: form.explanation || "",
-        gaps: form.gaps.filter((g) => g.trim() !== ""),
-        agreements: form.agreements.filter((a) => a.trim() !== ""),
-        signatures: form.signatures.filter((s) => s.trim() !== ""),
-        team: selectedTeam?.id || selectedTeam?._id,
-        teamName: selectedTeam?.name || "Unknown Team",
+        ...buildReportPayload(),
+        meetingId:
+          editingIdRef.current || savedProgressIdRef.current || undefined,
         isAutoSave: true,
         status: "in_progress",
       };
@@ -1714,49 +1924,72 @@ export default function ForumReport({
       const response = await forumReportService.autoSave(reportData);
       setLastAutoSaveTime(new Date());
       const id = response?.meeting?._id || response?._id || null;
-      if (id) setSavedProgressId(id);
+      if (id) {
+        savedProgressIdRef.current = id;
+        setSavedProgressId(id);
+      }
       return response;
     } catch (error) {
       console.error("Auto-save failed:", error);
       showToast(tf("autoSaveError") || "Auto-save failed", "error");
       throw error;
     }
-  }, [form, selectedTeam, tf, showToast, isReportLocked]);
+  }, [buildReportPayload, tf, showToast, isReportLocked]);
 
   // ─── Finalize on timer expiry ────────────────────────────────
+  // • Report COMPLETE   → saved as completed (as before).
+  // • Report INCOMPLETE → saved as PENDING (flagged timeExpired, locked until
+  //   an extension is approved). It is NOT counted as a completed report.
   const handleFinalizeOnExpiry = useCallback(async () => {
     try {
-      // Never turn a blank form into a completed (submitted) report.
+      // Never save a blank form.
       if (!hasReportContent(form)) return;
 
-      const reportData = {
-        date: form.date,
-        timeStart: form.timeStart,
-        timeEnd: form.timeEnd,
-        present: form.present.filter((p) => p.trim() !== ""),
-        absent: form.absent.filter((a) => a.name.trim() !== ""),
-        prevResults: form.prevResults.filter((p) => p.trim() !== ""),
-        topics: form.topics.filter((t) => t.trim() !== ""),
-        explanation: form.explanation || "",
-        gaps: form.gaps.filter((g) => g.trim() !== ""),
-        agreements: form.agreements.filter((a) => a.trim() !== ""),
-        signatures: form.signatures.filter((s) => s.trim() !== ""),
-        team: selectedTeam?.id || selectedTeam?._id,
-        teamName: selectedTeam?.name || "Unknown Team",
-        aiGeneratedContent,
-        isAutoSave: false,
-        status: "completed",
-        finalizedAt: new Date().toISOString(),
-      };
+      const payload = buildReportPayload();
+      const nowIso = new Date().toISOString();
+      const complete = missingFields.length === 0;
+
+      const reportData = complete
+        ? {
+            ...payload,
+            isAutoSave: false,
+            status: "completed",
+            finalizedAt: nowIso,
+          }
+        : {
+            ...payload,
+            isAutoSave: false,
+            status: "in_progress",
+            timeExpired: true,
+            timeExpiredAt: nowIso,
+          };
 
       const targetId = editingIdRef.current || savedProgressIdRef.current;
-      if (targetId) {
-        await meetingAPI.update(targetId, reportData);
-      } else {
-        await meetingAPI.create(reportData);
+      const res = targetId
+        ? await meetingAPI.update(targetId, reportData)
+        : await meetingAPI.create(reportData);
+
+      const saved = res?.data?.meeting || res?.meeting;
+      if (saved?._id) {
+        savedProgressIdRef.current = saved._id;
+        setSavedProgressId(saved._id);
       }
+
       setHistoryRefreshKey((k) => k + 1);
-      console.log("✅ Report finalized on timer expiry");
+      if (!complete) {
+        showToast(
+          tf(
+            "savedPending",
+            "Saved as pending. Find it under Pending Reports to finish it later.",
+          ),
+          "info",
+        );
+      }
+      console.log(
+        complete
+          ? "✅ Report finalized on timer expiry"
+          : "⏳ Incomplete report saved as pending on timer expiry",
+      );
     } catch (error) {
       console.error(
         "Finalize on expiry failed, falling back to draft save:",
@@ -1768,7 +2001,13 @@ export default function ForumReport({
         console.error("Fallback auto-save also failed:", fallbackError);
       }
     }
-  }, [form, selectedTeam, aiGeneratedContent, handleAutoSave]);
+  }, [form, buildReportPayload, missingFields, handleAutoSave, showToast, tf]);
+
+  // The timer hook may keep an older onTimeExpired closure; route it
+  // through a ref so it always runs the latest finalize logic.
+  useEffect(() => {
+    finalizeRef.current = handleFinalizeOnExpiry;
+  }, [handleFinalizeOnExpiry]);
 
   // ─── Extension request handler ──────────────────────────────
   const handleRequestExtension = async (reason) => {
@@ -1914,7 +2153,7 @@ export default function ForumReport({
 
   // ─── Load teams when no team is selected ──────────────────
   // NOTE: Team Leaders are intentionally NOT auto-redirected into their
-  // team's form any more. They land on this team list + "Submitted Reports"
+  // team's form any more. They land on this team list + "Reports"
   // first, then click their team to start a report.
   useEffect(() => {
     if (!isLeaderOrAbove(user)) {
@@ -2062,39 +2301,19 @@ export default function ForumReport({
   );
 
   // Reset + reload ONLY when the team actually changes.
+  // (When a pending report is continued from the first page the roster and
+  // signatures were just restored, so they are kept and only merged.)
   useEffect(() => {
     if (!teamId) return;
+    if (skipRosterResetRef.current) {
+      skipRosterResetRef.current = false;
+      loadRoster();
+      return;
+    }
     setRoster([]);
     setSignatureMap({});
     loadRoster();
   }, [teamId, loadRoster]);
-
-  // ─── Derived: attendance, signers, signatures ──────────────
-  const attendance = useMemo(
-    () =>
-      deriveAttendance({
-        mode: attendanceMode,
-        roster,
-        manualPresent: form.present,
-        manualAbsent: form.absent,
-      }),
-    [attendanceMode, roster, form.present, form.absent],
-  );
-
-  const signers = useMemo(
-    () =>
-      getSigners({
-        mode: attendanceMode,
-        roster,
-        manualPresent: form.present,
-      }),
-    [attendanceMode, roster, form.present],
-  );
-
-  const aligned = useMemo(
-    () => alignSignatures(signatureMap, signers),
-    [signatureMap, signers],
-  );
 
   // ─── Auto-translate engine ─────────────────────────────────
   const getTargetValue = useCallback((id) => {
@@ -2301,7 +2520,7 @@ export default function ForumReport({
     });
   };
 
-  // ─── Load report from History ───────────────────────────────
+  // ─── Load report from History / Pending ─────────────────────
   const handleLoadReport = useCallback(
     (report) => {
       if (!report || !report._id) return;
@@ -2343,13 +2562,36 @@ export default function ForumReport({
             : [""],
       });
 
-      // Rebuild signatureMap from signatureData (round-trips the
-      // key-based model) or from report.signatures zipped with the
-      // present members (legacy reports).
+      // Restore the synced roster (attendance marks + manual rows) so the
+      // Present/Absent state and the signature cards come back exactly as
+      // they were saved.
+      const isSync = report.attendanceMode === "sync";
+      let rows = null;
+      if (
+        isSync &&
+        Array.isArray(report.attendance) &&
+        report.attendance.length > 0
+      ) {
+        rows = attendanceToRoster(report.attendance);
+        setRoster(rows);
+      }
+
+      // Rebuild signatureMap from signatureData. Manual roster rows get new
+      // ids on every load, so map their signatures by name.
       const rebuilt = {};
-      if (Array.isArray(report.signatureData)) {
+      if (Array.isArray(report.signatureData) && report.signatureData.length) {
         report.signatureData.forEach((entry) => {
-          if (entry?.key && entry?.image) rebuilt[entry.key] = entry.image;
+          if (!entry?.image) return;
+          let key = entry.key;
+          if (rows) {
+            const row = rows.find((r) =>
+              entry.member
+                ? r.id === String(entry.member)
+                : r.source === "manual" && r.name === entry.name,
+            );
+            if (row) key = row.id;
+          }
+          if (key) rebuilt[key] = entry.image;
         });
       } else if (
         Array.isArray(report.signatures) &&
@@ -2357,7 +2599,7 @@ export default function ForumReport({
       ) {
         report.present.forEach((name, i) => {
           const img = report.signatures[i];
-          if (name && img) {
+          if (name && img && String(img).startsWith("data:image")) {
             rebuilt[
               report.attendance?.[i]?.member
                 ? String(report.attendance[i].member)
@@ -2370,10 +2612,11 @@ export default function ForumReport({
 
       // Restore attendance mode. New reports carry `attendanceMode`;
       // legacy reports only had manual present/absent arrays.
-      setAttendanceMode(report.attendanceMode === "sync" ? "sync" : "manual");
+      setAttendanceMode(isSync ? "sync" : "manual");
 
       setEditingId(report._id);
       setSavedProgressId(report._id);
+      setLoadedStatus(report.status || null);
       setIsReportLocked(
         report.isLocked === true ||
           report.status === "locked" ||
@@ -2401,6 +2644,26 @@ export default function ForumReport({
     [showToast],
   );
 
+  // ─── Continue a PENDING report from the first page ─────────
+  // The first page has no team selected, so select the report's team and
+  // load the report. skipRosterResetRef stops the team-change effect from
+  // wiping the roster / signatures that handleLoadReport just restored.
+  const handleContinuePending = (report) => {
+    const tid = String(report?.team?._id || report?.team || "");
+    if (!tid) {
+      showToast(tf("submittedOpenError", "Failed to open report"), "error");
+      return;
+    }
+    if (tid !== String(teamId || "")) skipRosterResetRef.current = true;
+    setSelectedTeam?.({
+      id: tid,
+      name: report.teamName || "",
+      department: "",
+      members: [],
+    });
+    handleLoadReport(report);
+  };
+
   // ─── Reset form ─────────────────────────────────────────────
   const resetForm = useCallback(() => {
     setForm({
@@ -2419,6 +2682,8 @@ export default function ForumReport({
 
     setEditingId(null);
     setSavedProgressId(null);
+    setLoadedStatus(null);
+    savedProgressIdRef.current = null;
     setAiGeneratedContent(null);
     setShowAIBadge(true);
     setTimerActive(false);
@@ -2605,17 +2870,19 @@ ${"=".repeat(50)}
     }
   };
 
-  const handleSaveReport = async () => {
+  // mode "submit"  → status "completed" (only allowed when nothing is missing)
+  // mode "pending" → status "in_progress" (saved as a PENDING report)
+  const handleSaveReport = async (mode = "submit") => {
+    const asPending = mode === "pending";
     try {
       setSaving(true);
 
       if (!form.date) {
         showToast(tf("selectDate", "Please select a date"), "warning");
-        setSaving(false);
         return;
       }
 
-      // Reject empty reports (backend enforces the same rule).
+      // Never save a blank report (pending or completed).
       if (!hasReportContent(form)) {
         showToast(
           tf(
@@ -2624,71 +2891,86 @@ ${"=".repeat(50)}
           ),
           "warning",
         );
-        setSaving(false);
         return;
       }
 
-      const signatureData =
-        aligned.signedCount > 0
-          ? aligned.signatureData
-          : form.signatures
-              .filter((s) => s && s.trim())
-              .map((img, i) => ({
-                key: `name:${attendance.presentNames[i] || `slot-${i}`}`,
-                member: null,
-                name: attendance.presentNames[i] || `Slot ${i + 1}`,
-                role: "member",
-                image: img,
-              }));
-
-      const reportData = {
-        date: form.date,
-        timeStart: form.timeStart,
-        timeEnd: form.timeEnd,
-        present: attendance.presentNames,
-        absent: attendance.absent,
-        attendanceMode,
-        attendance: attendance.attendance,
-        prevResults: form.prevResults.filter((p) => p.trim() !== ""),
-        topics: form.topics.filter((x) => x.trim() !== ""),
-        explanation: form.explanation || "",
-        gaps: form.gaps.filter((g) => g.trim() !== ""),
-        agreements: form.agreements.filter((a) => a.trim() !== ""),
-        signatures: signatureData.map((s) => s.image),
-        signatureData,
-        team: selectedTeam?.id || selectedTeam?._id,
-        teamName: selectedTeam?.name || "Unknown Team",
-        aiGeneratedContent: aiGeneratedContent,
-        // Saving = submitting. Without this the report stays a draft and
-        // never appears under "Submitted Reports".
-        status: "completed",
-      };
-
-      if (editingId) {
-        await meetingAPI.update(editingId, reportData);
+      // Only a COMPLETE report may be submitted.
+      if (!asPending && missingFields.length > 0) {
+        const labels = missingFields
+          .map((k) => tf(`miss_${k}`, MISSING_DEFAULTS[k] || k))
+          .join("، ");
         showToast(
-          tf("updateSuccess", "Report updated successfully!"),
-          "success",
+          `${tf(
+            "incompleteReport",
+            "This report is not complete yet. Fill the missing fields or save it as pending.",
+          )} (${labels})`,
+          "warning",
         );
-      } else if (savedProgressId) {
-        await meetingAPI.update(savedProgressId, reportData);
-        showToast(tf("updateSuccess", "Report saved successfully!"), "success");
-      } else {
-        await meetingAPI.create(reportData);
-        showToast(tf("saveSuccess", "Report saved successfully!"), "success");
+        return;
       }
 
-      if (onReportSaved) onReportSaved(selectedTeam?.id, form);
+      const reportData = {
+        ...buildReportPayload(),
+        status: asPending ? "in_progress" : "completed",
+      };
+
+      // Branch: updating an existing report (opened from History/Pending, or
+      // already autosaved) vs. creating a new one.
+      const targetId = editingId || savedProgressId;
+      let res;
+      if (targetId) {
+        res = await meetingAPI.update(targetId, reportData);
+      } else {
+        res = await meetingAPI.create(reportData);
+      }
+
+      const saved = res?.data?.meeting || res?.meeting;
+      if (saved?._id) {
+        savedProgressIdRef.current = saved._id;
+        setSavedProgressId(saved._id);
+      }
+
       setHistoryRefreshKey((k) => k + 1);
+
+      if (asPending) {
+        setLastAutoSaveTime(new Date());
+        showToast(
+          tf(
+            "savedPending",
+            "Saved as pending. Find it under Pending Reports to finish it later.",
+          ),
+          "success",
+        );
+        return; // stay on the form so the user can keep working
+      }
+
+      showToast(
+        targetId
+          ? tf("updateSuccess", "Report updated successfully!")
+          : tf("saveSuccess", "Report saved successfully!"),
+        "success",
+      );
+      if (onReportSaved) onReportSaved(selectedTeam?.id, form);
       setSubmitted(true);
     } catch (error) {
       console.error("Failed to save report:", error);
-      showToast(
-        error.response?.data?.message ||
-          error.response?.data?.error ||
-          tf("saveError", "Failed to save report. Please try again."),
-        "error",
-      );
+      const data = error.response?.data;
+      if (
+        data?.code === "INCOMPLETE_REPORT" &&
+        Array.isArray(data.missingFields)
+      ) {
+        const labels = data.missingFields
+          .map((k) => tf(`miss_${k}`, MISSING_DEFAULTS[k] || k))
+          .join("، ");
+        showToast(`${data.message} (${labels})`, "warning");
+      } else {
+        showToast(
+          data?.message ||
+            data?.error ||
+            tf("saveError", "Failed to save report. Please try again."),
+          "error",
+        );
+      }
     } finally {
       setSaving(false);
     }
@@ -2895,7 +3177,7 @@ ${"=".repeat(50)}
     );
   }
 
-  // ─── No team selected: team list + Submitted Reports ───────
+  // ─── No team selected: team list + Completed / Pending Reports ──
   if (!selectedTeam) {
     // Two panels side by side (stack on narrow screens via auto-fit grid).
     const panel = {
@@ -2939,7 +3221,12 @@ ${"=".repeat(50)}
             borderTop: `4px solid ${C.gold || C.primary}`,
           }}
         >
-          <SubmittedReports tf={tf} t={t} lang={currentLang} />
+          <SubmittedReports
+            tf={tf}
+            t={t}
+            lang={currentLang}
+            onContinue={handleContinuePending}
+          />
         </div>
       </div>
     );
@@ -3984,6 +4271,9 @@ ${"=".repeat(50)}
             )}
           </Section>
 
+          {/* What is still missing before this can be submitted */}
+          <CompletenessPanel missing={missingFields} tf={tf} />
+
           {/* Action bar */}
           <div
             style={{
@@ -3991,7 +4281,7 @@ ${"=".repeat(50)}
               flexDirection: isMobile ? "column" : "row",
               gap: "clamp(10px, 2vw, 16px)",
               justifyContent: "center",
-              marginTop: "clamp(24px, 4vw, 36px)",
+              marginTop: "clamp(16px, 3vw, 24px)",
               paddingTop: "clamp(16px, 3vw, 24px)",
               borderTop: `2px solid ${C.border}`,
               flexWrap: "wrap",
@@ -4082,6 +4372,44 @@ ${"=".repeat(50)}
               {!isMobile && <span>{tc("reset", "Reset")}</span>}
             </button>
 
+            {/* SAVE AS PENDING — keeps an unfinished report for later.
+                Not shown for a report that is already completed. */}
+            {loadedStatus !== "completed" && (
+              <button
+                style={{
+                  ...btn.secondary,
+                  flex: isMobile ? "1" : "0.8",
+                  justifyContent: "center",
+                  padding: "clamp(10px, 2vw, 14px) clamp(16px, 3vw, 28px)",
+                  fontSize: isMobile ? "13px" : FONT_SIZES.body,
+                  gap: "6px",
+                  borderRadius: radius.lg,
+                  background: "#FFFBEB",
+                  borderColor: "#FDE68A",
+                  color: "#92400E",
+                  fontWeight: 700,
+                  opacity:
+                    saving || isReportLocked || !hasReportContent(form)
+                      ? 0.6
+                      : 1,
+                  cursor:
+                    saving || isReportLocked || !hasReportContent(form)
+                      ? "not-allowed"
+                      : "pointer",
+                }}
+                onClick={() => handleSaveReport("pending")}
+                disabled={saving || isReportLocked || !hasReportContent(form)}
+                title={tf(
+                  "savePendingHint",
+                  "Save your progress as a pending report and finish it later",
+                )}
+              >
+                <FiClock size={isMobile ? 18 : 16} />
+                <span>{tf("savePending", "Save as Pending")}</span>
+              </button>
+            )}
+
+            {/* SUBMIT / UPDATE — only enabled when the report is complete */}
             <button
               style={{
                 ...btn.primary,
@@ -4089,13 +4417,27 @@ ${"=".repeat(50)}
                 justifyContent: "center",
                 padding: "clamp(10px, 2vw, 14px) clamp(16px, 4vw, 32px)",
                 fontSize: FONT_SIZES.body,
-                opacity: saving || isReportLocked ? 0.7 : 1,
-                cursor: saving || isReportLocked ? "not-allowed" : "pointer",
+                opacity:
+                  saving || isReportLocked || missingFields.length > 0
+                    ? 0.55
+                    : 1,
+                cursor:
+                  saving || isReportLocked || missingFields.length > 0
+                    ? "not-allowed"
+                    : "pointer",
                 borderRadius: radius.lg,
                 gap: "8px",
               }}
-              onClick={handleSaveReport}
-              disabled={saving || isReportLocked}
+              onClick={() => handleSaveReport("submit")}
+              disabled={saving || isReportLocked || missingFields.length > 0}
+              title={
+                missingFields.length > 0
+                  ? tf(
+                      "incompleteReport",
+                      "This report is not complete yet. Fill the missing fields or save it as pending.",
+                    )
+                  : ""
+              }
             >
               {saving ? (
                 <>
@@ -4108,9 +4450,9 @@ ${"=".repeat(50)}
               ) : (
                 <>
                   <FiSave size={18} />
-                  {editingId
+                  {loadedStatus === "completed"
                     ? tf("updateReport", "Update Report")
-                    : tf("save", "Save Report")}
+                    : tf("submitReport", "Submit Report")}
                 </>
               )}
             </button>
