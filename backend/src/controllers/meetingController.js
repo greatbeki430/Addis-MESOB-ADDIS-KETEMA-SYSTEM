@@ -51,7 +51,7 @@ const validateClientStatus = (status) => {
   return null;
 };
 
-// ─── PATCH 1: Sanitizers for the structured attendance / signature ─────
+// ─── Sanitizers for the structured attendance / signature payloads ─────
 // These match the shape produced by
 // frontend/src/utils/forumReportHelpers.js
 // (deriveAttendance / alignSignatures). Unknown / malformed entries are
@@ -99,17 +99,14 @@ const cleanSignatureData = (arr) => {
       image: s.image,
     }));
 };
-// ── end PATCH 1
 
 // ─── Content field whitelist (B1) ──────────────────────────
 // Only these keys may ever be written from a client-supplied body.
 // Everything else (team, createdBy, createdByName, status, isLocked,
 // extensionApproved, extensionExpiresAt, isResumed, resumedAt,
-// progressData, adminNotes, autoSaveCount, lastAutoSave, isAutoSave)
-// is server-owned. "status" is handled separately via B4 whitelist.
-//
-// ── PATCH 4a: three new fields appended so autoSaveMeeting can
-//    persist them via cleanContentForWrite. ──
+// progressData, adminNotes, autoSaveCount, lastAutoSave, isAutoSave,
+// isComplete, missingFields) is server-owned. "status" is handled
+// separately via B4 whitelist.
 const CONTENT_FIELDS = [
   "date",
   "timeStart",
@@ -124,9 +121,9 @@ const CONTENT_FIELDS = [
   "signatures",
   "teamName",
   "aiGeneratedContent",
-  "attendanceMode", // PATCH 4a
-  "attendance", // PATCH 4a
-  "signatureData", // PATCH 4a
+  "attendanceMode",
+  "attendance",
+  "signatureData",
 ];
 const pickContentFields = (body = {}) => {
   const out = {};
@@ -182,10 +179,8 @@ const cleanContentForWrite = (raw) => {
     if (out[field] !== undefined) out[field] = cleanStringArray(out[field]);
   }
 
-  // ── PATCH 4b: sanitize the three new structured fields here so
-  //    both autoSaveMeeting and updateMeeting pick them up
-  //    automatically. Sanitizers are idempotent, so also applying
-  //    them inline in createMeeting / updateMeeting is harmless. ──
+  // Sanitize the three structured fields here so autoSaveMeeting and
+  // updateMeeting pick them up automatically. Sanitizers are idempotent.
   if (out.attendanceMode !== undefined) {
     out.attendanceMode = out.attendanceMode === "sync" ? "sync" : "manual";
   }
@@ -195,7 +190,6 @@ const cleanContentForWrite = (raw) => {
   if (out.signatureData !== undefined) {
     out.signatureData = cleanSignatureData(out.signatureData);
   }
-  // ── end PATCH 4b
 
   return out;
 };
@@ -221,6 +215,92 @@ const EMPTY_REPORT_RESPONSE = {
     "Cannot submit an empty report. Fill in at least one topic, explanation, gap, or agreement.",
   code: "EMPTY_REPORT",
 };
+
+// ═══════════════════════════════════════════════════════════════
+// PENDING-FEATURE: completeness rule (pending vs completed)
+//
+// A report may only be COMPLETED when every item below is satisfied.
+// Anything else is PENDING (saved, but still to be finished).
+// Mirror of frontend/src/utils/forumReportHelpers.js → REQUIRED_FIELDS /
+// getMissingFields. To relax a rule, change BOTH places.
+//
+//   date, timeStart, ≥1 present member, ≥1 topic, explanation,
+//   ≥1 gap, ≥1 agreement, signatures:
+//        sync mode   → every PRESENT member has signed
+//        manual mode → at least one drawn signature
+// ═══════════════════════════════════════════════════════════════
+const allPresentSigned = (r) => {
+  const sigs = Array.isArray(r.signatureData)
+    ? r.signatureData.filter((s) => s && s.image)
+    : [];
+
+  // Older reports only have drawn images in `signatures`.
+  if (sigs.length === 0) {
+    return (
+      Array.isArray(r.signatures) &&
+      r.signatures.some(
+        (s) => typeof s === "string" && s.startsWith("data:image"),
+      )
+    );
+  }
+
+  if (r.attendanceMode === "sync" && Array.isArray(r.attendance)) {
+    const presentEntries = r.attendance.filter((a) => a.status === "present");
+    if (presentEntries.length === 0) return false;
+    const signedMembers = new Set(
+      sigs.map((s) => (s.member ? String(s.member) : null)).filter(Boolean),
+    );
+    const signedNames = new Set(sigs.map((s) => s.name));
+    return presentEntries.every(
+      (a) =>
+        (a.member && signedMembers.has(String(a.member))) ||
+        signedNames.has(a.name),
+    );
+  }
+  return true;
+};
+
+const getMissingFields = (r = {}) => {
+  const hasText = (a) =>
+    Array.isArray(a) && a.some((x) => typeof x === "string" && x.trim());
+  const missing = [];
+  if (!r.date) missing.push("date");
+  if (!String(r.timeStart || "").trim()) missing.push("timeStart");
+  if (!hasText(r.present)) missing.push("present");
+  if (!hasText(r.topics)) missing.push("topics");
+  if (!String(r.explanation || "").trim()) missing.push("explanation");
+  if (!hasText(r.gaps)) missing.push("gaps");
+  if (!hasText(r.agreements)) missing.push("agreements");
+  if (!allPresentSigned(r)) missing.push("signatures");
+  return missing;
+};
+
+const incompleteResponse = (missingFields) => ({
+  message:
+    "This report is not complete yet. Fill the missing fields, or save it as pending.",
+  code: "INCOMPLETE_REPORT",
+  missingFields,
+});
+
+// Statuses that count as "pending" (not yet a finished report).
+const PENDING_STATUSES = ["in_progress", "auto_saved", "expired"];
+
+// When the client reports that the meeting timer ran out, record it and
+// (for a report that is still incomplete) lock it so it cannot be edited
+// past the deadline — an approved extension or an admin unlock reopens it.
+const applyTimeExpiry = (target, body, status, now) => {
+  if (body.timeExpired !== true) return;
+  target.timeExpired = true;
+  target.timeExpiredAt = body.timeExpiredAt
+    ? new Date(body.timeExpiredAt)
+    : now;
+  if (status !== "completed") {
+    target.isLocked = true;
+    target.lockedAt = now;
+    target.lockedReason = "Meeting time expired";
+  }
+};
+// ── end PENDING-FEATURE helpers
 
 // ─── Create Meeting ─────────────────────────────────────────
 const createMeeting = async (req, res) => {
@@ -265,14 +345,11 @@ const createMeeting = async (req, res) => {
     // B1: whitelist then clean
     const content = cleanContentForWrite(pickContentFields(req.body));
 
-    // Reject empty submissions
-    if (status === "completed" && !hasReportContent(content)) {
+    // Never create a blank report (pending or completed)
+    if (!hasReportContent(content)) {
       return res.status(400).json(EMPTY_REPORT_RESPONSE);
     }
 
-    // ── PATCH 2: createMeeting builds meetingData inline (does not
-    //    use cleanContentForWrite alone), so explicitly carry over
-    //    the three structured fields from the whitelisted `content`. ──
     const meetingData = {
       ...content,
       date: new Date(date),
@@ -295,30 +372,27 @@ const createMeeting = async (req, res) => {
           ? cleanSignatureData(req.body.signatureData)
           : content.signatureData || [],
     };
-    // ── end PATCH 2
+
+    // PENDING-FEATURE: completeness is decided by the server, not the client.
+    const missing = getMissingFields(meetingData);
+    if (status === "completed" && missing.length > 0) {
+      return res.status(400).json(incompleteResponse(missing));
+    }
+    meetingData.isComplete = missing.length === 0;
+    meetingData.missingFields = missing;
+
+    const now = new Date();
 
     // A1 + B2: stamp completedAt/finalizedAt when completing
     if (status === "completed") {
-      const now = new Date();
       meetingData.completedAt = now;
       meetingData.finalizedAt = now;
     }
 
-    // ── PATCH 2b: when the client finalizes on timer expiry, it also
-    //    sends timeExpired / isLocked / lockedAt / lockedReason and
-    //    the finalizedAt stamp. Persist those so admin "expired"
-    //    filters keep working even when this path is a CREATE
-    //    (no prior draft existed). Validate defensively — client
-    //    cannot set these arbitrarily except when status is
-    //    completed, which is already whitelisted. ──
+    // Timer expiry audit trail (works for pending AND completed reports)
+    applyTimeExpiry(meetingData, req.body, status, now);
+
     if (status === "completed") {
-      const now = new Date();
-      if (req.body.timeExpired === true) {
-        meetingData.timeExpired = true;
-        meetingData.timeExpiredAt = req.body.timeExpiredAt
-          ? new Date(req.body.timeExpiredAt)
-          : now;
-      }
       if (req.body.isLocked === true) {
         meetingData.isLocked = true;
         meetingData.lockedAt = req.body.lockedAt
@@ -333,12 +407,14 @@ const createMeeting = async (req, res) => {
         if (!Number.isNaN(fa.getTime())) meetingData.finalizedAt = fa;
       }
     }
-    // ── end PATCH 2b
 
     const meeting = await Meeting.create(meetingData);
 
     res.status(201).json({
-      message: "✅ Meeting report saved successfully!",
+      message:
+        status === "completed"
+          ? "✅ Meeting report saved successfully!"
+          : "✅ Report saved as pending",
       meeting,
     });
   } catch (error) {
@@ -351,12 +427,12 @@ const createMeeting = async (req, res) => {
 };
 
 // ─── Auto-Save Meeting ──────────────────────────────────────
+// Auto-save only ever produces PENDING reports (never "completed").
 const autoSaveMeeting = async (req, res) => {
   try {
     const { meetingId } = req.body;
 
     // B1: whitelist the content fields before touching anything.
-    // PATCH 4a + 4b make this include the three structured fields.
     const content = cleanContentForWrite(pickContentFields(req.body));
     const now = new Date();
 
@@ -424,8 +500,14 @@ const autoSaveMeeting = async (req, res) => {
         meeting.status = "auto_saved";
       }
 
-      // ── PATCH 5: progress snapshot must include the structured
-      //    fields so resumeMeeting can fully restore them. ──
+      // PENDING-FEATURE: keep the completeness snapshot current so the
+      // pending list can show "ready to submit" / "N fields missing".
+      const missing = getMissingFields(meeting.toObject());
+      meeting.isComplete = missing.length === 0;
+      meeting.missingFields = missing;
+
+      // Progress snapshot (includes the structured fields so
+      // resumeMeeting can fully restore them).
       meeting.progressData = {
         date: meeting.date,
         timeStart: meeting.timeStart,
@@ -438,11 +520,10 @@ const autoSaveMeeting = async (req, res) => {
         gaps: meeting.gaps,
         agreements: meeting.agreements,
         signatures: meeting.signatures,
-        attendanceMode: meeting.attendanceMode, // PATCH 5
-        attendance: meeting.attendance, // PATCH 5
-        signatureData: meeting.signatureData, // PATCH 5
+        attendanceMode: meeting.attendanceMode,
+        attendance: meeting.attendance,
+        signatureData: meeting.signatureData,
       };
-      // ── end PATCH 5
 
       await meeting.save();
     } else {
@@ -460,6 +541,11 @@ const autoSaveMeeting = async (req, res) => {
         });
       }
 
+      const draftMissing = getMissingFields({
+        ...content,
+        date: content.date || now,
+      });
+
       meeting = await Meeting.create({
         ...content,
         date: content.date || now,
@@ -471,6 +557,8 @@ const autoSaveMeeting = async (req, res) => {
         isAutoSave: true,
         lastAutoSave: now,
         autoSaveCount: 1,
+        isComplete: draftMissing.length === 0,
+        missingFields: draftMissing,
       });
     }
 
@@ -502,14 +590,19 @@ const autoSaveMeeting = async (req, res) => {
 //   • :teamId (route), teamId or team (query) → narrow to a single team
 //   • status           → exact status, or "draft" for the umbrella
 //                        over the two not-yet-final statuses
-//   • submitted=true   → only completed (submitted) reports
+//   • submitted=true   → only COMPLETED reports
+//   • pending=true     → only PENDING reports (started, not completed)
 //   • mine=true        → only reports the caller created
 //   • isLocked         → "true" / "false"
 const getMeetings = async (req, res) => {
   try {
-    const { teamId, team, status, isLocked, mine, submitted } = req.query;
+    const { teamId, team, status, isLocked, mine, submitted, pending } =
+      req.query;
 
     const filter = {};
+    // $and is used for the completed/pending clauses because the
+    // visibility clamp below already uses filter.$or.
+    const andClauses = [];
 
     // ── Team filter (narrowing) ─────────────────────────────
     // Also honour GET /meetings/team/:teamId (param was ignored before).
@@ -520,7 +613,22 @@ const getMeetings = async (req, res) => {
 
     // ── Status filter ───────────────────────────────────────
     if (submitted === "true") {
-      filter.status = "completed";
+      // Completed — including completed reports that were locked later
+      // (lockMeeting flips status to "locked" but keeps completedAt).
+      andClauses.push({
+        $or: [
+          { status: "completed" },
+          { status: "locked", completedAt: { $ne: null } },
+        ],
+      });
+    } else if (pending === "true") {
+      // Pending — started but never completed.
+      andClauses.push({
+        $or: [
+          { status: { $in: PENDING_STATUSES } },
+          { status: "locked", completedAt: null },
+        ],
+      });
     } else if (status && status !== "all") {
       if (status === "draft") {
         // "Draft" is a UI-level umbrella over the two not-yet-final
@@ -531,6 +639,8 @@ const getMeetings = async (req, res) => {
         filter.status = status;
       }
     }
+
+    if (andClauses.length > 0) filter.$and = andClauses;
 
     // ── Only my own reports ─────────────────────────────────
     if (mine === "true") {
@@ -570,11 +680,15 @@ const getMeetings = async (req, res) => {
     }
 
     let query = Meeting.find(filter).populate("createdBy", "name email");
-    if (submitted === "true") {
+    if (submitted === "true" || pending === "true") {
       // Keep the list light: signature images load when a report is opened.
       query = query
         .select("-signatureData -progressData -aiGeneratedContent")
-        .sort({ completedAt: -1, updatedAt: -1 });
+        .sort(
+          submitted === "true"
+            ? { completedAt: -1, updatedAt: -1 }
+            : { updatedAt: -1 },
+        );
     } else {
       query = query.sort({ updatedAt: -1, date: -1 });
     }
@@ -719,7 +833,6 @@ const updateMeeting = async (req, res) => {
 
     // ── Apply the update ─────────────────────────────────────
     // B1: whitelist content fields
-    // PATCH 4a + 4b make this include the three structured fields.
     const content = cleanContentForWrite(pickContentFields(req.body));
 
     // B4: whitelist status
@@ -730,13 +843,19 @@ const updateMeeting = async (req, res) => {
         .json({ message: statusError, code: "INVALID_STATUS" });
     }
 
-    // Reject empty submissions (checked against the merged result so a
-    // partial update of an existing report is still judged correctly)
-    if (req.body.status === "completed") {
-      const merged = { ...meeting.toObject(), ...content };
-      if (!hasReportContent(merged)) {
-        return res.status(400).json(EMPTY_REPORT_RESPONSE);
-      }
+    // PENDING-FEATURE: judge the MERGED result, so a partial update of an
+    // existing report is still evaluated correctly.
+    const merged = { ...meeting.toObject(), ...content };
+
+    // Reject empty submissions
+    if (req.body.status === "completed" && !hasReportContent(merged)) {
+      return res.status(400).json(EMPTY_REPORT_RESPONSE);
+    }
+
+    // Only a COMPLETE report may become "completed"
+    const missing = getMissingFields(merged);
+    if (req.body.status === "completed" && missing.length > 0) {
+      return res.status(400).json(incompleteResponse(missing));
     }
 
     // B6: non-admins cannot edit after an approved extension has elapsed
@@ -750,9 +869,6 @@ const updateMeeting = async (req, res) => {
 
     const updates = { ...content };
 
-    // ── PATCH 3: explicitly carry over the three structured fields
-    //    even if cleanContentForWrite were ever changed to skip them.
-    //    Sanitizers are idempotent so this is safe alongside 4b. ──
     if (req.body.attendanceMode !== undefined) {
       updates.attendanceMode =
         req.body.attendanceMode === "sync" ? "sync" : "manual";
@@ -763,24 +879,19 @@ const updateMeeting = async (req, res) => {
     if (req.body.signatureData !== undefined) {
       updates.signatureData = cleanSignatureData(req.body.signatureData);
     }
-    // ── end PATCH 3
+
+    // PENDING-FEATURE: keep the completeness snapshot current
+    updates.isComplete = missing.length === 0;
+    updates.missingFields = missing;
+
+    const now = new Date();
 
     // A1 + B2: stamp on completion
     if (req.body.status === "completed") {
-      const now = new Date();
       updates.status = "completed";
       updates.completedAt = now;
       updates.finalizedAt = now;
 
-      // ── PATCH 3b: on timer-expiry finalization, also persist the
-      //    lock/expiry audit trail. Only honored when status is
-      //    completed (already whitelisted). ──
-      if (req.body.timeExpired === true) {
-        updates.timeExpired = true;
-        updates.timeExpiredAt = req.body.timeExpiredAt
-          ? new Date(req.body.timeExpiredAt)
-          : now;
-      }
       if (req.body.isLocked === true) {
         updates.isLocked = true;
         updates.lockedAt = req.body.lockedAt
@@ -794,10 +905,13 @@ const updateMeeting = async (req, res) => {
         const fa = new Date(req.body.finalizedAt);
         if (!Number.isNaN(fa.getTime())) updates.finalizedAt = fa;
       }
-      // ── end PATCH 3b
     } else if (req.body.status === "in_progress") {
       updates.status = "in_progress";
     }
+
+    // Timer expiry audit trail (pending reports get locked until an
+    // extension is approved or an admin unlocks them)
+    applyTimeExpiry(updates, req.body, req.body.status, now);
 
     // Accept explicit aiGeneratedContent only if provided
     if (typeof req.body.aiGeneratedContent === "string") {
@@ -977,7 +1091,9 @@ const deleteMeeting = async (req, res) => {
 
 // ─── Request Extension ───────────────────────────────────────
 // B5: owner-only request (documented decision). The report must be
-// completed or expired. requestedDuration is capped to [5, 30] minutes.
+// completed or expired (a pending report whose timer ran out is flagged
+// timeExpired, so it is eligible too). requestedDuration is capped to
+// [5, 30] minutes.
 const requestExtension = async (req, res) => {
   try {
     const { reason } = req.body;
@@ -1250,13 +1366,14 @@ const getMeetingProgress = async (req, res) => {
         createdByName: meeting.createdByName,
         createdAt: meeting.createdAt,
         updatedAt: meeting.updatedAt,
-        // ── PATCH 6: expose the structured fields so the admin
-        //    "View Saved Progress" modal can show the synced roster
-        //    and drawn signatures. ──
+        // Structured fields so the admin "View Saved Progress" modal can
+        // show the synced roster and drawn signatures.
         attendanceMode: meeting.attendanceMode,
         attendance: meeting.attendance,
         signatureData: meeting.signatureData,
-        // ── end PATCH 6
+        // PENDING-FEATURE
+        isComplete: meeting.isComplete,
+        missingFields: meeting.missingFields,
       },
     });
   } catch (error) {
@@ -1300,13 +1417,17 @@ const resumeMeeting = async (req, res) => {
       meeting.agreements = cleanStringArray(progress.agreements);
       meeting.signatures = cleanStringArray(progress.signatures);
 
-      // ── PATCH 5 (resume side): restore the three structured fields
-      //    from the snapshot so roster + signatures come back. ──
+      // Restore the three structured fields from the snapshot so
+      // roster + signatures come back.
       meeting.attendanceMode =
         progress.attendanceMode === "sync" ? "sync" : "manual";
       meeting.attendance = cleanAttendance(progress.attendance);
       meeting.signatureData = cleanSignatureData(progress.signatureData);
-      // ── end PATCH 5 (resume side)
+
+      // PENDING-FEATURE: refresh the completeness snapshot
+      const missing = getMissingFields(meeting.toObject());
+      meeting.isComplete = missing.length === 0;
+      meeting.missingFields = missing;
     }
 
     meeting.isLocked = false;

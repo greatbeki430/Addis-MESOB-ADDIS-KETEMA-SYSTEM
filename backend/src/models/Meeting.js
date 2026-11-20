@@ -32,7 +32,7 @@ const meetingSchema = new mongoose.Schema(
       default: [],
     },
 
-    // ─── Structured attendance (NEW — synced roster or manual) ──
+    // ─── Structured attendance (synced roster or manual) ──
     // `present` / `absent` above remain the plain name lists every
     // existing reader (feed, admin, PDF) already consumes.
     attendanceMode: {
@@ -93,7 +93,7 @@ const meetingSchema = new mongoose.Schema(
       default: [],
     },
 
-    // ─── Drawn signatures (NEW — one per present signer) ──
+    // ─── Drawn signatures (one per present signer) ────────
     // `signatures` above keeps the signer names for older readers.
     signatureData: {
       type: [
@@ -163,6 +163,19 @@ const meetingSchema = new mongoose.Schema(
     timeExpiredAt: {
       type: Date,
       default: null,
+    },
+
+    // ─── Completeness (NEW) ───────────────────────────────
+    // Recomputed by the server on every write. A report may only reach
+    // status "completed" when missingFields is empty. Pending reports use
+    // this to show "ready to submit" / "N fields missing".
+    isComplete: {
+      type: Boolean,
+      default: false,
+    },
+    missingFields: {
+      type: [String],
+      default: [],
     },
 
     // ─── Lifecycle stamps ─────────────────────────────────

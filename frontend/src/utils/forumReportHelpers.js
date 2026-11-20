@@ -1,6 +1,7 @@
 // frontend/src/utils/forumReportHelpers.js
 // Pure helpers for the Peer Forum Report page (no React, no DOM) so the
-// roster / attendance / signature / translation rules can be unit-tested.
+// roster / attendance / signature / translation / completeness rules can be
+// unit-tested.
 
 // ─── Roster ──────────────────────────────────────────────────
 
@@ -53,6 +54,28 @@ export const newManualMember = (name = "") => ({
   status: "present",
   reason: "",
 });
+
+/**
+ * Turn a saved report's structured `attendance` array back into roster rows
+ * (used when a pending report is opened again). Synced rows keep their member
+ * id so the live team sync merges into them instead of duplicating them.
+ */
+export const attendanceToRoster = (attendance = []) =>
+  (Array.isArray(attendance) ? attendance : [])
+    .filter((a) => a && typeof a.name === "string" && a.name.trim())
+    .map((a) => {
+      const status = a.status === "absent" ? "absent" : "present";
+      const base = {
+        name: a.name.trim(),
+        role: a.role === "leader" ? "leader" : "member",
+        status,
+        reason: status === "absent" ? a.reason || "" : "",
+      };
+      if (a.source === "synced" && a.member) {
+        return { ...base, id: String(a.member), source: "synced" };
+      }
+      return { ...newManualMember(base.name), ...base };
+    });
 
 export const setRosterStatus = (roster, id, status) =>
   roster.map((r) =>
@@ -182,6 +205,62 @@ export const alignSignatures = (signatureMap = {}, signers = []) => {
     signatures: signatureData.map((s) => s.name),
     signedCount: signatureData.length,
   };
+};
+
+// ─── Completeness (pending vs completed) ─────────────────────
+// A report is only COMPLETED when every item below is satisfied. Anything
+// else is a PENDING report (saved, but still to be finished).
+// The backend applies the same rule (meetingController.getMissingFields) and
+// refuses to mark an incomplete report as completed.
+//
+// To relax a rule, remove its key here AND in the backend's getMissingFields.
+export const REQUIRED_FIELDS = [
+  "date",
+  "timeStart",
+  "present",
+  "topics",
+  "explanation",
+  "gaps",
+  "agreements",
+  "signatures",
+];
+
+const hasText = (arr) =>
+  Array.isArray(arr) && arr.some((x) => typeof x === "string" && x.trim());
+
+/**
+ * @returns {string[]} keys from REQUIRED_FIELDS that are still missing.
+ *   signatures: sync mode  → every present member has signed
+ *               manual mode → at least one drawn signature
+ */
+export const getMissingFields = ({
+  mode,
+  form,
+  presentNames = [],
+  signers = [],
+  aligned = { signedCount: 0 },
+}) => {
+  const missing = [];
+  if (!form?.date) missing.push("date");
+  if (!String(form?.timeStart || "").trim()) missing.push("timeStart");
+  if (presentNames.length === 0) missing.push("present");
+  if (!hasText(form?.topics)) missing.push("topics");
+  if (!String(form?.explanation || "").trim()) missing.push("explanation");
+  if (!hasText(form?.gaps)) missing.push("gaps");
+  if (!hasText(form?.agreements)) missing.push("agreements");
+
+  const manualSigned =
+    Array.isArray(form?.signatures) &&
+    form.signatures.some(
+      (s) => typeof s === "string" && s.startsWith("data:image"),
+    );
+  const signed =
+    mode === "sync"
+      ? signers.length > 0 && aligned.signedCount === signers.length
+      : manualSigned;
+  if (!signed) missing.push("signatures");
+
+  return missing;
 };
 
 // ─── Translation ─────────────────────────────────────────────

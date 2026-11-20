@@ -7,6 +7,12 @@
 // AutoSaveIndicator.jsx, SubmittedReports.jsx, and every `t.*` call in the
 // admin Extensions tab (ForumReportManagement.jsx) resolves to a key
 // present below.
+//
+// Newest sections (each present in en / am / om):
+//   • Pending vs Completed reports   (+ miss_* "what is still missing" labels)
+//   • Attendance sync                (att*)
+//   • Auto-translate English → Amharic (tr*)
+//   • Signature cards                (sig*)
 
 export const forumReportTranslations = {
   en: {
@@ -274,6 +280,91 @@ export const forumReportTranslations = {
       adminLockedBadge: "Locked",
       adminUnlockedBadge: "Unlocked",
       adminReasonRequired: "A reason is required.",
+
+      // ─── Pending vs Completed reports ─────────────────────────
+      reportsTitle: "Reports",
+      completedReportsTitle: "Completed Reports",
+      pendingReportsTitle: "Pending Reports",
+      completedEmpty: "No completed reports yet.",
+      pendingEmpty:
+        "No pending reports. Started reports that are not finished will appear here.",
+      continueReport: "Continue",
+      pendingBadge: "Pending",
+      readyBadge: "Ready to submit",
+      lockedBadge: "Locked",
+      missingCount: "missing",
+      savePending: "Save as Pending",
+      savePendingHint:
+        "Save your progress as a pending report and finish it later",
+      submitReport: "Submit Report",
+      savedPending:
+        "Saved as pending. Find it under Pending Reports to finish it later.",
+      saveFirst: "Please save the report before requesting an extension",
+      extensionApproved: "✅ Extension approved by admin",
+      includeAiInPdf: "Include AI content in PDF",
+      completenessTitle: "Report completeness",
+      completenessReady:
+        "All required fields are filled. You can submit the report.",
+      completenessMissing: "Still missing before this report can be submitted:",
+      incompleteReport:
+        "This report is not complete yet. Fill the missing fields or save it as pending.",
+      miss_date: "Date",
+      miss_timeStart: "Start time",
+      miss_present: "At least one present member",
+      miss_topics: "At least one discussion topic",
+      miss_explanation: "Explanation",
+      miss_gaps: "At least one identified gap",
+      miss_agreements: "At least one agreed point",
+      miss_signatures: "Signatures of all present members",
+
+      // ─── Attendance sync (synced team roster) ─────────────────
+      attTitle: "👥 Attendance",
+      attModeSynced: "Synced team roster",
+      attModeManual: "Manual entry",
+      attSyncedHelper:
+        "Team members are loaded automatically. Mark each one Present or Absent.",
+      attLoading: "Loading team members...",
+      attLoadError:
+        "Could not load team members. You can retry or switch to manual entry.",
+      attRetry: "Retry",
+      attResync: "Re-sync team",
+      attNoMembers: "This team has no members yet. Add someone manually below.",
+      attPresent: "Present",
+      attAbsent: "Absent",
+      attTotal: "Total",
+      attAllPresent: "Mark all present",
+      attAllAbsent: "Mark all absent",
+      attAddManual: "Add someone not in the roster",
+      attManualBadge: "Manual",
+      attLeaderBadge: "Team Leader",
+      attMemberBadge: "Member",
+      attManualName: "Full name",
+      attReasonPlaceholder: "Reason for absence (English is auto-translated)",
+      attResynced: "✅ Team roster synced",
+
+      // ─── Auto-translate English → Amharic ─────────────────────
+      trAuto: "Auto-translate English → Amharic",
+      trAutoHelper:
+        "Type in English in the fields below; they are converted to Amharic automatically.",
+      trAll: "Translate all now",
+      trWorking: "Translating to Amharic...",
+      trDone: "Translated to Amharic",
+      trShowEnglish: "Show English",
+      trFailed: "⚠️ Translation failed. Your text was left unchanged.",
+      trNothing: "Nothing to translate",
+      trAllDone: "✅ Translated to Amharic",
+
+      // ─── Signature cards (one per present member) ─────────────
+      sigTitle: "✍️ Signatures",
+      sigHelper:
+        "Every present member signs here. Tap a card to sign. Absent members are not required.",
+      sigSigned: "Signed",
+      sigNotSigned: "Not signed",
+      sigNoSigners:
+        "Mark at least one member as present to collect signatures.",
+      sigSignFor: "Signature for",
+      sigProgress: "signed",
+      sigAbsentNote: "absent - not required to sign",
     },
   },
 
@@ -534,6 +625,85 @@ export const forumReportTranslations = {
       adminLockedBadge: "ተቆልፏል",
       adminUnlockedBadge: "ተከፍቷል",
       adminReasonRequired: "ምክንያት ያስፈልጋል።",
+
+      // ─── Pending vs Completed reports ─────────────────────────
+      reportsTitle: "ሪፖርቶች",
+      completedReportsTitle: "የተጠናቀቁ ሪፖርቶች",
+      pendingReportsTitle: "በመጠባበቅ ላይ ያሉ ሪፖርቶች",
+      completedEmpty: "እስካሁን የተጠናቀቀ ሪፖርት የለም።",
+      pendingEmpty: "በመጠባበቅ ላይ ያለ ሪፖርት የለም። የተጀመሩ ግን ያልተጠናቀቁ ሪፖርቶች እዚህ ይታያሉ።",
+      continueReport: "ቀጥል",
+      pendingBadge: "በመጠባበቅ ላይ",
+      readyBadge: "ለማስገባት ዝግጁ",
+      lockedBadge: "ተቆልፏል",
+      missingCount: "ያልተሞላ",
+      savePending: "በመጠባበቅ ላይ አስቀምጥ",
+      savePendingHint: "እስካሁን የሠሩትን በመጠባበቅ ላይ ያስቀምጡና በኋላ ያጠናቅቁ",
+      submitReport: "ሪፖርቱን አስገባ",
+      savedPending:
+        "በመጠባበቅ ላይ ተቀምጧል። በኋላ ለማጠናቀቅ ከ«በመጠባበቅ ላይ ያሉ ሪፖርቶች» ስር ያግኙት።",
+      saveFirst: "የጊዜ ማራዘሚያ ከመጠየቅዎ በፊት እባክዎ ሪፖርቱን ያስቀምጡ",
+      extensionApproved: "✅ የጊዜ ማራዘሚያ በአስተዳዳሪ ተፈቅዷል",
+      includeAiInPdf: "የAI ይዘትን በPDF ውስጥ አካትት",
+      completenessTitle: "የሪፖርት ሙሌት",
+      completenessReady: "ሁሉም አስፈላጊ መስኮች ተሞልተዋል። ሪፖርቱን ማስገባት ይችላሉ።",
+      completenessMissing: "ሪፖርቱ ከመግባቱ በፊት አሁንም የሚቀሩ፦",
+      incompleteReport:
+        "ሪፖርቱ ገና አልተጠናቀቀም። ያልተሞሉ መስኮችን ይሙሉ ወይም በመጠባበቅ ላይ ያስቀምጡት።",
+      miss_date: "ቀን",
+      miss_timeStart: "የመጀመሪያ ሰዓት",
+      miss_present: "ቢያንስ አንድ የተገኘ አባል",
+      miss_topics: "ቢያንስ አንድ የውይይት ርዕስ",
+      miss_explanation: "ማብራሪያ",
+      miss_gaps: "ቢያንስ አንድ የታየ ክፍተት",
+      miss_agreements: "ቢያንስ አንድ የተስማሙበት ነጥብ",
+      miss_signatures: "የሁሉም የተገኙ አባላት ፊርማ",
+
+      // ─── Attendance sync (synced team roster) ─────────────────
+      attTitle: "👥 የተሳታፊዎች ሁኔታ",
+      attModeSynced: "ከቡድን ዝርዝር",
+      attModeManual: "በእጅ ማስገባት",
+      attSyncedHelper:
+        "የቡድን አባላት በራስ-ሰር ተጭነዋል። እያንዳንዱን ተገኝቷል ወይም አልተገኘም ብለው ምልክት ያድርጉ።",
+      attLoading: "የቡድን አባላት በመጫን ላይ...",
+      attLoadError: "የቡድን አባላትን መጫን አልተቻለም። እንደገና መሞከር ወይም በእጅ ማስገባት ይችላሉ።",
+      attRetry: "እንደገና ሞክር",
+      attResync: "ቡድኑን እንደገና አስምር",
+      attNoMembers: "በዚህ ቡድን ውስጥ እስካሁን አባል የለም። ከታች በእጅ ይጨምሩ።",
+      attPresent: "ተገኝቷል",
+      attAbsent: "አልተገኘም",
+      attTotal: "ጠቅላላ",
+      attAllPresent: "ሁሉንም ተገኝተዋል በል",
+      attAllAbsent: "ሁሉንም አልተገኙም በል",
+      attAddManual: "በዝርዝሩ ያልተካተተ ሰው ጨምር",
+      attManualBadge: "በእጅ የገባ",
+      attLeaderBadge: "የቡድን መሪ",
+      attMemberBadge: "አባል",
+      attManualName: "ሙሉ ስም",
+      attReasonPlaceholder: "ያልተገኙበት ምክንያት (እንግሊዝኛ በራስ-ሰር ይተረጎማል)",
+      attResynced: "✅ የቡድን ዝርዝር ተስተካክሏል",
+
+      // ─── Auto-translate English → Amharic ─────────────────────
+      trAuto: "ከእንግሊዝኛ ወደ አማርኛ በራስ-ሰር ተርጉም",
+      trAutoHelper: "ከታች ባሉት መስኮች በእንግሊዝኛ ሲጽፉ በራስ-ሰር ወደ አማርኛ ይቀየራል።",
+      trAll: "ሁሉንም አሁን ተርጉም",
+      trWorking: "ወደ አማርኛ በመተርጎም ላይ...",
+      trDone: "ወደ አማርኛ ተተርጉሟል",
+      trShowEnglish: "እንግሊዝኛውን አሳይ",
+      trFailed: "⚠️ መተርጎም አልተቻለም። ጽሑፍዎ እንዳለ ተቀምጧል።",
+      trNothing: "የሚተረጎም ጽሑፍ የለም",
+      trAllDone: "✅ ወደ አማርኛ ተተርጉሟል",
+
+      // ─── Signature cards (one per present member) ─────────────
+      sigTitle: "✍️ ፊርማዎች",
+      sigHelper:
+        "የተገኙ አባላት ሁሉ እዚህ ይፈርማሉ። ለመፈረም ካርዱን ይጫኑ። ያልተገኙ አባላት መፈረም አይጠበቅባቸውም።",
+      sigSigned: "ተፈርሟል",
+      sigNotSigned: "አልተፈረመም",
+      sigNoSigners: "ፊርማ ለመሰብሰብ ቢያንስ አንድ አባል እንደተገኘ ምልክት ያድርጉ።",
+      sigSignFor: "ፊርማ ለ",
+      sigProgress: "ተፈርሟል",
+      sigAbsentNote: "ያልተገኘ - መፈረም አይጠበቅበትም",
     },
   },
 
@@ -806,6 +976,94 @@ export const forumReportTranslations = {
       adminLockedBadge: "Cufaa",
       adminUnlockedBadge: "Banaa",
       adminReasonRequired: "Sababni barbaachisa.",
+
+      // ─── Pending vs Completed reports ─────────────────────────
+      reportsTitle: "Gabaasawwan",
+      completedReportsTitle: "Gabaasawwan Xumuraman",
+      pendingReportsTitle: "Gabaasawwan Eegaa Jiran",
+      completedEmpty: "Gabaasni xumurame hin jiru.",
+      pendingEmpty:
+        "Gabaasni eegaa jiru hin jiru. Gabaasawwan jalqabaman garuu hin xumuramne asitti mul'atu.",
+      continueReport: "Itti Fufi",
+      pendingBadge: "Eegaa jira",
+      readyBadge: "Galchuuf qophiidha",
+      lockedBadge: "Cufaa",
+      missingCount: "hin guutamne",
+      savePending: "Eegaa Jiruu Olkaayi",
+      savePendingHint:
+        "Adeemsa kee gabaasa eegaa jiruu godhii olkaayi, booda xumuri",
+      submitReport: "Gabaasa Galchi",
+      savedPending:
+        "Gabaasa eegaa jiruu ta'ee olkaa'ameera. Booda xumuruuf 'Gabaasawwan Eegaa Jiran' jala argadhu.",
+      saveFirst: "Yeroo dheereffannaa osoo hin gaafatin dura gabaasa olkaayi",
+      extensionApproved: "✅ Yeroon dheereffannaa bulchaan eeyyamameera",
+      includeAiInPdf: "Qabiyyee AI PDF keessatti hammadhu",
+      completenessTitle: "Guutummaa Gabaasaa",
+      completenessReady:
+        "Dirreewwan barbaachisoo hundi guutamaniiru. Gabaasa galchuu dandeessa.",
+      completenessMissing: "Gabaasni kun osoo hin galchamin dura kan hafe:",
+      incompleteReport:
+        "Gabaasni kun amma hin guutamne. Dirreewwan hafan guuti ykn eegaa jiruu ta'ee olkaayi.",
+      miss_date: "Guyyaa",
+      miss_timeStart: "Yeroo jalqabaa",
+      miss_present: "Yoo xiqqaate miseensa argame tokko",
+      miss_topics: "Yoo xiqqaate mata-duree marii tokko",
+      miss_explanation: "Ibsa",
+      miss_gaps: "Yoo xiqqaate hanqina mul'ate tokko",
+      miss_agreements: "Yoo xiqqaate qabxii walii galame tokko",
+      miss_signatures: "Mallattoo miseensota argaman hundaa",
+
+      // ─── Attendance sync (synced team roster) ─────────────────
+      attTitle: "👥 Argama Miseensotaa",
+      attModeSynced: "Tarree garee waliin walqabate",
+      attModeManual: "Harkaan galchuu",
+      attSyncedHelper:
+        "Miseensonni garee ofumaan fe'amaniiru. Tokkoon tokkoon isaanii Argame ykn Hin argamne jedhii mallattoo godhi.",
+      attLoading: "Miseensota garee fe'aa jira...",
+      attLoadError:
+        "Miseensota garee fe'uun hin danda'amne. Irra deebi'ii yaaluu ykn harkaan galchuu dandeessa.",
+      attRetry: "Irra deebi'ii yaali",
+      attResync: "Garee irra deebi'ii walqabsiisi",
+      attNoMembers:
+        "Garee kana keessatti hanga ammaatti miseensi hin jiru. Gadii harkaan dabali.",
+      attPresent: "Argame",
+      attAbsent: "Hin argamne",
+      attTotal: "Waliigala",
+      attAllPresent: "Hunda argame jedhi",
+      attAllAbsent: "Hunda hin argamne jedhi",
+      attAddManual: "Nama tarree keessa hin jirre dabali",
+      attManualBadge: "Harkaan",
+      attLeaderBadge: "Hoogganaa Garee",
+      attMemberBadge: "Miseensa",
+      attManualName: "Maqaa guutuu",
+      attReasonPlaceholder:
+        "Sababa hin argamneef (Afaan Ingiliffaa ofumaan hiikama)",
+      attResynced: "✅ Tarreen garee walqabateera",
+
+      // ─── Auto-translate English → Amharic ─────────────────────
+      trAuto: "Afaan Ingiliffaa → Amaariffatti ofumaan hiiki",
+      trAutoHelper:
+        "Dirreewwan gadii keessatti Afaan Ingiliffaan barreessi; ofumaan gara Amaariffaatti jijjiiramu.",
+      trAll: "Amma hunda hiiki",
+      trWorking: "Gara Amaariffaatti hiikaa jira...",
+      trDone: "Gara Amaariffaatti hiikameera",
+      trShowEnglish: "Afaan Ingiliffaa agarsiisi",
+      trFailed:
+        "⚠️ Hiikuun hin danda'amne. Barreeffamni kee akkuma ture ta'eera.",
+      trNothing: "Waan hiikamu hin jiru",
+      trAllDone: "✅ Gara Amaariffaatti hiikameera",
+
+      // ─── Signature cards (one per present member) ─────────────
+      sigTitle: "✍️ Mallattoo",
+      sigHelper:
+        "Miseensonni argaman hundi asitti mallatteessu. Mallatteessuuf kaardii tuqi. Miseensonni hin argamne mallatteessuu hin barbaachisu.",
+      sigSigned: "Mallatteeffameera",
+      sigNotSigned: "Hin mallatteeffamne",
+      sigNoSigners:
+        "Mallattoo funaanuuf yoo xiqqaate miseensa tokko argame jedhii mallattoo godhi.",
+      sigSignFor: "Mallattoo kan",
+      sigProgress: "mallatteeffame",
+      sigAbsentNote: "hin argamne - mallatteessuu hin barbaachisu",
     },
   },
 };
